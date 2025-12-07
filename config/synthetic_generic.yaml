@@ -1,0 +1,18 @@
+# Synthetic Data Generation Configuration
+
+topic: "Lancer RPG Core Rules"
+depth: "deep"
+n_samples: 50
+
+styles:
+  - "instructional"
+  - "scenario_based"
+  - "faq"
+
+output:
+  # Path in the Colab environment (dynamically mapped to Drive if using Drive as working dir, 
+  # or requires copy command)
+  path: "/content/drive/MyDrive/llm_experiments/datasets/lancer_synthetic.jsonl" 
+
+llm:
+  model: "gpt-4o" # or another provider supported by distilabel/custom wrapper

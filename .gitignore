@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data
+dataset/
+outputs/
+*.pdf
+*.jsonl
+*.json
+
+# Env
+.env
+.venv
+env/
+venv/
+
+# IDE
+.vscode
+.idea
+

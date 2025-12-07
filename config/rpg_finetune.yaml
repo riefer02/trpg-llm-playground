@@ -1,0 +1,35 @@
+# Lancer RPG Fine-tuning Configuration
+
+model:
+  base_model: "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit"
+  max_seq_length: 2048
+  load_in_4bit: true
+
+dataset:
+  # Use the persistent Drive path
+  train_path: "/content/drive/MyDrive/llm_experiments/datasets/lancer_instruct_train.jsonl"
+  val_path: "/content/drive/MyDrive/llm_experiments/datasets/lancer_instruct_val.jsonl" # Optional
+
+training:
+  # Save the output directly to Drive
+  output_dir: "/content/drive/MyDrive/llm_experiments/outputs/lancer_lora"
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  warmup_steps: 5
+  max_steps: 60
+  learning_rate: 2.0e-4
+  logging_steps: 1
+  optim: "adamw_8bit"
+  weight_decay: 0.01
+  lr_scheduler_type: "linear"
+  seed: 3407
+
+lora:
+  r: 16
+  lora_alpha: 16
+  lora_dropout: 0
+  bias: "none"
+  use_gradient_checkpointing: "unsloth" # specific to unsloth
+  random_state: 3407
+  use_rslora: false
+  loftq_config: null
