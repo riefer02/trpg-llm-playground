@@ -4,7 +4,7 @@ This repository contains an end-to-end pipeline for fine-tuning Large Language M
 
 ## 🚀 Workflow Overview
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/riefer02/trpg-llm-playground/blob/main/llm-playground/colab/run_pipeline.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/riefer02/trpg-llm-playground/blob/main/colab/run_pipeline.ipynb)
 
 1.  **Configure Locally**: Edit hyperparameters and paths in `config/*.yaml`.
 2.  **Push Changes**: Commit and push your changes to GitHub.
