@@ -1,3 +1,4 @@
+openai
 transformers
 datasets
 accelerate
@@ -9,5 +10,5 @@ pymupdf
 distilabel
 bitsandbytes
 scipy
-trl
-
+trl<0.9.0 # Pin TRL to ensure compatibility with Unsloth
+xformers # Recommended for speed on Colab

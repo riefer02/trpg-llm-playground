@@ -65,8 +65,32 @@ To use your trained model:
 1.  Run the `src/training/evaluate.py` script (either in Colab or locally with a GPU).
 2.  Ensure it points to the directory containing your saved LoRA adapters.
 
-## 🤖 Tech Stack
+## 🤖 Tech Stack & Models
 
-- **Unsloth**: Faster, memory-efficient Llama 3 training.
-- **Hugging Face**: Transformers, Datasets, PEFT.
-- **Google Colab**: Free T4 GPU execution environment.
+### Recommended Models (Unsloth Optimized)
+
+- **High Performance (A100/H100)**: `unsloth/Qwen2.5-32B-Instruct-bnb-4bit`
+  - Best for complex reasoning and deep rule understanding.
+  - Requires ~20GB+ VRAM.
+- **Balanced / Free Tier (T4)**: `unsloth/Qwen2.5-7B-Instruct-bnb-4bit`
+  - Good reasoning, fits on free Colab tier.
+  - Alternative: `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit`.
+
+### Synthetic Data Generation
+
+- **Recommended**: `gpt-5.1-thinking` (OpenAI)
+  - Best for ensuring logical consistency in RPG rules and stats.
+
+### Key Configuration Tips
+
+- **A100 GPU**:
+  - `max_seq_length`: 4096 or 8192
+  - `per_device_train_batch_size`: 4 to 8
+- **T4 GPU (Free Colab)**:
+  - `max_seq_length`: 2048 (max)
+  - `per_device_train_batch_size`: 2
+  - _Must_ use 7B or 8B models.
+
+* **Unsloth**: Faster, memory-efficient Llama 3 training.
+* **Hugging Face**: Transformers, Datasets, PEFT.
+* **Google Colab**: Free T4 GPU execution environment.

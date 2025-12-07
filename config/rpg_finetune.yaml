@@ -1,9 +1,14 @@
 # Lancer RPG Fine-tuning Configuration
 
 model:
-  base_model: "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit"
-  max_seq_length: 2048
-  load_in_4bit: true
+  # To use Qwen 2.5 (Unsloth optimized), just change this string!
+  # A100/H100 Recommendation: "unsloth/Qwen2.5-32B-Instruct-bnb-4bit"
+  # T4 (Free Colab) Recommendation: "unsloth/Qwen2.5-7B-Instruct-bnb-4bit" or "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit"
+  base_model: "unsloth/Qwen2.5-32B-Instruct-bnb-4bit"
+
+  # A100/H100 specific: You can increase this significantly (e.g., 4096, 8192)
+  max_seq_length: 4096
+  load_in_4bit: true # Even on A100, 4-bit is faster/efficient, but you can turn this false for 16-bit full precision
 
 dataset:
   # Use the persistent Drive path
@@ -13,12 +18,17 @@ dataset:
 training:
   # Save the output directly to Drive
   output_dir: "/content/drive/MyDrive/llm_experiments/outputs/lancer_lora"
-  per_device_train_batch_size: 2
-  gradient_accumulation_steps: 4
+
+  # A100 Optimization:
+  # You can increase batch size (e.g., 4, 8, 16) depending on model size
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 2 # Adjust based on batch size (aim for total batch ~16-32)
+
   warmup_steps: 5
   max_steps: 60
   learning_rate: 2.0e-4
   logging_steps: 1
+  save_steps: 20 # Save checkpoint every 20 steps
   optim: "adamw_8bit"
   weight_decay: 0.01
   lr_scheduler_type: "linear"

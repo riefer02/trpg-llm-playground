@@ -16,6 +16,7 @@ def train(config_path: str):
     dtype = None # Auto detection
     load_in_4bit = config['model'].get('load_in_4bit', True)
 
+    print(f"Loading model: {config['model']['base_model']}...")
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = config['model']['base_model'],
         max_seq_length = max_seq_length,
@@ -46,6 +47,11 @@ def train(config_path: str):
     dataset = load_dataset("json", data_files={"train": dataset_path}, split="train")
 
     # Formatting function
+    # Check if the model is a Chat model (like Qwen/Llama Instruct) to use the right template
+    # Unsloth handles some of this, but explicit templates are safer.
+    # For Qwen, standard ChatML or the Alpaca format often works, but let's stick to Alpaca for simplicity
+    # or detect if we need a specific chat template.
+    
     alpaca_prompt = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
 
 ### Instruction:
@@ -81,6 +87,7 @@ def train(config_path: str):
         fp16 = not torch.cuda.is_bf16_supported(),
         bf16 = torch.cuda.is_bf16_supported(),
         logging_steps = config['training']['logging_steps'],
+        save_steps = config['training'].get('save_steps', 0), # Support save_steps from config
         optim = config['training']['optim'],
         weight_decay = config['training']['weight_decay'],
         lr_scheduler_type = config['training']['lr_scheduler_type'],
@@ -113,4 +120,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     train(args.config)
-

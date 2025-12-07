@@ -3,6 +3,7 @@ import json
 import argparse
 import os
 import re
+import yaml
 from typing import List, Dict
 
 def clean_text(text: str) -> str:
@@ -22,6 +23,9 @@ def extract_text_from_pdf(pdf_path: str, chunk_by_page: bool = True) -> List[Dic
     Returns:
         List of dictionaries containing text and metadata (page number).
     """
+    if not os.path.exists(pdf_path):
+        raise FileNotFoundError(f"PDF not found at: {pdf_path}")
+        
     doc = fitz.open(pdf_path)
     extracted_data = []
 
@@ -41,23 +45,46 @@ def extract_text_from_pdf(pdf_path: str, chunk_by_page: bool = True) -> List[Dic
     return extracted_data
 
 def main():
-    parser = argparse.ArgumentParser(description="Extract text from PDF for Lancer RPG ingestion.")
-    parser = argparse.ArgumentParser(description="Extract text from PDF for Lancer RPG ingestion.")
-    parser.add_argument("--pdf_path", type=str, required=True, help="Path to the PDF file.")
+    parser = argparse.ArgumentParser(description="Extract text from PDF for TTRPG ingestion.")
+    parser.add_argument("--config", type=str, help="Path to config YAML (optional).")
+    parser.add_argument("--pdf_path", type=str, help="Path to the PDF file (overrides config).")
     parser.add_argument("--output_path", type=str, default="dataset/raw_extracted.json", help="Path to save the extracted JSON.")
     
     args = parser.parse_args()
     
+    pdf_path = args.pdf_path
+    output_path = args.output_path
+    
+    # Load from config if provided
+    if args.config:
+        with open(args.config, "r") as f:
+            config = yaml.safe_load(f)
+            ingest_config = config.get("ingest", {})
+            
+            if not pdf_path:
+                pdf_path = ingest_config.get("pdf_path")
+            
+            # Only override output if not explicitly set (argparse default makes this tricky, 
+            # so we might prefer config over default if config exists, but arg over config if arg is explicit.
+            # For simplicity, we'll let explicit args always win, and config fill in gaps.)
+            if args.output_path == "dataset/raw_extracted.json" and ingest_config.get("raw_output_path"):
+                 output_path = ingest_config.get("raw_output_path")
+
+    if not pdf_path:
+        parser.error("pdf_path must be provided via argument or config file.")
+
     # Ensure output directory exists
-    os.makedirs(os.path.dirname(args.output_path), exist_ok=True)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    data = extract_text_from_pdf(args.pdf_path)
-    
-    with open(args.output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    try:
+        data = extract_text_from_pdf(pdf_path)
         
-    print(f"Extracted {len(data)} pages. Saved to {args.output_path}")
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            
+        print(f"Extracted {len(data)} pages. Saved to {output_path}")
+    except Exception as e:
+        print(f"Error during extraction: {e}")
 
 if __name__ == "__main__":
     main()
-
