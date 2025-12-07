@@ -15,10 +15,11 @@ def train(config_path: str):
     max_seq_length = config['model'].get('max_seq_length', 2048)
     dtype = None # Auto detection
     load_in_4bit = config['model'].get('load_in_4bit', True)
+    model_name = config['model']['base_model']
 
-    print(f"Loading model: {config['model']['base_model']}...")
+    print(f"Loading model: {model_name}...")
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name = config['model']['base_model'],
+        model_name = model_name,
         max_seq_length = max_seq_length,
         dtype = dtype,
         load_in_4bit = load_in_4bit,
@@ -46,37 +47,36 @@ def train(config_path: str):
         
     dataset = load_dataset("json", data_files={"train": dataset_path}, split="train")
 
-    # Formatting function
-    # Check if the model is a Chat model (like Qwen/Llama Instruct) to use the right template
-    # Unsloth handles some of this, but explicit templates are safer.
-    # For Qwen, standard ChatML or the Alpaca format often works, but let's stick to Alpaca for simplicity
-    # or detect if we need a specific chat template.
+    # 4. Apply Chat Template (Best Practice for Qwen/Llama)
+    # Unsloth/Transformers can auto-detect the right template for the model
+    # This maps "instruction/input/output" columns to the standard chat format
     
-    alpaca_prompt = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
-
-### Instruction:
-{}
-
-### Input:
-{}
-
-### Response:
-{}"""
-
-    EOS_TOKEN = tokenizer.eos_token # Must add EOS_TOKEN
     def formatting_prompts_func(examples):
-        instructions = examples["instruction"]
-        inputs       = examples["input"]
-        outputs      = examples["output"]
+        convos = []
         texts = []
-        for instruction, input, output in zip(instructions, inputs, outputs):
-            text = alpaca_prompt.format(instruction, input, output) + EOS_TOKEN
+        mapper = {"system": "You are a helpful assistant.", "user": "", "assistant": ""}
+        
+        for instruction, input, output in zip(examples["instruction"], examples["input"], examples["output"]):
+            # Construct the conversation
+            # If 'input' exists, append it to instruction
+            user_msg = instruction
+            if input and str(input).strip():
+                user_msg += f"\n\nContext:\n{input}"
+                
+            conversation = [
+                {"role": "user", "content": user_msg},
+                {"role": "assistant", "content": output},
+            ]
+            
+            # Apply the model's specific chat template (ChatML for Qwen, etc.)
+            text = tokenizer.apply_chat_template(conversation, tokenize=False, add_generation_prompt=False)
             texts.append(text)
+            
         return { "text" : texts, }
 
     dataset = dataset.map(formatting_prompts_func, batched = True)
 
-    # 4. Training Arguments
+    # 5. Training Arguments
     training_args = TrainingArguments(
         output_dir = config['training']['output_dir'],
         per_device_train_batch_size = config['training']['per_device_train_batch_size'],
@@ -87,7 +87,7 @@ def train(config_path: str):
         fp16 = not torch.cuda.is_bf16_supported(),
         bf16 = torch.cuda.is_bf16_supported(),
         logging_steps = config['training']['logging_steps'],
-        save_steps = config['training'].get('save_steps', 0), # Support save_steps from config
+        save_steps = config['training'].get('save_steps', 0),
         optim = config['training']['optim'],
         weight_decay = config['training']['weight_decay'],
         lr_scheduler_type = config['training']['lr_scheduler_type'],
@@ -101,15 +101,15 @@ def train(config_path: str):
         dataset_text_field = "text",
         max_seq_length = max_seq_length,
         dataset_num_proc = 2,
-        packing = False, # Can speed up training for short sequences
+        packing = False, 
         args = training_args,
     )
 
-    # 5. Train
+    # 6. Train
     print("Starting training...")
     trainer_stats = trainer.train()
 
-    # 6. Save
+    # 7. Save
     print(f"Saving model to {config['training']['output_dir']}")
     model.save_pretrained(config['training']['output_dir'])
     tokenizer.save_pretrained(config['training']['output_dir'])
