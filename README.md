@@ -4,6 +4,8 @@ This repository contains an end-to-end pipeline for fine-tuning Large Language M
 
 ## 🚀 Workflow Overview
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/YOUR_USERNAME/lancer-ai/blob/main/llm-playground/colab/run_pipeline.ipynb)
+
 1.  **Configure Locally**: Edit hyperparameters and paths in `config/*.yaml`.
 2.  **Push Changes**: Commit and push your changes to GitHub.
 3.  **Run Remotely**: Open `colab/run_pipeline.ipynb` in Google Colab, which clones this repo and executes the pipeline.
