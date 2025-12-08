@@ -1,0 +1,11 @@
+depth: shallow
+ingest:
+  raw_output_path: /Users/andrew/Code/trpg-llm-playground/tests/artifacts/mock_raw.json
+llm:
+  model: gpt-mock
+n_samples: 2
+output:
+  path: /Users/andrew/Code/trpg-llm-playground/tests/artifacts/mock_synthetic.jsonl
+styles:
+- simple
+topic: Test Topic
