@@ -1,13 +1,23 @@
+import sys
+import os
+import argparse
+import yaml
 import torch
-from unsloth import FastLanguageModel
+
+# Graceful import check for Unsloth
+try:
+    from unsloth import FastLanguageModel
+except ImportError:
+    print("❌ Error: Unsloth is not installed.")
+    print("Please install it: pip install \"unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git\"")
+    sys.exit(1)
+
 from datasets import load_dataset
 from trl import SFTTrainer
 from transformers import TrainingArguments
-import yaml
-import argparse
-import os
 
 def train(config_path: str):
+    print(f"Loading config from {config_path}...")
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
@@ -43,7 +53,9 @@ def train(config_path: str):
     # 3. Load Dataset
     dataset_path = config['dataset']['train_path']
     if not os.path.exists(dataset_path):
-        raise FileNotFoundError(f"Dataset not found at {dataset_path}")
+        print(f"❌ Error: Dataset file not found at: {dataset_path}")
+        print("Did you run the synthetic data generation step (Cell 5) successfully?")
+        sys.exit(1)
         
     dataset = load_dataset("json", data_files={"train": dataset_path}, split="train")
 

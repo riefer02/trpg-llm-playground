@@ -10,5 +10,5 @@ pymupdf
 distilabel
 bitsandbytes
 scipy
-trl<0.9.0 # Pin TRL to ensure compatibility with Unsloth
+trl # Unsloth manages this dependency
 xformers # Recommended for speed on Colab

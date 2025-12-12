@@ -1,10 +1,17 @@
-import fitz  # pymupdf
+import sys
+import os
 import json
 import argparse
-import os
 import re
 import yaml
 from typing import List, Dict
+
+try:
+    import fitz  # pymupdf
+except ImportError:
+    print("❌ Error: PyMuPDF (fitz) is not installed.")
+    print("Please run: pip install pymupdf")
+    sys.exit(1)
 
 def clean_text(text: str) -> str:
     """Basic text cleaning."""
