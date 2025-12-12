@@ -1,5 +1,8 @@
 # Lancer RPG Fine-tuning Configuration
 
+project_name: "lancer" # Change this to match your synthetic config
+dataset_tag: "v1_ctx4096" # Must match the generated dataset you want to train on
+
 model:
   # To use Qwen 2.5 (Unsloth optimized), just change this string!
   # A100/H100 Recommendation: "unsloth/Qwen2.5-32B-Instruct-bnb-4bit"
@@ -12,12 +15,16 @@ model:
 
 dataset:
   # Use the persistent Drive path
-  train_path: "/content/drive/MyDrive/llm_experiments/datasets/lancer_instruct_train.jsonl"
-  val_path: "/content/drive/MyDrive/llm_experiments/datasets/lancer_instruct_val.jsonl" # Optional
+  train_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic.jsonl"
+  val_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_val.jsonl" # Optional
 
 training:
   # Save the output directly to Drive
-  output_dir: "/content/drive/MyDrive/llm_experiments/outputs/lancer_lora"
+  output_dir: "/content/drive/MyDrive/llm_experiments/outputs/{project_name}_{dataset_tag}_lora"
+  
+  # Professional Tip: Set this to "wandb" to track loss curves in the cloud!
+  # You'll need to run `wandb login` in Colab first.
+  report_to: "none" 
 
   # A100 Optimization:
   # You can increase batch size (e.g., 4, 8, 16) depending on model size

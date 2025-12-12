@@ -21,6 +21,12 @@ def train(config_path: str):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
+    path_vars = {
+        "project_name": config.get("project_name", "default"),
+        "dataset_tag": config.get("dataset_tag", "v1")
+    }
+    print(f"Initializing training for project: {path_vars['project_name']} ({path_vars['dataset_tag']})")
+
     # 1. Load Model
     max_seq_length = config['model'].get('max_seq_length', 2048)
     dtype = None # Auto detection
@@ -51,7 +57,9 @@ def train(config_path: str):
     )
 
     # 3. Load Dataset
-    dataset_path = config['dataset']['train_path']
+    dataset_path_template = config['dataset']['train_path']
+    dataset_path = dataset_path_template.format(**path_vars)
+    
     if not os.path.exists(dataset_path):
         print(f"❌ Error: Dataset file not found at: {dataset_path}")
         print("Did you run the synthetic data generation step (Cell 5) successfully?")
@@ -89,8 +97,11 @@ def train(config_path: str):
     dataset = dataset.map(formatting_prompts_func, batched = True)
 
     # 5. Training Arguments
+    output_dir_template = config['training']['output_dir']
+    output_dir = output_dir_template.format(**path_vars)
+    
     training_args = TrainingArguments(
-        output_dir = config['training']['output_dir'],
+        output_dir = output_dir,
         per_device_train_batch_size = config['training']['per_device_train_batch_size'],
         gradient_accumulation_steps = config['training']['gradient_accumulation_steps'],
         warmup_steps = config['training']['warmup_steps'],
@@ -104,6 +115,7 @@ def train(config_path: str):
         weight_decay = config['training']['weight_decay'],
         lr_scheduler_type = config['training']['lr_scheduler_type'],
         seed = config['training']['seed'],
+        report_to = config['training'].get('report_to', "none"),
     )
 
     trainer = SFTTrainer(
@@ -121,10 +133,15 @@ def train(config_path: str):
     print("Starting training...")
     trainer_stats = trainer.train()
 
-    # 7. Save
-    print(f"Saving model to {config['training']['output_dir']}")
-    model.save_pretrained(config['training']['output_dir'])
-    tokenizer.save_pretrained(config['training']['output_dir'])
+    # 7. Save Artifacts (Model + Recipe)
+    print(f"Saving model and artifacts to {output_dir}")
+    model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+    
+    # PRO TIP: Save the exact config used to generate this model
+    # This ensures you always know the "recipe" for this specific artifact
+    with open(os.path.join(output_dir, "training_config_captured.yaml"), "w") as f:
+        yaml.dump(config, f)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

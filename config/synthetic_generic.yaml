@@ -1,10 +1,13 @@
 # Synthetic Data Generation Configuration
 
+project_name: "lancer" # Change this for different RPGs (e.g., "dnd5e", "cyberpunk")
+dataset_tag: "v1_ctx4096" # Label for compatibility (Version + Max Context)
+
 ingest:
   # Path to your Source Book PDF on Google Drive
   pdf_path: "/content/drive/MyDrive/Books/Lancer Core Book (PR2).pdf"
-  # Where to save the intermediate raw text JSON
-  raw_output_path: "dataset/raw_extracted.json"
+  # Where to save the intermediate raw text JSON (relative to Colab root)
+  raw_output_path: "dataset/{project_name}_{dataset_tag}_raw.json"
 
 topic: "Lancer RPG Core Rules"
 depth: "deep"
@@ -16,9 +19,8 @@ styles:
   - "faq"
 
 output:
-  # Path in the Colab environment (dynamically mapped to Drive if using Drive as working dir,
-  # or requires copy command)
-  path: "/content/drive/MyDrive/llm_experiments/datasets/lancer_synthetic.jsonl"
+  # Path in the Colab environment (dynamically mapped to Drive)
+  path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic.jsonl"
 
 llm:
   model: "gpt-5.1-thinking" # Latest OpenAI model for deep reasoning/rule consistency

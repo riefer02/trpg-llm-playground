@@ -68,14 +68,19 @@ def main():
             config = yaml.safe_load(f)
             ingest_config = config.get("ingest", {})
             
+            # Variables for path formatting
+            path_vars = {
+                "project_name": config.get("project_name", "default"),
+                "dataset_tag": config.get("dataset_tag", "v1")
+            }
+            
             if not pdf_path:
                 pdf_path = ingest_config.get("pdf_path")
             
-            # Only override output if not explicitly set (argparse default makes this tricky, 
-            # so we might prefer config over default if config exists, but arg over config if arg is explicit.
-            # For simplicity, we'll let explicit args always win, and config fill in gaps.)
+            # Resolve raw_output_path with variables
             if args.output_path == "dataset/raw_extracted.json" and ingest_config.get("raw_output_path"):
-                 output_path = ingest_config.get("raw_output_path")
+                raw_out = ingest_config.get("raw_output_path")
+                output_path = raw_out.format(**path_vars)
 
     if not pdf_path:
         parser.error("pdf_path must be provided via argument or config file.")

@@ -80,9 +80,15 @@ def main():
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
         
+    path_vars = {
+        "project_name": config.get("project_name", "default"),
+        "dataset_tag": config.get("dataset_tag", "v1")
+    }
+        
     # Determine input path from config or default
     ingest_config = config.get("ingest", {})
-    input_path = ingest_config.get("raw_output_path", "dataset/raw_extracted.json")
+    raw_path_template = ingest_config.get("raw_output_path", "dataset/raw_extracted.json")
+    input_path = raw_path_template.format(**path_vars)
     
     if not os.path.exists(input_path):
         print(f"Error: Input file {input_path} not found. Did you run ingest_pdf.py?")
@@ -131,9 +137,30 @@ def main():
             
     pbar.close()
             
-    output_path = config.get("output", {}).get("path", "dataset/lancer_synthetic.jsonl")
+    output_path_template = config.get("output", {}).get("path", "dataset/{project_name}_{dataset_tag}_synthetic.jsonl")
+    output_path = output_path_template.format(**path_vars)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
+    # Validation: Check approx token lengths
+    print("\n--- Data Stats ---")
+    long_samples = 0
+    total_samples = len(output_data)
+    # Rough estimate: 1 token ~= 4 chars
+    limit_4k = 4096 * 4 
+    
+    for record in output_data:
+        # Input context is the biggest factor
+        combined_len = len(record.get("input", "")) + len(record.get("instruction", "")) + len(record.get("output", ""))
+        if combined_len > limit_4k:
+            long_samples += 1
+            
+    print(f"Total Samples: {total_samples}")
+    print(f"Samples > ~4096 tokens (est): {long_samples}")
+    if long_samples > 0:
+        print("⚠️ Warning: Some samples might be truncated on small context models (e.g. Llama-3-8B).")
+    else:
+        print("✅ All samples fit comfortably within standard 4k context.")
+
     with open(output_path, "w", encoding="utf-8") as f:
         for record in output_data:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
