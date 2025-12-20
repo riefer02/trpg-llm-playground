@@ -69,6 +69,11 @@ output:
   path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
   run_id: "auto"
   append: false
+llm:
+  model: "gpt-5-mini"
+  temperature: null
+  max_output_tokens: null
+  max_completion_tokens: null
 ```
 
 **`config/rpg_finetune.yaml`**:

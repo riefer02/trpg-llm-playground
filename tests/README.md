@@ -10,6 +10,14 @@ We use `uv` to manage dependencies and run the test in an isolated environment (
 uv run --with PyYAML --with tqdm --with openai python tests/smoke_test.py
 ```
 
+### OpenAI Connectivity Check
+
+If you want a quick end-to-end API check (without running the full pipeline), run:
+
+```bash
+uv run --with PyYAML --with openai python tests/openai_smoke_test.py
+```
+
 ## What it Tests
 
 1.  **Ingestion Mock**: Creates a fake `raw_extracted.json` to simulate PDF text extraction.
@@ -22,4 +30,3 @@ uv run --with PyYAML --with tqdm --with openai python tests/smoke_test.py
 Artifacts are generated in `tests/artifacts/`:
 *   `mock_raw.json`: The fake ingested text.
 *   `mock_synthetic.jsonl`: The resulting training data samples.
-

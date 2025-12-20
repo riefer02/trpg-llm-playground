@@ -2,7 +2,8 @@ import json
 import argparse
 import os
 import random
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Optional
 from typing import List, Dict
 import yaml
 from tqdm import tqdm
@@ -44,11 +45,27 @@ Each example must be a pair of "instruction" (a user question or prompt) and "ou
 Do not include any markdown formatting (like ```json) outside the standard response if possible, just the raw JSON list.
 """
 
-def generate_qa_pairs(text_chunk: str, model: str, n_questions: int = 2) -> List[Dict[str, str]]:
+def generate_qa_pairs(
+    text_chunk: str,
+    model: str,
+    temperature: Optional[float],
+    max_output_tokens: Optional[int],
+    max_completion_tokens: Optional[int],
+    n_questions: int = 2,
+) -> List[Dict[str, str]]:
     prompt = PROMPT_TEMPLATE.format(text=text_chunk, n_questions=n_questions)
     
     # Call the model (GPT-5.1-Thinking or similar)
-    response = call_llm(prompt, model=model)
+    response = call_llm(
+        prompt,
+        model=model,
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+        max_completion_tokens=max_completion_tokens,
+    )
+    if not response.strip():
+        print("Warning: Empty response from model. Skipping this chunk.")
+        return []
     
     # Robust parsing logic
     try:
@@ -85,7 +102,7 @@ def main():
     output_config = config.get("output", {}) or {}
     run_id = output_config.get("run_id", "auto")
     if run_id == "auto":
-        run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
     path_vars = {
         "project_name": config.get("project_name", "default"),
@@ -125,6 +142,9 @@ def main():
     
     llm_config = config.get("llm", {}) or {}
     model = llm_config.get("model", "gpt-5-mini")
+    temperature = llm_config.get("temperature")
+    max_output_tokens = llm_config.get("max_output_tokens")
+    max_completion_tokens = llm_config.get("max_completion_tokens")
 
     for chunk in chunks:
         if count >= max_samples:
@@ -135,12 +155,29 @@ def main():
             continue
             
         # Generate data
-        qa_pairs = generate_qa_pairs(chunk["text"], model=model, n_questions=2)
+        qa_pairs = generate_qa_pairs(
+            chunk["text"],
+            model=model,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            max_completion_tokens=max_completion_tokens,
+            n_questions=2,
+        )
         
         for pair in qa_pairs:
             if count >= max_samples:
                 break
-                
+
+            missing = []
+            if "instruction" not in pair:
+                missing.append("instruction")
+            if "output" not in pair:
+                missing.append("output")
+            if missing:
+                page = chunk.get("page", "unknown")
+                print(f"Warning: Skipping malformed item on page {page}; missing {missing}.")
+                continue
+
             record = {
                 "instruction": pair["instruction"],
                 "input": "", 

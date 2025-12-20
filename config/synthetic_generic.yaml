@@ -31,3 +31,6 @@ output:
 
 llm:
   model: "gpt-5-mini" # Model for synthetic generation
+  temperature: null # Leave null for models that only support defaults
+  max_output_tokens: null # Preferred for Responses API
+  max_completion_tokens: null # Optional cap for response length
