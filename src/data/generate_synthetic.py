@@ -72,6 +72,56 @@ def suggest_questions(text_len: int, table_like: bool, low_signal: bool) -> int:
     return base
 
 
+def parse_json_list(response: str) -> Optional[List[Dict[str, str]]]:
+    try:
+        clean_response = response.replace("```json", "").replace("```", "").strip()
+        start_idx = clean_response.find("[")
+        end_idx = clean_response.rfind("]") + 1
+        if start_idx != -1 and end_idx != -1:
+            json_str = clean_response[start_idx:end_idx]
+            return json.loads(json_str)
+        print(f"Warning: Could not find JSON list in response. First 50 chars: {clean_response[:50]}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON: {e}. Response snippet: {response[:100]}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return None
+
+
+def repair_json_response(
+    response: str,
+    model: str,
+    temperature: Optional[float],
+    max_output_tokens: Optional[int],
+    max_completion_tokens: Optional[int],
+) -> str:
+    repair_prompt = (
+        "Fix the following output so it is a valid JSON list of objects. "
+        "Do not add commentary or extra text. Return JSON only.\n\n"
+        f"Output to fix:\n{response}"
+    )
+    repaired = call_llm(
+        repair_prompt,
+        model=model,
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+        max_completion_tokens=max_completion_tokens,
+    )
+    if repaired.strip():
+        return repaired
+    print("Warning: JSON repair returned empty response.")
+    return ""
+
+
+def log_invalid_response(log_path: str, response: str) -> None:
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(response)
+        f.write("\n\n---\n\n")
+
+
 # Advanced prompt with Chain-of-Thought (CoT) and explicit reasoning steps
 DEFAULT_TASK_TYPES = [
     "rules_qa",
@@ -132,6 +182,8 @@ def generate_qa_pairs(
     allowed_task_types: List[str],
     extra_instructions: str,
     n_questions: int = 2,
+    repair_invalid_json: bool = True,
+    invalid_log_path: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     prompt = PROMPT_TEMPLATE.format(
         text=text_chunk,
@@ -140,8 +192,7 @@ def generate_qa_pairs(
         task_types=", ".join(allowed_task_types),
         extra_instructions=extra_instructions,
     )
-    
-    # Call the model (GPT-5.1-Thinking or similar)
+
     response = call_llm(
         prompt,
         model=model,
@@ -152,28 +203,33 @@ def generate_qa_pairs(
     if not response.strip():
         print("Warning: Empty response from model. Skipping this chunk.")
         return []
-    
-    # Robust parsing logic
-    try:
-        # 1. Clean markdown code blocks if present
-        clean_response = response.replace("```json", "").replace("```", "").strip()
-        
-        # 2. Find list start/end
-        start_idx = clean_response.find('[')
-        end_idx = clean_response.rfind(']') + 1
-        
-        if start_idx != -1 and end_idx != -1:
-            json_str = clean_response[start_idx:end_idx]
-            return json.loads(json_str)
-        else:
-            print(f"Warning: Could not find JSON list in response. First 50 chars: {clean_response[:50]}")
-            return []
-    except json.JSONDecodeError as e:
-        print(f"Error parsing JSON: {e}. Response snippet: {response[:100]}")
+
+    parsed = parse_json_list(response)
+    if parsed is not None:
+        return parsed
+
+    if invalid_log_path:
+        log_invalid_response(invalid_log_path, response)
+
+    if not repair_invalid_json:
         return []
-    except Exception as e:
-        print(f"Unexpected error: {e}")
+
+    repaired = repair_json_response(
+        response,
+        model=model,
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+        max_completion_tokens=max_completion_tokens,
+    )
+    if not repaired:
         return []
+
+    repaired_parsed = parse_json_list(repaired)
+    if repaired_parsed is None:
+        if invalid_log_path:
+            log_invalid_response(invalid_log_path, repaired)
+        return []
+    return repaired_parsed
 
 def main():
     parser = argparse.ArgumentParser(description="Generate synthetic Q/A pairs from extracted text.")
@@ -208,8 +264,6 @@ def main():
     with open(input_path, "r") as f:
         chunks = json.load(f)
         
-    output_data = []
-    
     # Configurable limits
     max_samples = config.get("n_samples", 50)
     limits_config = config.get("limits", {}) or {}
@@ -230,6 +284,8 @@ def main():
     random.shuffle(chunks)
     
     count = 0
+    long_samples = 0
+    total_samples = 0
     pbar = tqdm(total=max_samples)
     
     llm_config = config.get("llm", {}) or {}
@@ -237,6 +293,8 @@ def main():
     temperature = llm_config.get("temperature")
     max_output_tokens = llm_config.get("max_output_tokens")
     max_completion_tokens = llm_config.get("max_completion_tokens")
+    repair_invalid_json = llm_config.get("repair_invalid_json", True)
+    invalid_response_log = llm_config.get("invalid_response_log")
 
     task_types = config.get("task_types") or DEFAULT_TASK_TYPES
     task_types = [t for t in task_types if isinstance(t, str) and t.strip()]
@@ -250,110 +308,114 @@ def main():
     processed_pages = 0
     requested_questions = 0
 
-    for chunk in chunks:
-        if max_samples is not None and count >= max_samples:
-            break
-            
-        analysis = analyze_text(chunk["text"])
-        if analysis["low_signal"]:
-            skipped_low_signal += 1
-            continue
-
-        n_questions = suggest_questions(
-            analysis["text_len"],
-            analysis["table_like"],
-            analysis["low_signal"],
-        )
-        if n_questions <= 0:
-            skipped_low_signal += 1
-            continue
-
-        if max_samples is not None:
-            remaining = max_samples - count
-            n_questions = min(n_questions, remaining)
-        requested_questions += n_questions
-
-        extra_instructions = ""
-        if analysis["table_like"]:
-            table_like_pages += 1
-            extra_instructions = (
-                "### Table Hint\n"
-                "If the text looks tabular, extract key rows into compact Q/A pairs."
-            )
-
-        processed_pages += 1
-
-        # Generate data
-        task_type = next(task_type_cycle)
-        qa_pairs = generate_qa_pairs(
-            chunk["text"],
-            model=model,
-            temperature=temperature,
-            max_output_tokens=max_output_tokens,
-            max_completion_tokens=max_completion_tokens,
-            task_type=task_type,
-            allowed_task_types=task_types,
-            extra_instructions=extra_instructions,
-            n_questions=n_questions,
-        )
-        
-        for pair in qa_pairs:
-            if max_samples is not None and count >= max_samples:
-                break
-
-            missing = []
-            if "instruction" not in pair:
-                missing.append("instruction")
-            if "output" not in pair:
-                missing.append("output")
-            if missing:
-                page = chunk.get("page", "unknown")
-                print(f"Warning: Skipping malformed item on page {page}; missing {missing}.")
-                continue
-
-            pair_task_type = pair.get("task_type", task_type)
-            if pair_task_type not in task_types:
-                page = chunk.get("page", "unknown")
-                print(
-                    f"Warning: Invalid task_type '{pair_task_type}' on page {page}; "
-                    f"forcing to '{task_type}'."
-                )
-                pair_task_type = task_type
-
-            record = {
-                "instruction": pair["instruction"],
-                "input": "", 
-                "output": pair["output"],
-                "task_type": pair_task_type,
-                "source_page": chunk["page"]
-            }
-            output_data.append(record)
-            count += 1
-            pbar.update(1)
-            
-    pbar.close()
-            
     output_path_template = output_config.get("path", "dataset/{project_name}_{dataset_tag}_synthetic.jsonl")
     output_path = output_path_template.format(**path_vars)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     append_output = output_config.get("append", False)
+    flush_every = output_config.get("flush_every", 50)
     if os.path.exists(output_path) and not append_output:
         print(f"Warning: Output file already exists and will be overwritten: {output_path}")
         print("Tip: Set output.append: true or include {run_id} in output.path to avoid overwrites.")
-    
+
+    write_mode = "a" if append_output else "w"
+    with open(output_path, write_mode, encoding="utf-8") as f:
+        for chunk in chunks:
+            if max_samples is not None and count >= max_samples:
+                break
+
+            analysis = analyze_text(chunk["text"])
+            if analysis["low_signal"]:
+                skipped_low_signal += 1
+                continue
+
+            n_questions = suggest_questions(
+                analysis["text_len"],
+                analysis["table_like"],
+                analysis["low_signal"],
+            )
+            if n_questions <= 0:
+                skipped_low_signal += 1
+                continue
+
+            if max_samples is not None:
+                remaining = max_samples - count
+                n_questions = min(n_questions, remaining)
+            requested_questions += n_questions
+
+            extra_instructions = ""
+            if analysis["table_like"]:
+                table_like_pages += 1
+                extra_instructions = (
+                    "### Table Hint\n"
+                    "If the text looks tabular, extract key rows into compact Q/A pairs."
+                )
+
+            processed_pages += 1
+
+            # Generate data
+            task_type = next(task_type_cycle)
+            qa_pairs = generate_qa_pairs(
+                chunk["text"],
+                model=model,
+                temperature=temperature,
+                max_output_tokens=max_output_tokens,
+                max_completion_tokens=max_completion_tokens,
+                task_type=task_type,
+                allowed_task_types=task_types,
+                extra_instructions=extra_instructions,
+                n_questions=n_questions,
+                repair_invalid_json=repair_invalid_json,
+                invalid_log_path=invalid_response_log,
+            )
+
+            for pair in qa_pairs:
+                if max_samples is not None and count >= max_samples:
+                    break
+
+                missing = []
+                if "instruction" not in pair:
+                    missing.append("instruction")
+                if "output" not in pair:
+                    missing.append("output")
+                if missing:
+                    page = chunk.get("page", "unknown")
+                    print(f"Warning: Skipping malformed item on page {page}; missing {missing}.")
+                    continue
+
+                pair_task_type = pair.get("task_type", task_type)
+                if pair_task_type not in task_types:
+                    page = chunk.get("page", "unknown")
+                    print(
+                        f"Warning: Invalid task_type '{pair_task_type}' on page {page}; "
+                        f"forcing to '{task_type}'."
+                    )
+                    pair_task_type = task_type
+
+                record = {
+                    "instruction": pair["instruction"],
+                    "input": "", 
+                    "output": pair["output"],
+                    "task_type": pair_task_type,
+                    "source_page": chunk["page"]
+                }
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                count += 1
+                total_samples += 1
+                combined_len = (
+                    len(record.get("input", ""))
+                    + len(record.get("instruction", ""))
+                    + len(record.get("output", ""))
+                )
+                if combined_len > 4096 * 4:
+                    long_samples += 1
+                if flush_every and count % flush_every == 0:
+                    f.flush()
+                pbar.update(1)
+            
+    pbar.close()
+            
     # Validation: Check approx token lengths
     print("\n--- Data Stats ---")
-    long_samples = 0
-    total_samples = len(output_data)
-    # Rough estimate: 1 token ~= 4 chars
-    limit_4k = 4096 * 4 
-    
-    for record in output_data:
-        # Input context is the biggest factor
-        combined_len = len(record.get("input", "")) + len(record.get("instruction", "")) + len(record.get("output", ""))
-        if combined_len > limit_4k:
-            long_samples += 1
-            
     print(f"Total Samples: {total_samples}")
     print(f"Samples > ~4096 tokens (est): {long_samples}")
     print(f"Low-signal pages skipped: {skipped_low_signal}")
@@ -366,12 +428,7 @@ def main():
     else:
         print("✅ All samples fit comfortably within standard 4k context.")
 
-    write_mode = "a" if append_output else "w"
-    with open(output_path, write_mode, encoding="utf-8") as f:
-        for record in output_data:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-            
-    print(f"Successfully generated {len(output_data)} pairs. Saved to {output_path}")
+    print(f"Successfully generated {total_samples} pairs. Saved to {output_path}")
 
 if __name__ == "__main__":
     main()

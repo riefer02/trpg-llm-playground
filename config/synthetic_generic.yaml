@@ -6,8 +6,8 @@ dataset_tag: "v1_ctx4096" # Label for compatibility (Version + Max Context)
 ingest:
   # Path to your Source Book PDF on Google Drive
   pdf_path: "/content/drive/MyDrive/Books/Lancer Core Book (PR2).pdf"
-  # Where to save the intermediate raw text JSON (relative to Colab root)
-  raw_output_path: "dataset/{project_name}_{dataset_tag}_raw.json"
+  # Where to save the intermediate raw text JSON (Drive recommended)
+  raw_output_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_raw.json"
 
 topic: "Lancer RPG Core Rules"
 depth: "deep"
@@ -38,9 +38,12 @@ output:
   path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
   run_id: "auto"
   append: false
+  flush_every: 50
 
 llm:
   model: "gpt-5-mini" # Model for synthetic generation
   temperature: null # Leave null for models that only support defaults
   max_output_tokens: null # Preferred for Responses API
   max_completion_tokens: null # Optional cap for response length
+  repair_invalid_json: true
+  invalid_response_log: "/content/drive/MyDrive/llm_experiments/datasets/invalid_synth_responses.log"

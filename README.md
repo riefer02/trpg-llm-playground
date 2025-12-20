@@ -61,6 +61,7 @@ project_name: "lancer"          # e.g., "dnd5e", "cyberpunk"
 dataset_tag: "v1_ctx4096"       # Version + Context Length
 ingest:
   pdf_path: "/content/drive/MyDrive/Books/Lancer Core Book.pdf"
+  raw_output_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_raw.json"
 debug:
   enabled: false                # Set true for quick end-to-end tests
   max_pages: 5                  # Limit ingest to first N pages
@@ -71,11 +72,14 @@ output:
   path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
   run_id: "auto"
   append: false
+  flush_every: 50
 llm:
   model: "gpt-5-mini"
   temperature: null
   max_output_tokens: null
   max_completion_tokens: null
+  repair_invalid_json: true
+  invalid_response_log: "/content/drive/MyDrive/llm_experiments/datasets/invalid_synth_responses.log"
 task_types:
   - "rules_qa"
   - "character_build"
