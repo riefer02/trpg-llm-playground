@@ -30,4 +30,4 @@ output:
   append: false
 
 llm:
-  model: "gpt-5.1-thinking" # Latest OpenAI model for deep reasoning/rule consistency
+  model: "gpt-5-mini" # Model for synthetic generation

@@ -44,11 +44,11 @@ Each example must be a pair of "instruction" (a user question or prompt) and "ou
 Do not include any markdown formatting (like ```json) outside the standard response if possible, just the raw JSON list.
 """
 
-def generate_qa_pairs(text_chunk: str, n_questions: int = 2) -> List[Dict[str, str]]:
+def generate_qa_pairs(text_chunk: str, model: str, n_questions: int = 2) -> List[Dict[str, str]]:
     prompt = PROMPT_TEMPLATE.format(text=text_chunk, n_questions=n_questions)
     
     # Call the model (GPT-5.1-Thinking or similar)
-    response = call_llm(prompt, model="gpt-5.1-thinking")
+    response = call_llm(prompt, model=model)
     
     # Robust parsing logic
     try:
@@ -123,6 +123,9 @@ def main():
     count = 0
     pbar = tqdm(total=max_samples)
     
+    llm_config = config.get("llm", {}) or {}
+    model = llm_config.get("model", "gpt-5-mini")
+
     for chunk in chunks:
         if count >= max_samples:
             break
@@ -132,7 +135,7 @@ def main():
             continue
             
         # Generate data
-        qa_pairs = generate_qa_pairs(chunk["text"], n_questions=2)
+        qa_pairs = generate_qa_pairs(chunk["text"], model=model, n_questions=2)
         
         for pair in qa_pairs:
             if count >= max_samples:
