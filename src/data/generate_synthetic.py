@@ -2,6 +2,7 @@ import json
 import argparse
 import os
 import random
+from datetime import datetime
 from typing import List, Dict
 import yaml
 from tqdm import tqdm
@@ -79,10 +80,17 @@ def main():
     
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
+    debug_config = config.get("debug", {}) or {}
         
+    output_config = config.get("output", {}) or {}
+    run_id = output_config.get("run_id", "auto")
+    if run_id == "auto":
+        run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
     path_vars = {
         "project_name": config.get("project_name", "default"),
-        "dataset_tag": config.get("dataset_tag", "v1")
+        "dataset_tag": config.get("dataset_tag", "v1"),
+        "run_id": run_id,
     }
         
     # Determine input path from config or default
@@ -101,6 +109,12 @@ def main():
     
     # Configurable limits
     max_samples = config.get("n_samples", 50)
+    if debug_config.get("enabled"):
+        debug_max = debug_config.get("max_samples")
+        if isinstance(debug_max, int) and debug_max > 0:
+            max_samples = min(max_samples, debug_max)
+            print(f"Debug mode: limiting synthetic samples to {max_samples}.")
+
     print(f"Generating up to {max_samples} synthetic samples from {len(chunks)} chunks...")
     
     # Shuffle chunks to get random distribution of rules if we hit the limit
@@ -137,9 +151,13 @@ def main():
             
     pbar.close()
             
-    output_path_template = config.get("output", {}).get("path", "dataset/{project_name}_{dataset_tag}_synthetic.jsonl")
+    output_path_template = output_config.get("path", "dataset/{project_name}_{dataset_tag}_synthetic.jsonl")
     output_path = output_path_template.format(**path_vars)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    append_output = output_config.get("append", False)
+    if os.path.exists(output_path) and not append_output:
+        print(f"Warning: Output file already exists and will be overwritten: {output_path}")
+        print("Tip: Set output.append: true or include {run_id} in output.path to avoid overwrites.")
     
     # Validation: Check approx token lengths
     print("\n--- Data Stats ---")
@@ -161,7 +179,8 @@ def main():
     else:
         print("✅ All samples fit comfortably within standard 4k context.")
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    write_mode = "a" if append_output else "w"
+    with open(output_path, write_mode, encoding="utf-8") as f:
         for record in output_data:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
             

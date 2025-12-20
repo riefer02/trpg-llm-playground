@@ -5,6 +5,8 @@ This repository contains an end-to-end pipeline for fine-tuning Large Language M
 ## 🚀 Workflow Overview
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/riefer02/trpg-llm-playground/blob/main/colab/run_pipeline.ipynb)
+[![Open In Colab (Synthetic Only)](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/riefer02/trpg-llm-playground/blob/main/colab/run_synthetic_only.ipynb)
+[![Open In Colab (Train/Eval Only)](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/riefer02/trpg-llm-playground/blob/main/colab/run_train_after_synth.ipynb)
 
 1.  **Configure Locally**: Edit hyperparameters and paths in `config/*.yaml`.
 2.  **Verify Locally**: Run smoke tests (`tests/`) to ensure your logic and configs are sound before deploying.
@@ -29,7 +31,8 @@ llm-playground/
 │   └── utils/              # Shared utilities
 ├── colab/                  # Notebooks for remote execution
 ├── tests/                  # Local smoke tests
-└── requirements.txt        # Dependencies
+├── requirements.txt        # Full pipeline dependencies
+└── requirements_synth.txt  # Synthetic-only dependencies
 ```
 
 ## 🛠️ Deployment Instructions
@@ -58,12 +61,22 @@ project_name: "lancer"          # e.g., "dnd5e", "cyberpunk"
 dataset_tag: "v1_ctx4096"       # Version + Context Length
 ingest:
   pdf_path: "/content/drive/MyDrive/Books/Lancer Core Book.pdf"
+debug:
+  enabled: false                # Set true for quick end-to-end tests
+  max_pages: 5                  # Limit ingest to first N pages
+  max_samples: 10               # Limit synthetic samples
+output:
+  path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
+  run_id: "auto"
+  append: false
 ```
 
 **`config/rpg_finetune.yaml`**:
 ```yaml
 project_name: "lancer"
 dataset_tag: "v1_ctx4096"
+dataset:
+  train_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic*.jsonl"
 training:
   report_to: "wandb" # Optional: Track experiments with Weights & Biases
 ```
@@ -81,7 +94,10 @@ MyDrive/
 
 ### Phase 3: Execution on Google Colab
 
-1.  Navigate to `colab/run_pipeline.ipynb` in this repository.
+1.  Choose the notebook that matches your run:
+    - Full pipeline: `colab/run_pipeline.ipynb`
+    - Synthetic-only: `colab/run_synthetic_only.ipynb`
+    - Train/Eval only: `colab/run_train_after_synth.ipynb`
 2.  Click the "Open in Colab" button.
 3.  **Important**: Update the `REPO_URL` variable if you forked this repo.
 4.  Run the notebook cells in order:

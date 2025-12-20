@@ -3,6 +3,7 @@ import os
 import argparse
 import yaml
 import torch
+import glob
 
 # Graceful import check for Unsloth
 try:
@@ -59,13 +60,30 @@ def train(config_path: str):
     # 3. Load Dataset
     dataset_path_template = config['dataset']['train_path']
     dataset_path = dataset_path_template.format(**path_vars)
-    
-    if not os.path.exists(dataset_path):
-        print(f"❌ Error: Dataset file not found at: {dataset_path}")
-        print("Did you run the synthetic data generation step (Cell 5) successfully?")
-        sys.exit(1)
-        
-    dataset = load_dataset("json", data_files={"train": dataset_path}, split="train")
+
+    data_files = None
+    if any(char in dataset_path for char in ["*", "?", "["]):
+        matched_files = sorted(glob.glob(dataset_path))
+        if not matched_files:
+            print(f"❌ Error: No dataset files matched pattern: {dataset_path}")
+            print("Did you run the synthetic data generation step (Cell 5) successfully?")
+            sys.exit(1)
+        data_files = matched_files
+    elif os.path.isdir(dataset_path):
+        matched_files = sorted(glob.glob(os.path.join(dataset_path, "*.jsonl")))
+        if not matched_files:
+            print(f"❌ Error: No JSONL datasets found in directory: {dataset_path}")
+            print("Did you run the synthetic data generation step (Cell 5) successfully?")
+            sys.exit(1)
+        data_files = matched_files
+    else:
+        if not os.path.exists(dataset_path):
+            print(f"❌ Error: Dataset file not found at: {dataset_path}")
+            print("Did you run the synthetic data generation step (Cell 5) successfully?")
+            sys.exit(1)
+        data_files = dataset_path
+
+    dataset = load_dataset("json", data_files={"train": data_files}, split="train")
 
     # 4. Apply Chat Template (Best Practice for Qwen/Llama)
     # Unsloth/Transformers can auto-detect the right template for the model

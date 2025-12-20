@@ -15,7 +15,7 @@ model:
 
 dataset:
   # Use the persistent Drive path
-  train_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic.jsonl"
+  train_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic*.jsonl"
   val_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_val.jsonl" # Optional
 
 training:

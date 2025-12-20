@@ -4,7 +4,7 @@ import json
 import argparse
 import re
 import yaml
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 try:
     import fitz  # pymupdf
@@ -19,7 +19,11 @@ def clean_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-def extract_text_from_pdf(pdf_path: str, chunk_by_page: bool = True) -> List[Dict[str, str]]:
+def extract_text_from_pdf(
+    pdf_path: str,
+    chunk_by_page: bool = True,
+    max_pages: Optional[int] = None,
+) -> List[Dict[str, str]]:
     """
     Extracts text from a PDF file.
     
@@ -39,6 +43,8 @@ def extract_text_from_pdf(pdf_path: str, chunk_by_page: bool = True) -> List[Dic
     print(f"Extracting text from {pdf_path}...")
     
     for page_num, page in enumerate(doc):
+        if max_pages is not None and page_num >= max_pages:
+            break
         text = page.get_text()
         cleaned_text = clean_text(text)
         
@@ -63,10 +69,12 @@ def main():
     output_path = args.output_path
     
     # Load from config if provided
+    debug_config = {}
     if args.config:
         with open(args.config, "r") as f:
             config = yaml.safe_load(f)
             ingest_config = config.get("ingest", {})
+            debug_config = config.get("debug", {}) or {}
             
             # Variables for path formatting
             path_vars = {
@@ -88,8 +96,16 @@ def main():
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
+    max_pages = None
+    if debug_config.get("enabled"):
+        max_pages = debug_config.get("max_pages")
+        if isinstance(max_pages, int) and max_pages > 0:
+            print(f"Debug mode: limiting ingest to {max_pages} pages.")
+        else:
+            max_pages = None
+
     try:
-        data = extract_text_from_pdf(pdf_path)
+        data = extract_text_from_pdf(pdf_path, max_pages=max_pages)
         
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)

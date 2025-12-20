@@ -13,6 +13,11 @@ topic: "Lancer RPG Core Rules"
 depth: "deep"
 n_samples: 50
 
+debug:
+  enabled: false
+  max_pages: 5
+  max_samples: 10
+
 styles:
   - "instructional"
   - "scenario_based"
@@ -20,7 +25,9 @@ styles:
 
 output:
   # Path in the Colab environment (dynamically mapped to Drive)
-  path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic.jsonl"
+  path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
+  run_id: "auto"
+  append: false
 
 llm:
   model: "gpt-5.1-thinking" # Latest OpenAI model for deep reasoning/rule consistency
