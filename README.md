@@ -65,6 +65,8 @@ debug:
   enabled: false                # Set true for quick end-to-end tests
   max_pages: 5                  # Limit ingest to first N pages
   max_samples: 10               # Limit synthetic samples
+limits:
+  enforce_max_samples: true     # Set false to ignore n_samples cap
 output:
   path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
   run_id: "auto"
@@ -101,6 +103,14 @@ MyDrive/
     outputs/
       lancer_v1_ctx4096_lora/           # Saved Model & Adapters
       training_config_captured.yaml     # The exact "Recipe" used
+```
+
+### Preflight PDF Analysis (Optional)
+
+Before generating synthetic data, you can analyze the PDF to estimate density, identify table-heavy pages, and estimate how many Q/A pairs a full run will produce.
+
+```bash
+python -m src.data.analyze_pdf --pdf_path "books/Lancer Core Book (PR2).pdf"
 ```
 
 ### Phase 3: Execution on Google Colab

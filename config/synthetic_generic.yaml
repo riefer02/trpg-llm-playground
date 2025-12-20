@@ -18,6 +18,9 @@ debug:
   max_pages: 5
   max_samples: 10
 
+limits:
+  enforce_max_samples: true
+
 task_types:
   - "rules_qa"
   - "character_build"

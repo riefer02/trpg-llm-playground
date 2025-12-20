@@ -2,6 +2,7 @@ import json
 import argparse
 import os
 import random
+import re
 import itertools
 from datetime import datetime, timezone
 from typing import Optional
@@ -9,6 +10,67 @@ from typing import List, Dict
 import yaml
 from tqdm import tqdm
 from ..utils.llm_client import call_llm
+
+LOW_SIGNAL_KEYWORDS = [
+    "all rights reserved",
+    "isbn",
+    "copyright",
+    "credits",
+    "printed in",
+    "graphic design",
+    "art direction",
+    "layout",
+    "www.",
+    "http",
+]
+
+
+def clamp(value: int, lower: int, upper: int) -> int:
+    return max(lower, min(upper, value))
+
+
+def is_table_like(lines: List[str]) -> bool:
+    if len(lines) < 5:
+        return False
+    table_like_lines = sum(
+        1 for line in lines if re.search(r"\s{2,}|\t|\|", line)
+    )
+    ratio = table_like_lines / max(1, len(lines))
+    return ratio >= 0.3
+
+
+def analyze_text(text: str) -> Dict[str, object]:
+    text_len = len(text)
+    lines = [line for line in text.splitlines() if line.strip()]
+    alpha = sum(c.isalpha() for c in text)
+
+    alpha_ratio = alpha / max(1, text_len)
+    lower_text = text.lower()
+    has_low_signal_keyword = any(k in lower_text for k in LOW_SIGNAL_KEYWORDS)
+    table_like = is_table_like(lines)
+
+    low_signal = (
+        text_len < 200
+        or (alpha_ratio < 0.5 and text_len < 1200)
+        or (has_low_signal_keyword and text_len < 1200)
+    )
+
+    return {
+        "text_len": text_len,
+        "lines": lines,
+        "table_like": table_like,
+        "low_signal": low_signal,
+    }
+
+
+def suggest_questions(text_len: int, table_like: bool, low_signal: bool) -> int:
+    if low_signal:
+        return 0
+    base = clamp(text_len // 800 + 2, 2, 6)
+    if table_like and base < 6:
+        base += 1
+    return base
+
 
 # Advanced prompt with Chain-of-Thought (CoT) and explicit reasoning steps
 DEFAULT_TASK_TYPES = [
@@ -34,6 +96,8 @@ Each example must be a pair of "instruction" (a user question or prompt) and "ou
 ### Task Type
 The task type for this generation is: {task_type}
 Choose prompts and answers that match this task type.
+
+{extra_instructions}
 
 ### Requirements
 1. **Variety**: Create a mix of:
@@ -66,6 +130,7 @@ def generate_qa_pairs(
     max_completion_tokens: Optional[int],
     task_type: str,
     allowed_task_types: List[str],
+    extra_instructions: str,
     n_questions: int = 2,
 ) -> List[Dict[str, str]]:
     prompt = PROMPT_TEMPLATE.format(
@@ -73,6 +138,7 @@ def generate_qa_pairs(
         n_questions=n_questions,
         task_type=task_type,
         task_types=", ".join(allowed_task_types),
+        extra_instructions=extra_instructions,
     )
     
     # Call the model (GPT-5.1-Thinking or similar)
@@ -146,13 +212,19 @@ def main():
     
     # Configurable limits
     max_samples = config.get("n_samples", 50)
+    limits_config = config.get("limits", {}) or {}
+    enforce_max_samples = limits_config.get("enforce_max_samples", True)
     if debug_config.get("enabled"):
         debug_max = debug_config.get("max_samples")
         if isinstance(debug_max, int) and debug_max > 0:
             max_samples = min(max_samples, debug_max)
             print(f"Debug mode: limiting synthetic samples to {max_samples}.")
 
-    print(f"Generating up to {max_samples} synthetic samples from {len(chunks)} chunks...")
+    if enforce_max_samples:
+        print(f"Generating up to {max_samples} synthetic samples from {len(chunks)} chunks...")
+    else:
+        max_samples = None
+        print(f"Generating synthetic samples from {len(chunks)} chunks...")
     
     # Shuffle chunks to get random distribution of rules if we hit the limit
     random.shuffle(chunks)
@@ -173,14 +245,44 @@ def main():
     random.shuffle(task_types)
     task_type_cycle = itertools.cycle(task_types)
 
+    skipped_low_signal = 0
+    table_like_pages = 0
+    processed_pages = 0
+    requested_questions = 0
+
     for chunk in chunks:
-        if count >= max_samples:
+        if max_samples is not None and count >= max_samples:
             break
             
-        # Skip empty or very short chunks (e.g., page numbers or headers)
-        if len(chunk["text"]) < 200:
+        analysis = analyze_text(chunk["text"])
+        if analysis["low_signal"]:
+            skipped_low_signal += 1
             continue
-            
+
+        n_questions = suggest_questions(
+            analysis["text_len"],
+            analysis["table_like"],
+            analysis["low_signal"],
+        )
+        if n_questions <= 0:
+            skipped_low_signal += 1
+            continue
+
+        if max_samples is not None:
+            remaining = max_samples - count
+            n_questions = min(n_questions, remaining)
+        requested_questions += n_questions
+
+        extra_instructions = ""
+        if analysis["table_like"]:
+            table_like_pages += 1
+            extra_instructions = (
+                "### Table Hint\n"
+                "If the text looks tabular, extract key rows into compact Q/A pairs."
+            )
+
+        processed_pages += 1
+
         # Generate data
         task_type = next(task_type_cycle)
         qa_pairs = generate_qa_pairs(
@@ -191,11 +293,12 @@ def main():
             max_completion_tokens=max_completion_tokens,
             task_type=task_type,
             allowed_task_types=task_types,
-            n_questions=2,
+            extra_instructions=extra_instructions,
+            n_questions=n_questions,
         )
         
         for pair in qa_pairs:
-            if count >= max_samples:
+            if max_samples is not None and count >= max_samples:
                 break
 
             missing = []
@@ -253,6 +356,11 @@ def main():
             
     print(f"Total Samples: {total_samples}")
     print(f"Samples > ~4096 tokens (est): {long_samples}")
+    print(f"Low-signal pages skipped: {skipped_low_signal}")
+    print(f"Table-like pages processed: {table_like_pages}")
+    if processed_pages:
+        avg_requested = requested_questions / processed_pages
+        print(f"Avg requested questions per processed page: {avg_requested:.2f}")
     if long_samples > 0:
         print("⚠️ Warning: Some samples might be truncated on small context models (e.g. Llama-3-8B).")
     else:
