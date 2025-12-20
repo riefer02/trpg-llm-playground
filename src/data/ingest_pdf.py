@@ -57,6 +57,40 @@ def extract_text_from_pdf(
             
     return extracted_data
 
+
+def write_pdf_jsonl(
+    pdf_path: str,
+    output_path: str,
+    max_pages: Optional[int],
+    flush_every: int,
+) -> int:
+    if not os.path.exists(pdf_path):
+        raise FileNotFoundError(f"PDF not found at: {pdf_path}")
+
+    doc = fitz.open(pdf_path)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    count = 0
+
+    print(f"Extracting text from {pdf_path}...")
+    with open(output_path, "w", encoding="utf-8") as f:
+        for page_num, page in enumerate(doc):
+            if max_pages is not None and page_num >= max_pages:
+                break
+            text = page.get_text()
+            cleaned_text = clean_text(text)
+            if not cleaned_text:
+                continue
+            record = {
+                "page": page_num + 1,
+                "text": cleaned_text,
+                "source": os.path.basename(pdf_path)
+            }
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            count += 1
+            if flush_every and count % flush_every == 0:
+                f.flush()
+    return count
+
 def main():
     parser = argparse.ArgumentParser(description="Extract text from PDF for TTRPG ingestion.")
     parser.add_argument("--config", type=str, help="Path to config YAML (optional).")
@@ -70,11 +104,16 @@ def main():
     
     # Load from config if provided
     debug_config = {}
+    ingest_config = {}
+    output_format = None
+    flush_every = 50
     if args.config:
         with open(args.config, "r") as f:
             config = yaml.safe_load(f)
             ingest_config = config.get("ingest", {})
             debug_config = config.get("debug", {}) or {}
+            output_format = ingest_config.get("output_format")
+            flush_every = ingest_config.get("flush_every", 50)
             
             # Variables for path formatting
             path_vars = {
@@ -95,7 +134,7 @@ def main():
 
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
+
     max_pages = None
     if debug_config.get("enabled"):
         max_pages = debug_config.get("max_pages")
@@ -105,12 +144,20 @@ def main():
             max_pages = None
 
     try:
-        data = extract_text_from_pdf(pdf_path, max_pages=max_pages)
-        
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            
-        print(f"Extracted {len(data)} pages. Saved to {output_path}")
+        if output_format is None:
+            if output_path.lower().endswith(".jsonl"):
+                output_format = "jsonl"
+            else:
+                output_format = "json"
+
+        if output_format == "jsonl":
+            count = write_pdf_jsonl(pdf_path, output_path, max_pages, flush_every)
+            print(f"Extracted {count} pages. Saved to {output_path}")
+        else:
+            data = extract_text_from_pdf(pdf_path, max_pages=max_pages)
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            print(f"Extracted {len(data)} pages. Saved to {output_path}")
     except Exception as e:
         print(f"Error during extraction: {e}")
 

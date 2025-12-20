@@ -1,246 +1,29 @@
-import json
 import argparse
+import itertools
+import json
 import os
 import random
-import re
-import itertools
 from datetime import datetime, timezone
-from typing import Optional
-from typing import List, Dict
+
 import yaml
 from tqdm import tqdm
-from ..utils.llm_client import call_llm
 
-LOW_SIGNAL_KEYWORDS = [
-    "all rights reserved",
-    "isbn",
-    "copyright",
-    "credits",
-    "printed in",
-    "graphic design",
-    "art direction",
-    "layout",
-    "www.",
-    "http",
-]
+from .synth_analysis import analyze_text, suggest_questions
+from .synth_io import load_chunks
+from .synth_llm import DEFAULT_TASK_TYPES, generate_qa_pairs
+from .synth_resume import build_signature, load_checkpoint, save_checkpoint
 
 
-def clamp(value: int, lower: int, upper: int) -> int:
-    return max(lower, min(upper, value))
-
-
-def is_table_like(lines: List[str]) -> bool:
-    if len(lines) < 5:
-        return False
-    table_like_lines = sum(
-        1 for line in lines if re.search(r"\s{2,}|\t|\|", line)
-    )
-    ratio = table_like_lines / max(1, len(lines))
-    return ratio >= 0.3
-
-
-def analyze_text(text: str) -> Dict[str, object]:
-    text_len = len(text)
-    lines = [line for line in text.splitlines() if line.strip()]
-    alpha = sum(c.isalpha() for c in text)
-
-    alpha_ratio = alpha / max(1, text_len)
-    lower_text = text.lower()
-    has_low_signal_keyword = any(k in lower_text for k in LOW_SIGNAL_KEYWORDS)
-    table_like = is_table_like(lines)
-
-    low_signal = (
-        text_len < 200
-        or (alpha_ratio < 0.5 and text_len < 1200)
-        or (has_low_signal_keyword and text_len < 1200)
-    )
-
-    return {
-        "text_len": text_len,
-        "lines": lines,
-        "table_like": table_like,
-        "low_signal": low_signal,
-    }
-
-
-def suggest_questions(text_len: int, table_like: bool, low_signal: bool) -> int:
-    if low_signal:
-        return 0
-    base = clamp(text_len // 800 + 2, 2, 6)
-    if table_like and base < 6:
-        base += 1
-    return base
-
-
-def parse_json_list(response: str) -> Optional[List[Dict[str, str]]]:
-    try:
-        clean_response = response.replace("```json", "").replace("```", "").strip()
-        start_idx = clean_response.find("[")
-        end_idx = clean_response.rfind("]") + 1
-        if start_idx != -1 and end_idx != -1:
-            json_str = clean_response[start_idx:end_idx]
-            return json.loads(json_str)
-        print(f"Warning: Could not find JSON list in response. First 50 chars: {clean_response[:50]}")
-        return None
-    except json.JSONDecodeError as e:
-        print(f"Error parsing JSON: {e}. Response snippet: {response[:100]}")
-        return None
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        return None
-
-
-def repair_json_response(
-    response: str,
-    model: str,
-    temperature: Optional[float],
-    max_output_tokens: Optional[int],
-    max_completion_tokens: Optional[int],
-) -> str:
-    repair_prompt = (
-        "Fix the following output so it is a valid JSON list of objects. "
-        "Do not add commentary or extra text. Return JSON only.\n\n"
-        f"Output to fix:\n{response}"
-    )
-    repaired = call_llm(
-        repair_prompt,
-        model=model,
-        temperature=temperature,
-        max_output_tokens=max_output_tokens,
-        max_completion_tokens=max_completion_tokens,
-    )
-    if repaired.strip():
-        return repaired
-    print("Warning: JSON repair returned empty response.")
-    return ""
-
-
-def log_invalid_response(log_path: str, response: str) -> None:
-    os.makedirs(os.path.dirname(log_path), exist_ok=True)
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(response)
-        f.write("\n\n---\n\n")
-
-
-# Advanced prompt with Chain-of-Thought (CoT) and explicit reasoning steps
-DEFAULT_TASK_TYPES = [
-    "rules_qa",
-    "character_build",
-    "scenario_seed",
-    "gm_guidance",
-    "lore",
-]
-
-PROMPT_TEMPLATE = """
-You are an expert Game Master and Rules Lawyer for the Lancer RPG system.
-Your goal is to create high-quality, logically consistent training data for a new AI model.
-
-### Context
-Read the following text from the Lancer Core Book:
-{text}
-
-### Task
-Generate {n_questions} training examples based on the text above. 
-Each example must be a pair of "instruction" (a user question or prompt) and "output" (the ideal response).
-
-### Task Type
-The task type for this generation is: {task_type}
-Choose prompts and answers that match this task type.
-
-{extra_instructions}
-
-### Requirements
-1. **Variety**: Create a mix of:
-   - **Rule Clarifications**: "How does X interact with Y?"
-   - **Tactical Scenarios**: "I'm in situation Z, what can I do?"
-   - **Lore/Flavor**: "Describe the history of..."
-2. **Reasoning**: Think step-by-step internally, but do not include reasoning in the output.
-3. **Format**: Output a valid JSON list of objects. Each object must have:
-   - `instruction`: The user prompt.
-   - `output`: The correct, high-quality answer.
-   - `task_type`: One of: {task_types}
-
-### Output Format
-[
-  {{
-    "instruction": "...",
-    "output": "...",
-    "task_type": "rules_qa"
-  }}
-]
-
-Do not include any markdown formatting (like ```json) outside the standard response if possible, just the raw JSON list.
-"""
-
-def generate_qa_pairs(
-    text_chunk: str,
-    model: str,
-    temperature: Optional[float],
-    max_output_tokens: Optional[int],
-    max_completion_tokens: Optional[int],
-    task_type: str,
-    allowed_task_types: List[str],
-    extra_instructions: str,
-    n_questions: int = 2,
-    repair_invalid_json: bool = True,
-    invalid_log_path: Optional[str] = None,
-) -> List[Dict[str, str]]:
-    prompt = PROMPT_TEMPLATE.format(
-        text=text_chunk,
-        n_questions=n_questions,
-        task_type=task_type,
-        task_types=", ".join(allowed_task_types),
-        extra_instructions=extra_instructions,
-    )
-
-    response = call_llm(
-        prompt,
-        model=model,
-        temperature=temperature,
-        max_output_tokens=max_output_tokens,
-        max_completion_tokens=max_completion_tokens,
-    )
-    if not response.strip():
-        print("Warning: Empty response from model. Skipping this chunk.")
-        return []
-
-    parsed = parse_json_list(response)
-    if parsed is not None:
-        return parsed
-
-    if invalid_log_path:
-        log_invalid_response(invalid_log_path, response)
-
-    if not repair_invalid_json:
-        return []
-
-    repaired = repair_json_response(
-        response,
-        model=model,
-        temperature=temperature,
-        max_output_tokens=max_output_tokens,
-        max_completion_tokens=max_completion_tokens,
-    )
-    if not repaired:
-        return []
-
-    repaired_parsed = parse_json_list(repaired)
-    if repaired_parsed is None:
-        if invalid_log_path:
-            log_invalid_response(invalid_log_path, repaired)
-        return []
-    return repaired_parsed
-
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Generate synthetic Q/A pairs from extracted text.")
     parser.add_argument("--config", type=str, default="config/synthetic_generic.yaml", help="Path to config YAML.")
-    
+
     args = parser.parse_args()
-    
+
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
     debug_config = config.get("debug", {}) or {}
-        
+
     output_config = config.get("output", {}) or {}
     run_id = output_config.get("run_id", "auto")
     if run_id == "auto":
@@ -251,19 +34,91 @@ def main():
         "dataset_tag": config.get("dataset_tag", "v1"),
         "run_id": run_id,
     }
-        
+
     # Determine input path from config or default
     ingest_config = config.get("ingest", {})
     raw_path_template = ingest_config.get("raw_output_path", "dataset/raw_extracted.json")
     input_path = raw_path_template.format(**path_vars)
-    
+
     if not os.path.exists(input_path):
         print(f"Error: Input file {input_path} not found. Did you run ingest_pdf.py?")
         return
-        
-    with open(input_path, "r") as f:
-        chunks = json.load(f)
-        
+
+    chunks = load_chunks(input_path)
+    if not isinstance(chunks, list):
+        print(f"Error: Input file {input_path} did not contain a list of chunks.")
+        return
+
+    generation_config = config.get("generation", {}) or {}
+    shuffle_enabled = generation_config.get("shuffle", True)
+    shuffle_seed = generation_config.get("shuffle_seed", 1337)
+
+    order = list(range(len(chunks)))
+    if shuffle_enabled:
+        rng = random.Random(shuffle_seed)
+        rng.shuffle(order)
+
+    task_types = config.get("task_types") or DEFAULT_TASK_TYPES
+    task_types = [t for t in task_types if isinstance(t, str) and t.strip()]
+    if not task_types:
+        task_types = DEFAULT_TASK_TYPES
+
+    resume_config = config.get("resume", {}) or {}
+    resume_enabled = resume_config.get("enabled", False)
+    checkpoint_path = resume_config.get("checkpoint_path", "")
+    checkpoint_path = checkpoint_path.format(**path_vars) if checkpoint_path else ""
+    resume_allow_mismatch = resume_config.get("allow_mismatch", False)
+    resume_force_restart = resume_config.get("force_restart", False)
+    start_index = 0
+    checkpoint = None
+
+    if resume_enabled and checkpoint_path:
+        checkpoint = load_checkpoint(checkpoint_path)
+        if resume_force_restart:
+            print("Resume force_restart enabled; starting fresh.")
+            checkpoint = None
+        elif checkpoint and checkpoint.get("run_id"):
+            run_id = checkpoint["run_id"]
+            path_vars["run_id"] = run_id
+
+    output_path_template = output_config.get(
+        "path",
+        "dataset/{project_name}_{dataset_tag}_synthetic.jsonl",
+    )
+    output_path = output_path_template.format(**path_vars)
+
+    signature = build_signature(
+        config,
+        input_path,
+        output_path,
+        task_types,
+        shuffle_enabled,
+        shuffle_seed,
+    )
+
+    if resume_enabled and checkpoint_path and checkpoint and not resume_force_restart:
+        if checkpoint.get("signature") == signature:
+            start_index = int(checkpoint.get("next_index", 0))
+        elif resume_allow_mismatch:
+            print("Warning: Checkpoint signature mismatch; resuming anyway (allow_mismatch=true).")
+            start_index = int(checkpoint.get("next_index", 0))
+        else:
+            print("Warning: Checkpoint signature mismatch; starting fresh.")
+            checkpoint = None
+            start_index = 0
+            if output_config.get("run_id", "auto") == "auto":
+                run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                path_vars["run_id"] = run_id
+                output_path = output_path_template.format(**path_vars)
+                signature = build_signature(
+                    config,
+                    input_path,
+                    output_path,
+                    task_types,
+                    shuffle_enabled,
+                    shuffle_seed,
+                )
+
     # Configurable limits
     max_samples = config.get("n_samples", 50)
     limits_config = config.get("limits", {}) or {}
@@ -279,15 +134,25 @@ def main():
     else:
         max_samples = None
         print(f"Generating synthetic samples from {len(chunks)} chunks...")
-    
-    # Shuffle chunks to get random distribution of rules if we hit the limit
-    random.shuffle(chunks)
-    
+
     count = 0
     long_samples = 0
     total_samples = 0
-    pbar = tqdm(total=max_samples)
-    
+    if checkpoint and checkpoint.get("stats"):
+        stats = checkpoint.get("stats", {})
+        count = int(stats.get("samples_written", 0))
+        total_samples = int(stats.get("samples_written", 0))
+        long_samples = int(stats.get("long_samples", 0))
+    elif checkpoint and os.path.exists(output_path):
+        try:
+            with open(output_path, "r", encoding="utf-8") as f:
+                count = sum(1 for _ in f if _.strip())
+            total_samples = count
+        except Exception as e:
+            print(f"Warning: Could not count existing output lines: {e}")
+
+    pbar = tqdm(total=max_samples, initial=count)
+
     llm_config = config.get("llm", {}) or {}
     model = llm_config.get("model", "gpt-5-mini")
     temperature = llm_config.get("temperature")
@@ -296,32 +161,34 @@ def main():
     repair_invalid_json = llm_config.get("repair_invalid_json", True)
     invalid_response_log = llm_config.get("invalid_response_log")
 
-    task_types = config.get("task_types") or DEFAULT_TASK_TYPES
-    task_types = [t for t in task_types if isinstance(t, str) and t.strip()]
-    if not task_types:
-        task_types = DEFAULT_TASK_TYPES
     random.shuffle(task_types)
     task_type_cycle = itertools.cycle(task_types)
+    if start_index > 0:
+        for _ in range(start_index):
+            next(task_type_cycle)
 
-    skipped_low_signal = 0
-    table_like_pages = 0
-    processed_pages = 0
-    requested_questions = 0
-
-    output_path_template = output_config.get("path", "dataset/{project_name}_{dataset_tag}_synthetic.jsonl")
-    output_path = output_path_template.format(**path_vars)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     append_output = output_config.get("append", False)
     flush_every = output_config.get("flush_every", 50)
+    if resume_enabled and checkpoint and start_index > 0:
+        append_output = True
     if os.path.exists(output_path) and not append_output:
         print(f"Warning: Output file already exists and will be overwritten: {output_path}")
         print("Tip: Set output.append: true or include {run_id} in output.path to avoid overwrites.")
 
     write_mode = "a" if append_output else "w"
+    checkpoint_stats = checkpoint.get("stats", {}) if checkpoint else {}
+    skipped_low_signal = int(checkpoint_stats.get("skipped_low_signal", 0))
+    table_like_pages = int(checkpoint_stats.get("table_like_pages", 0))
+    processed_pages = int(checkpoint_stats.get("processed_pages", 0))
+    requested_questions = int(checkpoint_stats.get("requested_questions", 0))
+
     with open(output_path, write_mode, encoding="utf-8") as f:
-        for chunk in chunks:
+        for order_pos in range(start_index, len(order)):
             if max_samples is not None and count >= max_samples:
                 break
+
+            chunk = chunks[order[order_pos]]
 
             analysis = analyze_text(chunk["text"])
             if analysis["low_signal"]:
@@ -352,7 +219,6 @@ def main():
 
             processed_pages += 1
 
-            # Generate data
             task_type = next(task_type_cycle)
             qa_pairs = generate_qa_pairs(
                 chunk["text"],
@@ -393,10 +259,10 @@ def main():
 
                 record = {
                     "instruction": pair["instruction"],
-                    "input": "", 
+                    "input": "",
                     "output": pair["output"],
                     "task_type": pair_task_type,
-                    "source_page": chunk["page"]
+                    "source_page": chunk["page"],
                 }
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
                 count += 1
@@ -411,9 +277,25 @@ def main():
                 if flush_every and count % flush_every == 0:
                     f.flush()
                 pbar.update(1)
-            
+
+            if resume_enabled and checkpoint_path:
+                checkpoint_payload = {
+                    "run_id": run_id,
+                    "signature": signature,
+                    "next_index": order_pos + 1,
+                    "stats": {
+                        "samples_written": total_samples,
+                        "long_samples": long_samples,
+                        "skipped_low_signal": skipped_low_signal,
+                        "table_like_pages": table_like_pages,
+                        "processed_pages": processed_pages,
+                        "requested_questions": requested_questions,
+                    },
+                }
+                save_checkpoint(checkpoint_path, checkpoint_payload)
+
     pbar.close()
-            
+
     # Validation: Check approx token lengths
     print("\n--- Data Stats ---")
     print(f"Total Samples: {total_samples}")
@@ -429,6 +311,7 @@ def main():
         print("✅ All samples fit comfortably within standard 4k context.")
 
     print(f"Successfully generated {total_samples} pairs. Saved to {output_path}")
+
 
 if __name__ == "__main__":
     main()

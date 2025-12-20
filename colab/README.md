@@ -15,3 +15,4 @@ Use the notebook that matches the stage you want to run. All notebooks expect pa
 - Train/Eval uses `config/rpg_finetune.yaml` and expects dataset paths to exist on Drive.
 - For a fast end-to-end test, enable `debug.enabled` in `config/synthetic_generic.yaml` and set small `max_pages`/`max_samples`.
 - To keep every synthetic run, use `output.path` with `{run_id}`; training can load multiple files via a glob pattern.
+- Synthetic generation streams output to Drive and supports resume checkpoints; see `resume` in `config/synthetic_generic.yaml`.

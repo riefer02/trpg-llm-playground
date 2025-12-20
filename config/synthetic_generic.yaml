@@ -6,8 +6,10 @@ dataset_tag: "v1_ctx4096" # Label for compatibility (Version + Max Context)
 ingest:
   # Path to your Source Book PDF on Google Drive
   pdf_path: "/content/drive/MyDrive/Books/Lancer Core Book (PR2).pdf"
-  # Where to save the intermediate raw text JSON (Drive recommended)
-  raw_output_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_raw.json"
+  # Where to save the intermediate raw text JSONL (Drive recommended)
+  raw_output_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_raw.jsonl"
+  output_format: "jsonl"
+  flush_every: 50
 
 topic: "Lancer RPG Core Rules"
 depth: "deep"
@@ -20,6 +22,16 @@ debug:
 
 limits:
   enforce_max_samples: true
+
+generation:
+  shuffle: true
+  shuffle_seed: 1337
+
+resume:
+  enabled: true
+  checkpoint_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_resume.json"
+  allow_mismatch: false
+  force_restart: false
 
 task_types:
   - "rules_qa"

@@ -9,9 +9,11 @@ def evaluate(config_path: str):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
         
+    project_name = config.get("project_name", "default")
+    dataset_tag = config.get("dataset_tag", "v1")
     path_vars = {
-        "project_name": config.get("project_name", "default"),
-        "dataset_tag": config.get("dataset_tag", "v1")
+        "project_name": project_name,
+        "dataset_tag": dataset_tag
     }
 
     max_seq_length = config['model'].get('max_seq_length', 2048)
@@ -53,8 +55,8 @@ def evaluate(config_path: str):
     val_path_template = config['dataset'].get('val_path', "")
     if val_path_template:
         path_vars = {
-            "project_name": project_name, 
-            "dataset_tag": config.get("dataset_tag", "v1")
+            "project_name": project_name,
+            "dataset_tag": dataset_tag
         }
         val_path = val_path_template.format(**path_vars)
         if os.path.exists(val_path):

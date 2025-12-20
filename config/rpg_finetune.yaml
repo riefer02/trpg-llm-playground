@@ -35,7 +35,7 @@ training:
   max_steps: 60
   learning_rate: 2.0e-4
   logging_steps: 1
-  save_steps: 20 # Save checkpoint every 20 steps
+  save_steps: 10 # Save checkpoint every 10 steps
   optim: "adamw_8bit"
   weight_decay: 0.01
   lr_scheduler_type: "linear"

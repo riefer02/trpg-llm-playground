@@ -61,13 +61,23 @@ project_name: "lancer"          # e.g., "dnd5e", "cyberpunk"
 dataset_tag: "v1_ctx4096"       # Version + Context Length
 ingest:
   pdf_path: "/content/drive/MyDrive/Books/Lancer Core Book.pdf"
-  raw_output_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_raw.json"
+  raw_output_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_raw.jsonl"
+  output_format: "jsonl"
+  flush_every: 50
 debug:
   enabled: false                # Set true for quick end-to-end tests
   max_pages: 5                  # Limit ingest to first N pages
   max_samples: 10               # Limit synthetic samples
 limits:
   enforce_max_samples: true     # Set false to ignore n_samples cap
+generation:
+  shuffle: true
+  shuffle_seed: 1337
+resume:
+  enabled: true
+  checkpoint_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_resume.json"
+  allow_mismatch: false
+  force_restart: false
 output:
   path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
   run_id: "auto"
@@ -116,6 +126,13 @@ Before generating synthetic data, you can analyze the PDF to estimate density, i
 ```bash
 python -m src.data.analyze_pdf --pdf_path "books/Lancer Core Book (PR2).pdf"
 ```
+
+### Resumable Synthetic Generation
+
+Synthetic generation writes each record to Drive as it is produced and periodically flushes, so partial runs persist through Colab disconnects. A lightweight resume checkpoint (based on your config + input file signature) lets you continue where you left off.
+
+- Resume behavior is controlled in `resume` (see config above).
+- If the book or settings change, the checkpoint signature will mismatch and a fresh run starts (unless you set `resume.allow_mismatch: true`).
 
 ### Phase 3: Execution on Google Colab
 
