@@ -2,6 +2,7 @@ import json
 import argparse
 import os
 import random
+import itertools
 from datetime import datetime, timezone
 from typing import Optional
 from typing import List, Dict
@@ -10,6 +11,14 @@ from tqdm import tqdm
 from ..utils.llm_client import call_llm
 
 # Advanced prompt with Chain-of-Thought (CoT) and explicit reasoning steps
+DEFAULT_TASK_TYPES = [
+    "rules_qa",
+    "character_build",
+    "scenario_seed",
+    "gm_guidance",
+    "lore",
+]
+
 PROMPT_TEMPLATE = """
 You are an expert Game Master and Rules Lawyer for the Lancer RPG system.
 Your goal is to create high-quality, logically consistent training data for a new AI model.
@@ -22,23 +31,27 @@ Read the following text from the Lancer Core Book:
 Generate {n_questions} training examples based on the text above. 
 Each example must be a pair of "instruction" (a user question or prompt) and "output" (the ideal response).
 
+### Task Type
+The task type for this generation is: {task_type}
+Choose prompts and answers that match this task type.
+
 ### Requirements
 1. **Variety**: Create a mix of:
    - **Rule Clarifications**: "How does X interact with Y?"
    - **Tactical Scenarios**: "I'm in situation Z, what can I do?"
    - **Lore/Flavor**: "Describe the history of..."
-2. **Reasoning**: Before writing the final JSON, you must THINK step-by-step to ensure the answer is correct according to the rules provided.
+2. **Reasoning**: Think step-by-step internally, but do not include reasoning in the output.
 3. **Format**: Output a valid JSON list of objects. Each object must have:
    - `instruction`: The user prompt.
    - `output`: The correct, high-quality answer.
-   - `thought_process`: (Optional but recommended) Your internal reasoning verification.
+   - `task_type`: One of: {task_types}
 
 ### Output Format
 [
   {{
     "instruction": "...",
     "output": "...",
-    "thought_process": "Checked page X, rule says Y..."
+    "task_type": "rules_qa"
   }}
 ]
 
@@ -51,9 +64,16 @@ def generate_qa_pairs(
     temperature: Optional[float],
     max_output_tokens: Optional[int],
     max_completion_tokens: Optional[int],
+    task_type: str,
+    allowed_task_types: List[str],
     n_questions: int = 2,
 ) -> List[Dict[str, str]]:
-    prompt = PROMPT_TEMPLATE.format(text=text_chunk, n_questions=n_questions)
+    prompt = PROMPT_TEMPLATE.format(
+        text=text_chunk,
+        n_questions=n_questions,
+        task_type=task_type,
+        task_types=", ".join(allowed_task_types),
+    )
     
     # Call the model (GPT-5.1-Thinking or similar)
     response = call_llm(
@@ -146,6 +166,13 @@ def main():
     max_output_tokens = llm_config.get("max_output_tokens")
     max_completion_tokens = llm_config.get("max_completion_tokens")
 
+    task_types = config.get("task_types") or DEFAULT_TASK_TYPES
+    task_types = [t for t in task_types if isinstance(t, str) and t.strip()]
+    if not task_types:
+        task_types = DEFAULT_TASK_TYPES
+    random.shuffle(task_types)
+    task_type_cycle = itertools.cycle(task_types)
+
     for chunk in chunks:
         if count >= max_samples:
             break
@@ -155,12 +182,15 @@ def main():
             continue
             
         # Generate data
+        task_type = next(task_type_cycle)
         qa_pairs = generate_qa_pairs(
             chunk["text"],
             model=model,
             temperature=temperature,
             max_output_tokens=max_output_tokens,
             max_completion_tokens=max_completion_tokens,
+            task_type=task_type,
+            allowed_task_types=task_types,
             n_questions=2,
         )
         
@@ -178,12 +208,21 @@ def main():
                 print(f"Warning: Skipping malformed item on page {page}; missing {missing}.")
                 continue
 
+            pair_task_type = pair.get("task_type", task_type)
+            if pair_task_type not in task_types:
+                page = chunk.get("page", "unknown")
+                print(
+                    f"Warning: Invalid task_type '{pair_task_type}' on page {page}; "
+                    f"forcing to '{task_type}'."
+                )
+                pair_task_type = task_type
+
             record = {
                 "instruction": pair["instruction"],
                 "input": "", 
                 "output": pair["output"],
-                "source_page": chunk["page"],
-                "generator_thought": pair.get("thought_process", "")
+                "task_type": pair_task_type,
+                "source_page": chunk["page"]
             }
             output_data.append(record)
             count += 1

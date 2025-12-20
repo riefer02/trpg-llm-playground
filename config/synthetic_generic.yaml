@@ -18,6 +18,13 @@ debug:
   max_pages: 5
   max_samples: 10
 
+task_types:
+  - "rules_qa"
+  - "character_build"
+  - "scenario_seed"
+  - "gm_guidance"
+  - "lore"
+
 styles:
   - "instructional"
   - "scenario_based"

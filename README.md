@@ -74,6 +74,12 @@ llm:
   temperature: null
   max_output_tokens: null
   max_completion_tokens: null
+task_types:
+  - "rules_qa"
+  - "character_build"
+  - "scenario_seed"
+  - "gm_guidance"
+  - "lore"
 ```
 
 **`config/rpg_finetune.yaml`**:
