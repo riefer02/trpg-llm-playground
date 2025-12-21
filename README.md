@@ -30,10 +30,15 @@ llm-playground/
 │   │   └── evaluate.py         # Inference & testing script
 │   └── utils/              # Shared utilities
 ├── colab/                  # Notebooks for remote execution
+├── docs/                   # Documentation
 ├── tests/                  # Local smoke tests
 ├── requirements.txt        # Full pipeline dependencies
 └── requirements_synth.txt  # Synthetic-only dependencies
 ```
+
+## 📘 Configuration Quick Ref
+
+See `docs/CONFIG.md` for a concise reference of the synthetic + training config blocks.
 
 ## 🛠️ Deployment Instructions
 
