@@ -90,6 +90,10 @@ llm:
   max_completion_tokens: null
   repair_invalid_json: true
   invalid_response_log: "/content/drive/MyDrive/llm_experiments/datasets/invalid_synth_responses.log"
+logging:
+  quiet: false
+  max_warnings: 10
+  hud_every: 10
 task_types:
   - "rules_qa"
   - "character_build"

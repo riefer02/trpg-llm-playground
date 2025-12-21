@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from .synth_analysis import analyze_text, suggest_questions
 from .synth_io import load_chunks
-from .synth_llm import DEFAULT_TASK_TYPES, generate_qa_pairs
+from .synth_llm import DEFAULT_TASK_TYPES, WarningLimiter, generate_qa_pairs
 from .synth_resume import build_signature, load_checkpoint, save_checkpoint
 
 
@@ -161,6 +161,12 @@ def main() -> None:
     repair_invalid_json = llm_config.get("repair_invalid_json", True)
     invalid_response_log = llm_config.get("invalid_response_log")
 
+    logging_config = config.get("logging", {}) or {}
+    max_warnings = logging_config.get("max_warnings", 10)
+    hud_every = logging_config.get("hud_every", 10)
+    quiet = logging_config.get("quiet", False)
+    warning_limiter = WarningLimiter(0 if quiet else max_warnings)
+
     random.shuffle(task_types)
     task_type_cycle = itertools.cycle(task_types)
     if start_index > 0:
@@ -232,6 +238,7 @@ def main() -> None:
                 n_questions=n_questions,
                 repair_invalid_json=repair_invalid_json,
                 invalid_log_path=invalid_response_log,
+                warning_limiter=warning_limiter,
             )
 
             for pair in qa_pairs:
@@ -293,6 +300,18 @@ def main() -> None:
                     },
                 }
                 save_checkpoint(checkpoint_path, checkpoint_payload)
+
+            if hud_every and processed_pages % hud_every == 0:
+                avg_requested = requested_questions / max(1, processed_pages)
+                pbar.set_postfix(
+                    {
+                        "pages": processed_pages,
+                        "written": total_samples,
+                        "skipped": skipped_low_signal,
+                        "tables": table_like_pages,
+                        "avg_q": f"{avg_requested:.2f}",
+                    }
+                )
 
     pbar.close()
 
