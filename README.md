@@ -78,6 +78,9 @@ limits:
 generation:
   shuffle: true
   shuffle_seed: 1337
+context:
+  prev_chars: 400
+  next_chars: 400
 resume:
   enabled: true
   checkpoint_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_resume.json"

@@ -52,6 +52,7 @@ def main() -> None:
     generation_config = config.get("generation", {}) or {}
     shuffle_enabled = generation_config.get("shuffle", True)
     shuffle_seed = generation_config.get("shuffle_seed", 1337)
+    context_config = config.get("context", {}) or {}
 
     order = list(range(len(chunks)))
     if shuffle_enabled:
@@ -195,6 +196,16 @@ def main() -> None:
                 break
 
             chunk = chunks[order[order_pos]]
+            prev_chars = context_config.get("prev_chars", 0)
+            next_chars = context_config.get("next_chars", 0)
+            prev_text = ""
+            next_text = ""
+            if prev_chars > 0 and order_pos > 0:
+                prev_chunk = chunks[order[order_pos - 1]]
+                prev_text = prev_chunk.get("text", "")[-prev_chars:]
+            if next_chars > 0 and order_pos + 1 < len(order):
+                next_chunk = chunks[order[order_pos + 1]]
+                next_text = next_chunk.get("text", "")[:next_chars]
 
             analysis = analyze_text(chunk["text"])
             if analysis["low_signal"]:
@@ -226,8 +237,13 @@ def main() -> None:
             processed_pages += 1
 
             task_type = next(task_type_cycle)
+            combined_text = (
+                f\"{prev_text}\\n\\n{chunk['text']}\\n\\n{next_text}\"
+                if (prev_text or next_text)
+                else chunk[\"text\"]
+            )
             qa_pairs = generate_qa_pairs(
-                chunk["text"],
+                combined_text,
                 model=model,
                 temperature=temperature,
                 max_output_tokens=max_output_tokens,
