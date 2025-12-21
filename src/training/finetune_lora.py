@@ -90,27 +90,52 @@ def train(config_path: str):
     # This maps "instruction/input/output" columns to the standard chat format
     
     def formatting_prompts_func(examples):
-        convos = []
         texts = []
-        mapper = {"system": "You are a helpful assistant.", "user": "", "assistant": ""}
-        
-        for instruction, input, output in zip(examples["instruction"], examples["input"], examples["output"]):
-            # Construct the conversation
-            # If 'input' exists, append it to instruction
-            user_msg = instruction
-            if input and str(input).strip():
-                user_msg += f"\n\nContext:\n{input}"
-                
+        batch_size = 0
+        for value in examples.values():
+            if isinstance(value, list):
+                batch_size = max(batch_size, len(value))
+
+        messages_list = examples.get("messages")
+        instructions = examples.get("instruction", [""] * batch_size)
+        inputs = examples.get("input", [""] * batch_size)
+        outputs = examples.get("output", [""] * batch_size)
+
+        for idx in range(batch_size):
+            messages = None
+            if isinstance(messages_list, list) and idx < len(messages_list):
+                messages = messages_list[idx]
+
+            if messages:
+                text = tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=False,
+                )
+                texts.append(text)
+                continue
+
+            instruction = instructions[idx] if idx < len(instructions) else ""
+            input_text = inputs[idx] if idx < len(inputs) else ""
+            output_text = outputs[idx] if idx < len(outputs) else ""
+
+            user_msg = instruction or ""
+            if input_text and str(input_text).strip():
+                user_msg += f"\n\nContext:\n{input_text}"
+
             conversation = [
                 {"role": "user", "content": user_msg},
-                {"role": "assistant", "content": output},
+                {"role": "assistant", "content": output_text},
             ]
-            
-            # Apply the model's specific chat template (ChatML for Qwen, etc.)
-            text = tokenizer.apply_chat_template(conversation, tokenize=False, add_generation_prompt=False)
+
+            text = tokenizer.apply_chat_template(
+                conversation,
+                tokenize=False,
+                add_generation_prompt=False,
+            )
             texts.append(text)
-            
-        return { "text" : texts, }
+
+        return {"text": texts}
 
     dataset = dataset.map(formatting_prompts_func, batched = True)
 

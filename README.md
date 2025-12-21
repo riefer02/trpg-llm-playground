@@ -94,6 +94,10 @@ coverage:
   min_text_len: 1400
   max_pairs: 2
   task_type: "rules_qa"
+rag_mode:
+  enabled: true
+  emit_messages: true
+  citation_style: "(p. {page})"
 resume:
   enabled: true
   checkpoint_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_resume.json"
@@ -123,6 +127,16 @@ task_types:
   - "lore"
 ```
 `tables` and `coverage` add lightweight passes to capture tabular stats and dense rule pages.
+
+Validate a synthetic JSONL (optional):
+```bash
+python scripts/validate_synth.py --input /content/drive/MyDrive/llm_experiments/datasets/lancer_v1_ctx4096_synthetic_*.jsonl
+```
+
+Sample-audit grounding quality (optional):
+```bash
+python scripts/audit_synth.py --input /content/drive/MyDrive/llm_experiments/datasets/lancer_v1_ctx4096_synthetic_*.jsonl --sample 50
+```
 
 **`config/rpg_finetune.yaml`**:
 ```yaml

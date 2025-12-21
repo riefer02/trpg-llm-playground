@@ -12,6 +12,11 @@
 - `resume.*`: enable/disable resume, checkpoint path, mismatch behavior.
 - `tables.*`: optional table extraction pass (min/max rows/cols, max pairs, task type).
 - `coverage.*`: optional coverage pass for dense pages (min text length, max pairs, task type).
+- `rag_mode.*`: emit RAG-aware records (context + citations + optional `messages`) and enforce grounded formatting.
+
+## Validation
+- `scripts/validate_synth.py`: validates JSON/JSONL for RAG-aware fields (messages/context/citations).
+- `scripts/audit_synth.py`: samples records and reports basic grounding/format issues.
 - `output.path`: synthetic JSONL output (use `{run_id}`).
 - `output.run_id`: `auto` generates a timestamp.
 - `output.append`: append to an existing output file.

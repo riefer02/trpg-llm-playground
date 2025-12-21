@@ -15,6 +15,58 @@ from .synth_llm import DEFAULT_TASK_TYPES, WarningLimiter, generate_qa_pairs
 from .synth_resume import build_signature, load_checkpoint, save_checkpoint
 from .synth_tables import extract_table_pairs
 
+RAG_SYSTEM_PROMPT = (
+    "You are a grounded RPG assistant. Use only the provided context to answer. "
+    "If the context does not contain the answer, say \"Not found in context.\" and ask "
+    "one concise clarifying question. Include citations in a final 'Citations' line "
+    "using the provided citation style."
+)
+
+RAG_FORMATS = {
+    "rules_qa": (
+        "### Answer Format\n"
+        "Answer: 1-3 sentences.\n"
+        "Rules Reference:\n"
+        "- Bullet list with citations.\n"
+        "Example: short, practical example.\n"
+        "Citations: (p. X)"
+    ),
+    "character_build": (
+        "### Answer Format\n"
+        "Assumptions: short list.\n"
+        "Recommendations: ranked bullets.\n"
+        "Tradeoffs: 1-3 bullets.\n"
+        "Next Questions: 1-2 clarifying questions.\n"
+        "Citations: (p. X) only when referencing mechanics."
+    ),
+    "scenario_seed": (
+        "### Answer Format\n"
+        "Scenario Summary: 2-4 sentences.\n"
+        "Hooks: 2-3 bullets.\n"
+        "Obstacles: 2-3 bullets.\n"
+        "Adjustments: easy/hard variants.\n"
+        "Citations: (p. X) if mechanics are referenced."
+    ),
+    "gm_guidance": (
+        "### Answer Format\n"
+        "Guidance: 3-5 bullets.\n"
+        "Table Safety/Clarifications: 1-2 bullets if relevant.\n"
+        "Citations: (p. X) for any rule references."
+    ),
+    "lore": (
+        "### Answer Format\n"
+        "Answer: 2-4 sentences.\n"
+        "Key Facts: 2-4 bullets.\n"
+        "Citations: (p. X)"
+    ),
+}
+
+DEFAULT_RAG_FORMAT = (
+    "### Answer Format\n"
+    "Answer: concise and grounded.\n"
+    "Citations: (p. X)"
+)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate synthetic Q/A pairs from extracted text.")
@@ -185,6 +237,14 @@ def main() -> None:
     coverage_max_pairs = coverage_config.get("max_pairs", 2)
     coverage_task_type = coverage_config.get("task_type", "auto")
 
+    rag_config = config.get("rag_mode", {}) or {}
+    rag_enabled = rag_config.get("enabled", False)
+    rag_emit_messages = rag_config.get("emit_messages", True)
+    rag_system_prompt = rag_config.get("system_prompt", RAG_SYSTEM_PROMPT)
+    rag_citation_style = rag_config.get("citation_style", "(p. {page})")
+    rag_format_overrides = rag_config.get("format_by_task_type", {}) or {}
+    rag_default_format = rag_config.get("default_format", DEFAULT_RAG_FORMAT)
+
     random.shuffle(task_types)
     task_type_cycle = itertools.cycle(task_types)
     if start_index > 0:
@@ -197,6 +257,11 @@ def main() -> None:
         if config_value in task_types:
             return config_value
         return fallback
+
+    def format_instructions_for(task_type: str) -> str:
+        if task_type in rag_format_overrides:
+            return rag_format_overrides[task_type]
+        return RAG_FORMATS.get(task_type, rag_default_format)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     append_output = output_config.get("append", False)
@@ -215,7 +280,14 @@ def main() -> None:
     requested_questions = int(checkpoint_stats.get("requested_questions", 0))
 
     with open(output_path, write_mode, encoding="utf-8") as f:
-        def write_record(pair: dict, fallback_task_type: str, source_page: int) -> bool:
+        def write_record(
+            pair: dict,
+            fallback_task_type: str,
+            source_page: int,
+            context_block: str,
+            context_pages: list,
+            answer_format: str,
+        ) -> bool:
             nonlocal count, total_samples, long_samples
             if max_samples is not None and count >= max_samples:
                 return False
@@ -237,13 +309,32 @@ def main() -> None:
                 )
                 pair_task_type = fallback_task_type
 
+            output_text = pair["output"]
+            if rag_enabled and pair.pop("_force_citation", False):
+                citation = rag_citation_style.format(page=source_page)
+                if "Citations:" not in output_text:
+                    output_text = f"{output_text}\n\nCitations: {citation}"
+
             record = {
                 "instruction": pair["instruction"],
-                "input": "",
-                "output": pair["output"],
+                "input": context_block if rag_enabled else "",
+                "output": output_text,
                 "task_type": pair_task_type,
                 "source_page": source_page,
             }
+            if rag_enabled:
+                record["context"] = context_block
+                record["citations"] = context_pages
+                record["answer_format"] = answer_format
+                if rag_emit_messages:
+                    record["messages"] = [
+                        {"role": "system", "content": rag_system_prompt},
+                        {
+                            "role": "user",
+                            "content": f"{pair['instruction']}\n\nContext:\n{context_block}",
+                        },
+                        {"role": "assistant", "content": output_text},
+                    ]
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
             count += 1
             total_samples += 1
@@ -268,12 +359,16 @@ def main() -> None:
             next_chars = context_config.get("next_chars", 0)
             prev_text = ""
             next_text = ""
+            prev_page = None
+            next_page = None
             if prev_chars > 0 and order_pos > 0:
                 prev_chunk = chunks[order[order_pos - 1]]
                 prev_text = prev_chunk.get("text", "")[-prev_chars:]
+                prev_page = prev_chunk.get("page")
             if next_chars > 0 and order_pos + 1 < len(order):
                 next_chunk = chunks[order[order_pos + 1]]
                 next_text = next_chunk.get("text", "")[:next_chars]
+                next_page = next_chunk.get("page")
 
             analysis = analyze_text(chunk["text"])
             page = chunk.get("page", "unknown")
@@ -313,12 +408,34 @@ def main() -> None:
             if table_pairs:
                 for pair in table_pairs:
                     pair["task_type"] = resolved_table_type
+                    if rag_enabled:
+                        pair["_force_citation"] = True
 
-            combined_text = (
-                f"{prev_text}\n\n{chunk['text']}\n\n{next_text}"
-                if (prev_text or next_text)
-                else chunk["text"]
-            )
+            context_pages = [page]
+            context_parts = [f"[Page {page}]\n{chunk['text']}"]
+            if prev_text:
+                context_pages.append(prev_page)
+                context_parts.insert(0, f"[Page {prev_page} - excerpt]\n{prev_text}")
+            if next_text:
+                context_pages.append(next_page)
+                context_parts.append(f"[Page {next_page} - excerpt]\n{next_text}")
+            context_pages = [p for p in context_pages if p is not None]
+            context_pages = list(dict.fromkeys(context_pages))
+            combined_text = "\n\n".join(context_parts)
+
+            grounding_instructions = ""
+            format_instructions = ""
+            if rag_enabled:
+                page_list = ", ".join(str(p) for p in context_pages) or "unknown"
+                grounding_instructions = (
+                    "### Grounding Rules\n"
+                    "- Use only the provided context.\n"
+                    "- If the context does not contain the answer, say \"Not found in context.\" "
+                    "and ask one concise clarifying question.\n"
+                    f"- Cite sources using {rag_citation_style} where page is one of: {page_list}.\n"
+                    "- Include a final 'Citations:' line.\n"
+                )
+                format_instructions = format_instructions_for(task_type)
 
             remaining = None if max_samples is None else max_samples - count
 
@@ -327,7 +444,14 @@ def main() -> None:
                     table_pairs = table_pairs[:remaining]
                 requested_questions += len(table_pairs)
                 for pair in table_pairs:
-                    if not write_record(pair, resolved_table_type, page):
+                    if not write_record(
+                        pair,
+                        resolved_table_type,
+                        page,
+                        combined_text,
+                        context_pages,
+                        resolved_table_type,
+                    ):
                         break
 
             if max_samples is not None and count >= max_samples:
@@ -354,9 +478,18 @@ def main() -> None:
                             repair_invalid_json=repair_invalid_json,
                             invalid_log_path=invalid_response_log,
                             warning_limiter=warning_limiter,
+                            grounding_instructions=grounding_instructions,
+                            format_instructions=format_instructions_for(coverage_type),
                         )
                         for pair in coverage_pairs:
-                            if not write_record(pair, coverage_type, page):
+                            if not write_record(
+                                pair,
+                                coverage_type,
+                                page,
+                                combined_text,
+                                context_pages,
+                                coverage_type,
+                            ):
                                 break
 
             if max_samples is not None and count >= max_samples:
@@ -390,7 +523,9 @@ def main() -> None:
                         max_completion_tokens=max_completion_tokens,
                         task_type=task_type,
                         allowed_task_types=task_types,
-                        extra_instructions=extra_instructions,
+                        extra_instructions="\n\n".join(
+                            part for part in [extra_instructions, grounding_instructions, format_instructions] if part
+                        ),
                         n_questions=n_questions,
                         repair_invalid_json=repair_invalid_json,
                         invalid_log_path=invalid_response_log,
@@ -398,7 +533,14 @@ def main() -> None:
                     )
 
                     for pair in qa_pairs:
-                        if not write_record(pair, task_type, page):
+                        if not write_record(
+                            pair,
+                            task_type,
+                            page,
+                            combined_text,
+                            context_pages,
+                            task_type,
+                        ):
                             break
 
             if resume_enabled and checkpoint_path:

@@ -20,6 +20,10 @@ Avoid generic summaries. Focus on precise, testable Q/A that can be answered fro
 Use the task type: {task_type}
 Allowed task types: {task_types}
 
+{grounding_instructions}
+
+{format_instructions}
+
 ### Output Format
 [
   {{
@@ -45,6 +49,8 @@ def generate_coverage_pairs(
     repair_invalid_json: bool,
     invalid_log_path: Optional[str],
     warning_limiter: Optional[WarningLimiter],
+    grounding_instructions: str,
+    format_instructions: str,
 ) -> List[Dict[str, str]]:
     if n_questions <= 0:
         return []
@@ -54,6 +60,8 @@ def generate_coverage_pairs(
         n_questions=n_questions,
         task_type=task_type,
         task_types=", ".join(allowed_task_types),
+        grounding_instructions=grounding_instructions,
+        format_instructions=format_instructions,
     )
 
     response = call_llm(

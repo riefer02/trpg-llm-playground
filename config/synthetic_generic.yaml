@@ -46,6 +46,38 @@ coverage:
   max_pairs: 2
   task_type: "rules_qa"
 
+rag_mode:
+  enabled: true
+  emit_messages: true
+  citation_style: "(p. {page})"
+  format_by_task_type:
+    rules_qa: |
+      Answer: 1-3 sentences.
+      Rules Reference:
+      - Bullet list with citations.
+      Example: short, practical example.
+      Citations: (p. X)
+    character_build: |
+      Assumptions: short list.
+      Recommendations: ranked bullets.
+      Tradeoffs: 1-3 bullets.
+      Next Questions: 1-2 clarifying questions.
+      Citations: (p. X) only when referencing mechanics.
+    scenario_seed: |
+      Scenario Summary: 2-4 sentences.
+      Hooks: 2-3 bullets.
+      Obstacles: 2-3 bullets.
+      Adjustments: easy/hard variants.
+      Citations: (p. X) if mechanics are referenced.
+    gm_guidance: |
+      Guidance: 3-5 bullets.
+      Table Safety/Clarifications: 1-2 bullets if relevant.
+      Citations: (p. X) for any rule references.
+    lore: |
+      Answer: 2-4 sentences.
+      Key Facts: 2-4 bullets.
+      Citations: (p. X)
+
 resume:
   enabled: true
   checkpoint_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_resume.json"
