@@ -81,6 +81,19 @@ generation:
 context:
   prev_chars: 400
   next_chars: 400
+tables:
+  enabled: true
+  min_rows: 4
+  min_cols: 2
+  max_rows: 12
+  max_cols: 5
+  max_pairs: 5
+  task_type: "rules_qa"
+coverage:
+  enabled: true
+  min_text_len: 1400
+  max_pairs: 2
+  task_type: "rules_qa"
 resume:
   enabled: true
   checkpoint_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_resume.json"
@@ -109,6 +122,7 @@ task_types:
   - "gm_guidance"
   - "lore"
 ```
+`tables` and `coverage` add lightweight passes to capture tabular stats and dense rule pages.
 
 **`config/rpg_finetune.yaml`**:
 ```yaml

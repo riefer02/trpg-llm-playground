@@ -10,6 +10,8 @@
 - `limits.enforce_max_samples`: if false, ignore `n_samples` cap.
 - `generation.shuffle`, `generation.shuffle_seed`: deterministic page order.
 - `resume.*`: enable/disable resume, checkpoint path, mismatch behavior.
+- `tables.*`: optional table extraction pass (min/max rows/cols, max pairs, task type).
+- `coverage.*`: optional coverage pass for dense pages (min text length, max pairs, task type).
 - `output.path`: synthetic JSONL output (use `{run_id}`).
 - `output.run_id`: `auto` generates a timestamp.
 - `output.append`: append to an existing output file.

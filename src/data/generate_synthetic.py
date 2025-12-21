@@ -9,9 +9,11 @@ import yaml
 from tqdm import tqdm
 
 from .synth_analysis import analyze_text, suggest_questions
+from .synth_coverage import generate_coverage_pairs
 from .synth_io import load_chunks
 from .synth_llm import DEFAULT_TASK_TYPES, WarningLimiter, generate_qa_pairs
 from .synth_resume import build_signature, load_checkpoint, save_checkpoint
+from .synth_tables import extract_table_pairs
 
 
 def main() -> None:
@@ -168,11 +170,33 @@ def main() -> None:
     quiet = logging_config.get("quiet", False)
     warning_limiter = WarningLimiter(0 if quiet else max_warnings)
 
+    tables_config = config.get("tables", {}) or {}
+    tables_enabled = tables_config.get("enabled", False)
+    tables_min_rows = tables_config.get("min_rows", 4)
+    tables_min_cols = tables_config.get("min_cols", 2)
+    tables_max_rows = tables_config.get("max_rows", 12)
+    tables_max_cols = tables_config.get("max_cols", 5)
+    tables_max_pairs = tables_config.get("max_pairs", 5)
+    tables_task_type = tables_config.get("task_type", "auto")
+
+    coverage_config = config.get("coverage", {}) or {}
+    coverage_enabled = coverage_config.get("enabled", False)
+    coverage_min_text_len = coverage_config.get("min_text_len", 1400)
+    coverage_max_pairs = coverage_config.get("max_pairs", 2)
+    coverage_task_type = coverage_config.get("task_type", "auto")
+
     random.shuffle(task_types)
     task_type_cycle = itertools.cycle(task_types)
     if start_index > 0:
         for _ in range(start_index):
             next(task_type_cycle)
+
+    def resolve_task_type(config_value: str, fallback: str) -> str:
+        if not config_value or config_value == "auto":
+            return fallback
+        if config_value in task_types:
+            return config_value
+        return fallback
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     append_output = output_config.get("append", False)
@@ -191,6 +215,50 @@ def main() -> None:
     requested_questions = int(checkpoint_stats.get("requested_questions", 0))
 
     with open(output_path, write_mode, encoding="utf-8") as f:
+        def write_record(pair: dict, fallback_task_type: str, source_page: int) -> bool:
+            nonlocal count, total_samples, long_samples
+            if max_samples is not None and count >= max_samples:
+                return False
+
+            missing = []
+            if "instruction" not in pair:
+                missing.append("instruction")
+            if "output" not in pair:
+                missing.append("output")
+            if missing:
+                print(f"Warning: Skipping malformed item on page {source_page}; missing {missing}.")
+                return False
+
+            pair_task_type = pair.get("task_type", fallback_task_type)
+            if pair_task_type not in task_types:
+                print(
+                    f"Warning: Invalid task_type '{pair_task_type}' on page {source_page}; "
+                    f"forcing to '{fallback_task_type}'."
+                )
+                pair_task_type = fallback_task_type
+
+            record = {
+                "instruction": pair["instruction"],
+                "input": "",
+                "output": pair["output"],
+                "task_type": pair_task_type,
+                "source_page": source_page,
+            }
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            count += 1
+            total_samples += 1
+            combined_len = (
+                len(record.get("input", ""))
+                + len(record.get("instruction", ""))
+                + len(record.get("output", ""))
+            )
+            if combined_len > 4096 * 4:
+                long_samples += 1
+            if flush_every and count % flush_every == 0:
+                f.flush()
+            pbar.update(1)
+            return True
+
         for order_pos in range(start_index, len(order)):
             if max_samples is not None and count >= max_samples:
                 break
@@ -208,7 +276,25 @@ def main() -> None:
                 next_text = next_chunk.get("text", "")[:next_chars]
 
             analysis = analyze_text(chunk["text"])
-            if analysis["low_signal"]:
+            page = chunk.get("page", "unknown")
+            table_like = analysis["table_like"]
+            if table_like:
+                table_like_pages += 1
+
+            table_pairs = []
+            if tables_enabled and table_like:
+                default_table_type = task_types[0] if task_types else "rules_qa"
+                table_pairs = extract_table_pairs(
+                    chunk["text"],
+                    task_type=resolve_task_type(tables_task_type, default_table_type),
+                    min_rows=tables_min_rows,
+                    min_cols=tables_min_cols,
+                    max_rows=tables_max_rows,
+                    max_cols=tables_max_cols,
+                    max_pairs=tables_max_pairs,
+                )
+
+            if analysis["low_signal"] and not table_pairs:
                 skipped_low_signal += 1
                 continue
 
@@ -217,89 +303,103 @@ def main() -> None:
                 analysis["table_like"],
                 analysis["low_signal"],
             )
-            if n_questions <= 0:
-                skipped_low_signal += 1
-                continue
-
-            if max_samples is not None:
-                remaining = max_samples - count
-                n_questions = min(n_questions, remaining)
-            requested_questions += n_questions
-
-            extra_instructions = ""
-            if analysis["table_like"]:
-                table_like_pages += 1
-                extra_instructions = (
-                    "### Table Hint\n"
-                    "If the text looks tabular, extract key rows into compact Q/A pairs."
-                )
+            if analysis["low_signal"]:
+                n_questions = 0
 
             processed_pages += 1
 
             task_type = next(task_type_cycle)
+            resolved_table_type = resolve_task_type(tables_task_type, task_type)
+            if table_pairs:
+                for pair in table_pairs:
+                    pair["task_type"] = resolved_table_type
+
             combined_text = (
-                f\"{prev_text}\\n\\n{chunk['text']}\\n\\n{next_text}\"
+                f"{prev_text}\n\n{chunk['text']}\n\n{next_text}"
                 if (prev_text or next_text)
-                else chunk[\"text\"]
-            )
-            qa_pairs = generate_qa_pairs(
-                combined_text,
-                model=model,
-                temperature=temperature,
-                max_output_tokens=max_output_tokens,
-                max_completion_tokens=max_completion_tokens,
-                task_type=task_type,
-                allowed_task_types=task_types,
-                extra_instructions=extra_instructions,
-                n_questions=n_questions,
-                repair_invalid_json=repair_invalid_json,
-                invalid_log_path=invalid_response_log,
-                warning_limiter=warning_limiter,
+                else chunk["text"]
             )
 
-            for pair in qa_pairs:
-                if max_samples is not None and count >= max_samples:
-                    break
+            remaining = None if max_samples is None else max_samples - count
 
-                missing = []
-                if "instruction" not in pair:
-                    missing.append("instruction")
-                if "output" not in pair:
-                    missing.append("output")
-                if missing:
-                    page = chunk.get("page", "unknown")
-                    print(f"Warning: Skipping malformed item on page {page}; missing {missing}.")
-                    continue
+            if table_pairs:
+                if remaining is not None:
+                    table_pairs = table_pairs[:remaining]
+                requested_questions += len(table_pairs)
+                for pair in table_pairs:
+                    if not write_record(pair, resolved_table_type, page):
+                        break
 
-                pair_task_type = pair.get("task_type", task_type)
-                if pair_task_type not in task_types:
-                    page = chunk.get("page", "unknown")
-                    print(
-                        f"Warning: Invalid task_type '{pair_task_type}' on page {page}; "
-                        f"forcing to '{task_type}'."
+            if max_samples is not None and count >= max_samples:
+                break
+
+            if coverage_enabled and not analysis["low_signal"] and coverage_max_pairs > 0:
+                if analysis["text_len"] >= coverage_min_text_len:
+                    remaining = None if max_samples is None else max_samples - count
+                    if remaining is None or remaining > 0:
+                        coverage_count = coverage_max_pairs
+                        if remaining is not None:
+                            coverage_count = min(coverage_count, remaining)
+                        requested_questions += coverage_count
+                        coverage_type = resolve_task_type(coverage_task_type, task_type)
+                        coverage_pairs = generate_coverage_pairs(
+                            combined_text,
+                            model=model,
+                            temperature=temperature,
+                            max_output_tokens=max_output_tokens,
+                            max_completion_tokens=max_completion_tokens,
+                            task_type=coverage_type,
+                            allowed_task_types=task_types,
+                            n_questions=coverage_count,
+                            repair_invalid_json=repair_invalid_json,
+                            invalid_log_path=invalid_response_log,
+                            warning_limiter=warning_limiter,
+                        )
+                        for pair in coverage_pairs:
+                            if not write_record(pair, coverage_type, page):
+                                break
+
+            if max_samples is not None and count >= max_samples:
+                break
+
+            extra_instructions = ""
+            if table_like:
+                if tables_enabled:
+                    extra_instructions = (
+                        "### Table Hint\n"
+                        "If the text looks tabular, prioritize rules, definitions, or exceptions "
+                        "instead of listing every row."
                     )
-                    pair_task_type = task_type
+                else:
+                    extra_instructions = (
+                        "### Table Hint\n"
+                        "If the text looks tabular, extract key rows into compact Q/A pairs."
+                    )
 
-                record = {
-                    "instruction": pair["instruction"],
-                    "input": "",
-                    "output": pair["output"],
-                    "task_type": pair_task_type,
-                    "source_page": chunk["page"],
-                }
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
-                count += 1
-                total_samples += 1
-                combined_len = (
-                    len(record.get("input", ""))
-                    + len(record.get("instruction", ""))
-                    + len(record.get("output", ""))
-                )
-                if combined_len > 4096 * 4:
-                    long_samples += 1
-                if flush_every and count % flush_every == 0:
-                    f.flush()
-                pbar.update(1)
+            if n_questions > 0:
+                remaining = None if max_samples is None else max_samples - count
+                if remaining is not None:
+                    n_questions = min(n_questions, remaining)
+                if n_questions > 0:
+                    requested_questions += n_questions
+                    qa_pairs = generate_qa_pairs(
+                        combined_text,
+                        model=model,
+                        temperature=temperature,
+                        max_output_tokens=max_output_tokens,
+                        max_completion_tokens=max_completion_tokens,
+                        task_type=task_type,
+                        allowed_task_types=task_types,
+                        extra_instructions=extra_instructions,
+                        n_questions=n_questions,
+                        repair_invalid_json=repair_invalid_json,
+                        invalid_log_path=invalid_response_log,
+                        warning_limiter=warning_limiter,
+                    )
+
+                    for pair in qa_pairs:
+                        if not write_record(pair, task_type, page):
+                            break
 
             if resume_enabled and checkpoint_path:
                 checkpoint_payload = {
