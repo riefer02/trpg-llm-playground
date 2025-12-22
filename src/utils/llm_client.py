@@ -40,6 +40,7 @@ def _call_chat(
     temperature: Optional[float],
     max_completion_tokens: Optional[int],
     max_tokens: Optional[int],
+    response_format: Optional[dict] = None,
 ) -> str:
     request_kwargs = {
         "model": model,
@@ -51,6 +52,8 @@ def _call_chat(
         request_kwargs["max_completion_tokens"] = max_completion_tokens
     elif max_tokens is not None:
         request_kwargs["max_tokens"] = max_tokens
+    if response_format:
+        request_kwargs["response_format"] = response_format
 
     try:
         response = client.chat.completions.create(**request_kwargs)
@@ -133,6 +136,7 @@ def call_llm(
     max_output_tokens: Optional[int] = None,
     max_completion_tokens: Optional[int] = None,
     max_tokens: Optional[int] = None,
+    response_format: Optional[dict] = None,
 ) -> str:
     """
     Calls an LLM (OpenAI compatible) to generate a response.
@@ -143,18 +147,20 @@ def call_llm(
         print("Warning: OPENAI_API_KEY not found in environment. Returning mock response.")
         # Return a valid JSON list structure for the smoke test to parse
         return """
-[
-  {
-    "instruction": "Explain the basic combat mechanic.",
-    "output": "Combat is turn-based, involving move and action phases.",
-    "thought_process": "Simulated reasoning for smoke test."
-  },
-  {
-    "instruction": "What is a mech?",
-    "output": "A mech is a giant robot piloted by a player character.",
-    "thought_process": "Checking definitions in mock context."
-  }
-]
+{
+  "examples": [
+    {
+      "instruction": "Explain the basic combat mechanic.",
+      "output": "Combat is turn-based, involving move and action phases.",
+      "task_type": "rules_qa"
+    },
+    {
+      "instruction": "What is a mech?",
+      "output": "A mech is a giant robot piloted by a player character.",
+      "task_type": "rules_qa"
+    }
+  ]
+}
 """
 
     try:
@@ -171,7 +177,7 @@ def call_llm(
                 max_tokens,
             )
 
-        content = _call_chat(client, model, prompt, temperature, max_completion_tokens, max_tokens)
+        content = _call_chat(client, model, prompt, temperature, max_completion_tokens, max_tokens, response_format=response_format)
         if content.strip():
             return content
 

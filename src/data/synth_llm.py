@@ -1,6 +1,8 @@
 import json
 from typing import Dict, List, Optional
 
+from pydantic import BaseModel, Field
+
 from ..utils.llm_client import call_llm
 from .synth_io import log_invalid_response
 
@@ -11,6 +13,21 @@ DEFAULT_TASK_TYPES = [
     "gm_guidance",
     "lore",
 ]
+
+
+class SyntheticExample(BaseModel):
+    """A single synthetic Q/A example."""
+
+    instruction: str = Field(description="The user prompt or question.")
+    output: str = Field(description="The ideal, high-quality response.")
+    task_type: str = Field(description="The category of the task (e.g., rules_qa, lore).")
+
+
+class SyntheticExampleList(BaseModel):
+    """A list of synthetic Q/A examples."""
+
+    examples: List[SyntheticExample]
+
 
 PROMPT_TEMPLATE = """
 You are an expert Game Master and Rules Lawyer for the Lancer RPG system.
@@ -36,10 +53,13 @@ Choose prompts and answers that match this task type.
    - **Tactical Scenarios**: "I'm in situation Z, what can I do?"
    - **Lore/Flavor**: "Describe the history of..."
 2. **Reasoning**: Think step-by-step internally, but do not include reasoning in the output.
-3. **Format**: Output a valid JSON list of objects. Each object must have:
-   - `instruction`: The user prompt.
-   - `output`: The correct, high-quality answer.
-   - `task_type`: One of: {task_types}
+
+### Format
+Output MUST be a valid JSON object with an "examples" key containing a list of objects. Each object must have:
+- `instruction`: The user prompt.
+- `output`: The correct, high-quality answer.
+- `task_type`: One of: {task_types}
+"""
 
 ### Output Format
 [
@@ -77,26 +97,37 @@ def parse_json_list(
 ) -> Optional[List[Dict[str, str]]]:
     try:
         clean_response = response.replace("```json", "").replace("```", "").strip()
-        start_idx = clean_response.find("[")
-        end_idx = clean_response.rfind("]") + 1
-        if start_idx != -1 and end_idx != -1:
-            json_str = clean_response[start_idx:end_idx]
-            return json.loads(json_str)
-        msg = f"Warning: Could not find JSON list in response. First 50 chars: {clean_response[:50]}"
-        if warning_limiter:
-            warning_limiter.warn(msg)
-        else:
-            print(msg)
-        return None
-    except json.JSONDecodeError as e:
-        msg = f"Error parsing JSON: {e}. Response snippet: {response[:100]}"
+        # Look for the start of a JSON object or list
+        start_obj = clean_response.find("{")
+        start_list = clean_response.find("[")
+
+        if start_obj != -1 and (start_list == -1 or start_obj < start_list):
+            # Probably an object like {"examples": [...]}
+            end_idx = clean_response.rfind("}") + 1
+            json_str = clean_response[start_obj:end_idx]
+            data = json.loads(json_str)
+            if isinstance(data, dict) and "examples" in data:
+                # Validate with Pydantic
+                validated = SyntheticExampleList(**data)
+                return [item.model_dump() for item in validated.examples]
+        elif start_list != -1:
+            # Fallback for old list format
+            end_idx = clean_response.rfind("]") + 1
+            json_str = clean_response[start_list:end_idx]
+            data = json.loads(json_str)
+            if isinstance(data, list):
+                # Validate each item
+                validated_list = [SyntheticExample(**item).model_dump() for item in data]
+                return validated_list
+
+        msg = f"Warning: Could not find valid JSON examples in response. Snippet: {clean_response[:100]}"
         if warning_limiter:
             warning_limiter.warn(msg)
         else:
             print(msg)
         return None
     except Exception as e:
-        msg = f"Unexpected error: {e}"
+        msg = f"Error parsing or validating JSON: {e}. Snippet: {response[:100]}"
         if warning_limiter:
             warning_limiter.warn(msg)
         else:
@@ -162,6 +193,7 @@ def generate_qa_pairs(
         temperature=temperature,
         max_output_tokens=max_output_tokens,
         max_completion_tokens=max_completion_tokens,
+        response_format={"type": "json_object"} if "gpt-4" in model or "gpt-3.5" in model else None,
     )
     if not response.strip():
         print("Warning: Empty response from model. Skipping this chunk.")

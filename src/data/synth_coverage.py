@@ -24,16 +24,11 @@ Allowed task types: {task_types}
 
 {format_instructions}
 
-### Output Format
-[
-  {{
-    "instruction": "...",
-    "output": "...",
-    "task_type": "rules_qa"
-  }}
-]
-
-Return JSON list only. Do not include markdown fences.
+### Format
+Output MUST be a valid JSON object with an "examples" key containing a list of objects. Each object must have:
+- `instruction`: The user prompt.
+- `output`: The correct, high-quality answer.
+- `task_type`: One of: {task_types}
 """
 
 
@@ -70,6 +65,7 @@ def generate_coverage_pairs(
         temperature=temperature,
         max_output_tokens=max_output_tokens,
         max_completion_tokens=max_completion_tokens,
+        response_format={"type": "json_object"} if "gpt-4" in model or "gpt-3.5" in model else None,
     )
     if not response.strip():
         msg = "Warning: Empty coverage response from model."
