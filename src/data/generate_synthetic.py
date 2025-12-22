@@ -68,6 +68,30 @@ DEFAULT_RAG_FORMAT = (
 )
 
 
+def build_doc_adjacency(chunks: list) -> tuple[dict, dict]:
+    """
+    Build prev/next adjacency maps based on document order.
+
+    This ensures prev/next context comes from adjacent text in the source document
+    even when we shuffle the sampling order for generation diversity.
+    """
+
+    def doc_sort_key(item: dict):
+        if isinstance(item.get("page_start"), int):
+            return (int(item.get("page_start")), int(item.get("chunk_index", 0)))
+        if isinstance(item.get("page"), int):
+            return (int(item.get("page")), 0)
+        return (10**9, 0)
+
+    sorted_indices = sorted(range(len(chunks)), key=lambda i: doc_sort_key(chunks[i]))
+    prev_by_idx = {}
+    next_by_idx = {}
+    for pos, idx in enumerate(sorted_indices):
+        prev_by_idx[idx] = sorted_indices[pos - 1] if pos > 0 else None
+        next_by_idx[idx] = sorted_indices[pos + 1] if pos + 1 < len(sorted_indices) else None
+    return prev_by_idx, next_by_idx
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate synthetic Q/A pairs from extracted text.")
     parser.add_argument("--config", type=str, default="config/synthetic_generic.yaml", help="Path to config YAML.")
@@ -94,6 +118,23 @@ def main() -> None:
     raw_path_template = ingest_config.get("raw_output_path", "dataset/raw_extracted.json")
     input_path = raw_path_template.format(**path_vars)
 
+    # Optional: Use rag_ingest chunks instead of raw per-page extraction
+    rag_ingest = config.get("rag_ingest", {}) or {}
+    chunks_path = None
+    if rag_ingest.get("enabled", False):
+        chunks_path_tmpl = rag_ingest.get("chunks_output_path")
+        if chunks_path_tmpl:
+            resolved = chunks_path_tmpl.format(**path_vars)
+            if os.path.exists(resolved):
+                chunks_path = resolved
+                input_path = resolved
+                print(f"Using RAG chunks input: {input_path}")
+            else:
+                print(
+                    f"Warning: rag_ingest.enabled is true but chunks file not found at {resolved}. "
+                    "Falling back to raw ingest output."
+                )
+
     if not os.path.exists(input_path):
         print(f"Error: Input file {input_path} not found. Did you run ingest_pdf.py?")
         return
@@ -102,6 +143,10 @@ def main() -> None:
     if not isinstance(chunks, list):
         print(f"Error: Input file {input_path} did not contain a list of chunks.")
         return
+
+    # Build adjacency in document order so prev/next context is stable even when we shuffle sampling order.
+    # For page-based raw chunks this is page number; for RAG chunks it is (page_start, chunk_index).
+    prev_by_idx, next_by_idx = build_doc_adjacency(chunks)
 
     generation_config = config.get("generation", {}) or {}
     shuffle_enabled = generation_config.get("shuffle", True)
@@ -326,6 +371,14 @@ def main() -> None:
                 record["context"] = context_block
                 record["citations"] = context_pages
                 record["answer_format"] = answer_format
+                # Optional richer provenance when chunk artifacts are used
+                if isinstance(chunk.get("doc_id"), str):
+                    record["source_doc_id"] = chunk.get("doc_id")
+                if isinstance(chunk.get("chunk_id"), str):
+                    record["source_chunk_id"] = chunk.get("chunk_id")
+                if isinstance(chunk.get("page_start"), int) and isinstance(chunk.get("page_end"), int):
+                    record["source_page_start"] = chunk.get("page_start")
+                    record["source_page_end"] = chunk.get("page_end")
                 if rag_emit_messages:
                     record["messages"] = [
                         {"role": "system", "content": rag_system_prompt},
@@ -361,17 +414,26 @@ def main() -> None:
             next_text = ""
             prev_page = None
             next_page = None
-            if prev_chars > 0 and order_pos > 0:
-                prev_chunk = chunks[order[order_pos - 1]]
-                prev_text = prev_chunk.get("text", "")[-prev_chars:]
-                prev_page = prev_chunk.get("page")
-            if next_chars > 0 and order_pos + 1 < len(order):
-                next_chunk = chunks[order[order_pos + 1]]
-                next_text = next_chunk.get("text", "")[:next_chars]
-                next_page = next_chunk.get("page")
+            # IMPORTANT: prev/next must be based on document adjacency, not shuffled sampling order.
+            if prev_chars > 0:
+                prev_idx = prev_by_idx.get(order[order_pos])
+                if prev_idx is not None:
+                    prev_chunk = chunks[prev_idx]
+                    prev_text = prev_chunk.get("text", "")[-prev_chars:]
+                    prev_page = prev_chunk.get("page") or prev_chunk.get("page_start")
+            if next_chars > 0:
+                next_idx = next_by_idx.get(order[order_pos])
+                if next_idx is not None:
+                    next_chunk = chunks[next_idx]
+                    next_text = next_chunk.get("text", "")[:next_chars]
+                    next_page = next_chunk.get("page") or next_chunk.get("page_start")
 
             analysis = analyze_text(chunk["text"])
-            page = chunk.get("page", "unknown")
+            page = chunk.get("page")
+            if page is None and isinstance(chunk.get("page_start"), int):
+                page = int(chunk["page_start"])
+            if page is None:
+                page = "unknown"
             table_like = analysis["table_like"]
             if table_like:
                 table_like_pages += 1
@@ -412,7 +474,12 @@ def main() -> None:
                         pair["_force_citation"] = True
 
             context_pages = [page]
-            context_parts = [f"[Page {page}]\n{chunk['text']}"]
+            # Use page span label if available
+            if isinstance(chunk.get("page_start"), int) and isinstance(chunk.get("page_end"), int):
+                label = f"{chunk['page_start']}-{chunk['page_end']}"
+            else:
+                label = str(page)
+            context_parts = [f"[Page {label}]\n{chunk['text']}"]
             if prev_text:
                 context_pages.append(prev_page)
                 context_parts.insert(0, f"[Page {prev_page} - excerpt]\n{prev_text}")

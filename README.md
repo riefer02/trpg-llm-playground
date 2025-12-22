@@ -40,6 +40,18 @@ llm-playground/
 
 See `docs/CONFIG.md` for a concise reference of the synthetic + training config blocks.
 
+## 🔎 Optional RAG (Chunks + Semantic Search)
+
+This repo now supports an **optional** RAG ingestion path that creates **heading-aware, overlapping chunks with stable IDs** and can build a **FAISS** index for top-k semantic search.
+
+- Chunk the PDF into stable artifacts:
+  - Enable `rag_ingest.enabled: true` in `config/synthetic_generic.yaml`
+  - Run: `python -m src.rag.chunk_pdf --config config/synthetic_generic.yaml`
+- Build/query an index (optional):
+  - Install: `pip install -r requirements_rag.txt`
+  - Build: `python -m src.rag.build_index --config config/synthetic_generic.yaml`
+  - Query: `python -m src.rag.query --config config/synthetic_generic.yaml --query "How does Overcharge work?"`
+
 ## 🛠️ Deployment Instructions
 
 ### Phase 1: Local Setup & Verification

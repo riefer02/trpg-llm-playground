@@ -59,18 +59,19 @@ Output MUST be a valid JSON object with an "examples" key containing a list of o
 - `instruction`: The user prompt.
 - `output`: The correct, high-quality answer.
 - `task_type`: One of: {task_types}
-"""
 
 ### Output Format
-[
-  {{
-    "instruction": "...",
-    "output": "...",
-    "task_type": "rules_qa"
-  }}
-]
+{{
+  "examples": [
+    {{
+      "instruction": "...",
+      "output": "...",
+      "task_type": "rules_qa"
+    }}
+  ]
+}}
 
-Do not include any markdown formatting (like ```json) outside the standard response if possible, just the raw JSON list.
+Do not include any markdown formatting (like ```json) outside the response. Return JSON only.
 """
 
 

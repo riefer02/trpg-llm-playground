@@ -1,7 +1,7 @@
 # Synthetic Data Generation Configuration
 
 project_name: "lancer" # Change this for different RPGs (e.g., "dnd5e", "cyberpunk")
-dataset_tag: "v1_ctx4096" # Label for compatibility (Version + Max Context)
+dataset_tag: "v2_ctx4096" # Label for compatibility (Version + Max Context)
 
 ingest:
   # Path to your Source Book PDF on Google Drive
@@ -21,7 +21,7 @@ debug:
   max_samples: 10
 
 limits:
-  enforce_max_samples: true
+  enforce_max_samples: false
 
 generation:
   shuffle: true
@@ -77,6 +77,37 @@ rag_mode:
       Answer: 2-4 sentences.
       Key Facts: 2-4 bullets.
       Citations: (p. X)
+
+# Optional: RAG ingestion artifacts (heading-aware, overlapping chunks with stable IDs).
+# This is intentionally separate from rag_mode (which controls synthetic record formatting).
+rag_ingest:
+  enabled: true
+  # Writes chunk JSONL that can be used by synthetic generation and later retrieval.
+  chunks_output_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_chunks.jsonl"
+  # If true, chunker prepends a short section header to chunk text for better retrieval.
+  include_section_prefix: true
+  chunking:
+    max_tokens: 900
+    overlap_tokens: 150
+    min_chunk_tokens: 200
+  heading_detection:
+    # Heading if font size >= (body_font_size + min_size_delta)
+    min_size_delta: 1.5
+    # Map heading size above body to hierarchical level.
+    # Example: >= body+4 => level 1, >= body+2 => level 2, else level 3.
+    level_deltas: [4.0, 2.0]
+    # Ignore headings that are too long (often body text artifacts).
+    max_heading_words: 14
+
+# Optional: RAG index (FAISS) built from rag_ingest chunks.
+rag_index:
+  enabled: false
+  embedding:
+    provider: "openai"
+    model: "text-embedding-3-small"
+    batch_size: 64
+  faiss:
+    index_output_dir: "/content/drive/MyDrive/llm_experiments/indexes/{project_name}_{dataset_tag}"
 
 resume:
   enabled: true

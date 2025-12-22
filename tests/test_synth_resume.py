@@ -169,6 +169,37 @@ class TestSynthResume(unittest.TestCase):
             first = json.loads(lines[0])
             self.assertNotEqual(first["instruction"], "old")
 
+    def test_signature_changes_with_rag_ingest(self):
+        config = {
+            "project_name": "lancer",
+            "dataset_tag": "test",
+            "ingest": {"raw_output_path": "raw.jsonl"},
+            "output": {"path": "out.jsonl"},
+            "task_types": ["rules_qa"],
+            "generation": {"shuffle": False, "shuffle_seed": 1337},
+            "limits": {"enforce_max_samples": False},
+            "rag_mode": {"enabled": False},
+            "rag_ingest": {"enabled": False},
+        }
+        sig_a = build_signature(
+            config,
+            "raw.jsonl",
+            "out.jsonl",
+            ["rules_qa"],
+            False,
+            1337,
+        )
+        config["rag_ingest"] = {"enabled": True, "chunks_output_path": "chunks.jsonl"}
+        sig_b = build_signature(
+            config,
+            "raw.jsonl",
+            "out.jsonl",
+            ["rules_qa"],
+            False,
+            1337,
+        )
+        self.assertNotEqual(sig_a, sig_b)
+
 
 if __name__ == "__main__":
     unittest.main()

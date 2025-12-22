@@ -32,6 +32,7 @@ def build_signature(
         "tables": config.get("tables"),
         "coverage": config.get("coverage"),
         "rag_mode": config.get("rag_mode"),
+        "rag_ingest": config.get("rag_ingest"),
         "llm": config.get("llm"),
         "shuffle": shuffle,
         "shuffle_seed": shuffle_seed,

@@ -13,6 +13,8 @@
 - `tables.*`: optional table extraction pass (min/max rows/cols, max pairs, task type).
 - `coverage.*`: optional coverage pass for dense pages (min text length, max pairs, task type).
 - `rag_mode.*`: emit RAG-aware records (context + citations + optional `messages`) and enforce grounded formatting.
+- `rag_ingest.*`: (optional) create heading-aware overlapping chunks with stable IDs for later retrieval.
+- `rag_index.*`: (optional) build a FAISS index over `rag_ingest` chunks for semantic search.
 
 ## Validation
 - `scripts/validate_synth.py`: validates JSON/JSONL for RAG-aware fields (messages/context/citations).
@@ -36,3 +38,20 @@
 - `colab/run_synthetic_only.ipynb`: ingest + synthetic only.
 - `colab/run_train_after_synth.ipynb`: training + eval only.
 - `colab/run_pipeline.ipynb`: full pipeline.
+
+## Optional RAG (Chunks + FAISS)
+
+### Chunk artifact (recommended first step)
+- Enable `rag_ingest.enabled: true`
+- Run:
+  - `python -m src.rag.chunk_pdf --config config/synthetic_generic.yaml`
+- Output: `rag_ingest.chunks_output_path` (JSONL; one chunk per line with stable IDs).
+
+### Build FAISS index (semantic search)
+- Enable `rag_index.enabled: true`
+- Install deps:
+  - `pip install -r requirements_rag.txt`
+- Run:
+  - `python -m src.rag.build_index --config config/synthetic_generic.yaml`
+- Query:
+  - `python -m src.rag.query --config config/synthetic_generic.yaml --query "How does Overcharge work?" --top_k 5`
