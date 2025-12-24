@@ -42,12 +42,19 @@ llm-playground/
 │   │   └── evaluate_rpg.py     # RPG-specific benchmark framework
 │   ├── rag/                # RAG ingestion & indexing
 │   └── utils/              # Shared utilities
+├── scripts/
+│   ├── local_chat.py       # Local chat with Ollama + RAG
+│   ├── validate_synth.py   # Validate synthetic data
+│   └── audit_synth.py      # Audit grounding quality
 ├── colab/                  # Notebooks for remote execution
 ├── docs/                   # Documentation
-│   └── CONFIG.md           # Configuration reference
+│   ├── CONFIG.md           # Configuration reference
+│   └── LOCAL_CHAT.md       # Local Ollama + RAG setup guide
 ├── tests/                  # Local smoke tests
-├── requirements.txt        # Full pipeline dependencies
-└── requirements_synth.txt  # Synthetic-only dependencies
+├── requirements.txt        # Full pipeline (Colab training)
+├── requirements_synth.txt  # Synthetic generation only
+├── requirements_rag.txt    # RAG indexing only
+└── requirements_local.txt  # Local chat with Ollama
 ```
 
 ## 📘 Configuration Quick Ref
@@ -78,6 +85,7 @@ Available templates:
 The synthetic generation pipeline includes multiple quality enhancement passes:
 
 ### Automatic Quality Features
+
 - **Negative Examples** (12% default): Teaches model to say "Not found in context" when appropriate
 - **Answer Verification**: LLM-scored quality filtering with automatic correction
 - **Semantic Deduplication**: Removes similar questions using embeddings
@@ -85,12 +93,14 @@ The synthetic generation pipeline includes multiple quality enhancement passes:
 - **Difficulty Stratification**: Basic/Intermediate/Advanced question mix
 
 ### Post-Generation Reports
+
 ```bash
 # Generate a quality dashboard after synthetic generation
 python -m src.data.synth_report --input dataset/my_synthetic.jsonl --output report.md
 ```
 
 ### Model Evaluation Benchmark
+
 ```bash
 # Create evaluation template
 python -m src.training.evaluate_rpg --create-template evals/my_game_eval.yaml
@@ -98,6 +108,7 @@ python -m src.training.evaluate_rpg --create-template evals/my_game_eval.yaml
 ```
 
 Configuration for quality features in `synthetic_generic.yaml`:
+
 ```yaml
 negatives:
   enabled: true
@@ -158,20 +169,21 @@ uv run --with PyYAML --with tqdm --with openai python tests/smoke_test.py
 The configs use variables (`project_name`, `dataset_tag`) to organize your experiments in Google Drive automatically.
 
 **`config/synthetic_generic.yaml`**:
+
 ```yaml
-project_name: "lancer"          # e.g., "dnd5e", "cyberpunk"
-dataset_tag: "v1_ctx4096"       # Version + Context Length
+project_name: "lancer" # e.g., "dnd5e", "cyberpunk"
+dataset_tag: "v1_ctx4096" # Version + Context Length
 ingest:
   pdf_path: "/content/drive/MyDrive/Books/Lancer Core Book.pdf"
   raw_output_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_raw.jsonl"
   output_format: "jsonl"
   flush_every: 50
 debug:
-  enabled: false                # Set true for quick end-to-end tests
-  max_pages: 5                  # Limit ingest to first N pages
-  max_samples: 10               # Limit synthetic samples
+  enabled: false # Set true for quick end-to-end tests
+  max_pages: 5 # Limit ingest to first N pages
+  max_samples: 10 # Limit synthetic samples
 limits:
-  enforce_max_samples: true     # Set false to ignore n_samples cap
+  enforce_max_samples: true # Set false to ignore n_samples cap
 generation:
   shuffle: true
   shuffle_seed: 1337
@@ -223,19 +235,23 @@ task_types:
   - "gm_guidance"
   - "lore"
 ```
+
 `tables` and `coverage` add lightweight passes to capture tabular stats and dense rule pages.
 
 Validate a synthetic JSONL (optional):
+
 ```bash
 python scripts/validate_synth.py --input /content/drive/MyDrive/llm_experiments/datasets/lancer_v1_ctx4096_synthetic_*.jsonl
 ```
 
 Sample-audit grounding quality (optional):
+
 ```bash
 python scripts/audit_synth.py --input /content/drive/MyDrive/llm_experiments/datasets/lancer_v1_ctx4096_synthetic_*.jsonl --sample 50
 ```
 
 **`config/rpg_finetune.yaml`**:
+
 ```yaml
 project_name: "lancer"
 dataset_tag: "v1_ctx4096"
@@ -246,6 +262,7 @@ training:
 ```
 
 **Drive Structure (Created Automatically)**:
+
 ```text
 MyDrive/
   llm_experiments/
@@ -291,11 +308,11 @@ Synthetic generation writes each record to Drive as it is produced and periodica
 
 **For local deployment, 7-8B is the sweet spot**—excellent quality for domain-specific tasks while running on consumer hardware.
 
-| Model | Unsloth ID | Training | Inference |
-|-------|------------|----------|-----------|
-| **Qwen2.5-7B** (recommended) | `unsloth/Qwen2.5-7B-Instruct-bnb-4bit` | T4 (free) or A100 | RTX 3060+, M1 Mac |
-| Llama-3.1-8B | `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit` | T4 (free) or A100 | RTX 3060+, M1 Mac |
-| Qwen2.5-32B | `unsloth/Qwen2.5-32B-Instruct-bnb-4bit` | A100 required | Not practical locally |
+| Model                        | Unsloth ID                                    | Training          | Inference             |
+| ---------------------------- | --------------------------------------------- | ----------------- | --------------------- |
+| **Qwen2.5-7B** (recommended) | `unsloth/Qwen2.5-7B-Instruct-bnb-4bit`        | T4 (free) or A100 | RTX 3060+, M1 Mac     |
+| Llama-3.1-8B                 | `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit` | T4 (free) or A100 | RTX 3060+, M1 Mac     |
+| Qwen2.5-32B                  | `unsloth/Qwen2.5-32B-Instruct-bnb-4bit`       | A100 required     | Not practical locally |
 
 > **Why not 32B?** TTRPG rules lookup is factual retrieval with RAG grounding—you don't need frontier-level reasoning. A fine-tuned 7B + good RAG beats a generic 70B for this use case, and users can actually run it locally.
 
@@ -304,24 +321,48 @@ Synthetic generation writes each record to Drive as it is produced and periodica
 After training, push your model to Hugging Face Hub (cells included in notebooks), then deploy:
 
 ### Option 1: HF Spaces Demo (Quickest)
+
 ```bash
 # Model on HF Hub + Gradio app = instant demo
 # See notes/hf_spaces_deployment.md for full template
 ```
+
 - Zero-GPU: Free, cold starts ~10-30s
 - GPU Space: $0.60-0.90/hr, no cold starts
 
-### Option 2: Local with Ollama
+### Option 2: Local with Ollama + RAG
+
+Run the full assistant locally with RAG retrieval:
+
 ```bash
-# Export to GGUF (cell in notebook)
-ollama create my-rules-assistant -f Modelfile
-ollama run my-rules-assistant
+# 1. Install dependencies
+pip install -r requirements_local.txt
+
+# 2. Import your trained model (after GGUF export from Colab)
+ollama create lancer-rules -f Modelfile
+
+# 3. Run chat with RAG (Web UI)
+python scripts/local_chat.py --chunks dataset/lancer_v1_chunks.jsonl --ui
+
+# Or CLI mode
+python scripts/local_chat.py --chunks dataset/lancer_v1_chunks.jsonl
 ```
-- ~4.5GB download (Q4 quantized)
-- Runs on RTX 3060+, M1/M2 Mac
-- Fully offline, private
+
+**Test before training** - Validate your RAG pipeline with a base model:
+
+```bash
+ollama pull qwen2.5:7b
+python scripts/local_chat.py --model qwen2.5:7b --ui
+```
+
+See `docs/LOCAL_CHAT.md` for full setup guide.
+
+- ~4.5GB model download (Q4 quantized)
+- Runs on RTX 3060+, M1/M2 Mac (16GB RAM)
+- Fully offline, private, no API costs
 
 ### Option 3: API Deployment
+
 - **Modal/Replicate**: Serverless, pay-per-request
 - **RunPod/Vast.ai**: Dedicated GPU, ~$0.20-0.40/hr
 
@@ -334,7 +375,7 @@ ollama run my-rules-assistant
 
 ## Dependencies
 
--   **Unsloth**: Faster, memory-efficient Llama 3 training.
--   **Hugging Face**: Transformers, Datasets, PEFT.
--   **PyMuPDF**: Robust PDF text extraction.
--   **OpenAI**: Synthetic data generation.
+- **Unsloth**: Faster, memory-efficient Llama 3 training.
+- **Hugging Face**: Transformers, Datasets, PEFT.
+- **PyMuPDF**: Robust PDF text extraction.
+- **OpenAI**: Synthetic data generation.

@@ -31,10 +31,15 @@ The goal is to create models capable of understanding game rules, lore, and gene
 - **`src/training/finetune_lora.py`**: Unsloth/LoRA training. Preserve `FastLanguageModel` loading logic.
 - **`src/training/evaluate_rpg.py`**: RPG-specific benchmark framework (accuracy, grounding, citations).
 
+### Local Inference
+- **`scripts/local_chat.py`**: Local chat with Ollama + RAG. Supports CLI and Gradio UI modes.
+- **`requirements_local.txt`**: Dependencies for local chat (sentence-transformers, faiss-cpu, ollama, gradio).
+- **`docs/LOCAL_CHAT.md`**: Setup guide for local Ollama + RAG deployment.
+
 ### Notebooks
-- **`colab/run_pipeline.ipynb`**: Full pipeline execution driver.
+- **`colab/run_pipeline.ipynb`**: Full pipeline (ingest → synth → train → push to HF Hub).
 - **`colab/run_synthetic_only.ipynb`**: Synthetic generation only.
-- **`colab/run_train_after_synth.ipynb`**: Training after existing synthetic data.
+- **`colab/run_train_after_synth.ipynb`**: Training + HF Hub push (assumes dataset exists).
 
 ## Conventions
 - **Paths**: Use relative paths in code, assuming execution from the project root (`llm-playground/`).
@@ -48,9 +53,17 @@ The goal is to create models capable of understanding game rules, lore, and gene
 - ✅ **Quality Pipeline**: Verification, deduplication, negative examples.
 - ✅ **Multi-RPG Templates**: D&D, Lancer, Blades configs ready to use.
 - ✅ **Evaluation Benchmark**: RPG-specific accuracy/grounding/citation metrics.
+- ✅ **HF Hub Integration**: Notebooks include cells for pushing models to Hugging Face.
+- ✅ **GGUF Export**: Optional cell for Ollama/local deployment.
+- ✅ **Local Chat Script**: `scripts/local_chat.py` with Ollama + RAG for local testing.
+
+## Deployment Options
+1. **HF Spaces**: Gradio app with RAG (see `notes/hf_spaces_deployment.md` for template).
+2. **Local Ollama**: GGUF model + `local_chat.py` for fully offline use.
+3. **API Services**: Modal, Replicate, or dedicated GPU hosting.
 
 ## Future Ideas (If Needed)
 - **Adversarial Examples**: Edge cases and trick questions for robustness
 - **Entity-Aware Coverage**: Extract named abilities/items and generate targeted questions
-- **Interactive Review UI**: Web interface to approve/reject samples before training
+- **Desktop App**: Tauri/Electron wrapper for end-user distribution
 

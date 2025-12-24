@@ -1,0 +1,17 @@
+# Local chat with Ollama + RAG
+# Usage: pip install -r requirements_local.txt
+
+# RAG components
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+numpy>=1.24.0
+
+# Ollama Python client
+ollama>=0.3.0
+
+# Web UI (optional but recommended)
+gradio>=4.0.0
+
+# Config parsing
+PyYAML>=6.0
+
