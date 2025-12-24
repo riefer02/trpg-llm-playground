@@ -289,12 +289,41 @@ Synthetic generation writes each record to Drive as it is produced and periodica
 
 ### Recommended Models (Unsloth Optimized)
 
--   **High Performance (A100/H100)**: `unsloth/Qwen2.5-32B-Instruct-bnb-4bit`
-    -   Best for complex reasoning and deep rule understanding.
-    -   Requires ~20GB+ VRAM.
--   **Balanced / Free Tier (T4)**: `unsloth/Qwen2.5-7B-Instruct-bnb-4bit`
-    -   Good reasoning, fits on free Colab tier.
-    -   Alternative: `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit`.
+**For local deployment, 7-8B is the sweet spot**—excellent quality for domain-specific tasks while running on consumer hardware.
+
+| Model | Unsloth ID | Training | Inference |
+|-------|------------|----------|-----------|
+| **Qwen2.5-7B** (recommended) | `unsloth/Qwen2.5-7B-Instruct-bnb-4bit` | T4 (free) or A100 | RTX 3060+, M1 Mac |
+| Llama-3.1-8B | `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit` | T4 (free) or A100 | RTX 3060+, M1 Mac |
+| Qwen2.5-32B | `unsloth/Qwen2.5-32B-Instruct-bnb-4bit` | A100 required | Not practical locally |
+
+> **Why not 32B?** TTRPG rules lookup is factual retrieval with RAG grounding—you don't need frontier-level reasoning. A fine-tuned 7B + good RAG beats a generic 70B for this use case, and users can actually run it locally.
+
+## 🚀 Deployment Options
+
+After training, push your model to Hugging Face Hub (cells included in notebooks), then deploy:
+
+### Option 1: HF Spaces Demo (Quickest)
+```bash
+# Model on HF Hub + Gradio app = instant demo
+# See notes/hf_spaces_deployment.md for full template
+```
+- Zero-GPU: Free, cold starts ~10-30s
+- GPU Space: $0.60-0.90/hr, no cold starts
+
+### Option 2: Local with Ollama
+```bash
+# Export to GGUF (cell in notebook)
+ollama create my-rules-assistant -f Modelfile
+ollama run my-rules-assistant
+```
+- ~4.5GB download (Q4 quantized)
+- Runs on RTX 3060+, M1/M2 Mac
+- Fully offline, private
+
+### Option 3: API Deployment
+- **Modal/Replicate**: Serverless, pay-per-request
+- **RunPod/Vast.ai**: Dedicated GPU, ~$0.20-0.40/hr
 
 ### Best Practices & "Pro" Tips
 
