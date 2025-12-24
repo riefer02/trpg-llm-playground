@@ -21,11 +21,16 @@ The goal is to create models capable of understanding game rules, lore, and gene
 - **`src/data/generate_synthetic.py`**: Main generation orchestrator. Integrates all quality modules.
 - **`src/data/synth_prompts.py`**: Configurable prompt templates (no more hardcoded system strings).
 - **`src/data/synth_multiturn.py`**: Multi-turn conversation generation.
+- **`src/data/synth_walkthrough.py`**: Guided step-by-step walkthrough conversations.
+- **`src/data/synth_filter.py`**: Topic-based chunk filtering (keyword + semantic).
 - **`src/data/synth_difficulty.py`**: Basic/Intermediate/Advanced stratification.
 - **`src/data/synth_negatives.py`**: "Not found in context" example generation.
 - **`src/data/synth_verify.py`**: LLM-based answer verification and correction.
 - **`src/data/synth_dedup.py`**: Semantic deduplication via sentence embeddings.
 - **`src/data/synth_report.py`**: Post-generation quality dashboard.
+
+### Utilities
+- **`scripts/merge_datasets.py`**: Combine multiple JSONL datasets with optional deduplication.
 
 ### Training & Evaluation
 - **`src/training/finetune_lora.py`**: Unsloth/LoRA training. Preserve `FastLanguageModel` loading logic.
@@ -56,6 +61,9 @@ The goal is to create models capable of understanding game rules, lore, and gene
 - ✅ **HF Hub Integration**: Notebooks include cells for pushing models to Hugging Face.
 - ✅ **GGUF Export**: Optional cell for Ollama/local deployment.
 - ✅ **Local Chat Script**: `scripts/local_chat.py` with Ollama + RAG for local testing.
+- ✅ **Topic-Focused Generation**: Filter chunks by section keywords or semantic similarity.
+- ✅ **Walkthrough Mode**: Generate guided step-by-step conversations for processes like character creation.
+- ✅ **Dataset Merging**: Combine focused datasets with general ones using `scripts/merge_datasets.py`.
 
 ## Deployment Options
 1. **HF Spaces**: Gradio app with RAG (see `notes/hf_spaces_deployment.md` for template).

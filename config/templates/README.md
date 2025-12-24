@@ -5,6 +5,8 @@ Each template provides game-specific customization for synthetic data generation
 
 ## Available Templates
 
+### System Templates
+
 | Template             | Game System        | Description             |
 | -------------------- | ------------------ | ----------------------- |
 | `lancer.yaml`        | Lancer RPG         | Tactical mech combat    |
@@ -12,6 +14,12 @@ Each template provides game-specific customization for synthetic data generation
 | `pathfinder2e.yaml`  | Pathfinder 2e      | Crunchy fantasy tactics |
 | `cyberpunk_red.yaml` | Cyberpunk RED      | Dystopian future        |
 | `blades.yaml`        | Blades in the Dark | Heist-focused narrative |
+
+### Focused/Walkthrough Templates
+
+| Template                            | Purpose                                 |
+| ----------------------------------- | --------------------------------------- |
+| `lancer_character_walkthrough.yaml` | Guided character creation conversations |
 
 ## Usage
 
@@ -45,3 +53,39 @@ Templates use these placeholders:
 - `{topic}` - The game system name
 - `{project_name}` - Short identifier for file naming
 - `{dataset_tag}` - Version tag for the dataset
+
+## Topic-Focused Data Generation
+
+For focused datasets (like character creation walkthroughs), use `topic_filter`:
+
+```yaml
+topic_filter:
+  enabled: true
+  section_keywords: ["character", "creation", "pilot"]
+  semantic:
+    enabled: true
+    query: "How to create a character"
+    threshold: 0.25
+```
+
+Then enable `walkthrough` mode for guided conversations:
+
+```yaml
+walkthrough:
+  enabled: true
+  topic: "creating a pilot character"
+  n_conversations: 20
+  turns_per_conversation: 3
+```
+
+## Merging Datasets
+
+Combine focused datasets with general ones:
+
+```bash
+# Simple merge
+python scripts/merge_datasets.py general.jsonl walkthrough.jsonl -o combined.jsonl
+
+# With deduplication
+python scripts/merge_datasets.py *.jsonl -o combined.jsonl --dedup --threshold 0.85
+```

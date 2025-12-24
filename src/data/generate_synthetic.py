@@ -11,6 +11,7 @@ from tqdm import tqdm
 from .synth_analysis import analyze_text, suggest_questions
 from .synth_coverage import generate_coverage_pairs
 from .synth_dedup import RunningDeduplicator
+from .synth_filter import apply_topic_filter
 from .synth_difficulty import (
     DEFAULT_DISTRIBUTION,
     DifficultyStats,
@@ -26,6 +27,7 @@ from .synth_multiturn import (
     select_turn_count,
     should_generate_multiturn,
 )
+from .synth_walkthrough import generate_walkthrough_series
 from .synth_negatives import generate_negative_pairs, should_generate_negative
 from .synth_prompts import PromptConfig
 from .synth_resume import build_signature, load_checkpoint, save_checkpoint
@@ -160,6 +162,16 @@ def main() -> None:
     if not isinstance(chunks, list):
         print(f"Error: Input file {input_path} did not contain a list of chunks.")
         return
+
+    # Apply topic filtering if configured
+    topic_filter_config = config.get("topic_filter", {}) or {}
+    if topic_filter_config.get("enabled", False):
+        original_count = len(chunks)
+        chunks = apply_topic_filter(chunks, topic_filter_config)
+        print(f"Topic filter: {original_count} -> {len(chunks)} chunks")
+        if not chunks:
+            print("Error: No chunks remaining after topic filter. Check your filter config.")
+            return
 
     # Build adjacency in document order so prev/next context is stable even when we shuffle sampling order.
     # For page-based raw chunks this is page number; for RAG chunks it is (page_start, chunk_index).
@@ -364,6 +376,36 @@ def main() -> None:
         for _ in range(start_index):
             next(task_type_cycle)
 
+    # Walkthrough mode: generate guided step-by-step conversations
+    walkthrough_config = config.get("walkthrough", {}) or {}
+    walkthrough_enabled = walkthrough_config.get("enabled", False)
+    walkthrough_records = []
+    if walkthrough_enabled:
+        walkthrough_topic = walkthrough_config.get("topic", "the process")
+        walkthrough_n = walkthrough_config.get("n_conversations", 10)
+        walkthrough_turns = walkthrough_config.get("turns_per_conversation", 3)
+        print(f"Generating {walkthrough_n} walkthrough conversations for: {walkthrough_topic}")
+
+        walkthrough_records = generate_walkthrough_series(
+            chunks=chunks,
+            prompt_config=prompt_config,
+            walkthrough_topic=walkthrough_topic,
+            model=model,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            max_completion_tokens=max_completion_tokens,
+            n_conversations=walkthrough_n,
+            turns_per_conversation=walkthrough_turns,
+            citation_style=rag_citation_style if rag_enabled else "(p. {page})",
+            grounding_instructions="",
+            format_instructions="",
+            rag_system_prompt=rag_system_prompt if rag_enabled else "",
+            repair_invalid_json=repair_invalid_json,
+            invalid_log_path=invalid_response_log,
+            warning_limiter=warning_limiter,
+        )
+        print(f"Generated {len(walkthrough_records)} walkthrough conversations")
+
     def resolve_task_type(config_value: str, fallback: str) -> str:
         if not config_value or config_value == "auto":
             return fallback
@@ -391,6 +433,18 @@ def main() -> None:
     table_like_pages = int(checkpoint_stats.get("table_like_pages", 0))
     processed_pages = int(checkpoint_stats.get("processed_pages", 0))
     requested_questions = int(checkpoint_stats.get("requested_questions", 0))
+
+    # Write walkthrough records first if we have them
+    walkthrough_written = 0
+    if walkthrough_records and write_mode == "w":
+        with open(output_path, "w", encoding="utf-8") as wf:
+            for record in walkthrough_records:
+                wf.write(json.dumps(record, ensure_ascii=False) + "\n")
+                walkthrough_written += 1
+        write_mode = "a"  # Append remaining records
+        count = walkthrough_written
+        total_samples = walkthrough_written
+        print(f"Wrote {walkthrough_written} walkthrough records")
 
     with open(output_path, write_mode, encoding="utf-8") as f:
         def write_record(
@@ -874,6 +928,10 @@ def main() -> None:
 
     if difficulty_enabled and difficulty_stats:
         difficulty_stats.print_summary(target_distribution=difficulty_distribution)
+
+    if walkthrough_written > 0:
+        print(f"\n--- Walkthrough Summary ---")
+        print(f"Walkthrough conversations: {walkthrough_written}")
 
     print(f"\nSuccessfully generated {total_samples} pairs. Saved to {output_path}")
 

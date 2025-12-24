@@ -120,6 +120,58 @@ For each question, provide:
 Do not include any markdown formatting. Return JSON only.
 """
 
+DEFAULT_WALKTHROUGH_TEMPLATE = """
+You are an expert guide helping players learn {topic}. Your goal is to create step-by-step walkthrough conversations.
+
+### Context (Source Material)
+{text}
+
+### Walkthrough Task
+Generate a {n_turns}-turn guided conversation where a player asks how to do something, and the assistant walks them through it step by step.
+
+### Walkthrough Topic
+{walkthrough_topic}
+
+### Conversation Structure
+- **Turn 1**: Player asks how to start or what to do first
+- **Turn 2**: Assistant explains the first steps with specific details from the context
+- **Turn 3+**: Player asks follow-up questions, assistant continues guiding them through the process
+- **Final turn**: Assistant provides a summary or "next steps" to complete the process
+
+### Requirements
+1. Each response must be grounded in the provided context
+2. Responses should be instructional and encouraging
+3. Include specific details like page references, stat names, or step numbers
+4. The conversation should feel like a patient teacher guiding a new player
+5. If the full process isn't covered in context, acknowledge what's missing and focus on what IS there
+
+### Types of Follow-ups to Include
+- "What do I do next?"
+- "Can you explain [specific term] more?"
+- "What are my options for [choice point]?"
+- "Is there anything I should watch out for?"
+- "How do I decide between X and Y?"
+
+{grounding_instructions}
+
+{format_instructions}
+
+### Output Format
+Return a valid JSON object:
+{{
+  "messages": [
+    {{"role": "user", "content": "How do I create a character?"}},
+    {{"role": "assistant", "content": "Great question! Let's start with... (p. X)"}},
+    {{"role": "user", "content": "What's next after that?"}},
+    {{"role": "assistant", "content": "Now you'll need to... (p. Y)"}}
+  ],
+  "topic_summary": "walkthrough for {walkthrough_topic}",
+  "task_type": "character_build"
+}}
+
+Do not include markdown formatting. Return JSON only.
+"""
+
 DEFAULT_VERIFICATION_TEMPLATE = """
 You are a quality assurance expert for {topic} training data.
 
@@ -174,6 +226,9 @@ class PromptConfig:
         )
         self.verification_template = prompts_config.get(
             "verification_template", DEFAULT_VERIFICATION_TEMPLATE
+        )
+        self.walkthrough_template = prompts_config.get(
+            "walkthrough_template", DEFAULT_WALKTHROUGH_TEMPLATE
         )
 
     def format_system_persona(self) -> str:
@@ -243,5 +298,22 @@ class PromptConfig:
             context=context,
             question=question,
             answer=answer,
+            topic=self.topic,
+        )
+
+    def format_walkthrough_prompt(
+        self,
+        text: str,
+        walkthrough_topic: str,
+        n_turns: int = 3,
+        grounding_instructions: str = "",
+        format_instructions: str = "",
+    ) -> str:
+        return self.walkthrough_template.format(
+            text=text,
+            walkthrough_topic=walkthrough_topic,
+            n_turns=n_turns,
+            grounding_instructions=grounding_instructions,
+            format_instructions=format_instructions,
             topic=self.topic,
         )

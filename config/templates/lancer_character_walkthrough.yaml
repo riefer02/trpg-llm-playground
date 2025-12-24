@@ -1,0 +1,161 @@
+# Focused Synthetic Data Config: Lancer Character Creation Walkthrough
+#
+# This config generates guided, step-by-step walkthrough conversations
+# specifically for helping players learn character/pilot creation.
+#
+# Usage:
+#   python -m src.data.generate_synthetic --config config/templates/lancer_character_walkthrough.yaml
+
+project_name: "lancer"
+dataset_tag: "character_walkthrough"
+
+# Topic for prompt context
+topic: "Lancer RPG pilot and mech creation"
+
+# ============================================================================
+# TOPIC FILTERING - Only process chunks about character creation
+# ============================================================================
+topic_filter:
+  enabled: true
+  # Match chunks where section_path or heading contains ANY of these keywords
+  section_keywords:
+    - "character"
+    - "pilot"
+    - "creation"
+    - "background"
+    - "skills"
+    - "talents"
+    - "triggers"
+    - "license"
+    - "LL0"
+    - "level 0"
+  # Match chunks where text contains ANY of these keywords
+  text_keywords: []
+  # If true, ALL keywords must match (AND). If false, ANY keyword matches (OR)
+  match_all: false
+  # Optional: Use semantic similarity to find relevant chunks
+  semantic:
+    enabled: true
+    query: "How to create a character pilot in Lancer, including background, skills, triggers, and starting mech"
+    # Minimum similarity score (0-1, lower = more inclusive)
+    threshold: 0.25
+    # Max chunks to keep (null = no limit)
+    top_k: 30
+    model: "all-MiniLM-L6-v2"
+
+# ============================================================================
+# WALKTHROUGH MODE - Higher multi-turn ratio, guided conversations
+# ============================================================================
+walkthrough:
+  enabled: true
+  # Topic description for the walkthrough
+  topic: "creating a pilot character in Lancer"
+  # How many walkthrough conversations to generate
+  n_conversations: 20
+  # Turns per conversation (3 = 6 messages: user-assistant-user-assistant-user-assistant)
+  turns_per_conversation: 3
+
+# Keep standard generation but with walkthrough-friendly settings
+n_samples: 50
+
+# ============================================================================
+# INPUT/OUTPUT PATHS
+# ============================================================================
+ingest:
+  raw_output_path: "dataset/{project_name}_{dataset_tag}_raw.jsonl"
+
+rag_ingest:
+  enabled: true
+  chunks_output_path: "dataset/{project_name}_v1_chunks.jsonl"  # Use existing chunks
+
+output:
+  path: "dataset/{project_name}_{dataset_tag}_{run_id}.jsonl"
+  run_id: "auto"
+  append: false
+  flush_every: 10
+
+# ============================================================================
+# GENERATION SETTINGS
+# ============================================================================
+generation:
+  shuffle: true
+  shuffle_seed: 42
+
+# Narrow task types to character-building focus
+task_types:
+  - "character_build"
+  - "rules_qa"
+
+# Higher multi-turn ratio for walkthrough-style content
+multiturn:
+  enabled: true
+  ratio: 0.60  # 60% multi-turn for guided conversations
+  min_turns: 2
+  max_turns: 4
+  task_types:
+    - "character_build"
+
+# Difficulty skews toward beginner-friendly
+difficulty:
+  enabled: true
+  distribution:
+    basic: 0.50      # "What is X?" - good for new players
+    intermediate: 0.40  # "How do I choose between X and Y?"
+    advanced: 0.10   # Edge cases
+
+# ============================================================================
+# RAG MODE - Grounded answers with citations
+# ============================================================================
+rag_mode:
+  enabled: true
+  emit_messages: true
+  citation_style: "(p. {page})"
+  system_prompt: |
+    You are a helpful Lancer RPG guide specializing in character creation.
+    Help players step-by-step through making their pilot and mech.
+    Always cite page numbers. Be encouraging and clear.
+  format_by_task_type:
+    character_build: |
+      ### Answer Format
+      Step: What to do in this step.
+      Details: Specific options or choices.
+      Tips: Beginner-friendly advice.
+      Next: What comes after this step (if applicable).
+      Citations: (p. X)
+    rules_qa: |
+      ### Answer Format
+      Answer: Direct answer to the question.
+      Context: Why this matters for character creation.
+      Citations: (p. X)
+
+# ============================================================================
+# QUALITY SETTINGS
+# ============================================================================
+negatives:
+  enabled: false  # Skip negatives for walkthrough-focused data
+
+verification:
+  enabled: true
+  threshold: 4
+  use_corrections: true
+
+deduplication:
+  enabled: true
+  similarity_threshold: 0.80  # Slightly more permissive for varied walkthroughs
+  model: "all-MiniLM-L6-v2"
+  cross_chunk: true
+
+# ============================================================================
+# LLM SETTINGS
+# ============================================================================
+llm:
+  model: "gpt-4o-mini"
+  temperature: 0.7  # Slightly higher for more varied walkthroughs
+  repair_invalid_json: true
+  invalid_response_log: "dataset/invalid_walkthrough_responses.log"
+
+logging:
+  quiet: false
+  max_warnings: 10
+  hud_every: 5
+

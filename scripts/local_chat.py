@@ -250,9 +250,6 @@ def main():
     )
     args = parser.parse_args()
 
-    global TOP_K
-    TOP_K = args.top_k
-
     # Check Ollama is running
     try:
         models_response = ollama.list()
@@ -263,7 +260,17 @@ def main():
         sys.exit(1)
 
     # Check model exists
-    model_names = [m["name"].split(":")[0] for m in models_response.get("models", [])]
+    # Handle both old dict format and new Model object format
+    models_list = (
+        models_response.get("models", [])
+        if isinstance(models_response, dict)
+        else getattr(models_response, "models", [])
+    )
+    model_names = []
+    for m in models_list:
+        name = m.get("name", "") if isinstance(m, dict) else getattr(m, "model", "")
+        model_names.append(name.split(":")[0])
+
     if args.model not in model_names and args.model.split(":")[0] not in model_names:
         print(f"⚠️  Warning: Model '{args.model}' not found in Ollama.")
         print(f"   Available models: {model_names}")

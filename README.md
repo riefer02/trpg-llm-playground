@@ -44,12 +44,14 @@ llm-playground/
 │   └── utils/              # Shared utilities
 ├── scripts/
 │   ├── local_chat.py       # Local chat with Ollama + RAG
+│   ├── merge_datasets.py   # Combine multiple datasets
 │   ├── validate_synth.py   # Validate synthetic data
 │   └── audit_synth.py      # Audit grounding quality
 ├── colab/                  # Notebooks for remote execution
 ├── docs/                   # Documentation
 │   ├── CONFIG.md           # Configuration reference
-│   └── LOCAL_CHAT.md       # Local Ollama + RAG setup guide
+│   ├── LOCAL_CHAT.md       # Local Ollama + RAG setup guide
+│   └── FOCUSED_GENERATION.md # Topic-focused data & merging guide
 ├── tests/                  # Local smoke tests
 ├── requirements.txt        # Full pipeline (Colab training)
 ├── requirements_synth.txt  # Synthetic generation only
@@ -79,6 +81,22 @@ Available templates:
 | `lancer.yaml` | Lancer RPG | Tactical mech combat |
 | `blades.yaml` | Blades in the Dark | Heist-focused narrative play |
 | `_base.yaml` | Template | Starting point for new systems |
+
+### Focused Generation & Dataset Merging
+
+Need more depth on a specific topic (like character creation walkthroughs)? See **[docs/FOCUSED_GENERATION.md](docs/FOCUSED_GENERATION.md)** for:
+
+- **Topic filtering**: Generate data from specific sections only
+- **Walkthrough mode**: Step-by-step guided conversations
+- **Dataset merging**: Combine general + focused datasets
+
+```bash
+# Quick example: character creation walkthrough
+python -m src.data.generate_synthetic --config config/templates/lancer_character_walkthrough.yaml
+
+# Merge with general dataset
+python scripts/merge_datasets.py general.jsonl walkthrough.jsonl -o combined.jsonl --dedup
+```
 
 ## 🔬 Quality Enhancement Pipeline
 
