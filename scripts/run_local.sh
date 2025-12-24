@@ -44,8 +44,16 @@ python -m src.data.generate_synthetic --config "$CONFIG"
 # Step 3: Generate quality report
 echo ""
 echo "📊 Step 3: Generating quality report..."
-# Find the most recent synthetic file
-LATEST=$(ls -t dataset/*_synthetic_*.jsonl 2>/dev/null | head -1)
+# Find the most recent generated file (matches _synthetic_, _walkthrough_, etc.)
+# Extract project_name and dataset_tag from config to build the pattern
+PROJECT=$(grep -E "^project_name:" "$CONFIG" | awk '{print $2}' | tr -d '"')
+TAG=$(grep -E "^dataset_tag:" "$CONFIG" | awk '{print $2}' | tr -d '"')
+if [ -n "$PROJECT" ] && [ -n "$TAG" ]; then
+    LATEST=$(ls -t dataset/${PROJECT}_${TAG}_*.jsonl 2>/dev/null | head -1)
+else
+    # Fallback: find most recent .jsonl that's not a chunks file
+    LATEST=$(ls -t dataset/*.jsonl 2>/dev/null | grep -v "_chunks.jsonl" | head -1)
+fi
 if [ -n "$LATEST" ]; then
     REPORT="${LATEST%.jsonl}_report.md"
     python -m src.data.synth_report --input "$LATEST" --output "$REPORT"
