@@ -11,8 +11,21 @@ from tqdm import tqdm
 from .synth_analysis import analyze_text, suggest_questions
 from .synth_coverage import generate_coverage_pairs
 from .synth_dedup import RunningDeduplicator
+from .synth_difficulty import (
+    DEFAULT_DISTRIBUTION,
+    DifficultyStats,
+    build_difficulty_prompt_section,
+    get_distribution_for_task,
+    select_difficulty,
+)
 from .synth_io import load_chunks
 from .synth_llm import DEFAULT_TASK_TYPES, WarningLimiter, generate_qa_pairs
+from .synth_multiturn import (
+    MultiturnStats,
+    generate_multiturn_conversation,
+    select_turn_count,
+    should_generate_multiturn,
+)
 from .synth_negatives import generate_negative_pairs, should_generate_negative
 from .synth_prompts import PromptConfig
 from .synth_resume import build_signature, load_checkpoint, save_checkpoint
@@ -304,6 +317,23 @@ def main() -> None:
     # Track negative example counts for ratio management
     positive_count = 0
     negative_count = 0
+
+    # Multi-turn conversation config
+    multiturn_config = config.get("multiturn", {}) or {}
+    multiturn_enabled = multiturn_config.get("enabled", False)
+    multiturn_ratio = multiturn_config.get("ratio", 0.20)
+    multiturn_min_turns = multiturn_config.get("min_turns", 2)
+    multiturn_max_turns = multiturn_config.get("max_turns", 3)
+    multiturn_task_types = multiturn_config.get("task_types") or task_types
+    multiturn_stats = MultiturnStats() if multiturn_enabled else None
+    multiturn_count = 0
+
+    # Difficulty stratification config
+    difficulty_config = config.get("difficulty", {}) or {}
+    difficulty_enabled = difficulty_config.get("enabled", False)
+    difficulty_distribution = difficulty_config.get("distribution", DEFAULT_DISTRIBUTION)
+    difficulty_overrides = difficulty_config.get("overrides", {}) or {}
+    difficulty_stats = DifficultyStats() if difficulty_enabled else None
 
     tables_config = config.get("tables", {}) or {}
     tables_enabled = tables_config.get("enabled", False)
@@ -614,6 +644,14 @@ def main() -> None:
                         "If the text looks tabular, extract key rows into compact Q/A pairs."
                     )
 
+            # Difficulty stratification - select difficulty for this chunk's questions
+            difficulty_instructions = ""
+            current_difficulty = None
+            if difficulty_enabled:
+                dist = get_distribution_for_task(task_type, difficulty_distribution, difficulty_overrides)
+                current_difficulty = select_difficulty(dist, shuffle_seed, order_pos)
+                difficulty_instructions = build_difficulty_prompt_section(current_difficulty)
+
             if n_questions > 0:
                 remaining = None if max_samples is None else max_samples - count
                 if remaining is not None:
@@ -629,7 +667,12 @@ def main() -> None:
                         task_type=task_type,
                         allowed_task_types=task_types,
                         extra_instructions="\n\n".join(
-                            part for part in [extra_instructions, grounding_instructions, format_instructions] if part
+                            part for part in [
+                                extra_instructions,
+                                difficulty_instructions,
+                                grounding_instructions,
+                                format_instructions,
+                            ] if part
                         ),
                         n_questions=n_questions,
                         repair_invalid_json=repair_invalid_json,
@@ -637,6 +680,11 @@ def main() -> None:
                         warning_limiter=warning_limiter,
                         prompt_config=prompt_config,
                     )
+
+                    # Track difficulty for stats
+                    if difficulty_enabled and current_difficulty and qa_pairs:
+                        for _ in qa_pairs:
+                            difficulty_stats.record(current_difficulty)
 
                     # Verification pass
                     if verification_enabled and qa_pairs:
@@ -704,6 +752,63 @@ def main() -> None:
                             break
                         negative_count += 1
 
+            # Multi-turn conversation generation
+            if (
+                multiturn_enabled
+                and task_type in multiturn_task_types
+                and should_generate_multiturn(order_pos, multiturn_ratio, shuffle_seed)
+                and not analysis["low_signal"]
+            ):
+                remaining = None if max_samples is None else max_samples - count
+                if remaining is None or remaining > 0:
+                    n_turns = select_turn_count(
+                        multiturn_min_turns,
+                        multiturn_max_turns,
+                        shuffle_seed,
+                        order_pos,
+                    )
+                    conversation = generate_multiturn_conversation(
+                        combined_text,
+                        prompt_config=prompt_config,
+                        model=model,
+                        temperature=temperature,
+                        max_output_tokens=max_output_tokens,
+                        max_completion_tokens=max_completion_tokens,
+                        task_type=task_type,
+                        n_turns=n_turns,
+                        citation_style=rag_citation_style,
+                        grounding_instructions=grounding_instructions,
+                        format_instructions=format_instructions,
+                        repair_invalid_json=repair_invalid_json,
+                        invalid_log_path=invalid_response_log,
+                        warning_limiter=warning_limiter,
+                    )
+                    if conversation:
+                        multiturn_stats.record_success(conversation["turn_count"])
+                        # Write multi-turn as a special record with full messages
+                        mt_record = {
+                            "instruction": conversation["messages"][0]["content"],
+                            "output": conversation["messages"][-1]["content"],
+                            "task_type": conversation["task_type"],
+                            "source_page": page,
+                            "is_multiturn": True,
+                            "turn_count": conversation["turn_count"],
+                            "topic_summary": conversation.get("topic_summary", ""),
+                        }
+                        if rag_enabled:
+                            mt_record["context"] = combined_text
+                            mt_record["citations"] = context_pages
+                            mt_record["messages"] = [
+                                {"role": "system", "content": rag_system_prompt},
+                            ] + conversation["messages"]
+                        f.write(json.dumps(mt_record, ensure_ascii=False) + "\n")
+                        count += 1
+                        total_samples += 1
+                        multiturn_count += 1
+                        pbar.update(1)
+                    else:
+                        multiturn_stats.record_failure()
+
             if resume_enabled and checkpoint_path:
                 checkpoint_payload = {
                     "run_id": run_id,
@@ -762,6 +867,13 @@ def main() -> None:
 
     if dedup_enabled and deduplicator:
         deduplicator.stats.print_summary()
+
+    if multiturn_enabled and multiturn_stats:
+        multiturn_stats.print_summary()
+        print(f"Multi-turn conversations: {multiturn_count} ({multiturn_count/max(1,total_samples):.1%} of total)")
+
+    if difficulty_enabled and difficulty_stats:
+        difficulty_stats.print_summary(target_distribution=difficulty_distribution)
 
     print(f"\nSuccessfully generated {total_samples} pairs. Saved to {output_path}")
 

@@ -188,3 +188,42 @@ deduplication:
   model: "all-MiniLM-L6-v2"
   # Run deduplication across entire dataset (true) or per-chunk (false)
   cross_chunk: true
+
+# ============================================================================
+# DIVERSITY ENHANCEMENTS (P2)
+# ============================================================================
+
+# Multi-turn conversation generation
+# Generates realistic 2-4 turn conversations with follow-ups
+multiturn:
+  enabled: true
+  # Target ratio of multi-turn conversations in dataset
+  ratio: 0.20
+  # Turn count range (each turn = 1 user + 1 assistant message)
+  min_turns: 2
+  max_turns: 3
+  # Which task types to generate multi-turn for (null = all)
+  task_types:
+    - "rules_qa"
+    - "character_build"
+    - "gm_guidance"
+
+# Difficulty stratification
+# Ensures diverse cognitive complexity in generated questions
+difficulty:
+  enabled: true
+  # Distribution of difficulty levels (should sum to ~1.0)
+  distribution:
+    basic: 0.30 # Direct factual recall
+    intermediate: 0.50 # Synthesis and comparison
+    advanced: 0.20 # Edge cases, complex reasoning
+  # Optional: Task-specific overrides
+  overrides:
+    lore:
+      basic: 0.50
+      intermediate: 0.40
+      advanced: 0.10
+    character_build:
+      basic: 0.20
+      intermediate: 0.50
+      advanced: 0.30

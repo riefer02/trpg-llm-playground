@@ -7,7 +7,9 @@ This document captures future improvements for the synthetic data generation pip
 ## Completed Enhancements
 
 ### P0: Core Quality Fixes (Implemented Dec 2024)
+
 - [x] **Configurable Prompt Templates** (`src/data/synth_prompts.py`)
+
   - Prompts now read from YAML config instead of hardcoded strings
   - Use `{topic}` placeholder for dynamic system/context customization
   - Config section: `prompts:` in `synthetic_generic.yaml`
@@ -18,7 +20,9 @@ This document captures future improvements for the synthetic data generation pip
   - Config section: `negatives:` in `synthetic_generic.yaml`
 
 ### P1: Quality Assurance (Implemented Dec 2024)
+
 - [x] **Answer Verification Pass** (`src/data/synth_verify.py`)
+
   - LLM-based 1-5 scoring of generated Q/A pairs
   - Automatic correction of low-scoring answers
   - Configurable threshold filtering
@@ -31,118 +35,50 @@ This document captures future improvements for the synthetic data generation pip
 
 ---
 
-## Next Step Improvements (P2)
+### P2: Diversity Enhancements (Implemented Dec 2024)
 
-### Multi-Turn Conversation Generation
-**Priority**: P2 | **Effort**: High | **Impact**: High
+- [x] **Multi-Turn Conversation Generation** (`src/data/synth_multiturn.py`)
 
-Generate 2-4 turn conversations that simulate realistic user interactions with follow-up questions.
+  - Generates 2-4 turn conversations with natural follow-ups
+  - Simulates realistic user interactions with clarification questions
+  - Task-type aware conversation guidance
+  - Config section: `multiturn:` in `synthetic_generic.yaml`
 
-**Rationale**: Single-turn Q/A doesn't capture the back-and-forth nature of real assistant usage. Users often ask clarifying questions or dig deeper into topics.
+- [x] **Difficulty Stratification** (`src/data/synth_difficulty.py`)
+  - Three levels: basic (recall), intermediate (synthesis), advanced (edge cases)
+  - Weighted random selection with configurable distribution
+  - Task-type specific overrides (e.g., lore gets more basic questions)
+  - Config section: `difficulty:` in `synthetic_generic.yaml`
 
-**Implementation Sketch**:
-```python
-# src/data/synth_multiturn.py
-MULTITURN_PROMPT = """
-Generate a {n_turns}-turn conversation about {topic_area}.
+### User Experience Enhancements (Implemented Dec 2024)
 
-Structure:
-- Turn 1: User asks initial question about the context
-- Turn 2: Assistant answers with citations, user follows up
-- Turn 3+: Natural continuation until topic is exhausted
+- [x] **Quality Dashboard Report** (`src/data/synth_report.py`)
 
-Rules:
-- Each assistant turn must cite the context
-- Follow-up questions should deepen understanding, not repeat
-- Final assistant message should be conclusive
+  - Comprehensive post-generation analysis
+  - Sample distribution by task type, difficulty, multi-turn
+  - Flagged issues (short outputs, missing citations, very long samples)
+  - Representative examples from each category
+  - Run with: `python -m src.data.synth_report --input <data.jsonl> --output report.md`
 
-Context:
-{text}
+- [x] **RPG Evaluation Benchmark** (`src/training/evaluate_rpg.py`)
 
-Output JSON:
-{
-  "messages": [
-    {"role": "user", "content": "..."},
-    {"role": "assistant", "content": "..."},
-    ...
-  ],
-  "task_type": "...",
-  "turn_count": N
-}
-"""
-```
+  - Measures: accuracy, grounding fidelity, citation accuracy, refusal calibration
+  - Breakdown by task type and difficulty level
+  - YAML-based evaluation set format
+  - Create template: `python -m src.training.evaluate_rpg --create-template eval_set.yaml`
 
-**Config Addition**:
-```yaml
-multiturn:
-  enabled: true
-  ratio: 0.20  # 20% of samples
-  min_turns: 2
-  max_turns: 4
-  task_types: ["rules_qa", "character_build", "gm_guidance"]
-```
-
-**Integration Points**:
-- Add to `generate_synthetic.py` main loop
-- Track `turn_count` in output records
-- Modify validation to handle multi-turn messages
-
----
-
-### Difficulty Stratification
-**Priority**: P2 | **Effort**: Low | **Impact**: Medium
-
-Explicitly request questions at different difficulty levels to ensure diverse training coverage.
-
-**Rationale**: Models trained on only easy questions struggle with complex reasoning. Conversely, all-hard datasets may not teach basic recall.
-
-**Implementation Sketch**:
-```python
-DIFFICULTY_INSTRUCTIONS = {
-    "basic": (
-        "Generate simple factual questions with direct answers. "
-        "These should test basic recall: 'What is X?', 'How many Y?'"
-    ),
-    "intermediate": (
-        "Generate questions requiring synthesis of 2-3 facts. "
-        "These should test understanding: 'How does X affect Y?', 'Compare X and Y.'"
-    ),
-    "advanced": (
-        "Generate questions about edge cases, exceptions, or multi-step interactions. "
-        "These should test deep comprehension: 'What happens if X and Y both apply?', "
-        "'Under what conditions would Z fail?'"
-    ),
-}
-
-def select_difficulty(distribution: dict) -> str:
-    """Weighted random selection based on config distribution."""
-    import random
-    choices = list(distribution.keys())
-    weights = list(distribution.values())
-    return random.choices(choices, weights=weights, k=1)[0]
-```
-
-**Config Addition**:
-```yaml
-difficulty:
-  enabled: true
-  distribution:
-    basic: 0.30
-    intermediate: 0.50
-    advanced: 0.20
-  # Optional: override per task_type
-  overrides:
-    lore:
-      basic: 0.50
-      intermediate: 0.40
-      advanced: 0.10
-```
+- [x] **Multi-RPG Template System** (`config/templates/`)
+  - Pre-built templates for D&D 5e, Lancer, Blades in the Dark
+  - Game-specific task types, personas, and answer formats
+  - Difficulty distribution tuned per system
+  - Base template for creating new game configs
 
 ---
 
 ## Future Improvements (P3)
 
 ### Adversarial Example Generation
+
 **Priority**: P3 | **Effort**: Medium | **Impact**: Medium
 
 Generate edge-case questions that test model robustness against tricky inputs.
@@ -150,12 +86,14 @@ Generate edge-case questions that test model robustness against tricky inputs.
 **Rationale**: Production users ask ambiguous, misleading, or multi-part questions. Training should include these patterns.
 
 **Example Types**:
+
 1. **Ambiguous questions**: "How much damage does it do?" (no subject specified)
 2. **Mixed premises**: Questions combining valid rules with invented mechanics
 3. **Conditional questions**: "What if X, but also Y?"
 4. **Multi-part with mixed answerability**: "Explain A, B, and C" where C isn't in context
 
 **Implementation Sketch**:
+
 ```python
 ADVERSARIAL_PROMPT = """
 Generate {n} adversarial test questions based on this context.
@@ -177,10 +115,11 @@ Context:
 ```
 
 **Config Addition**:
+
 ```yaml
 adversarial:
   enabled: true
-  ratio: 0.05  # 5% of samples
+  ratio: 0.05 # 5% of samples
   types:
     - ambiguous
     - trick
@@ -191,6 +130,7 @@ adversarial:
 ---
 
 ### Entity-Aware Coverage Generation
+
 **Priority**: P3 | **Effort**: High | **Impact**: Medium
 
 Two-phase generation that first extracts game mechanic entities, then generates targeted questions per entity.
@@ -198,6 +138,7 @@ Two-phase generation that first extracts game mechanic entities, then generates 
 **Rationale**: Current coverage generation may miss specific named abilities, items, or numeric rules. Explicit entity extraction ensures nothing important is skipped.
 
 **Phase 1: Entity Extraction**
+
 ```python
 ENTITY_EXTRACTION_PROMPT = """
 Extract all game mechanics entities from this text. Be exhaustive.
@@ -224,6 +165,7 @@ Output JSON:
 ```
 
 **Phase 2: Entity-Targeted Questions**
+
 ```python
 ENTITY_QA_PROMPT = """
 Generate a Q/A pair specifically about this game entity:
@@ -238,6 +180,7 @@ The answer must include all relevant details from the context.
 ```
 
 **Benefits**:
+
 - Ensures coverage of every named mechanic
 - Creates a verifiable mapping from entities → questions
 - Enables entity-level coverage reports
@@ -245,6 +188,7 @@ The answer must include all relevant details from the context.
 ---
 
 ### Answer Format Enforcement with Retry
+
 **Priority**: P3 | **Effort**: Medium | **Impact**: Low
 
 Structural validation of answers with automatic retry on format failures.
@@ -252,6 +196,7 @@ Structural validation of answers with automatic retry on format failures.
 **Current State**: RAG formats define expected structure but aren't enforced.
 
 **Implementation Sketch**:
+
 ```python
 FORMAT_REQUIREMENTS = {
     "rules_qa": {
@@ -286,17 +231,21 @@ def generate_with_format_retry(prompt, task_type, max_retries=2):
 ## Implementation Notes
 
 ### Dependency Considerations
+
 - **Semantic Deduplication** requires `sentence-transformers` (add to `requirements_synth.txt`)
 - **Multi-turn** increases token usage ~3x per sample
 - **Entity extraction** doubles LLM calls per chunk
 
 ### Testing Strategy
+
 1. Add smoke tests for each new module in `tests/`
 2. Create golden test files with expected outputs
 3. Run full pipeline with `debug.max_samples: 20` before production runs
 
 ### Metrics to Track
+
 After implementing enhancements, track:
+
 - Deduplication rate (% filtered)
 - Verification pass rate (% scoring ≥ threshold)
 - Negative example ratio in final dataset
@@ -310,4 +259,3 @@ After implementing enhancements, track:
 - Original analysis: Pipeline review session (Dec 2024)
 - Related: `docs/CONFIG.md` for configuration documentation
 - Related: `AGENTS.md` for project context
-

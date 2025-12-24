@@ -1,0 +1,147 @@
+# D&D 5th Edition Template
+# Classic fantasy roleplaying game
+
+project_name: "dnd5e"
+dataset_tag: "v1"
+topic: "Dungeons & Dragons 5th Edition"
+
+ingest:
+  pdf_path: "/path/to/players_handbook.pdf"
+  raw_output_path: "dataset/{project_name}_{dataset_tag}_raw.jsonl"
+  output_format: "jsonl"
+
+# D&D-specific task types
+task_types:
+  - "rules_qa"        # Spells, abilities, combat rules
+  - "character_build" # Class/race combos, multiclassing, feats
+  - "scenario_seed"   # Encounters, dungeons, plot hooks
+  - "gm_guidance"     # DMing tips, encounter balance
+  - "lore"            # Forgotten Realms, deities, factions
+  - "spell_lookup"    # Spell-specific questions (D&D specialty)
+
+rag_mode:
+  enabled: true
+  emit_messages: true
+  citation_style: "(PHB p. {page})"  # D&D-specific citation
+  
+  format_by_task_type:
+    rules_qa: |
+      Answer: Clear rules explanation.
+      Mechanics:
+      - Action economy and timing.
+      - Relevant ability scores/saves.
+      Example: Combat or exploration scenario.
+      Citations: (PHB p. X)
+    character_build: |
+      Build Concept: 1-2 sentences.
+      Key Choices:
+      - Race: [recommendation]
+      - Class Features: [key picks]
+      - Feats: [if applicable]
+      - Ability Scores: [priority order]
+      Playstyle: How it plays at the table.
+      Citations: (PHB p. X)
+    spell_lookup: |
+      Spell Level: [level] [school]
+      Casting Time: [time]
+      Range/Area: [range]
+      Components: [V/S/M]
+      Duration: [duration]
+      Effect: Clear description.
+      Tactical Tips: When to use it.
+      Citations: (PHB p. X)
+    scenario_seed: |
+      Hook: 1-2 sentences to draw players in.
+      Setup: The situation.
+      Complications: 2-3 twists.
+      Rewards: Potential treasure/XP.
+      Scaling: CR adjustments.
+      Citations: (DMG p. X) if mechanics.
+    gm_guidance: |
+      Core Advice: The main point.
+      At the Table:
+      - Player expectations.
+      - Pacing considerations.
+      Common Mistakes: What to avoid.
+      Citations: (DMG p. X)
+    lore: |
+      Overview: Setting context.
+      Key Facts:
+      - Important details.
+      - Connections to other lore.
+      Adventure Hooks: How to use in play.
+      Citations: (PHB/DMG p. X)
+
+prompts:
+  system_persona: |
+    You are an expert Dungeon Master with deep knowledge of D&D 5th Edition.
+    You provide rules-accurate answers while encouraging creative play.
+    You balance RAW (Rules As Written) with practical table advice.
+    
+  context_intro: |
+    The following text is from the official D&D 5th Edition rulebooks:
+
+# D&D tends toward more basic questions due to broad audience
+difficulty:
+  enabled: true
+  distribution:
+    basic: 0.40
+    intermediate: 0.45
+    advanced: 0.15
+  overrides:
+    spell_lookup:
+      basic: 0.60
+      intermediate: 0.35
+      advanced: 0.05
+    character_build:
+      basic: 0.25
+      intermediate: 0.50
+      advanced: 0.25
+
+multiturn:
+  enabled: true
+  ratio: 0.25  # More multi-turn for D&D's complex builds
+  min_turns: 2
+  max_turns: 4
+  task_types:
+    - "rules_qa"
+    - "character_build"
+    - "spell_lookup"
+
+# Standard quality settings
+generation:
+  shuffle: true
+  shuffle_seed: 1337
+
+context:
+  prev_chars: 400
+  next_chars: 400
+
+n_samples: 500
+
+negatives:
+  enabled: true
+  ratio: 0.10
+
+verification:
+  enabled: true
+  threshold: 4
+  use_corrections: true
+
+deduplication:
+  enabled: true
+  similarity_threshold: 0.85
+
+output:
+  path: "dataset/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
+  run_id: "auto"
+
+llm:
+  model: "gpt-4o-mini"
+  repair_invalid_json: true
+
+logging:
+  quiet: false
+  max_warnings: 10
+  hud_every: 10
+

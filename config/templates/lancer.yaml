@@ -1,0 +1,169 @@
+# Lancer RPG Template
+# Tactical mech combat in a far-future setting
+
+project_name: "lancer"
+dataset_tag: "v1"
+topic: "Lancer RPG Core Rules"
+
+ingest:
+  pdf_path: "/path/to/lancer_core_book.pdf"
+  raw_output_path: "dataset/{project_name}_{dataset_tag}_raw.jsonl"
+  output_format: "jsonl"
+
+# Lancer-specific task types
+task_types:
+  - "rules_qa"        # Combat, heat, structure, systems
+  - "character_build" # Mech builds, license paths, pilot talents
+  - "scenario_seed"   # Missions, sitreps, faction conflicts
+  - "gm_guidance"     # Running tactical combat, session 0
+  - "lore"            # Union, corpro-states, the Aun, history
+  - "mech_stats"      # Frame stats, weapon loadouts (Lancer specialty)
+
+rag_mode:
+  enabled: true
+  emit_messages: true
+  citation_style: "(p. {page})"
+  
+  format_by_task_type:
+    rules_qa: |
+      Answer: 1-3 sentences.
+      Rules Reference:
+      - Bullet list with citations.
+      Example: Tactical scenario.
+      Heat/Structure Notes: If relevant.
+      Citations: (p. X)
+    character_build: |
+      Build Concept: Mech role and pilot synergy.
+      License Path: Recommended progression.
+      Core Systems:
+      - Frame choice and traits.
+      - Key systems/weapons.
+      - HASE allocation.
+      Pilot Talents: Supporting triggers.
+      Tactical Role: How to play in combat.
+      Citations: (p. X)
+    mech_stats: |
+      Frame: [name] - [manufacturer]
+      Size: [size] | Armor: [armor] | HP: [hp] | E-Def: [edef]
+      Heat Cap: [heat] | Sensors: [sensors] | Tech Attack: [tech]
+      Speed: [speed] | Evasion: [eva] | Save: [save]
+      CORE System: [description]
+      Mounts: [mount configuration]
+      Traits: [frame traits]
+      Citations: (p. X)
+    scenario_seed: |
+      SITREP: [mission type]
+      Objective: Clear goal.
+      Opposition: Hostile forces.
+      Environment: Terrain and hazards.
+      Complications: 2-3 twists.
+      Intel Gaps: Unknown factors.
+      Citations: (p. X) if mechanics.
+    gm_guidance: |
+      Guidance: 3-5 bullets.
+      Combat Pacing: Action economy tips.
+      Narrative Stakes: Non-combat considerations.
+      Common Issues: What trips up new GMs.
+      Citations: (p. X)
+    lore: |
+      Answer: Setting context.
+      Timeline: When relevant.
+      Key Factions: Involved parties.
+      Themes: Core narrative elements.
+      Hooks: Campaign connections.
+      Citations: (p. X)
+
+prompts:
+  system_persona: |
+    You are an expert Lancer GM with deep tactical and lore knowledge.
+    You understand the game's blend of crunchy mech combat and narrative play.
+    You balance mechanical optimization with the game's themes of found family,
+    anti-imperialism, and the cost of violence.
+    
+  context_intro: |
+    The following text is from the Lancer Core Book:
+
+# Lancer is crunchier - more intermediate/advanced questions
+difficulty:
+  enabled: true
+  distribution:
+    basic: 0.25
+    intermediate: 0.50
+    advanced: 0.25
+  overrides:
+    mech_stats:
+      basic: 0.50
+      intermediate: 0.40
+      advanced: 0.10
+    character_build:
+      basic: 0.15
+      intermediate: 0.50
+      advanced: 0.35
+    lore:
+      basic: 0.45
+      intermediate: 0.45
+      advanced: 0.10
+
+multiturn:
+  enabled: true
+  ratio: 0.20
+  min_turns: 2
+  max_turns: 3
+  task_types:
+    - "rules_qa"
+    - "character_build"
+    - "gm_guidance"
+
+# Lancer tables need special handling
+tables:
+  enabled: true
+  min_rows: 4
+  min_cols: 2
+  max_rows: 12
+  max_cols: 5
+  max_pairs: 5
+  task_type: "mech_stats"
+
+coverage:
+  enabled: true
+  min_text_len: 1400
+  max_pairs: 2
+  task_type: "rules_qa"
+
+# Standard quality settings
+generation:
+  shuffle: true
+  shuffle_seed: 1337
+
+context:
+  prev_chars: 400
+  next_chars: 400
+
+n_samples: 500
+
+negatives:
+  enabled: true
+  ratio: 0.12
+
+verification:
+  enabled: true
+  threshold: 4
+  use_corrections: true
+
+deduplication:
+  enabled: true
+  similarity_threshold: 0.85
+
+output:
+  path: "dataset/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
+  run_id: "auto"
+
+llm:
+  model: "gpt-4o-mini"
+  repair_invalid_json: true
+
+logging:
+  quiet: false
+  max_warnings: 10
+  hud_every: 10
+

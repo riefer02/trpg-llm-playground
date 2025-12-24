@@ -1,0 +1,135 @@
+# Base Template for RPG Synthetic Data Generation
+# Copy this file and customize for your specific RPG system
+
+# ============================================================================
+# CORE SETTINGS - MUST CUSTOMIZE
+# ============================================================================
+
+project_name: "rpg_system"  # Short name for files (e.g., "dnd5e", "lancer")
+dataset_tag: "v1"           # Version tag for the dataset
+topic: "RPG System Name"    # Full name used in prompts
+
+ingest:
+  pdf_path: "/path/to/your/rulebook.pdf"
+  raw_output_path: "dataset/{project_name}_{dataset_tag}_raw.jsonl"
+  output_format: "jsonl"
+
+# ============================================================================
+# TASK TYPES - Customize for your system's focus
+# ============================================================================
+
+task_types:
+  - "rules_qa"        # Rules clarification and lookup
+  - "character_build" # Character creation and optimization
+  - "scenario_seed"   # Adventure and encounter ideas
+  - "gm_guidance"     # Running the game advice
+  - "lore"            # Setting and world information
+
+# ============================================================================
+# RAG MODE - Enables grounded generation with citations
+# ============================================================================
+
+rag_mode:
+  enabled: true
+  emit_messages: true
+  citation_style: "(p. {page})"
+  
+  # Customize answer formats per task type
+  format_by_task_type:
+    rules_qa: |
+      Answer: 1-3 sentences with rule explanation.
+      Rules Reference:
+      - Key mechanics with citations.
+      Example: Practical application.
+      Citations: (p. X)
+    character_build: |
+      Assumptions: Listed prerequisites.
+      Recommendations: Ranked options.
+      Tradeoffs: Pros and cons.
+      Citations: (p. X) for mechanics.
+    scenario_seed: |
+      Scenario: 2-4 sentence setup.
+      Hooks: 2-3 story hooks.
+      Challenges: Key obstacles.
+      Citations: (p. X) if rules-relevant.
+    gm_guidance: |
+      Guidance: 3-5 practical tips.
+      Common Issues: Pitfalls to avoid.
+      Citations: (p. X) for rules.
+    lore: |
+      Answer: Setting information.
+      Key Facts: Important details.
+      Connections: Related lore elements.
+      Citations: (p. X)
+
+# ============================================================================
+# PROMPTS - Customize persona and domain knowledge
+# ============================================================================
+
+prompts:
+  # System persona - how the AI should present itself
+  system_persona: |
+    You are an expert Game Master and rules expert for {topic}.
+    You provide accurate, helpful answers grounded in the official rules.
+    
+  # Context introduction - how to frame source material
+  context_intro: |
+    The following text is from the official {topic} rulebook:
+
+# ============================================================================
+# QUALITY SETTINGS - Generally don't need customization
+# ============================================================================
+
+generation:
+  shuffle: true
+  shuffle_seed: 1337
+
+context:
+  prev_chars: 400
+  next_chars: 400
+
+n_samples: 500
+
+negatives:
+  enabled: true
+  ratio: 0.12
+
+verification:
+  enabled: true
+  threshold: 4
+  use_corrections: true
+
+deduplication:
+  enabled: true
+  similarity_threshold: 0.85
+
+multiturn:
+  enabled: true
+  ratio: 0.20
+  min_turns: 2
+  max_turns: 3
+
+difficulty:
+  enabled: true
+  distribution:
+    basic: 0.30
+    intermediate: 0.50
+    advanced: 0.20
+
+# ============================================================================
+# OUTPUT - Customize paths as needed
+# ============================================================================
+
+output:
+  path: "dataset/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
+  run_id: "auto"
+
+llm:
+  model: "gpt-4o-mini"
+  repair_invalid_json: true
+
+logging:
+  quiet: false
+  max_warnings: 10
+  hud_every: 10
+

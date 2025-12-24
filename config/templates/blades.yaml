@@ -1,0 +1,160 @@
+# Blades in the Dark Template
+# Heist-focused narrative game in a haunted industrial city
+
+project_name: "blades"
+dataset_tag: "v1"
+topic: "Blades in the Dark"
+
+ingest:
+  pdf_path: "/path/to/blades_in_the_dark.pdf"
+  raw_output_path: "dataset/{project_name}_{dataset_tag}_raw.jsonl"
+  output_format: "jsonl"
+
+# Blades-specific task types - more narrative focus
+task_types:
+  - "rules_qa"        # Action rolls, position/effect, harm
+  - "crew_build"      # Crew types, upgrades, claims
+  - "score_seed"      # Heist scenarios, complications
+  - "gm_guidance"     # Running scores, clocks, factions
+  - "lore"            # Doskvol, ghosts, factions, history
+  - "npc_faction"     # Faction details and NPCs (Blades specialty)
+
+rag_mode:
+  enabled: true
+  emit_messages: true
+  citation_style: "(p. {page})"
+  
+  format_by_task_type:
+    rules_qa: |
+      Answer: Clear explanation.
+      The Fiction First: How it ties to narrative.
+      Mechanics:
+      - Position (Controlled/Risky/Desperate)
+      - Effect (Limited/Standard/Great)
+      - Relevant actions/attributes.
+      Example: Play example.
+      Citations: (p. X)
+    crew_build: |
+      Crew Type: [type] - [concept]
+      Starting Abilities: Key picks.
+      Upgrade Path: Recommended progression.
+      Hunting Grounds: Best territories.
+      Faction Relations: Who to ally/oppose.
+      Playstyle: How sessions tend to go.
+      Citations: (p. X)
+    score_seed: |
+      The Score: 1-2 sentence pitch.
+      Client/Target: Who's involved.
+      The Setup:
+      - Engagement roll setup.
+      - Key obstacles.
+      - Potential approaches.
+      Complications:
+      - Clock suggestions.
+      - Faction entanglements.
+      The Take: Potential rewards.
+      Citations: (p. X) if mechanics.
+    npc_faction: |
+      Name: [faction/NPC name]
+      Tier: [tier] | Hold: [weak/strong]
+      Turf: [territories]
+      Notable NPCs: Key figures.
+      Goals: What they want.
+      Methods: How they operate.
+      Allies/Enemies: Faction web.
+      Hooks: Adventure connections.
+      Citations: (p. X)
+    gm_guidance: |
+      Principle: Core GM advice.
+      At the Table:
+      - When to use this.
+      - Common situations.
+      Fiction-Mechanics Bridge: How to frame.
+      Don't: Pitfalls to avoid.
+      Citations: (p. X)
+    lore: |
+      Overview: Doskvol context.
+      The Ghost Field: Supernatural elements.
+      Key Details: Important facts.
+      Table Use: How to incorporate.
+      Citations: (p. X)
+
+prompts:
+  system_persona: |
+    You are an expert Blades in the Dark GM steeped in the fiction of Doskvol.
+    You understand the game's narrative focus and player agency principles.
+    You embrace the "play to find out" philosophy and spotlight fictional positioning.
+    You help create a world of desperate scoundrels in a haunted, industrialized city.
+    
+  context_intro: |
+    The following text is from Blades in the Dark:
+
+# Blades is more narrative - fewer "basic" lookup questions
+difficulty:
+  enabled: true
+  distribution:
+    basic: 0.20
+    intermediate: 0.55
+    advanced: 0.25
+  overrides:
+    npc_faction:
+      basic: 0.40
+      intermediate: 0.50
+      advanced: 0.10
+    score_seed:
+      basic: 0.10
+      intermediate: 0.50
+      advanced: 0.40
+    lore:
+      basic: 0.35
+      intermediate: 0.50
+      advanced: 0.15
+
+# Blades benefits from lots of multi-turn for score planning
+multiturn:
+  enabled: true
+  ratio: 0.30
+  min_turns: 2
+  max_turns: 4
+  task_types:
+    - "score_seed"
+    - "crew_build"
+    - "gm_guidance"
+
+# Standard quality settings
+generation:
+  shuffle: true
+  shuffle_seed: 1337
+
+context:
+  prev_chars: 400
+  next_chars: 400
+
+n_samples: 400  # Smaller book
+
+negatives:
+  enabled: true
+  ratio: 0.10
+
+verification:
+  enabled: true
+  threshold: 4
+  use_corrections: true
+
+deduplication:
+  enabled: true
+  similarity_threshold: 0.85
+
+output:
+  path: "dataset/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
+  run_id: "auto"
+
+llm:
+  model: "gpt-4o-mini"
+  repair_invalid_json: true
+
+logging:
+  quiet: false
+  max_warnings: 10
+  hud_every: 10
+

@@ -1,7 +1,10 @@
 # Config Reference (Concise)
 
 ## Synthetic Generation (`config/synthetic_generic.yaml`)
+
+### Core Settings
 - `project_name`, `dataset_tag`: naming keys used in Drive paths and checkpoints.
+- `topic`: full name of the RPG system (used in prompts).
 - `ingest.pdf_path`: source PDF on Drive.
 - `ingest.raw_output_path`: JSONL output for extracted pages (persisted).
 - `ingest.output_format`: `jsonl` recommended for streaming.
@@ -16,9 +19,73 @@
 - `rag_ingest.*`: (optional) create heading-aware overlapping chunks with stable IDs for later retrieval.
 - `rag_index.*`: (optional) build a FAISS index over `rag_ingest` chunks for semantic search.
 
-## Validation
-- `scripts/validate_synth.py`: validates JSON/JSONL for RAG-aware fields (messages/context/citations).
-- `scripts/audit_synth.py`: samples records and reports basic grounding/format issues.
+### Quality Enhancement Settings (NEW)
+
+#### Prompt Configuration
+- `prompts.system_persona`: custom system prompt (use `{topic}` placeholder).
+- `prompts.context_intro`: custom context introduction text.
+
+#### Negative Examples
+Generates "Not found in context" training examples for RAG grounding.
+```yaml
+negatives:
+  enabled: true       # Enable negative example generation
+  ratio: 0.12         # Target 12% of dataset
+  max_per_chunk: 2    # Max negatives per chunk
+  task_type: "rules_qa"  # Task type for negatives ("auto" = match chunk)
+```
+
+#### Answer Verification
+LLM-based quality scoring and automatic correction.
+```yaml
+verification:
+  enabled: true       # Enable verification pass
+  threshold: 4        # Min score (1-5) to keep
+  use_corrections: true  # Use corrected answers for low scores
+  model: "gpt-4o-mini"   # Optional: different model for verification
+```
+
+#### Semantic Deduplication
+Removes similar questions using sentence embeddings.
+```yaml
+deduplication:
+  enabled: true
+  similarity_threshold: 0.85  # Cosine similarity threshold
+  model: "all-MiniLM-L6-v2"   # Sentence transformer model
+  cross_chunk: true           # Dedupe across entire dataset
+```
+
+#### Multi-Turn Conversations
+Generates realistic 2-4 turn dialogues with follow-ups.
+```yaml
+multiturn:
+  enabled: true
+  ratio: 0.20          # 20% of samples
+  min_turns: 2         # Minimum turns (user+assistant = 1 turn)
+  max_turns: 3
+  task_types:          # Which tasks get multi-turn
+    - "rules_qa"
+    - "character_build"
+    - "gm_guidance"
+```
+
+#### Difficulty Stratification
+Ensures diverse cognitive complexity in questions.
+```yaml
+difficulty:
+  enabled: true
+  distribution:
+    basic: 0.30        # Direct factual recall
+    intermediate: 0.50  # Synthesis and comparison
+    advanced: 0.20      # Edge cases, complex reasoning
+  overrides:           # Per-task-type overrides
+    lore:
+      basic: 0.50
+      intermediate: 0.40
+      advanced: 0.10
+```
+
+## Output & Logging
 - `output.path`: synthetic JSONL output (use `{run_id}`).
 - `output.run_id`: `auto` generates a timestamp.
 - `output.append`: append to an existing output file.
@@ -26,6 +93,12 @@
 - `llm.*`: model and response settings; JSON repair toggles and log path.
 - `logging.*`: HUD + warning volume controls.
 - `task_types`: labels emitted per sample for dataset balancing/filters.
+
+## Validation & Reporting
+- `scripts/validate_synth.py`: validates JSON/JSONL for RAG-aware fields (messages/context/citations).
+- `scripts/audit_synth.py`: samples records and reports basic grounding/format issues.
+- `python -m src.data.synth_report`: generates quality dashboard markdown report.
+- `python -m src.training.evaluate_rpg`: RPG-specific evaluation benchmark.
 
 ## Training (`config/rpg_finetune.yaml`)
 - `model.base_model`: Unsloth base model.
@@ -38,6 +111,27 @@
 - `colab/run_synthetic_only.ipynb`: ingest + synthetic only.
 - `colab/run_train_after_synth.ipynb`: training + eval only.
 - `colab/run_pipeline.ipynb`: full pipeline.
+
+## Multi-RPG Templates (`config/templates/`)
+
+Pre-built configurations for different game systems. Copy and customize:
+
+```bash
+cp config/templates/dnd5e.yaml config/my_config.yaml
+```
+
+| Template | System | Notes |
+|----------|--------|-------|
+| `_base.yaml` | Generic | Starting point for new systems |
+| `dnd5e.yaml` | D&D 5th Edition | Includes `spell_lookup` task type |
+| `lancer.yaml` | Lancer RPG | Includes `mech_stats` task type |
+| `blades.yaml` | Blades in the Dark | Includes `npc_faction` task type |
+
+Each template customizes:
+- Task types specific to the system
+- Answer format instructions per task type
+- Difficulty distribution tuned to the system's complexity
+- System-specific terminology and persona
 
 ## Optional RAG (Chunks + FAISS)
 

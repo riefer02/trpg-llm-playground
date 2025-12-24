@@ -19,18 +19,33 @@ This repository contains an end-to-end pipeline for fine-tuning Large Language M
 ```text
 llm-playground/
 ├── config/                 # Configuration files (YAML)
-│   ├── rpg_finetune.yaml   # Model & training hyperparameters
-│   └── synthetic_generic.yaml # Synthetic data generation settings
+│   ├── rpg_finetune.yaml       # Model & training hyperparameters
+│   ├── synthetic_generic.yaml  # Synthetic data generation settings
+│   └── templates/              # Pre-built configs for different RPGs
+│       ├── dnd5e.yaml          # D&D 5th Edition
+│       ├── lancer.yaml         # Lancer RPG
+│       └── blades.yaml         # Blades in the Dark
 ├── src/
-│   ├── data/               # Data processing
+│   ├── data/               # Data processing & synthetic generation
 │   │   ├── ingest_pdf.py       # Extracts text from RPG PDFs
-│   │   └── generate_synthetic.py # Generates Q/A pairs via LLM (GPT-4o/5.1)
-│   ├── training/           # Model training
+│   │   ├── generate_synthetic.py # Main generation pipeline
+│   │   ├── synth_prompts.py    # Configurable prompt templates
+│   │   ├── synth_multiturn.py  # Multi-turn conversation generation
+│   │   ├── synth_difficulty.py # Difficulty stratification
+│   │   ├── synth_negatives.py  # "Not found" example generation
+│   │   ├── synth_verify.py     # Answer verification & quality scoring
+│   │   ├── synth_dedup.py      # Semantic deduplication
+│   │   └── synth_report.py     # Quality dashboard reports
+│   ├── training/           # Model training & evaluation
 │   │   ├── finetune_lora.py    # Unsloth/LoRA training script
-│   │   └── evaluate.py         # Inference & testing script
+│   │   ├── evaluate.py         # Inference & testing script
+│   │   └── evaluate_rpg.py     # RPG-specific benchmark framework
+│   ├── rag/                # RAG ingestion & indexing
 │   └── utils/              # Shared utilities
 ├── colab/                  # Notebooks for remote execution
 ├── docs/                   # Documentation
+│   ├── CONFIG.md           # Configuration reference
+│   └── SYNTH_ROADMAP.md    # Feature roadmap & implementation status
 ├── tests/                  # Local smoke tests
 ├── requirements.txt        # Full pipeline dependencies
 └── requirements_synth.txt  # Synthetic-only dependencies
@@ -39,6 +54,77 @@ llm-playground/
 ## 📘 Configuration Quick Ref
 
 See `docs/CONFIG.md` for a concise reference of the synthetic + training config blocks.
+
+## 🎮 Multi-RPG Template System
+
+Pre-built configuration templates make it easy to train models for different game systems:
+
+```bash
+# Copy a template and customize
+cp config/templates/dnd5e.yaml config/my_dnd_campaign.yaml
+# Edit paths and settings, then run
+python -m src.data.generate_synthetic --config config/my_dnd_campaign.yaml
+```
+
+Available templates:
+| Template | System | Focus |
+|----------|--------|-------|
+| `dnd5e.yaml` | D&D 5th Edition | Spells, builds, classic fantasy |
+| `lancer.yaml` | Lancer RPG | Tactical mech combat |
+| `blades.yaml` | Blades in the Dark | Heist-focused narrative play |
+| `_base.yaml` | Template | Starting point for new systems |
+
+## 🔬 Quality Enhancement Pipeline
+
+The synthetic generation pipeline includes multiple quality enhancement passes:
+
+### Automatic Quality Features
+- **Negative Examples** (12% default): Teaches model to say "Not found in context" when appropriate
+- **Answer Verification**: LLM-scored quality filtering with automatic correction
+- **Semantic Deduplication**: Removes similar questions using embeddings
+- **Multi-Turn Conversations** (20% default): Realistic follow-up Q&A dialogues
+- **Difficulty Stratification**: Basic/Intermediate/Advanced question mix
+
+### Post-Generation Reports
+```bash
+# Generate a quality dashboard after synthetic generation
+python -m src.data.synth_report --input dataset/my_synthetic.jsonl --output report.md
+```
+
+### Model Evaluation Benchmark
+```bash
+# Create evaluation template
+python -m src.training.evaluate_rpg --create-template evals/my_game_eval.yaml
+# Edit with test questions, then benchmark your model
+```
+
+Configuration for quality features in `synthetic_generic.yaml`:
+```yaml
+negatives:
+  enabled: true
+  ratio: 0.12
+
+verification:
+  enabled: true
+  threshold: 4
+
+deduplication:
+  enabled: true
+  similarity_threshold: 0.85
+
+multiturn:
+  enabled: true
+  ratio: 0.20
+  min_turns: 2
+  max_turns: 3
+
+difficulty:
+  enabled: true
+  distribution:
+    basic: 0.30
+    intermediate: 0.50
+    advanced: 0.20
+```
 
 ## 🔎 Optional RAG (Chunks + Semantic Search)
 
