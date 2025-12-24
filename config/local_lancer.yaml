@@ -16,7 +16,7 @@ ingest:
 n_samples: 500
 
 debug:
-  enabled: true
+  enabled: false
   max_pages: 5
   max_samples: 10
 

@@ -4,10 +4,14 @@ project_name: "lancer" # Change this to match your synthetic config
 dataset_tag: "v1_ctx4096" # Must match the generated dataset you want to train on
 
 model:
-  # To use Qwen 2.5 (Unsloth optimized), just change this string!
-  # A100/H100 Recommendation: "unsloth/Qwen2.5-32B-Instruct-bnb-4bit"
-  # T4 (Free Colab) Recommendation: "unsloth/Qwen2.5-7B-Instruct-bnb-4bit" or "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit"
-  base_model: "unsloth/Qwen2.5-32B-Instruct-bnb-4bit"
+  # Model Selection (7-8B recommended for local deployment)
+  # - Qwen2.5-7B: Best quality, great instruction following
+  # - Llama-3.1-8B: Strong reasoning, good community support
+  # - 32B models require A100/H100 and are overkill for rules QA
+  #
+  # Training: 7B fits on free Colab T4 (16GB VRAM)
+  # Inference: Runs on RTX 3060+, M1 Mac, most gaming PCs
+  base_model: "unsloth/Qwen2.5-7B-Instruct-bnb-4bit"
 
   # A100/H100 specific: You can increase this significantly (e.g., 4096, 8192)
   max_seq_length: 4096
@@ -21,32 +25,37 @@ dataset:
 training:
   # Save the output directly to Drive
   output_dir: "/content/drive/MyDrive/llm_experiments/outputs/{project_name}_{dataset_tag}_lora"
-  
+
   # Professional Tip: Set this to "wandb" to track loss curves in the cloud!
   # You'll need to run `wandb login` in Colab first.
-  report_to: "none" 
+  report_to: "none"
 
-  # A100 Optimization:
-  # You can increase batch size (e.g., 4, 8, 16) depending on model size
-  per_device_train_batch_size: 4
-  gradient_accumulation_steps: 2 # Adjust based on batch size (aim for total batch ~16-32)
+  # A100 Optimized Settings (40GB VRAM)
+  # - Batch 8 x grad_accum 2 = effective batch 16
+  # - ~10-15 min for 500 samples with 7B model
+  # - For T4 (16GB), reduce to batch_size: 4
+  per_device_train_batch_size: 8
+  gradient_accumulation_steps: 2
 
-  warmup_steps: 5
-  max_steps: 60
+  warmup_steps: 10
+  max_steps: 100 # More steps for better convergence, still fast on A100
   learning_rate: 2.0e-4
-  logging_steps: 1
-  save_steps: 10 # Save checkpoint every 10 steps
+  logging_steps: 5
+  save_steps: 25 # Checkpoint every 25 steps
   optim: "adamw_8bit"
   weight_decay: 0.01
-  lr_scheduler_type: "linear"
+  lr_scheduler_type: "cosine" # Cosine often works better than linear
   seed: 3407
 
 lora:
-  r: 16
-  lora_alpha: 16
+  # A100: Can afford higher rank for better quality
+  # r=32 gives more expressiveness without much slowdown
+  # For T4, reduce to r=16, lora_alpha=16
+  r: 32
+  lora_alpha: 32
   lora_dropout: 0
   bias: "none"
-  use_gradient_checkpointing: "unsloth" # specific to unsloth
+  use_gradient_checkpointing: "unsloth"
   random_state: 3407
   use_rslora: false
   loftq_config: null
