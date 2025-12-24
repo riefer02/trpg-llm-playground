@@ -49,11 +49,8 @@ The goal is to create models capable of understanding game rules, lore, and gene
 - ✅ **Multi-RPG Templates**: D&D, Lancer, Blades configs ready to use.
 - ✅ **Evaluation Benchmark**: RPG-specific accuracy/grounding/citation metrics.
 
-## Future Roadmap
-See `docs/SYNTH_ROADMAP.md` for detailed implementation status. Remaining items:
-1. **Interactive Sample Review UI**: Web interface to approve/reject samples before training.
-2. **Production RAG Pipeline**: Combine fine-tuned model with retrieval for deployment.
-3. **Adversarial Examples**: Edge cases and trick questions for robustness.
-4. **Entity-Aware Coverage**: Extract named abilities/items and generate targeted questions.
-5. **Curriculum Learning**: Train on easy examples first, then progressively harder ones.
+## Future Ideas (If Needed)
+- **Adversarial Examples**: Edge cases and trick questions for robustness
+- **Entity-Aware Coverage**: Extract named abilities/items and generate targeted questions
+- **Interactive Review UI**: Web interface to approve/reject samples before training
 

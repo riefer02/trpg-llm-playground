@@ -44,8 +44,7 @@ llm-playground/
 │   └── utils/              # Shared utilities
 ├── colab/                  # Notebooks for remote execution
 ├── docs/                   # Documentation
-│   ├── CONFIG.md           # Configuration reference
-│   └── SYNTH_ROADMAP.md    # Feature roadmap & implementation status
+│   └── CONFIG.md           # Configuration reference
 ├── tests/                  # Local smoke tests
 ├── requirements.txt        # Full pipeline dependencies
 └── requirements_synth.txt  # Synthetic-only dependencies
