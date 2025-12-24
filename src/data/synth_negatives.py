@@ -11,6 +11,12 @@ from typing import Dict, List, Optional
 from ..utils.llm_client import call_llm
 from .synth_io import log_invalid_response
 from .synth_llm import WarningLimiter, parse_json_list, repair_json_response
+
+__all__ = [
+    "generate_negative_pairs",
+    "should_generate_negative",
+    "calculate_negative_count",
+]
 from .synth_prompts import PromptConfig
 
 
@@ -61,7 +67,7 @@ def generate_negative_pairs(
             print(msg)
         return []
 
-    parsed = parse_json_list(response, warning_limiter=warning_limiter)
+    parsed = parse_json_list(response, warning_limiter=warning_limiter, default_task_type=task_type)
     if parsed is not None:
         # Mark these as negative examples for tracking
         for pair in parsed:
@@ -81,11 +87,12 @@ def generate_negative_pairs(
         max_output_tokens=max_output_tokens,
         max_completion_tokens=max_completion_tokens,
         warning_limiter=warning_limiter,
+        task_type=task_type,
     )
     if not repaired:
         return []
 
-    repaired_parsed = parse_json_list(repaired, warning_limiter=warning_limiter)
+    repaired_parsed = parse_json_list(repaired, warning_limiter=warning_limiter, default_task_type=task_type)
     if repaired_parsed is None:
         if invalid_log_path:
             log_invalid_response(invalid_log_path, repaired)

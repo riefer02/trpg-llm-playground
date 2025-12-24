@@ -177,7 +177,7 @@ def cli_chat(
 def gradio_ui(
     index, chunks: list[dict], embed_model: SentenceTransformer, model_name: str
 ):
-    """Launch Gradio chat interface."""
+    """Launch Gradio chat interface with enhanced UI."""
     try:
         import gradio as gr
     except ImportError:
@@ -187,33 +187,383 @@ def gradio_ui(
         cli_chat(index, chunks, embed_model, model_name)
         return
 
-    def respond(message, history):
-        answer, sources = chat_with_rag(message, index, chunks, embed_model, model_name)
+    # Custom CSS for a polished TTRPG aesthetic
+    custom_css = """
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Exo+2:wght@300;400;500;600&display=swap');
+    
+    :root {
+        --lancer-gold: #d4af37;
+        --lancer-gold-dim: #b8942e;
+        --lancer-cyan: #00d4ff;
+        --lancer-cyan-dim: #0099bb;
+        --lancer-dark: #0a0e14;
+        --lancer-darker: #060a0f;
+        --lancer-panel: #111820;
+        --lancer-border: #1e2a38;
+        --lancer-text: #e8ecf0;
+        --lancer-text-dim: #8899aa;
+    }
+    
+    .gradio-container {
+        background: linear-gradient(135deg, var(--lancer-darker) 0%, var(--lancer-dark) 50%, #0d1219 100%) !important;
+        font-family: 'Exo 2', sans-serif !important;
+        max-width: 1400px !important;
+    }
+    
+    .main-header {
+        text-align: center;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid var(--lancer-border);
+        margin-bottom: 1rem;
+        background: linear-gradient(180deg, rgba(212,175,55,0.08) 0%, transparent 100%);
+    }
+    
+    .main-header h1 {
+        font-family: 'Orbitron', monospace !important;
+        font-size: 2.2rem !important;
+        font-weight: 700 !important;
+        color: var(--lancer-gold) !important;
+        text-shadow: 0 0 20px rgba(212,175,55,0.3);
+        margin: 0 !important;
+        letter-spacing: 2px;
+    }
+    
+    .main-header p {
+        color: var(--lancer-text-dim) !important;
+        margin-top: 0.5rem !important;
+        font-size: 0.95rem;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background: rgba(0, 212, 255, 0.1);
+        border: 1px solid var(--lancer-cyan-dim);
+        border-radius: 20px;
+        color: var(--lancer-cyan);
+        font-size: 0.8rem;
+        font-family: 'Orbitron', monospace;
+        margin-top: 0.75rem;
+    }
+    
+    /* Chat container - target Gradio 6 structure */
+    #chat-column {
+        background: var(--lancer-panel) !important;
+        border: 1px solid var(--lancer-border) !important;
+        border-radius: 12px !important;
+        padding: 0 !important;
+        overflow: hidden;
+    }
+    
+    /* Chatbot wrapper and inner elements */
+    [data-testid="chatbot"],
+    .chatbot,
+    .wrap,
+    .bubble-wrap {
+        background: var(--lancer-panel) !important;
+        border: none !important;
+    }
+    
+    /* Target all possible chatbot containers */
+    #chat-column > div,
+    #chat-column [role="log"],
+    #chat-column .overflow-y-auto {
+        background: var(--lancer-panel) !important;
+    }
+    
+    /* Message styling */
+    .message,
+    [data-testid="user"],
+    [data-testid="bot"] {
+        font-family: 'Exo 2', sans-serif !important;
+        border-radius: 12px !important;
+        padding: 1rem 1.25rem !important;
+        line-height: 1.6 !important;
+    }
+    
+    /* User messages */
+    [data-testid="user"],
+    .user-message,
+    .message.user {
+        background: linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,153,187,0.1) 100%) !important;
+        border: 1px solid rgba(0,212,255,0.3) !important;
+        color: var(--lancer-text) !important;
+    }
+    
+    /* Bot messages */
+    [data-testid="bot"],
+    .bot-message,
+    .message.bot {
+        background: linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(184,148,46,0.05) 100%) !important;
+        border: 1px solid rgba(212,175,55,0.2) !important;
+        color: var(--lancer-text) !important;
+    }
+    
+    /* Input area */
+    .input-row {
+        background: var(--lancer-panel) !important;
+        border-top: 1px solid var(--lancer-border) !important;
+        padding: 1rem !important;
+    }
+    
+    .input-row textarea {
+        background: var(--lancer-darker) !important;
+        border: 1px solid var(--lancer-border) !important;
+        border-radius: 8px !important;
+        color: var(--lancer-text) !important;
+        font-family: 'Exo 2', sans-serif !important;
+        padding: 0.75rem 1rem !important;
+    }
+    
+    .input-row textarea:focus {
+        border-color: var(--lancer-cyan) !important;
+        box-shadow: 0 0 0 2px rgba(0,212,255,0.2) !important;
+    }
+    
+    .input-row button {
+        background: linear-gradient(135deg, var(--lancer-cyan) 0%, var(--lancer-cyan-dim) 100%) !important;
+        border: none !important;
+        border-radius: 8px !important;
+        color: var(--lancer-darker) !important;
+        font-family: 'Orbitron', monospace !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .input-row button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,212,255,0.3) !important;
+    }
+    
+    /* Sources panel */
+    #sources-column {
+        background: var(--lancer-panel) !important;
+        border: 1px solid var(--lancer-border) !important;
+        border-radius: 12px !important;
+        padding: 1rem !important;
+    }
+    
+    .sources-header {
+        font-family: 'Orbitron', monospace !important;
+        color: var(--lancer-gold) !important;
+        font-size: 0.9rem;
+        font-weight: 600;
+        letter-spacing: 1px;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--lancer-border);
+    }
+    
+    .source-card {
+        background: var(--lancer-darker) !important;
+        border: 1px solid var(--lancer-border) !important;
+        border-radius: 8px !important;
+        padding: 0.75rem !important;
+        margin-bottom: 0.5rem !important;
+        transition: border-color 0.2s ease;
+    }
+    
+    .source-card:hover {
+        border-color: var(--lancer-gold-dim) !important;
+    }
+    
+    .source-page {
+        font-family: 'Orbitron', monospace;
+        color: var(--lancer-cyan);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .source-section {
+        color: var(--lancer-text);
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+    
+    .source-score {
+        color: var(--lancer-text-dim);
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+    
+    /* Examples styling */
+    .examples-section {
+        background: var(--lancer-panel) !important;
+        border: 1px solid var(--lancer-border) !important;
+        border-radius: 12px !important;
+        padding: 1rem !important;
+        margin-top: 1rem !important;
+    }
+    
+    .examples-section button {
+        background: var(--lancer-darker) !important;
+        border: 1px solid var(--lancer-border) !important;
+        border-radius: 6px !important;
+        color: var(--lancer-text) !important;
+        font-family: 'Exo 2', sans-serif !important;
+        font-size: 0.85rem !important;
+        padding: 0.5rem 1rem !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .examples-section button:hover {
+        border-color: var(--lancer-gold-dim) !important;
+        background: rgba(212,175,55,0.1) !important;
+    }
+    
+    /* Footer */
+    footer {
+        display: none !important;
+    }
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--lancer-darker);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: var(--lancer-border);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--lancer-gold-dim);
+    }
+    
+    /* Markdown in responses */
+    .chatbot .bot strong {
+        color: var(--lancer-gold) !important;
+    }
+    
+    .chatbot .bot code {
+        background: var(--lancer-darker) !important;
+        color: var(--lancer-cyan) !important;
+        padding: 0.1rem 0.4rem !important;
+        border-radius: 4px !important;
+        font-family: 'IBM Plex Mono', monospace !important;
+    }
+    
+    .chatbot .bot blockquote {
+        border-left: 3px solid var(--lancer-gold) !important;
+        padding-left: 1rem !important;
+        margin: 0.5rem 0 !important;
+        color: var(--lancer-text-dim) !important;
+    }
+    """
 
-        # Append sources
-        source_text = "\n\n---\n**Sources:**\n"
+    def format_sources_html(sources):
+        """Format sources as HTML cards."""
+        if not sources:
+            return """<div class="sources-header">📚 RETRIEVED SOURCES</div>
+                     <p style="color: var(--lancer-text-dim); font-size: 0.85rem;">
+                     Sources will appear here when you ask a question.</p>"""
+
+        html = '<div class="sources-header">📚 RETRIEVED SOURCES</div>'
         for i, s in enumerate(sources, 1):
-            section = f" - {s['section']}" if s.get("section") else ""
-            source_text += f"- [{i}] p.{s['page']}{section} (score: {s['score']:.2f})\n"
+            section = s.get("section", "")
+            section_html = (
+                f'<div class="source-section">{section}</div>' if section else ""
+            )
+            score_pct = int(s["score"] * 100)
+            html += f"""
+            <div class="source-card">
+                <div class="source-page">SOURCE {i} • PAGE {s["page"]}</div>
+                {section_html}
+                <div class="source-score">Relevance: {score_pct}%</div>
+            </div>
+            """
+        return html
 
-        return answer + source_text
+    def respond(message, history):
+        """Process message and return response with sources."""
+        if not message.strip():
+            return history, format_sources_html([])
 
-    demo = gr.ChatInterface(
-        respond,
-        title="🤖 Lancer Rules Assistant (Local)",
-        description=f"Ask questions about Lancer RPG rules. Running locally with Ollama ({model_name}).",
-        examples=[
-            "How does the LOCK ON action work?",
-            "What are the different mech sizes?",
-            "How do I calculate my mech's HP?",
-            "What is Overcharge?",
-            "Explain the difference between kinetic and energy damage.",
-        ],
-    )
+        answer, sources = chat_with_rag(message, index, chunks, embed_model, model_name)
+        # Gradio 6 expects messages format with role/content dicts
+        history = history + [
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": answer},
+        ]
+        return history, format_sources_html(sources)
 
-    print(f"\n🚀 Starting Gradio UI at http://localhost:7860")
+    def make_example_handler(example_text):
+        """Create a handler for a specific example."""
+        def handler(history):
+            return respond(example_text, history)
+        return handler
+
+    # Build the interface
+    with gr.Blocks(title="Lancer Rules Assistant") as demo:
+        # Header
+        gr.HTML("""
+        <div class="main-header">
+            <h1>⚔️ LANCER RULES ASSISTANT</h1>
+            <p>Your AI-powered guide to the Lancer TTRPG ruleset</p>
+            <div class="status-badge">● LOCAL • OLLAMA</div>
+        </div>
+        """)
+
+        with gr.Row():
+            # Main chat column
+            with gr.Column(scale=3, elem_id="chat-column"):
+                chatbot = gr.Chatbot(
+                    label="",
+                    height=500,
+                    show_label=False,
+                    avatar_images=(None, "🤖"),
+                )
+
+                with gr.Row(elem_classes="input-row"):
+                    msg = gr.Textbox(
+                        placeholder="Ask about Lancer rules, mechs, combat, or lore...",
+                        show_label=False,
+                        scale=6,
+                        container=False,
+                    )
+                    submit_btn = gr.Button("TRANSMIT", scale=1, variant="primary")
+
+            # Sources sidebar
+            with gr.Column(scale=1, elem_id="sources-column"):
+                sources_display = gr.HTML(value=format_sources_html([]), label="")
+
+        # Examples section
+        with gr.Row(elem_classes="examples-section"):
+            gr.Markdown("**Quick queries:**")
+            for example in [
+                "How does the LOCK ON action work?",
+                "What are the different mech sizes?",
+                "What is Overcharge?",
+                "Explain heat and overheating",
+            ]:
+                ex_btn = gr.Button(example, size="sm")
+                ex_btn.click(
+                    fn=make_example_handler(example),
+                    inputs=[chatbot],
+                    outputs=[chatbot, sources_display],
+                )
+
+        # Wire up main inputs
+        msg.submit(
+            fn=respond,
+            inputs=[msg, chatbot],
+            outputs=[chatbot, sources_display],
+        ).then(lambda: "", outputs=msg)
+
+        submit_btn.click(
+            fn=respond,
+            inputs=[msg, chatbot],
+            outputs=[chatbot, sources_display],
+        ).then(lambda: "", outputs=msg)
+
+    print("\n🚀 Starting Gradio UI at http://localhost:7860")
     print(f"   Model: {model_name}")
-    demo.launch()
+    demo.launch(css=custom_css)
 
 
 # ============================================================
@@ -274,7 +624,7 @@ def main():
     if args.model not in model_names and args.model.split(":")[0] not in model_names:
         print(f"⚠️  Warning: Model '{args.model}' not found in Ollama.")
         print(f"   Available models: {model_names}")
-        print(f"\n   To use a base model for testing: --model qwen2.5:7b")
+        print("\n   To use a base model for testing: --model qwen2.5:7b")
         print(
             f"   To create your fine-tuned model: ollama create {args.model} -f Modelfile"
         )

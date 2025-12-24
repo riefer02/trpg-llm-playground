@@ -94,9 +94,18 @@ class WarningLimiter:
                 self.suppressed = True
 
 
+def _inject_task_type_if_missing(item: dict, default_task_type: Optional[str]) -> dict:
+    """Inject task_type into an item if missing and default is provided."""
+    if "task_type" not in item and default_task_type:
+        item = dict(item)
+        item["task_type"] = default_task_type
+    return item
+
+
 def parse_json_list(
     response: str,
     warning_limiter: Optional[WarningLimiter] = None,
+    default_task_type: Optional[str] = None,
 ) -> Optional[List[Dict[str, str]]]:
     try:
         clean_response = response.replace("```json", "").replace("```", "").strip()
@@ -110,6 +119,9 @@ def parse_json_list(
             json_str = clean_response[start_obj:end_idx]
             data = json.loads(json_str)
             if isinstance(data, dict) and "examples" in data:
+                # Inject missing task_type before validation
+                examples = [_inject_task_type_if_missing(ex, default_task_type) for ex in data["examples"]]
+                data["examples"] = examples
                 # Validate with Pydantic
                 validated = SyntheticExampleList(**data)
                 return [item.model_dump() for item in validated.examples]
@@ -119,6 +131,8 @@ def parse_json_list(
             json_str = clean_response[start_list:end_idx]
             data = json.loads(json_str)
             if isinstance(data, list):
+                # Inject missing task_type before validation
+                data = [_inject_task_type_if_missing(item, default_task_type) for item in data]
                 # Validate each item
                 validated_list = [SyntheticExample(**item).model_dump() for item in data]
                 return validated_list
@@ -145,9 +159,13 @@ def repair_json_response(
     max_output_tokens: Optional[int],
     max_completion_tokens: Optional[int],
     warning_limiter: Optional[WarningLimiter] = None,
+    task_type: Optional[str] = None,
 ) -> str:
+    # Include task_type requirement in repair prompt for better results
+    task_type_hint = f' Each object must have "task_type": "{task_type}".' if task_type else ""
     repair_prompt = (
-        "Fix the following output so it is a valid JSON list of objects. "
+        "Fix the following output so it is a valid JSON list of objects with "
+        f'"instruction", "output", and "task_type" fields.{task_type_hint} '
         "Do not add commentary or extra text. Return JSON only.\n\n"
         f"Output to fix:\n{response}"
     )
@@ -213,7 +231,7 @@ def generate_qa_pairs(
         print("Warning: Empty response from model. Skipping this chunk.")
         return []
 
-    parsed = parse_json_list(response, warning_limiter=warning_limiter)
+    parsed = parse_json_list(response, warning_limiter=warning_limiter, default_task_type=task_type)
     if parsed is not None:
         return parsed
 
@@ -230,11 +248,12 @@ def generate_qa_pairs(
         max_output_tokens=max_output_tokens,
         max_completion_tokens=max_completion_tokens,
         warning_limiter=warning_limiter,
+        task_type=task_type,
     )
     if not repaired:
         return []
 
-    repaired_parsed = parse_json_list(repaired, warning_limiter=warning_limiter)
+    repaired_parsed = parse_json_list(repaired, warning_limiter=warning_limiter, default_task_type=task_type)
     if repaired_parsed is None:
         if invalid_log_path:
             log_invalid_response(invalid_log_path, repaired)

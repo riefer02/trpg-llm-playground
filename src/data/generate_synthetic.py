@@ -28,7 +28,7 @@ from .synth_multiturn import (
     should_generate_multiturn,
 )
 from .synth_walkthrough import generate_walkthrough_series
-from .synth_negatives import generate_negative_pairs, should_generate_negative
+from .synth_negatives import calculate_negative_count, generate_negative_pairs
 from .synth_prompts import PromptConfig
 from .synth_resume import build_signature, load_checkpoint, save_checkpoint
 from .synth_tables import extract_table_pairs
@@ -774,37 +774,44 @@ def main() -> None:
                             break
                         positive_count += 1
 
-            # Negative example generation
-            if negatives_enabled and should_generate_negative(order_pos, len(order), negatives_ratio):
-                remaining = None if max_samples is None else max_samples - count
-                if remaining is None or remaining > 0:
-                    neg_count = min(negatives_max_per_chunk, remaining or negatives_max_per_chunk)
-                    neg_task = negatives_task_type if negatives_task_type != "auto" else task_type
-                    neg_pairs = generate_negative_pairs(
-                        combined_text,
-                        prompt_config=prompt_config,
-                        model=model,
-                        temperature=temperature,
-                        max_output_tokens=max_output_tokens,
-                        max_completion_tokens=max_completion_tokens,
-                        task_type=neg_task,
-                        n_questions=neg_count,
-                        repair_invalid_json=repair_invalid_json,
-                        invalid_log_path=invalid_response_log,
-                        warning_limiter=warning_limiter,
-                    )
-                    for pair in neg_pairs:
-                        pair.pop("_is_negative", None)  # Remove internal marker
-                        if not write_record(
-                            pair,
-                            neg_task,
-                            page,
+            # Negative example generation - use ratio-based calculation
+            if negatives_enabled:
+                neg_needed = calculate_negative_count(
+                    current_positive_count=positive_count,
+                    current_negative_count=negative_count,
+                    target_ratio=negatives_ratio,
+                    max_per_chunk=negatives_max_per_chunk,
+                )
+                if neg_needed > 0:
+                    remaining = None if max_samples is None else max_samples - count
+                    if remaining is None or remaining > 0:
+                        neg_count = min(neg_needed, remaining or neg_needed)
+                        neg_task = negatives_task_type if negatives_task_type != "auto" else task_type
+                        neg_pairs = generate_negative_pairs(
                             combined_text,
-                            context_pages,
-                            neg_task,
-                        ):
-                            break
-                        negative_count += 1
+                            prompt_config=prompt_config,
+                            model=model,
+                            temperature=temperature,
+                            max_output_tokens=max_output_tokens,
+                            max_completion_tokens=max_completion_tokens,
+                            task_type=neg_task,
+                            n_questions=neg_count,
+                            repair_invalid_json=repair_invalid_json,
+                            invalid_log_path=invalid_response_log,
+                            warning_limiter=warning_limiter,
+                        )
+                        for pair in neg_pairs:
+                            pair.pop("_is_negative", None)  # Remove internal marker
+                            if not write_record(
+                                pair,
+                                neg_task,
+                                page,
+                                combined_text,
+                                context_pages,
+                                neg_task,
+                            ):
+                                break
+                            negative_count += 1
 
             # Multi-turn conversation generation
             if (
