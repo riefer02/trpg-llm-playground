@@ -10,10 +10,14 @@ from tqdm import tqdm
 
 from .synth_analysis import analyze_text, suggest_questions
 from .synth_coverage import generate_coverage_pairs
+from .synth_dedup import RunningDeduplicator
 from .synth_io import load_chunks
 from .synth_llm import DEFAULT_TASK_TYPES, WarningLimiter, generate_qa_pairs
+from .synth_negatives import generate_negative_pairs, should_generate_negative
+from .synth_prompts import PromptConfig
 from .synth_resume import build_signature, load_checkpoint, save_checkpoint
 from .synth_tables import extract_table_pairs
+from .synth_verify import VerificationStats, verify_and_filter_pairs
 
 RAG_SYSTEM_PROMPT = (
     "You are a grounded RPG assistant. Use only the provided context to answer. "
@@ -266,6 +270,40 @@ def main() -> None:
     hud_every = logging_config.get("hud_every", 10)
     quiet = logging_config.get("quiet", False)
     warning_limiter = WarningLimiter(0 if quiet else max_warnings)
+
+    # Initialize PromptConfig with topic from config
+    topic = config.get("topic", "the RPG system")
+    prompt_config = PromptConfig(config, topic=topic)
+
+    # Quality enhancement configs
+    negatives_config = config.get("negatives", {}) or {}
+    negatives_enabled = negatives_config.get("enabled", False)
+    negatives_ratio = negatives_config.get("ratio", 0.12)
+    negatives_max_per_chunk = negatives_config.get("max_per_chunk", 2)
+    negatives_task_type = negatives_config.get("task_type", "rules_qa")
+
+    verification_config = config.get("verification", {}) or {}
+    verification_enabled = verification_config.get("enabled", False)
+    verification_threshold = verification_config.get("threshold", 4)
+    verification_use_corrections = verification_config.get("use_corrections", True)
+    verification_model = verification_config.get("model", model)
+    verification_stats = VerificationStats() if verification_enabled else None
+
+    dedup_config = config.get("deduplication", {}) or {}
+    dedup_enabled = dedup_config.get("enabled", False)
+    dedup_threshold = dedup_config.get("similarity_threshold", 0.85)
+    dedup_model = dedup_config.get("model", "all-MiniLM-L6-v2")
+    dedup_cross_chunk = dedup_config.get("cross_chunk", True)
+    deduplicator = None
+    if dedup_enabled and dedup_cross_chunk:
+        deduplicator = RunningDeduplicator(
+            threshold=dedup_threshold,
+            model_name=dedup_model,
+        )
+
+    # Track negative example counts for ratio management
+    positive_count = 0
+    negative_count = 0
 
     tables_config = config.get("tables", {}) or {}
     tables_enabled = tables_config.get("enabled", False)
@@ -597,7 +635,30 @@ def main() -> None:
                         repair_invalid_json=repair_invalid_json,
                         invalid_log_path=invalid_response_log,
                         warning_limiter=warning_limiter,
+                        prompt_config=prompt_config,
                     )
+
+                    # Verification pass
+                    if verification_enabled and qa_pairs:
+                        qa_pairs, v_stats = verify_and_filter_pairs(
+                            qa_pairs,
+                            context=combined_text,
+                            prompt_config=prompt_config,
+                            model=verification_model,
+                            temperature=temperature,
+                            max_output_tokens=max_output_tokens,
+                            max_completion_tokens=max_completion_tokens,
+                            threshold=verification_threshold,
+                            use_corrections=verification_use_corrections,
+                            warning_limiter=warning_limiter,
+                        )
+                        verification_stats.update(v_stats)
+
+                    # Deduplication pass
+                    if dedup_enabled and qa_pairs:
+                        if deduplicator:
+                            qa_pairs = deduplicator.add_and_filter(qa_pairs)
+                        # If not cross-chunk, we'd do per-chunk dedup here
 
                     for pair in qa_pairs:
                         if not write_record(
@@ -609,6 +670,39 @@ def main() -> None:
                             task_type,
                         ):
                             break
+                        positive_count += 1
+
+            # Negative example generation
+            if negatives_enabled and should_generate_negative(order_pos, len(order), negatives_ratio):
+                remaining = None if max_samples is None else max_samples - count
+                if remaining is None or remaining > 0:
+                    neg_count = min(negatives_max_per_chunk, remaining or negatives_max_per_chunk)
+                    neg_task = negatives_task_type if negatives_task_type != "auto" else task_type
+                    neg_pairs = generate_negative_pairs(
+                        combined_text,
+                        prompt_config=prompt_config,
+                        model=model,
+                        temperature=temperature,
+                        max_output_tokens=max_output_tokens,
+                        max_completion_tokens=max_completion_tokens,
+                        task_type=neg_task,
+                        n_questions=neg_count,
+                        repair_invalid_json=repair_invalid_json,
+                        invalid_log_path=invalid_response_log,
+                        warning_limiter=warning_limiter,
+                    )
+                    for pair in neg_pairs:
+                        pair.pop("_is_negative", None)  # Remove internal marker
+                        if not write_record(
+                            pair,
+                            neg_task,
+                            page,
+                            combined_text,
+                            context_pages,
+                            neg_task,
+                        ):
+                            break
+                        negative_count += 1
 
             if resume_enabled and checkpoint_path:
                 checkpoint_payload = {
@@ -654,7 +748,22 @@ def main() -> None:
     else:
         print("✅ All samples fit comfortably within standard 4k context.")
 
-    print(f"Successfully generated {total_samples} pairs. Saved to {output_path}")
+    # Quality enhancement summaries
+    if negatives_enabled:
+        total_examples = positive_count + negative_count
+        actual_ratio = negative_count / total_examples if total_examples > 0 else 0
+        print(f"\n--- Negative Examples ---")
+        print(f"Positive examples: {positive_count}")
+        print(f"Negative examples: {negative_count}")
+        print(f"Negative ratio: {actual_ratio:.1%} (target: {negatives_ratio:.1%})")
+
+    if verification_enabled and verification_stats:
+        verification_stats.print_summary()
+
+    if dedup_enabled and deduplicator:
+        deduplicator.stats.print_summary()
+
+    print(f"\nSuccessfully generated {total_samples} pairs. Saved to {output_path}")
 
 
 if __name__ == "__main__":

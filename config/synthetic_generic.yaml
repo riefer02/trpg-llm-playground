@@ -146,3 +146,45 @@ logging:
   quiet: false
   max_warnings: 10
   hud_every: 10
+
+# ============================================================================
+# QUALITY ENHANCEMENTS (P0/P1)
+# ============================================================================
+
+# Configurable prompt templates - override defaults from synth_prompts.py
+# Use {topic} placeholder which gets replaced with the 'topic' field above
+prompts:
+  # Override system persona (default uses topic)
+  # system_persona: "You are an expert Game Master for {topic}."
+  # Override context introduction
+  # context_intro: "Read the following text from the {topic} source material:"
+
+# Negative example generation - trains model to say "Not found in context"
+negatives:
+  enabled: true
+  # Target ratio of negative examples in final dataset
+  ratio: 0.12
+  # Maximum negative examples per chunk
+  max_per_chunk: 2
+  # Default task type for negatives (or "auto" to match chunk's task type)
+  task_type: "rules_qa"
+
+# Answer verification - LLM-based quality scoring and correction
+verification:
+  enabled: true
+  # Minimum score (1-5) to keep a Q/A pair
+  threshold: 4
+  # If true, use corrected answers for pairs scoring below threshold
+  use_corrections: true
+  # Model to use for verification (can differ from generation model)
+  # model: "gpt-4o-mini"  # Uncomment to use a different model
+
+# Semantic deduplication - removes similar questions
+deduplication:
+  enabled: true
+  # Cosine similarity threshold (0-1, higher = stricter)
+  similarity_threshold: 0.85
+  # Sentence transformer model for embeddings
+  model: "all-MiniLM-L6-v2"
+  # Run deduplication across entire dataset (true) or per-chunk (false)
+  cross_chunk: true

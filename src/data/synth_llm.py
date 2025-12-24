@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from ..utils.llm_client import call_llm
 from .synth_io import log_invalid_response
+from .synth_prompts import PromptConfig
 
 DEFAULT_TASK_TYPES = [
     "rules_qa",
@@ -29,6 +30,7 @@ class SyntheticExampleList(BaseModel):
     examples: List[SyntheticExample]
 
 
+# Legacy template kept for backwards compatibility - prefer PromptConfig
 PROMPT_TEMPLATE = """
 You are an expert Game Master and Rules Lawyer for the Lancer RPG system.
 Your goal is to create high-quality, logically consistent training data for a new AI model.
@@ -179,14 +181,25 @@ def generate_qa_pairs(
     repair_invalid_json: bool = True,
     invalid_log_path: Optional[str] = None,
     warning_limiter: Optional[WarningLimiter] = None,
+    prompt_config: Optional[PromptConfig] = None,
 ) -> List[Dict[str, str]]:
-    prompt = PROMPT_TEMPLATE.format(
-        text=text_chunk,
-        n_questions=n_questions,
-        task_type=task_type,
-        task_types=", ".join(allowed_task_types),
-        extra_instructions=extra_instructions,
-    )
+    # Use PromptConfig if provided, otherwise fall back to legacy template
+    if prompt_config is not None:
+        prompt = prompt_config.format_qa_prompt(
+            text=text_chunk,
+            n_questions=n_questions,
+            task_type=task_type,
+            task_types=allowed_task_types,
+            extra_instructions=extra_instructions,
+        )
+    else:
+        prompt = PROMPT_TEMPLATE.format(
+            text=text_chunk,
+            n_questions=n_questions,
+            task_type=task_type,
+            task_types=", ".join(allowed_task_types),
+            extra_instructions=extra_instructions,
+        )
 
     response = call_llm(
         prompt,

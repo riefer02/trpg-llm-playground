@@ -3,3 +3,4 @@ PyYAML
 tqdm
 pymupdf
 pydantic
+sentence-transformers  # For semantic deduplication (optional but recommended)
