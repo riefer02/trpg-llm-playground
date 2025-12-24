@@ -5,17 +5,18 @@ Each template provides game-specific customization for synthetic data generation
 
 ## Available Templates
 
-| Template | Game System | Description |
-|----------|-------------|-------------|
-| `lancer.yaml` | Lancer RPG | Tactical mech combat |
-| `dnd5e.yaml` | D&D 5th Edition | Classic fantasy |
-| `pathfinder2e.yaml` | Pathfinder 2e | Crunchy fantasy tactics |
-| `cyberpunk_red.yaml` | Cyberpunk RED | Dystopian future |
-| `blades.yaml` | Blades in the Dark | Heist-focused narrative |
+| Template             | Game System        | Description             |
+| -------------------- | ------------------ | ----------------------- |
+| `lancer.yaml`        | Lancer RPG         | Tactical mech combat    |
+| `dnd5e.yaml`         | D&D 5th Edition    | Classic fantasy         |
+| `pathfinder2e.yaml`  | Pathfinder 2e      | Crunchy fantasy tactics |
+| `cyberpunk_red.yaml` | Cyberpunk RED      | Dystopian future        |
+| `blades.yaml`        | Blades in the Dark | Heist-focused narrative |
 
 ## Usage
 
 1. Copy a template to create your config:
+
    ```bash
    cp config/templates/dnd5e.yaml config/my_dnd_campaign.yaml
    ```
@@ -40,7 +41,7 @@ Use `_base.yaml` as a starting point. Key customization areas:
 ## Template Variables
 
 Templates use these placeholders:
+
 - `{topic}` - The game system name
 - `{project_name}` - Short identifier for file naming
 - `{dataset_tag}` - Version tag for the dataset
-

@@ -1,0 +1,166 @@
+# Local Development Config for Lancer RPG
+# Saves to dataset/ folder - upload to Drive when done
+
+project_name: "lancer"
+dataset_tag: "v1"
+topic: "Lancer RPG Core Rules"
+
+# Local paths
+ingest:
+  pdf_path: "books/Lancer Core Book (PR2).pdf"
+  raw_output_path: "dataset/{project_name}_{dataset_tag}_raw.jsonl"
+  output_format: "jsonl"
+  flush_every: 50
+
+# Generation settings
+n_samples: 500
+
+debug:
+  enabled: true
+  max_pages: 5
+  max_samples: 10
+
+limits:
+  enforce_max_samples: false
+
+generation:
+  shuffle: true
+  shuffle_seed: 1337
+
+context:
+  prev_chars: 400
+  next_chars: 400
+
+# Task types
+task_types:
+  - "rules_qa"
+  - "character_build"
+  - "scenario_seed"
+  - "gm_guidance"
+  - "lore"
+
+# RAG mode for grounded answers
+rag_mode:
+  enabled: true
+  emit_messages: true
+  citation_style: "(p. {page})"
+  format_by_task_type:
+    rules_qa: |
+      Answer: 1-3 sentences.
+      Rules Reference:
+      - Bullet list with citations.
+      Example: short, practical example.
+      Citations: (p. X)
+    character_build: |
+      Assumptions: short list.
+      Recommendations: ranked bullets.
+      Tradeoffs: 1-3 bullets.
+      Next Questions: 1-2 clarifying questions.
+      Citations: (p. X) only when referencing mechanics.
+    scenario_seed: |
+      Scenario Summary: 2-4 sentences.
+      Hooks: 2-3 bullets.
+      Obstacles: 2-3 bullets.
+      Adjustments: easy/hard variants.
+      Citations: (p. X) if mechanics are referenced.
+    gm_guidance: |
+      Guidance: 3-5 bullets.
+      Table Safety/Clarifications: 1-2 bullets if relevant.
+      Citations: (p. X) for any rule references.
+    lore: |
+      Answer: 2-4 sentences.
+      Key Facts: 2-4 bullets.
+      Citations: (p. X)
+
+# RAG chunking (heading-aware)
+rag_ingest:
+  enabled: true
+  chunks_output_path: "dataset/{project_name}_{dataset_tag}_chunks.jsonl"
+  include_section_prefix: true
+  chunking:
+    max_tokens: 900
+    overlap_tokens: 150
+    min_chunk_tokens: 200
+  heading_detection:
+    min_size_delta: 1.5
+    level_deltas: [4.0, 2.0]
+    max_heading_words: 14
+
+# Tables
+tables:
+  enabled: true
+  min_rows: 4
+  min_cols: 2
+  max_rows: 12
+  max_cols: 5
+  max_pairs: 5
+  task_type: "rules_qa"
+
+# Coverage for dense pages
+coverage:
+  enabled: true
+  min_text_len: 1400
+  max_pairs: 2
+  task_type: "rules_qa"
+
+# Resume support (survives interrupts)
+resume:
+  enabled: true
+  checkpoint_path: "dataset/{project_name}_{dataset_tag}_resume.json"
+  allow_mismatch: false
+  force_restart: false
+
+# Output
+output:
+  path: "dataset/{project_name}_{dataset_tag}_synthetic_{run_id}.jsonl"
+  run_id: "auto"
+  append: false
+  flush_every: 50
+
+# LLM settings
+llm:
+  model: "gpt-4o-mini"
+  temperature: null
+  max_output_tokens: null
+  repair_invalid_json: true
+  invalid_response_log: "dataset/invalid_responses.log"
+
+# Quality enhancements
+negatives:
+  enabled: true
+  ratio: 0.12
+  max_per_chunk: 2
+  task_type: "rules_qa"
+
+verification:
+  enabled: true
+  threshold: 4
+  use_corrections: true
+
+deduplication:
+  enabled: true
+  similarity_threshold: 0.85
+  model: "all-MiniLM-L6-v2"
+  cross_chunk: true
+
+multiturn:
+  enabled: true
+  ratio: 0.20
+  min_turns: 2
+  max_turns: 3
+  task_types:
+    - "rules_qa"
+    - "character_build"
+    - "gm_guidance"
+
+difficulty:
+  enabled: true
+  distribution:
+    basic: 0.30
+    intermediate: 0.50
+    advanced: 0.20
+
+logging:
+  quiet: false
+  max_warnings: 10
+  hud_every: 10
