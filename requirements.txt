@@ -11,5 +11,6 @@ distilabel
 pydantic
 bitsandbytes
 scipy
+psutil  # Required by Unsloth's SFTTrainer
 trl # Unsloth manages this dependency
 xformers # Recommended for speed on Colab

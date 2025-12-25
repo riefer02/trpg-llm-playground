@@ -43,6 +43,57 @@ def save_jsonl(records: List[dict], path: str) -> None:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def normalize_schema(records: List[dict]) -> List[dict]:
+    """
+    Normalize all records to have the same columns.
+    
+    HuggingFace datasets requires consistent schema across all records.
+    This adds missing columns with type-appropriate defaults.
+    """
+    if not records:
+        return records
+    
+    # Collect all columns and infer their types from non-null values
+    column_types = {}
+    for record in records:
+        for col, val in record.items():
+            if val is not None and col not in column_types:
+                column_types[col] = type(val)
+    
+    # Type-appropriate defaults
+    def get_default(col):
+        col_type = column_types.get(col)
+        if col_type == str:
+            return ""
+        elif col_type == bool:
+            return False
+        elif col_type == int:
+            return 0
+        elif col_type == float:
+            return 0.0
+        elif col_type == list:
+            return []
+        elif col_type == dict:
+            return {}
+        else:
+            return ""  # Default to empty string for unknown types
+    
+    # Normalize each record to have all columns
+    all_columns = set(column_types.keys())
+    normalized = []
+    for record in records:
+        norm_record = {}
+        for col in all_columns:
+            if col in record and record[col] is not None:
+                norm_record[col] = record[col]
+            else:
+                norm_record[col] = get_default(col)
+        normalized.append(norm_record)
+    
+    print(f"Normalized schema: {len(all_columns)} columns across all records")
+    return normalized
+
+
 def deduplicate_records(
     records: List[dict],
     threshold: float = 0.85,
@@ -167,6 +218,9 @@ Examples:
         random.seed(args.seed)
         random.shuffle(all_records)
         print(f"Shuffled records (seed={args.seed})")
+
+    # Normalize schema so all records have the same columns
+    all_records = normalize_schema(all_records)
 
     # Save output
     save_jsonl(all_records, args.output)
