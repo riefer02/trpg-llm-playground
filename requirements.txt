@@ -1,9 +1,9 @@
+# Core dependencies (Unsloth installed separately in Colab notebooks)
 openai
 transformers
 datasets
 accelerate
 peft
-unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
 PyYAML
 tqdm
 pymupdf
@@ -11,6 +11,9 @@ distilabel
 pydantic
 bitsandbytes
 scipy
-psutil  # Required by Unsloth's SFTTrainer
-trl # Unsloth manages this dependency
-xformers # Recommended for speed on Colab
+psutil
+
+# For local (non-Colab) use only - uncomment if running locally:
+# unsloth
+# trl
+# xformers
