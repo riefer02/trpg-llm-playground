@@ -52,7 +52,11 @@ training:
   gradient_accumulation_steps: 4 # Effective batch = 4*4 = 16
 
   warmup_steps: 10
-  max_steps: 100 # ~15-20 min on A100 for 3000 samples
+  # Training steps - aim for 2-3 epochs over your dataset
+  # Formula: steps = (dataset_size / effective_batch_size) * epochs
+  # Example: 1600 samples / 16 batch * 3 epochs = 300 steps
+  # More steps = better learning, but diminishing returns after 3-4 epochs
+  max_steps: 300 # ~30-45 min on A100 for 1600 samples (3 epochs)
   learning_rate: 2.0e-4
   logging_steps: 5
   save_steps: 25 # Checkpoint every 25 steps
