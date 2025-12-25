@@ -1,7 +1,7 @@
 # Lancer RPG Fine-tuning Configuration
 
 project_name: "lancer" # Change this to match your synthetic config
-dataset_tag: "v1_ctx4096" # Must match the generated dataset you want to train on
+dataset_tag: "combined" # Using merged general + walkthrough dataset
 
 model:
   # Model Selection (7-8B recommended for local deployment)
@@ -19,7 +19,7 @@ model:
 
 dataset:
   # Use the persistent Drive path
-  train_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_synthetic*.jsonl"
+  train_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}.jsonl"
   val_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_val.jsonl" # Optional
 
 training:
