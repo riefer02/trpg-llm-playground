@@ -13,9 +13,11 @@ model:
   # Inference: Runs on RTX 3060+, M1 Mac, most gaming PCs
   base_model: "unsloth/Qwen2.5-7B-Instruct-bnb-4bit"
 
-  # A100/H100 specific: You can increase this significantly (e.g., 4096, 8192)
+  # Max sequence length for training examples
+  # - 4096 works well for most RPG Q&A
+  # - Reduce to 2048 if you hit OOM errors
   max_seq_length: 4096
-  load_in_4bit: true # Even on A100, 4-bit is faster/efficient, but you can turn this false for 16-bit full precision
+  load_in_4bit: true # 4-bit is faster/efficient even on A100
 
 dataset:
   # Use the persistent Drive path
@@ -26,36 +28,49 @@ training:
   # Save the output directly to Drive
   output_dir: "/content/drive/MyDrive/llm_experiments/outputs/{project_name}_{dataset_tag}_lora"
 
-  # Professional Tip: Set this to "wandb" to track loss curves in the cloud!
-  # You'll need to run `wandb login` in Colab first.
+  # Set to "wandb" to track loss curves (run `wandb login` first)
   report_to: "none"
 
-  # A100 Optimized Settings (40GB VRAM)
-  # - Batch 8 x grad_accum 2 = effective batch 16
-  # - ~10-15 min for 500 samples with 7B model
-  # - For T4 (16GB), reduce to batch_size: 4
-  per_device_train_batch_size: 8
-  gradient_accumulation_steps: 2
+  # ==========================================================================
+  # MEMORY SETTINGS - Adjust based on your GPU
+  # ==========================================================================
+  # Effective batch size = per_device_batch * gradient_accumulation * num_gpus
+  # Keep effective batch ~16 for good convergence
+  #
+  # GPU Memory Guide:
+  #   T4 (16GB):  batch=2, grad_accum=8  (may need max_seq_length=2048)
+  #   A100 (40GB): batch=4, grad_accum=4  (safe default)
+  #   A100 (80GB): batch=8, grad_accum=2  (faster)
+  #
+  # If you hit OOM errors:
+  #   1. Reduce per_device_train_batch_size
+  #   2. Increase gradient_accumulation_steps to compensate
+  #   3. Reduce max_seq_length (in model section)
+  #   4. Reduce lora.r (in lora section)
+  # ==========================================================================
+  per_device_train_batch_size: 4 # Safe for A100 40GB with 7B model
+  gradient_accumulation_steps: 4 # Effective batch = 4*4 = 16
 
   warmup_steps: 10
-  max_steps: 100 # More steps for better convergence, still fast on A100
+  max_steps: 100 # ~15-20 min on A100 for 3000 samples
   learning_rate: 2.0e-4
   logging_steps: 5
   save_steps: 25 # Checkpoint every 25 steps
   optim: "adamw_8bit"
   weight_decay: 0.01
-  lr_scheduler_type: "cosine" # Cosine often works better than linear
+  lr_scheduler_type: "cosine"
   seed: 3407
 
 lora:
-  # A100: Can afford higher rank for better quality
-  # r=32 gives more expressiveness without much slowdown
-  # For T4, reduce to r=16, lora_alpha=16
+  # LoRA rank affects quality vs memory tradeoff
+  # Higher rank = more expressive but uses more VRAM
+  #   T4: r=16, lora_alpha=16
+  #   A100: r=32, lora_alpha=32
   r: 32
   lora_alpha: 32
   lora_dropout: 0
   bias: "none"
-  use_gradient_checkpointing: "unsloth"
+  use_gradient_checkpointing: "unsloth" # Critical for memory efficiency
   random_state: 3407
   use_rslora: false
   loftq_config: null

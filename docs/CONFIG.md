@@ -101,11 +101,44 @@ difficulty:
 - `python -m src.training.evaluate_rpg`: RPG-specific evaluation benchmark.
 
 ## Training (`config/rpg_finetune.yaml`)
-- `model.base_model`: Unsloth base model.
-- `dataset.train_path`: can be a glob to load multiple JSONL files.
-- `training.output_dir`: LoRA output on Drive.
-- `training.save_steps`: checkpoint frequency.
-- `lora.*`: adapter config.
+
+### Model Settings
+- `model.base_model`: Unsloth base model (e.g., `unsloth/Qwen2.5-7B-Instruct-bnb-4bit`)
+- `model.max_seq_length`: Max tokens per training example (reduce if OOM)
+- `model.load_in_4bit`: Use 4-bit quantization (recommended)
+
+### Dataset
+- `dataset.train_path`: Path to training JSONL (can use `{project_name}`, `{dataset_tag}`)
+
+### Training
+- `training.output_dir`: LoRA output on Drive
+- `training.save_steps`: Checkpoint frequency
+- `training.max_steps`: Total training steps
+
+### Memory Configuration (Critical!)
+
+Training memory usage depends on batch size, sequence length, and LoRA rank.
+If you hit **CUDA out of memory** errors, adjust these settings:
+
+| GPU | VRAM | `per_device_train_batch_size` | `gradient_accumulation_steps` | Notes |
+|-----|------|------------------------------|------------------------------|-------|
+| T4 | 16GB | 2 | 8 | May need `max_seq_length: 2048` |
+| A100 | 40GB | 4 | 4 | Safe default |
+| A100 | 80GB | 8 | 2 | Faster training |
+
+**Key principle**: Keep effective batch size ~16 for good convergence.
+`effective_batch = per_device_batch × gradient_accumulation × num_gpus`
+
+**OOM Troubleshooting** (in order of impact):
+1. Reduce `per_device_train_batch_size`
+2. Increase `gradient_accumulation_steps` to compensate
+3. Reduce `model.max_seq_length`
+4. Reduce `lora.r` (LoRA rank)
+
+### LoRA Settings
+- `lora.r`: Rank (higher = more expressive, more VRAM). T4: 16, A100: 32
+- `lora.lora_alpha`: Usually set equal to `r`
+- `lora.use_gradient_checkpointing`: Set to `"unsloth"` for memory efficiency
 
 ## Colab Notebooks
 - `colab/run_synthetic_only.ipynb`: ingest + synthetic only.
