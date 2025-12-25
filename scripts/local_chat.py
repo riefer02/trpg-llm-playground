@@ -494,8 +494,10 @@ def gradio_ui(
 
     def make_example_handler(example_text):
         """Create a handler for a specific example."""
+
         def handler(history):
             return respond(example_text, history)
+
         return handler
 
     # Build the interface
