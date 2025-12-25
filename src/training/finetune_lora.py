@@ -2,7 +2,6 @@ import sys
 import os
 import argparse
 import yaml
-import torch
 import glob
 
 # Graceful import check for Unsloth
@@ -14,8 +13,7 @@ except ImportError:
     sys.exit(1)
 
 from datasets import load_dataset
-from trl import SFTTrainer
-from transformers import TrainingArguments
+from trl import SFTTrainer, SFTConfig
 
 def train(config_path: str):
     print(f"Loading config from {config_path}...")
@@ -139,37 +137,32 @@ def train(config_path: str):
 
     dataset = dataset.map(formatting_prompts_func, batched = True)
 
-    # 5. Training Arguments
+    # 5. Training Config (using SFTConfig per official Unsloth pattern)
     output_dir_template = config['training']['output_dir']
     output_dir = output_dir_template.format(**path_vars)
     
-    training_args = TrainingArguments(
-        output_dir = output_dir,
-        per_device_train_batch_size = config['training']['per_device_train_batch_size'],
-        gradient_accumulation_steps = config['training']['gradient_accumulation_steps'],
-        warmup_steps = config['training']['warmup_steps'],
-        max_steps = config['training']['max_steps'],
-        learning_rate = float(config['training']['learning_rate']),
-        fp16 = not torch.cuda.is_bf16_supported(),
-        bf16 = torch.cuda.is_bf16_supported(),
-        logging_steps = config['training']['logging_steps'],
-        save_steps = config['training'].get('save_steps', 0),
-        optim = config['training']['optim'],
-        weight_decay = config['training']['weight_decay'],
-        lr_scheduler_type = config['training']['lr_scheduler_type'],
-        seed = config['training']['seed'],
-        report_to = config['training'].get('report_to', "none"),
-    )
-
     trainer = SFTTrainer(
         model = model,
         tokenizer = tokenizer,
         train_dataset = dataset,
         dataset_text_field = "text",
         max_seq_length = max_seq_length,
-        dataset_num_proc = 2,
-        packing = False, 
-        args = training_args,
+        packing = False,
+        args = SFTConfig(
+            output_dir = output_dir,
+            per_device_train_batch_size = config['training']['per_device_train_batch_size'],
+            gradient_accumulation_steps = config['training']['gradient_accumulation_steps'],
+            warmup_steps = config['training']['warmup_steps'],
+            max_steps = config['training']['max_steps'],
+            learning_rate = float(config['training']['learning_rate']),
+            logging_steps = config['training']['logging_steps'],
+            save_steps = config['training'].get('save_steps', 0),
+            optim = config['training']['optim'],
+            weight_decay = config['training']['weight_decay'],
+            lr_scheduler_type = config['training']['lr_scheduler_type'],
+            seed = config['training']['seed'],
+            report_to = config['training'].get('report_to', "none"),
+        ),
     )
 
     # 6. Train
