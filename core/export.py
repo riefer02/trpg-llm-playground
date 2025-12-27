@@ -19,6 +19,7 @@ from core.pilot import (
     Skill,
     SkillSet,
     Background,
+    BackgroundInvokeRule,
     Talent,
     TalentDefinition,
     TalentRank,
@@ -26,6 +27,20 @@ from core.pilot import (
     LicenseDefinition,
     CoreBonus,
     CoreBonusDefinition,
+    PilotTrigger,
+    TriggerDefinition,
+    LevelProgression,
+    PilotProgressionRules,
+    ProgressionIssue,
+    ProgressionValidation,
+    PilotGearItemDefinition,
+    PilotGearRules,
+    PilotLoadout,
+    PilotCombatBaseStats,
+    PilotDamageSeverity,
+    DownAndOutRule,
+    PilotRestRule,
+    PilotCombatRules,
 )
 from core.shared.dice import DiceExpression
 from core.shared.effects import (
@@ -40,6 +55,31 @@ from core.shared.effects import (
     MovementGrant,
     StatusGrant,
 )
+from core.shared.rolls import (
+    AccuracyDifficulty,
+    FlatBonus,
+    RollModifiers,
+    SkillCheck,
+    AttackRoll,
+    SaveRoll,
+    ContestedCheck,
+)
+from core.mech import (
+    MechWeaponDefinition,
+    MountSlot,
+    CoreSystemDefinition,
+    MechFrameBaseStats,
+    MechFrameDefinition,
+    MechPilotingRules,
+    CorePowerRules,
+    SystemPointRules,
+    MountedWeapon,
+    InstalledSystem,
+    MechBuild,
+    MechDerivedStats,
+    MechBuildIssue,
+    MechBuildValidation,
+)
 
 
 # All exportable models
@@ -49,6 +89,7 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "Skill": Skill,
     "SkillSet": SkillSet,
     "Background": Background,
+    "BackgroundInvokeRule": BackgroundInvokeRule,
     "Talent": Talent,
     "TalentDefinition": TalentDefinition,
     "TalentRank": TalentRank,
@@ -56,6 +97,20 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "LicenseDefinition": LicenseDefinition,
     "CoreBonus": CoreBonus,
     "CoreBonusDefinition": CoreBonusDefinition,
+    "PilotTrigger": PilotTrigger,
+    "TriggerDefinition": TriggerDefinition,
+    "LevelProgression": LevelProgression,
+    "PilotProgressionRules": PilotProgressionRules,
+    "ProgressionIssue": ProgressionIssue,
+    "ProgressionValidation": ProgressionValidation,
+    "PilotGearItemDefinition": PilotGearItemDefinition,
+    "PilotGearRules": PilotGearRules,
+    "PilotLoadout": PilotLoadout,
+    "PilotCombatBaseStats": PilotCombatBaseStats,
+    "PilotDamageSeverity": PilotDamageSeverity,
+    "DownAndOutRule": DownAndOutRule,
+    "PilotRestRule": PilotRestRule,
+    "PilotCombatRules": PilotCombatRules,
     # Shared - Dice
     "DiceExpression": DiceExpression,
     # Shared - Effects
@@ -69,6 +124,29 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "AccuracyModifier": AccuracyModifier,
     "MovementGrant": MovementGrant,
     "StatusGrant": StatusGrant,
+    # Shared - Rolls
+    "AccuracyDifficulty": AccuracyDifficulty,
+    "FlatBonus": FlatBonus,
+    "RollModifiers": RollModifiers,
+    "SkillCheck": SkillCheck,
+    "AttackRoll": AttackRoll,
+    "SaveRoll": SaveRoll,
+    "ContestedCheck": ContestedCheck,
+    # Mech domain
+    "MechWeaponDefinition": MechWeaponDefinition,
+    "MountSlot": MountSlot,
+    "CoreSystemDefinition": CoreSystemDefinition,
+    "MechFrameBaseStats": MechFrameBaseStats,
+    "MechFrameDefinition": MechFrameDefinition,
+    "MechPilotingRules": MechPilotingRules,
+    "CorePowerRules": CorePowerRules,
+    "SystemPointRules": SystemPointRules,
+    "MountedWeapon": MountedWeapon,
+    "InstalledSystem": InstalledSystem,
+    "MechBuild": MechBuild,
+    "MechDerivedStats": MechDerivedStats,
+    "MechBuildIssue": MechBuildIssue,
+    "MechBuildValidation": MechBuildValidation,
 }
 
 
@@ -216,4 +294,3 @@ if __name__ == "__main__":
             export_combined_schema(f"{args.output_dir}/lancer.json", args.mode)
         
         print(f"\nAll schemas exported to: {args.output_dir}/")
-

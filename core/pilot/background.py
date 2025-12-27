@@ -1,13 +1,29 @@
 """Pilot background types for Lancer TTRPG.
 
 Backgrounds define a pilot's history before becoming a Lancer.
-They provide starting triggers for skill checks.
+They provide starting triggers for pilot skill checks.
 
 Note: This module contains only mechanical definitions (allowed under
 the Lancer Third Party License). No copyrighted flavor text.
 """
 
+from typing import Literal
 from pydantic import BaseModel, Field
+
+
+class BackgroundInvokeRule(BaseModel):
+    """
+    Rule for invoking a background during narrative play.
+
+    Invoking a background grants either +1 accuracy or +1 difficulty
+    on a pilot skill check, depending on the situation.
+    """
+
+    bonus: int = Field(default=1, ge=1, le=1)
+    modifier_type: Literal["accuracy", "difficulty", "either"] = "either"
+    applies_to: Literal["skill_check"] = "skill_check"
+
+    model_config = {"frozen": True}
 
 
 class Background(BaseModel):
@@ -23,107 +39,114 @@ class Background(BaseModel):
     their own descriptions if needed.
     """
     
-    id: str = Field(..., description="Unique identifier (e.g., 'colonist', 'soldier')")
+    id: str = Field(..., description="Unique identifier (e.g., 'background_1')")
     name: str = Field(..., description="Display name")
     triggers: list[str] = Field(
         ...,
         min_length=4,
         max_length=4,
-        description="Four skill triggers from this background"
+        description="Four trigger IDs from this background"
     )
     
     model_config = {"frozen": True}
 
 
-# Standard backgrounds from the Lancer core book
-# Note: Only IDs, names, and mechanical triggers - no flavor text
-STANDARD_BACKGROUNDS: list[Background] = [
+# Background invoke rule (mechanical only)
+BACKGROUND_INVOKE_RULE = BackgroundInvokeRule()
+
+
+# Example backgrounds (generic labels, mechanical triggers only)
+EXAMPLE_BACKGROUNDS: list[Background] = [
     Background(
-        id="colonist",
-        name="Colonist",
+        id="background_1",
+        name="Example Background 1",
         triggers=[
-            "Survive",
-            "Word on the Street",
-            "Get a Hold of Something",
-            "Fix or Patch",
+            "survive",
+            "word_on_the_street",
+            "get_a_hold_of_something",
+            "hack_or_fix",
         ],
     ),
     Background(
-        id="soldier",
-        name="Soldier",
+        id="background_2",
+        name="Example Background 2",
         triggers=[
-            "Apply Fists to Faces",
-            "Assault",
-            "Threaten",
-            "Survive",
+            "apply_fists_to_faces",
+            "assault",
+            "threaten",
+            "survive",
         ],
     ),
     Background(
-        id="mechanic",
-        name="Mechanic",
+        id="background_3",
+        name="Example Background 3",
         triggers=[
-            "Fix or Patch",
-            "Hack or Fix",
-            "Invent or Create",
-            "Get a Hold of Something",
+            "hack_or_fix",
+            "invent_or_create",
+            "get_a_hold_of_something",
+            "blow_something_up",
         ],
     ),
     Background(
-        id="scientist",
-        name="Scientist",
+        id="background_4",
+        name="Example Background 4",
         triggers=[
-            "Investigate",
-            "Read a Situation",
-            "Spot",
-            "Invent or Create",
+            "investigate",
+            "read_a_situation",
+            "spot",
+            "invent_or_create",
         ],
     ),
     Background(
-        id="pilot",
-        name="Pilot",
+        id="background_5",
+        name="Example Background 5",
         triggers=[
-            "Get Somewhere Quickly",
-            "Stay Cool Under Fire",
-            "Perform a Feat of Dexterity",
-            "Act Unseen or Unheard",
+            "get_somewhere_fast",
+            "stay_cool_under_fire",
+            "perform_a_feat_of_dexterity",
+            "act_unseen_or_unheard",
         ],
     ),
     Background(
-        id="criminal",
-        name="Criminal",
+        id="background_6",
+        name="Example Background 6",
         triggers=[
-            "Act Unseen or Unheard",
-            "Get a Hold of Something",
-            "Spot",
-            "Word on the Street",
+            "act_unseen_or_unheard",
+            "get_a_hold_of_something",
+            "spot",
+            "word_on_the_street",
         ],
     ),
     Background(
-        id="noble",
-        name="Noble",
+        id="background_7",
+        name="Example Background 7",
         triggers=[
-            "Charm",
-            "Lead or Inspire",
-            "Pull Rank",
-            "Word on the Street",
+            "charm",
+            "lead_or_inspire",
+            "pull_rank",
+            "word_on_the_street",
         ],
     ),
     Background(
-        id="spacer",
-        name="Spacer",
+        id="background_8",
+        name="Example Background 8",
         triggers=[
-            "Survive",
-            "Get Somewhere Quickly",
-            "Stay Cool Under Fire",
-            "Hack or Fix",
+            "survive",
+            "get_somewhere_fast",
+            "stay_cool_under_fire",
+            "hack_or_fix",
         ],
     ),
 ]
 
 
 def get_background(background_id: str) -> Background | None:
-    """Look up a standard background by ID."""
-    for bg in STANDARD_BACKGROUNDS:
+    """Look up an example background by ID."""
+    for bg in EXAMPLE_BACKGROUNDS:
         if bg.id == background_id:
             return bg
     return None
+
+
+# Backwards-compatible alias
+STANDARD_BACKGROUNDS = EXAMPLE_BACKGROUNDS

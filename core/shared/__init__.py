@@ -10,7 +10,24 @@ from core.shared.enums import (
     SystemType,
     StatusType,
 )
-from core.shared.dice import DiceExpression, DieSize, roll_dice, roll_with_advantage
+from core.shared.dice import (
+    DiceExpression,
+    DieSize,
+    roll_dice,
+    roll_accuracy_difficulty,
+    roll_with_advantage,
+)
+from core.shared.rolls import (
+    RollType,
+    FlatBonusSource,
+    AccuracyDifficulty,
+    FlatBonus,
+    RollModifiers,
+    SkillCheck,
+    AttackRoll,
+    SaveRoll,
+    ContestedCheck,
+)
 from core.shared.effects import (
     StatType,
     ConditionType,
@@ -43,7 +60,18 @@ __all__ = [
     "DiceExpression",
     "DieSize",
     "roll_dice",
+    "roll_accuracy_difficulty",
     "roll_with_advantage",
+    # Rolls
+    "RollType",
+    "FlatBonusSource",
+    "AccuracyDifficulty",
+    "FlatBonus",
+    "RollModifiers",
+    "SkillCheck",
+    "AttackRoll",
+    "SaveRoll",
+    "ContestedCheck",
     # Effects
     "StatType",
     "ConditionType",
@@ -61,4 +89,3 @@ __all__ = [
     "damage_bonus",
     "immunity_to",
 ]
-

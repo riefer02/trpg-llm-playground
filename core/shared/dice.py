@@ -92,18 +92,33 @@ def roll_dice(expr: str | DiceExpression) -> int:
     return total + expr.modifier
 
 
-def roll_with_advantage(size: DieSize = 20) -> tuple[int, int, int]:
+def roll_accuracy_difficulty(accuracy: int = 0, difficulty: int = 0) -> int:
     """
-    Roll with accuracy (Lancer's advantage mechanic).
-    
-    In Lancer, accuracy adds +1d6 per accuracy point.
-    The highest single d6 is added to the d20 roll.
-    
+    Roll Lancer accuracy/difficulty dice (d6).
+
+    Accuracy and difficulty cancel 1:1. The remaining dice roll
+    and only the single highest result applies (max +/-6).
+    """
+    net = accuracy - difficulty
+    if net == 0:
+        return 0
+    dice_count = abs(net)
+    rolls = [random.randint(1, 6) for _ in range(dice_count)]
+    bonus = max(rolls)
+    return bonus if net > 0 else -bonus
+
+
+def roll_with_advantage(
+    size: DieSize = 20,
+    accuracy: int = 1,
+    difficulty: int = 0,
+) -> tuple[int, int, int]:
+    """
+    Roll a d20 with accuracy/difficulty applied.
+
     Returns:
-        Tuple of (total, d20_roll, accuracy_bonus)
+        Tuple of (total, d20_roll, accuracy_or_difficulty_bonus)
     """
     d20 = random.randint(1, size)
-    # For simplicity, this rolls 1 accuracy die
-    accuracy = random.randint(1, 6)
-    return (d20 + accuracy, d20, accuracy)
-
+    bonus = roll_accuracy_difficulty(accuracy=accuracy, difficulty=difficulty)
+    return (d20 + bonus, d20, bonus)

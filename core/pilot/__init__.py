@@ -1,7 +1,26 @@
 """Pilot domain models for Lancer TTRPG."""
 
-from core.pilot.skill import Skill, SkillSet, SkillType, SKILLS, SKILL_TRIGGERS
-from core.pilot.background import Background, STANDARD_BACKGROUNDS, get_background
+from core.pilot.skill import (
+    Skill,
+    SkillSet,
+    SkillType,
+    SKILLS,
+    SKILL_TRIGGERS,
+    TriggerDefinition,
+    PilotTrigger,
+    TRIGGER_DEFINITIONS,
+    TRIGGERS_BY_SKILL,
+    TRIGGER_IDS_BY_SKILL,
+    get_trigger_definition,
+)
+from core.pilot.background import (
+    Background,
+    BackgroundInvokeRule,
+    BACKGROUND_INVOKE_RULE,
+    EXAMPLE_BACKGROUNDS,
+    STANDARD_BACKGROUNDS,
+    get_background,
+)
 from core.pilot.talent import (
     Talent,
     TalentRank,
@@ -26,6 +45,42 @@ from core.pilot.core_bonus import (
     get_core_bonuses_by_manufacturer,
 )
 from core.pilot.pilot import Pilot, create_ll0_pilot
+from core.pilot.progression import (
+    LEVEL_CAP,
+    LevelProgression,
+    PilotProgressionRules,
+    DEFAULT_PILOT_PROGRESSION,
+    LICENSE_LEVEL_TABLE,
+    get_level_progression,
+)
+from core.pilot.validation import ProgressionIssue, ProgressionValidation, validate_pilot_progression
+from core.pilot.examples import (
+    build_example_pilot_ll0,
+    evaluate_example_pilot_ll0,
+    build_oda_ll0_pilot,
+    build_oda_ll3_pilot,
+    evaluate_oda_ll0_example,
+    evaluate_oda_ll3_example,
+)
+from core.pilot.gear import (
+    PilotGearItemDefinition,
+    PilotGearRules,
+    DEFAULT_PILOT_GEAR_RULES,
+    PilotLoadout,
+    PilotGearCategory,
+)
+from core.pilot.combat import (
+    PilotCombatBaseStats,
+    DEFAULT_PILOT_COMBAT_STATS,
+    PilotDamageSeverity,
+    PILOT_DAMAGE_SEVERITY_BANDS,
+    DownAndOutRule,
+    DEFAULT_DOWN_AND_OUT_RULE,
+    PilotRestRule,
+    DEFAULT_PILOT_REST_RULE,
+    PilotCombatRules,
+    DEFAULT_PILOT_COMBAT_RULES,
+)
 
 __all__ = [
     # Main model
@@ -37,8 +92,17 @@ __all__ = [
     "SkillType",
     "SKILLS",
     "SKILL_TRIGGERS",
+    "TriggerDefinition",
+    "PilotTrigger",
+    "TRIGGER_DEFINITIONS",
+    "TRIGGERS_BY_SKILL",
+    "TRIGGER_IDS_BY_SKILL",
+    "get_trigger_definition",
     # Backgrounds
     "Background",
+    "BackgroundInvokeRule",
+    "BACKGROUND_INVOKE_RULE",
+    "EXAMPLE_BACKGROUNDS",
     "STANDARD_BACKGROUNDS",
     "get_background",
     # Talents
@@ -61,5 +125,39 @@ __all__ = [
     "ALL_CORE_BONUSES",
     "get_core_bonus_definition",
     "get_core_bonuses_by_manufacturer",
+    # Progression
+    "LEVEL_CAP",
+    "LevelProgression",
+    "PilotProgressionRules",
+    "DEFAULT_PILOT_PROGRESSION",
+    "LICENSE_LEVEL_TABLE",
+    "get_level_progression",
+    # Validation
+    "ProgressionIssue",
+    "ProgressionValidation",
+    "validate_pilot_progression",
+    # Examples
+    "build_example_pilot_ll0",
+    "evaluate_example_pilot_ll0",
+    "build_oda_ll0_pilot",
+    "build_oda_ll3_pilot",
+    "evaluate_oda_ll0_example",
+    "evaluate_oda_ll3_example",
+    # Gear
+    "PilotGearItemDefinition",
+    "PilotGearRules",
+    "DEFAULT_PILOT_GEAR_RULES",
+    "PilotLoadout",
+    "PilotGearCategory",
+    # Combat
+    "PilotCombatBaseStats",
+    "DEFAULT_PILOT_COMBAT_STATS",
+    "PilotDamageSeverity",
+    "PILOT_DAMAGE_SEVERITY_BANDS",
+    "DownAndOutRule",
+    "DEFAULT_DOWN_AND_OUT_RULE",
+    "PilotRestRule",
+    "DEFAULT_PILOT_REST_RULE",
+    "PilotCombatRules",
+    "DEFAULT_PILOT_COMBAT_RULES",
 ]
-

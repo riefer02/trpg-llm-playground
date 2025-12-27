@@ -1,9 +1,9 @@
-"""Pilot skill types and models for Lancer TTRPG.
+"""Mech skills and pilot triggers for Lancer TTRPG.
 
 Skills in Lancer:
-- Pilots have 4 skills, each with a trigger list
+- Pilots have 4 mech skills (HULL, AGI, SYS, ENG)
 - Skill ranks range from +0 to +6
-- Triggers describe situations where the skill applies
+- Pilot triggers provide flat bonuses on pilot skill checks
 """
 
 from typing import Literal
@@ -20,38 +20,78 @@ SKILLS: dict[SkillType, str] = {
     "engineering": "ENG",
 }
 
-# Skill triggers - situations where each skill applies
-SKILL_TRIGGERS: dict[SkillType, list[str]] = {
-    "hull": [
-        "Assault",
-        "Threaten", 
-        "Apply Fists to Faces",
-        "Survive",
-        "Take Control",
-    ],
-    "agility": [
-        "Act Unseen or Unheard",
-        "Get Somewhere Quickly",
-        "Perform a Feat of Dexterity",
-        "Stay Cool Under Fire",
-        "Take Someone Out",
-    ],
-    "systems": [
-        "Hack or Fix",
-        "Invent or Create",
-        "Read a Situation",
-        "Spot",
-        "Investigate",
-    ],
-    "engineering": [
-        "Blow Something Up",
-        "Charm",
-        "Get a Hold of Something",
-        "Lead or Inspire",
-        "Pull Rank",
-        "Word on the Street",
-    ],
+class TriggerDefinition(BaseModel):
+    """A trigger definition usable for pilot skill checks."""
+
+    id: str = Field(..., description="Unique trigger identifier")
+    name: str = Field(..., description="Display name")
+    skill_type: SkillType
+
+    model_config = {"frozen": True}
+
+
+class PilotTrigger(BaseModel):
+    """A pilot's trigger rank (+2 to +6)."""
+
+    trigger_id: str = Field(..., description="ID of the trigger definition")
+    rank: int = Field(default=2, ge=2, le=6, description="Trigger bonus (+2 to +6)")
+
+    model_config = {"frozen": True}
+
+
+# Trigger definitions grouped by associated mech skill
+TRIGGER_DEFINITIONS: list[TriggerDefinition] = [
+    # HULL
+    TriggerDefinition(id="assault", name="Assault", skill_type="hull"),
+    TriggerDefinition(id="threaten", name="Threaten", skill_type="hull"),
+    TriggerDefinition(id="apply_fists_to_faces", name="Apply Fists to Faces", skill_type="hull"),
+    TriggerDefinition(id="survive", name="Survive", skill_type="hull"),
+    TriggerDefinition(id="take_control", name="Take Control", skill_type="hull"),
+    # AGILITY
+    TriggerDefinition(id="act_unseen_or_unheard", name="Act Unseen or Unheard", skill_type="agility"),
+    TriggerDefinition(id="get_somewhere_fast", name="Get Somewhere Fast", skill_type="agility"),
+    TriggerDefinition(
+        id="perform_a_feat_of_dexterity",
+        name="Perform a Feat of Dexterity",
+        skill_type="agility",
+    ),
+    TriggerDefinition(id="stay_cool_under_fire", name="Stay Cool Under Fire", skill_type="agility"),
+    TriggerDefinition(id="take_someone_out", name="Take Someone Out", skill_type="agility"),
+    # SYSTEMS
+    TriggerDefinition(id="hack_or_fix", name="Hack or Fix", skill_type="systems"),
+    TriggerDefinition(id="invent_or_create", name="Invent or Create", skill_type="systems"),
+    TriggerDefinition(id="read_a_situation", name="Read a Situation", skill_type="systems"),
+    TriggerDefinition(id="spot", name="Spot", skill_type="systems"),
+    TriggerDefinition(id="investigate", name="Investigate", skill_type="systems"),
+    # ENGINEERING
+    TriggerDefinition(id="blow_something_up", name="Blow Something Up", skill_type="engineering"),
+    TriggerDefinition(id="charm", name="Charm", skill_type="engineering"),
+    TriggerDefinition(id="get_a_hold_of_something", name="Get a Hold of Something", skill_type="engineering"),
+    TriggerDefinition(id="lead_or_inspire", name="Lead or Inspire", skill_type="engineering"),
+    TriggerDefinition(id="pull_rank", name="Pull Rank", skill_type="engineering"),
+    TriggerDefinition(id="word_on_the_street", name="Word on the Street", skill_type="engineering"),
+]
+
+TRIGGERS_BY_SKILL: dict[SkillType, list[str]] = {
+    skill: [trigger.name for trigger in TRIGGER_DEFINITIONS if trigger.skill_type == skill]
+    for skill in SKILLS
 }
+
+TRIGGER_IDS_BY_SKILL: dict[SkillType, list[str]] = {
+    skill: [trigger.id for trigger in TRIGGER_DEFINITIONS if trigger.skill_type == skill]
+    for skill in SKILLS
+}
+
+# Backwards-compatible alias
+SKILL_TRIGGERS = TRIGGERS_BY_SKILL
+
+
+def get_trigger_definition(trigger_id: str) -> TriggerDefinition | None:
+    """Look up a trigger definition by ID."""
+    for trigger in TRIGGER_DEFINITIONS:
+        if trigger.id == trigger_id:
+            return trigger
+    return None
 
 
 class Skill(BaseModel):
@@ -59,8 +99,8 @@ class Skill(BaseModel):
     A pilot skill with a rank.
     
     In Lancer, pilots have 4 mech skills (HULL, AGI, SYS, ENG)
-    that determine their mech's base stats, and also serve as
-    the basis for pilot skill checks using triggers.
+    that determine their mech's base stats. Pilot skill checks
+    instead use triggers for flat bonuses.
     """
     
     skill_type: SkillType
@@ -76,7 +116,12 @@ class Skill(BaseModel):
     @property
     def triggers(self) -> list[str]:
         """Get the triggers associated with this skill."""
-        return SKILL_TRIGGERS[self.skill_type]
+        return TRIGGERS_BY_SKILL[self.skill_type]
+
+    @property
+    def trigger_ids(self) -> list[str]:
+        """Get trigger IDs associated with this skill."""
+        return TRIGGER_IDS_BY_SKILL[self.skill_type]
     
     def __str__(self) -> str:
         return f"{self.abbreviation} +{self.rank}"
@@ -87,7 +132,7 @@ class SkillSet(BaseModel):
     A complete set of pilot skills.
     
     At LL0, pilots have +2 to distribute among their 4 skills.
-    They gain +2 more at each level up.
+    They gain +1 more at each level up.
     """
     
     hull: int = Field(default=0, ge=0, le=6)
@@ -113,4 +158,3 @@ class SkillSet(BaseModel):
             "systems": self.systems,
             "engineering": self.engineering,
         }
-
