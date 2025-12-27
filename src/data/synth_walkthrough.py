@@ -211,19 +211,22 @@ def generate_walkthrough_series(
         )
 
         if conversation:
-            # Format as training record
+            # Format as training record - use same schema as generate_synthetic.py
             record = {
                 "instruction": conversation["messages"][0]["content"],
+                "input": text,  # Match main generator's 'input' field
                 "output": conversation["messages"][-1]["content"],
                 "task_type": conversation["task_type"],
                 "source_page": page,
+                "context": text,
+                "citations": context_pages,
+                "answer_format": "walkthrough",  # Match main generator's answer_format
+                # Walkthrough-specific metadata
                 "is_multiturn": True,
                 "is_walkthrough": True,
                 "turn_count": conversation["turn_count"],
                 "topic_summary": conversation["topic_summary"],
                 "walkthrough_topic": walkthrough_topic,
-                "context": text,
-                "citations": context_pages,
             }
 
             # Add full messages for chat fine-tuning
@@ -234,9 +237,15 @@ def generate_walkthrough_series(
             else:
                 record["messages"] = conversation["messages"]
 
-            # Add chunk provenance
+            # Add chunk provenance - match main generator's field names
+            if chunk.get("doc_id"):
+                record["source_doc_id"] = chunk["doc_id"]
             if chunk.get("chunk_id"):
                 record["source_chunk_id"] = chunk["chunk_id"]
+            if isinstance(chunk.get("page_start"), int):
+                record["source_page_start"] = chunk["page_start"]
+            if isinstance(chunk.get("page_end"), int):
+                record["source_page_end"] = chunk["page_end"]
             if chunk.get("section_path"):
                 record["source_section"] = " > ".join(str(s) for s in chunk["section_path"])
 

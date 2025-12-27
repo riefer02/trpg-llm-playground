@@ -24,6 +24,12 @@ dataset:
   train_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}.jsonl"
   val_path: "/content/drive/MyDrive/llm_experiments/datasets/{project_name}_{dataset_tag}_val.jsonl" # Optional
 
+evaluation:
+  # Evaluation benchmark for measuring model quality
+  # Run: python scripts/run_eval_benchmark.py --model ollama:your-model --eval-set dataset/lancer_eval_benchmark.yaml
+  eval_set: "dataset/lancer_eval_benchmark.yaml"
+  output_path: "dataset/eval_results.md"
+
 training:
   # Save the output directly to Drive
   output_dir: "/content/drive/MyDrive/llm_experiments/outputs/{project_name}_{dataset_tag}_lora"

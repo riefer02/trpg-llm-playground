@@ -35,6 +35,9 @@ The goal is to create models capable of understanding game rules, lore, and gene
 ### Training & Evaluation
 - **`src/training/finetune_lora.py`**: Unsloth/LoRA training. Preserve `FastLanguageModel` loading logic.
 - **`src/training/evaluate_rpg.py`**: RPG-specific benchmark framework (accuracy, grounding, citations).
+- **`src/training/evaluate.py`**: Quick sanity check with sample questions.
+- **`scripts/run_eval_benchmark.py`**: CLI runner for evaluation benchmarks (Ollama or HF models).
+- **`dataset/lancer_eval_benchmark.yaml`**: Curated evaluation set with 20 annotated examples.
 
 ### Local Inference
 - **`scripts/local_chat.py`**: Local chat with Ollama + RAG. Supports CLI and Gradio UI modes.
@@ -57,7 +60,7 @@ The goal is to create models capable of understanding game rules, lore, and gene
 - ✅ **Multi-Turn Generation**: Realistic follow-up conversations (`synth_multiturn.py`).
 - ✅ **Quality Pipeline**: Verification, deduplication, negative examples.
 - ✅ **Multi-RPG Templates**: D&D, Lancer, Blades configs ready to use.
-- ✅ **Evaluation Benchmark**: RPG-specific accuracy/grounding/citation metrics.
+- ✅ **Evaluation Benchmark**: RPG-specific accuracy/grounding/citation/refusal metrics with curated Lancer eval set.
 - ✅ **HF Hub Integration**: Notebooks include cells for pushing models to Hugging Face.
 - ✅ **GGUF Export**: Optional cell for Ollama/local deployment.
 - ✅ **Local Chat Script**: `scripts/local_chat.py` with Ollama + RAG for local testing.
@@ -71,7 +74,8 @@ The goal is to create models capable of understanding game rules, lore, and gene
 3. **API Services**: Modal, Replicate, or dedicated GPU hosting.
 
 ## Future Ideas (If Needed)
-- **Adversarial Examples**: Edge cases and trick questions for robustness
 - **Entity-Aware Coverage**: Extract named abilities/items and generate targeted questions
+- **Expand Eval Benchmarks**: Add D&D 5e and Blades eval sets following the Lancer template
+- **Automated Eval in CI**: Run benchmarks on push to track model quality over time
 - **Desktop App**: Tauri/Electron wrapper for end-user distribution
 
