@@ -138,7 +138,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run Lancer evaluation benchmark")
     parser.add_argument(
         "--eval-set",
-        default="dataset/lancer_eval_benchmark.yaml",
+        default="dataset/eval_benchmark.yaml",
         help="Path to evaluation set",
     )
     parser.add_argument(

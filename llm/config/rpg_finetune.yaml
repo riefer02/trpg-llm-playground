@@ -26,8 +26,9 @@ dataset:
 
 evaluation:
   # Evaluation benchmark for measuring model quality
-  # Run: python scripts/run_eval_benchmark.py --model ollama:your-model --eval-set dataset/lancer_eval_benchmark.yaml
-  eval_set: "dataset/lancer_eval_benchmark.yaml"
+  # Create your own eval set (see llm/src/training/evaluate_rpg.py for schema)
+  # Run: python scripts/run_eval_benchmark.py --model ollama:your-model --eval-set dataset/my_eval.yaml
+  eval_set: ""  # Path to your custom eval set
   output_path: "dataset/eval_results.md"
 
 training:

@@ -23,10 +23,10 @@ DIFFICULTY_LEVELS = {
             "- 'How many [X] does [Y] have?'\n"
             "- 'What happens when you [action]?'\n"
             "- 'List the [things] for [topic].'\n\n"
-            "Answers should be concise and directly quote or paraphrase the source."
+            "Answers should be concise and paraphrase the mechanical information."
         ),
         "answer_guidance": (
-            "Keep answers brief and factual. Direct quotes from the rules are preferred. "
+            "Keep answers brief and factual. Paraphrase the rules in your own words. "
             "Avoid over-explaining - just answer what was asked."
         ),
     },
