@@ -28,7 +28,7 @@ except ImportError as e:
 # Configuration
 # ============================================================
 
-OLLAMA_MODEL = "lancer-rules"
+OLLAMA_MODEL = "lancer-expert"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 TOP_K = 3
 
