@@ -30,9 +30,10 @@ except ImportError as e:
 
 OLLAMA_MODEL = "lancer-expert"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-TOP_K = 3
+TOP_K = 5  # Retrieve more chunks for better context
 
-SYSTEM_PROMPT = """You are a Lancer RPG rules assistant. Answer questions about game mechanics, character building, and lore using ONLY the provided reference material. Always cite page numbers when referencing rules. If the answer is not in the provided context, say "I don't have information about that in the rules I can access." Do not make up rules."""
+# System prompt - kept minimal since fine-tuned model already knows its role
+SYSTEM_PROMPT = """Answer using ONLY the provided context. Cite page numbers. If not in context, say "Not found in the provided context.\""""
 
 
 # ============================================================
@@ -54,7 +55,11 @@ def load_chunks(chunks_path: str) -> list[dict]:
 def build_index(chunks: list[dict], embed_model: SentenceTransformer):
     """Build FAISS index from chunks."""
     print("Building FAISS index...")
-    texts = [c.get("text", c.get("content", "")) for c in chunks]
+    # Handle different chunk formats
+    texts = [
+        c.get("text_prefixed") or c.get("text") or c.get("content", "") 
+        for c in chunks
+    ]
     embeddings = embed_model.encode(texts, show_progress_bar=True)
     embeddings = np.array(embeddings).astype("float32")
 
@@ -83,14 +88,27 @@ def retrieve(
     results = []
     for i, idx in enumerate(indices[0]):
         chunk = chunks[idx]
-        results.append(
-            {
-                "text": chunk.get("text", chunk.get("content", "")),
-                "page": chunk.get("page", chunk.get("metadata", {}).get("page", "?")),
-                "section": chunk.get("section", chunk.get("heading", "")),
-                "score": float(scores[0][i]),
-            }
-        )
+        # Handle different chunk formats (our chunker vs generic)
+        text = chunk.get("text_prefixed") or chunk.get("text") or chunk.get("content", "")
+        
+        # Page: try page_start/page_end first, then fall back to page
+        page_start = chunk.get("page_start")
+        page_end = chunk.get("page_end")
+        if page_start and page_end and page_start != page_end:
+            page = f"{page_start}-{page_end}"
+        elif page_start:
+            page = str(page_start)
+        else:
+            page = chunk.get("page", chunk.get("metadata", {}).get("page", "?"))
+        
+        section = chunk.get("heading") or chunk.get("section", "")
+        
+        results.append({
+            "text": text,
+            "page": page,
+            "section": section,
+            "score": float(scores[0][i]),
+        })
     return results
 
 
@@ -121,21 +139,25 @@ def chat_with_rag(
     retrieved = retrieve(query, index, chunks, embed_model)
     context = format_context(retrieved)
 
-    # Build prompt with context
-    user_prompt = f"""Reference Material:
+    # Build prompt - clear single-question format
+    user_prompt = f"""Context:
 {context}
 
 Question: {query}
 
-Answer the question using ONLY the reference material above. Cite page numbers."""
+Provide a single, concise answer based on the context. Do not generate additional questions."""
 
-    # Call Ollama
+    # Call Ollama with generation limits and stop tokens
     response = ollama.chat(
         model=model_name,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ],
+        options={
+            "num_predict": 300,  # Shorter limit
+            "temperature": 0.7,
+            "stop": ["Question:", "Q:", "\n\n\n"],  # Stop before generating new questions
+        },
     )
 
     answer = response["message"]["content"]

@@ -12,20 +12,10 @@ FROM ./qwen-lancer-7b-q4_k_m.gguf
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.1
+PARAMETER num_predict 512
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
 
-# System prompt for RAG-grounded responses
-SYSTEM """You are a Lancer RPG rules expert and helpful game master assistant.
-
-Your role is to:
-- Answer questions about Lancer game mechanics, combat rules, and mech systems
-- Help players with character and mech creation
-- Provide GM guidance for running Lancer sessions
-- Explain lore and setting details
-
-Guidelines:
-- Base your answers on the official Lancer Core Book
-- Cite page numbers when referencing specific rules (e.g., "p. 45")
-- If you're unsure or the information isn't in your training, say so
-- Be concise but thorough
-- Use bullet points for complex rules explanations"""
+# No SYSTEM prompt here - let the RAG script provide context dynamically
+# The fine-tuned model already knows it's a Lancer expert
 
