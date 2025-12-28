@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from typing import Literal
+from collections import Counter
 from pydantic import BaseModel, Field
 
 from core.mech.build import MechBuild, compute_mech_stats
 from core.mech.frame import MechFrameDefinition
 from core.mech.mounts import allowed_weapon_sizes
-from core.mech.weapon import WeaponSize
+from core.mech.weapon import MechWeaponDefinition, WeaponSize
+from core.mech.system import MechSystemDefinition
 from core.pilot.skill import SkillSet
 
 
@@ -188,19 +190,59 @@ def _validate_system_points(
     build: MechBuild,
     skills: SkillSet,
     grit: int,
+    system_definitions: dict[str, MechSystemDefinition] | None = None,
 ) -> list[MechBuildIssue]:
     issues: list[MechBuildIssue] = []
     stats = compute_mech_stats(frame, skills, grit)
-    if build.total_sp() > stats.system_points:
+    total_sp = build.total_sp(system_definitions)
+    if total_sp > stats.system_points:
         issues.append(
             MechBuildIssue(
                 code="system_points_exceeded",
                 message=(
-                    f"System points spent {build.total_sp()} exceed budget "
+                    f"System points spent {total_sp} exceed budget "
                     f"{stats.system_points}."
                 ),
             )
         )
+    return issues
+
+
+def _validate_unique_tags(
+    build: MechBuild,
+    weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
+    system_definitions: dict[str, MechSystemDefinition] | None = None,
+) -> list[MechBuildIssue]:
+    issues: list[MechBuildIssue] = []
+
+    if weapon_definitions:
+        weapon_counts = Counter(mounted.weapon_id for mounted in build.weapons)
+        for weapon_id, count in weapon_counts.items():
+            if count <= 1:
+                continue
+            weapon_def = weapon_definitions.get(weapon_id)
+            if weapon_def and weapon_def.unique:
+                issues.append(
+                    MechBuildIssue(
+                        code="unique_weapon_duplicate",
+                        message=f"Weapon '{weapon_id}' is unique and cannot be duplicated.",
+                    )
+                )
+
+    if system_definitions:
+        system_counts = Counter(installed.system_id for installed in build.systems)
+        for system_id, count in system_counts.items():
+            if count <= 1:
+                continue
+            system_def = system_definitions.get(system_id)
+            if system_def and system_def.unique:
+                issues.append(
+                    MechBuildIssue(
+                        code="unique_system_duplicate",
+                        message=f"System '{system_id}' is unique and cannot be duplicated.",
+                    )
+                )
+
     return issues
 
 
@@ -209,13 +251,22 @@ def validate_mech_build(
     build: MechBuild,
     skills: SkillSet,
     grit: int,
+    weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
+    system_definitions: dict[str, MechSystemDefinition] | None = None,
 ) -> MechBuildValidation:
     """Validate a mech build against frame, skills, and grit."""
     issues: list[MechBuildIssue] = []
 
+    if weapon_definitions is None or system_definitions is None:
+        from core.mech.compendium import WEAPON_DEFINITIONS_BY_ID, SYSTEM_DEFINITIONS_BY_ID
+
+        weapon_definitions = weapon_definitions or WEAPON_DEFINITIONS_BY_ID
+        system_definitions = system_definitions or SYSTEM_DEFINITIONS_BY_ID
+
     issues.extend(_validate_mount_allocation(frame, build))
     issues.extend(_validate_superheavy(frame, build))
-    issues.extend(_validate_system_points(frame, build, skills, grit))
+    issues.extend(_validate_system_points(frame, build, skills, grit, system_definitions))
+    issues.extend(_validate_unique_tags(build, weapon_definitions, system_definitions))
 
     valid = not any(issue.severity == "error" for issue in issues)
     return MechBuildValidation(valid=valid, issues=issues)

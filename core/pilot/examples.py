@@ -13,7 +13,14 @@ from core.mech.examples import (
 )
 from core.mech.build import compute_mech_stats
 from core.mech.validation import MechBuildValidation, validate_mech_build
+from core.mech.compendium import SYSTEM_DEFINITIONS_BY_ID, WEAPON_DEFINITIONS_BY_ID
 from core.pilot.gear import PilotLoadout
+from core.pilot.mission import (
+    DowntimeActionUse,
+    DowntimePlan,
+    ReserveEntry,
+    validate_downtime_plan,
+)
 
 
 def build_example_pilot_ll0() -> Pilot:
@@ -139,7 +146,14 @@ def evaluate_oda_ll0_example() -> tuple[ProgressionValidation, MechBuildValidati
     pilot = build_oda_ll0_pilot()
     pilot_validation = pilot.validate_progression()
     frame, build, skills, grit, effects = build_oda_ll0_mech_example()
-    mech_validation = validate_mech_build(frame, build, skills, grit)
+    mech_validation = validate_mech_build(
+        frame,
+        build,
+        skills,
+        grit,
+        weapon_definitions=WEAPON_DEFINITIONS_BY_ID,
+        system_definitions=SYSTEM_DEFINITIONS_BY_ID,
+    )
     stats = compute_mech_stats(frame, skills, grit, bonus_effects=effects)
     expected = {
         "hp": 16,
@@ -163,23 +177,61 @@ def evaluate_oda_ll3_example() -> tuple[ProgressionValidation, MechBuildValidati
     pilot = build_oda_ll3_pilot()
     pilot_validation = pilot.validate_progression()
     frame, build, skills, grit, effects = build_oda_ll3_mech_example()
-    mech_validation = validate_mech_build(frame, build, skills, grit)
+    mech_validation = validate_mech_build(
+        frame,
+        build,
+        skills,
+        grit,
+        weapon_definitions=WEAPON_DEFINITIONS_BY_ID,
+        system_definitions=SYSTEM_DEFINITIONS_BY_ID,
+    )
     stats = compute_mech_stats(frame, skills, grit, bonus_effects=effects)
     expected = {
-        "hp": 26,
+        "hp": 27,
         "evasion": 8,
         "speed": 4,
         "heat_cap": 5,
         "sensor_range": 10,
         "armor": 1,
-        "e_defense": 8,
+        "e_defense": 7,
         "size": "size_1",
-        "repair_cap": 6,
-        "tech_attack": 0,
+        "repair_cap": 7,
+        "tech_attack": -1,
         "system_points": 7,
     }
     mismatches = _compare_mech_stats(stats.model_dump(), expected)
     return pilot_validation, mech_validation, mismatches
+
+
+def build_example_downtime_plan() -> DowntimePlan:
+    """Build a small downtime plan with reserve tracking."""
+    return DowntimePlan(
+        pilot_id="example_pilot",
+        actions=[
+            DowntimeActionUse(
+                action_id="get_a_hold_of_something",
+                outcome="reserve",
+                reserve=ReserveEntry(
+                    id="reserve_cache",
+                    name="Reserve Cache",
+                    uses_remaining=1,
+                    shared=True,
+                    source="downtime_action",
+                ),
+            ),
+            DowntimeActionUse(
+                action_id="get_a_clue",
+                outcome="info",
+                reserve=None,
+            ),
+        ],
+    )
+
+
+def evaluate_example_downtime_plan() -> bool:
+    """Return True if the downtime plan validates cleanly."""
+    plan = build_example_downtime_plan()
+    return validate_downtime_plan(plan).valid
 
 
 def _compare_mech_stats(actual: dict[str, object], expected: dict[str, object]) -> list[str]:

@@ -3,10 +3,103 @@
 from typing import Literal
 from pydantic import BaseModel, Field
 
-from core.shared.effects import MechanicalEffect
+from core.shared.effects import MechanicalEffect, StatModifier
+from core.shared.enums import ActionType, DamageType, RangeType
 
 
 PilotGearCategory = Literal["clothing", "armor", "weapon", "gear"]
+PilotGearTagType = Literal[
+    "sidearm",
+    "archaic",
+    "loading",
+    "ordnance",
+    "inaccurate",
+]
+
+
+class PilotGearTag(BaseModel):
+    """Structured tag for pilot gear items."""
+
+    tag: PilotGearTagType
+    value: int | None = None
+
+    model_config = {"frozen": True}
+
+
+class PilotDamageSpec(BaseModel):
+    """Damage specification for pilot gear."""
+
+    damage_type: DamageType
+    flat: int = 0
+    ap: bool = False
+
+    model_config = {"frozen": True}
+
+
+class PilotAreaEffect(BaseModel):
+    """Area effect payload for pilot gear."""
+
+    pattern: RangeType
+    size: int = Field(..., ge=0)
+    damage: PilotDamageSpec | None = None
+    attack_vs: Literal["evasion", "e_defense"] | None = None
+
+    model_config = {"frozen": True}
+
+
+class PilotGrenadePayload(BaseModel):
+    """Grenade option for pilot gear."""
+
+    name: str
+    range: int = Field(..., ge=0)
+    area: PilotAreaEffect
+
+    model_config = {"frozen": True}
+
+
+class PilotChargePayload(BaseModel):
+    """Planted explosive charge payload for pilot gear."""
+
+    name: str
+    plant_action: ActionType
+    detonate_action: ActionType
+    area: PilotAreaEffect
+
+    model_config = {"frozen": True}
+
+
+class PilotFlightEffect(BaseModel):
+    """Flight behavior granted by pilot gear."""
+
+    mode: Literal["move", "boost", "move_or_boost"]
+    must_end_on_surface: bool = False
+
+    model_config = {"frozen": True}
+
+
+class PilotMedicalEffect(BaseModel):
+    """Medical gear payload."""
+
+    name: str
+    action: ActionType
+    heal_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
+    heal_round_up: bool = True
+    can_heal_down_and_out: bool = False
+    restores_consciousness: bool = False
+    applies_to_adjacent: bool = True
+    affects_mechs: bool = False
+
+    model_config = {"frozen": True}
+
+
+class PilotStimEffect(BaseModel):
+    """Stim gear payload."""
+
+    name: str
+    effect: Literal["awake_alert", "calm_emotional", "heightened_senses"]
+    duration_hours: int | None = Field(default=None, ge=0)
+
+    model_config = {"frozen": True}
 
 
 class PilotGearItemDefinition(BaseModel):
@@ -15,6 +108,13 @@ class PilotGearItemDefinition(BaseModel):
     id: str = Field(..., description="Unique gear identifier")
     name: str = Field(..., description="Display name")
     category: PilotGearCategory
+    limited_uses: int | None = Field(default=None, ge=0)
+    tags: list[PilotGearTag] = Field(default_factory=list)
+    grenades: list[PilotGrenadePayload] = Field(default_factory=list)
+    charges: list[PilotChargePayload] = Field(default_factory=list)
+    flight: PilotFlightEffect | None = None
+    medical: PilotMedicalEffect | None = None
+    stim: PilotStimEffect | None = None
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
 
     model_config = {"frozen": True}
@@ -52,3 +152,379 @@ class PilotLoadout(BaseModel):
         if self.armor:
             count += 1
         return count
+
+
+PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
+    PilotGearItemDefinition(
+        id="flight_suit",
+        name="Flight Suit",
+        category="clothing",
+    ),
+    PilotGearItemDefinition(
+        id="light_hardsuit",
+        name="Light Hardsuit",
+        category="armor",
+        effects=MechanicalEffect(
+            stat_mods=[StatModifier(stat="hp", value=3)],
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="assault_hardsuit",
+        name="Assault Hardsuit",
+        category="armor",
+        effects=MechanicalEffect(
+            stat_mods=[
+                StatModifier(stat="hp", value=3),
+                StatModifier(stat="armor", value=1),
+                StatModifier(stat="evasion", value=-2),
+                StatModifier(stat="e_defense", value=-2),
+            ],
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="heavy_hardsuit",
+        name="Heavy Hardsuit",
+        category="armor",
+        effects=MechanicalEffect(
+            stat_mods=[
+                StatModifier(stat="hp", value=3),
+                StatModifier(stat="armor", value=2),
+                StatModifier(stat="evasion", value=-4),
+                StatModifier(stat="e_defense", value=-2),
+                StatModifier(stat="speed", value=-1),
+            ],
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="mobility_hardsuit",
+        name="Mobility Hardsuit",
+        category="armor",
+        flight=PilotFlightEffect(
+            mode="move_or_boost",
+            must_end_on_surface=True,
+        ),
+        effects=MechanicalEffect(
+            stat_mods=[StatModifier(stat="speed", value=1)],
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="stealth_hardsuit",
+        name="Stealth Hardsuit",
+        category="armor",
+        effects=MechanicalEffect(
+            stat_mods=[
+                StatModifier(stat="evasion", value=-2),
+                StatModifier(stat="e_defense", value=-2),
+            ],
+            special="quick_action_invisible_breaks_on_damage",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="archaic_melee",
+        name="Archaic Melee Weapon",
+        category="weapon",
+        tags=[PilotGearTag(tag="archaic")],
+        effects=MechanicalEffect(
+            special="pilot_melee_threat1_damage1_kinetic",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="alloy_composite_light",
+        name="Alloy/Composite Weapon (Light)",
+        category="weapon",
+        effects=MechanicalEffect(
+            special="pilot_melee_threat1_damage1_kinetic",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="alloy_composite_combat",
+        name="Alloy/Composite Weapon (Combat)",
+        category="weapon",
+        effects=MechanicalEffect(
+            special="pilot_melee_threat1_damage2_kinetic",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="alloy_composite_heavy",
+        name="Alloy/Composite Weapon (Heavy)",
+        category="weapon",
+        tags=[PilotGearTag(tag="inaccurate")],
+        effects=MechanicalEffect(
+            special="pilot_melee_threat1_damage3_kinetic",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="archaic_ranged",
+        name="Archaic Ranged Weapon",
+        category="weapon",
+        tags=[PilotGearTag(tag="archaic")],
+        effects=MechanicalEffect(
+            special="pilot_ranged_range5_damage1_kinetic",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="signature_weapon_sidearm",
+        name="Signature Weapon (Sidearm)",
+        category="weapon",
+        tags=[PilotGearTag(tag="sidearm")],
+        effects=MechanicalEffect(
+            special="pilot_ranged_range3_damage1_choose_type",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="signature_weapon_combat",
+        name="Signature Weapon (Combat)",
+        category="weapon",
+        effects=MechanicalEffect(
+            special="pilot_ranged_range5_damage2_choose_type",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="signature_weapon_heavy",
+        name="Signature Weapon (Heavy)",
+        category="weapon",
+        tags=[PilotGearTag(tag="loading"), PilotGearTag(tag="ordnance")],
+        effects=MechanicalEffect(
+            special="pilot_ranged_range10_damage4_choose_type",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="corrective",
+        name="Corrective",
+        category="gear",
+        limited_uses=1,
+        medical=PilotMedicalEffect(
+            name="Corrective",
+            action="full",
+            heal_fraction=0.5,
+            heal_round_up=True,
+            can_heal_down_and_out=True,
+            restores_consciousness=True,
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="fragmentation_grenade",
+        name="Fragmentation Grenade",
+        category="gear",
+        limited_uses=2,
+        grenades=[
+            PilotGrenadePayload(
+                name="Frag Grenade",
+                range=5,
+                area=PilotAreaEffect(
+                    pattern="blast",
+                    size=1,
+                    attack_vs="evasion",
+                    damage=PilotDamageSpec(
+                        damage_type="explosive",
+                        flat=2,
+                    ),
+                ),
+            ),
+        ],
+    ),
+    PilotGearItemDefinition(
+        id="nanite_spray",
+        name="Nanite Spray",
+        category="gear",
+        effects=MechanicalEffect(
+            special="mark_surface_transmit_simple_data_unlimited",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="patch",
+        name="Patch",
+        category="gear",
+        limited_uses=1,
+        medical=PilotMedicalEffect(
+            name="Patch",
+            action="full",
+            heal_fraction=0.5,
+            heal_round_up=True,
+            can_heal_down_and_out=True,
+            restores_consciousness=False,
+            applies_to_adjacent=True,
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="stims_kick",
+        name="Stims (Kick)",
+        category="gear",
+        limited_uses=3,
+        stim=PilotStimEffect(
+            name="Kick",
+            effect="awake_alert",
+            duration_hours=30,
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="stims_freeze",
+        name="Stims (Freeze)",
+        category="gear",
+        limited_uses=3,
+        stim=PilotStimEffect(
+            name="Freeze",
+            effect="calm_emotional",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="stims_juice",
+        name="Stims (Juice)",
+        category="gear",
+        limited_uses=3,
+        stim=PilotStimEffect(
+            name="Juice",
+            effect="heightened_senses",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="thermal_charge",
+        name="Thermal Charge",
+        category="gear",
+        limited_uses=1,
+        charges=[
+            PilotChargePayload(
+                name="Thermal Charge",
+                plant_action="full",
+                detonate_action="quick",
+                area=PilotAreaEffect(
+                    pattern="blast",
+                    size=1,
+                    attack_vs="evasion",
+                    damage=PilotDamageSpec(
+                        damage_type="energy",
+                        flat=3,
+                        ap=True,
+                    ),
+                ),
+            ),
+        ],
+    ),
+    PilotGearItemDefinition(
+        id="antiphoton_visor",
+        name="Antiphoton Visor",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="camo_cloth",
+        name="Camo Cloth",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="dataplating",
+        name="Dataplating",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="extra_rations",
+        name="Extra Rations",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="flexsuit",
+        name="Flexsuit",
+        category="gear",
+        effects=MechanicalEffect(
+            special="no_food_or_water_week_after_use",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="handheld_printer",
+        name="Handheld Printer",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="horus_subjectivity_suite",
+        name="HORUS Subjectivity Enhancement Suite",
+        category="gear",
+        effects=MechanicalEffect(
+            special="hack_without_external_gear",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="infoskin",
+        name="Infoskin",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="mag_clamps",
+        name="Mag-Clamps",
+        category="gear",
+        effects=MechanicalEffect(
+            special="zero_g_maneuvering_bonus",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="omnihook",
+        name="Omnihook",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="personal_drone",
+        name="Personal Drone",
+        category="gear",
+        effects=MechanicalEffect(
+            special="non_combat_drone_relay_audio_visual",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="prosocollar",
+        name="Prosocollar",
+        category="gear",
+        effects=MechanicalEffect(
+            special="holographic_face_projection_voice_masking",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="smart_scope",
+        name="Smart Scope",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="sleeping_bag",
+        name="Sleeping Bag",
+        category="gear",
+        effects=MechanicalEffect(
+            special="full_action_enter_immunity_burn_vacuum_air1hr_evasion5_slowed_no_actions_except_exit",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="ssc_sylph",
+        name="SSC Sylph",
+        category="gear",
+        effects=MechanicalEffect(
+            special="undersuit_environmental_seal_breathe_water_limited_time",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="sound_system",
+        name="Sound System",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="tertiary_arm",
+        name="Tertiary Arm",
+        category="gear",
+        effects=MechanicalEffect(
+            special="powered_third_arm_tool_or_weapon_mount",
+        ),
+    ),
+    PilotGearItemDefinition(
+        id="wilderness_survival_kit",
+        name="Wilderness Survival Kit",
+        category="gear",
+    ),
+    PilotGearItemDefinition(
+        id="cooking_gear",
+        name="Cooking Gear",
+        category="gear",
+    ),
+]
+
+
+def get_pilot_gear_definition(gear_id: str) -> PilotGearItemDefinition | None:
+    """Look up a pilot gear definition by ID."""
+    for item in PILOT_GEAR_DEFINITIONS:
+        if item.id == gear_id:
+            return item
+    return None

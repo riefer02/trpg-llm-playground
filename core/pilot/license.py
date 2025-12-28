@@ -7,11 +7,9 @@ Note: This module contains only mechanical definitions (allowed under
 the Lancer Third Party License). No copyrighted flavor text.
 """
 
-from typing import Literal
 from pydantic import BaseModel, Field
 
-# Lancer manufacturers
-Manufacturer = Literal["GMS", "IPS-N", "SSC", "HORUS", "HA"]
+from core.shared.enums import ManufacturerType as Manufacturer
 
 # Manufacturer full names (these are proper nouns, allowed)
 MANUFACTURER_NAMES: dict[Manufacturer, str] = {

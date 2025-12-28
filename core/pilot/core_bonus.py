@@ -11,6 +11,7 @@ the Lancer Third Party License). No copyrighted flavor text.
 from pydantic import BaseModel, Field
 
 from core.pilot.license import Manufacturer
+from core.shared.dice import DiceExpression
 from core.shared.effects import (
     MechanicalEffect,
     StatModifier,
@@ -91,7 +92,7 @@ IPSN_CORE_BONUSES: list[CoreBonusDefinition] = [
         name="Siege Ram",
         manufacturer="IPS-N",
         effects=MechanicalEffect(
-            damage_mods=[DamageModifier(dice="1d6", damage_type="kinetic", condition=None)],
+            damage_mods=[DamageModifier(dice=DiceExpression.parse("1d6"), damage_type="kinetic", condition=None)],
             special="ram_knockdown",  # Ram knocks prone on hit
         ),
     ),

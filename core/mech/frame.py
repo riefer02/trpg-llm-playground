@@ -18,6 +18,15 @@ class CoreSystemDefinition(BaseModel):
     model_config = {"frozen": True}
 
 
+class FrameTrait(BaseModel):
+    """Passive trait provided by a mech frame."""
+
+    name: str = Field(..., description="Display name")
+    effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
+
+    model_config = {"frozen": True}
+
+
 class MechFrameBaseStats(BaseModel):
     """Base statistics provided by a frame before pilot bonuses."""
 
@@ -28,7 +37,7 @@ class MechFrameBaseStats(BaseModel):
     e_defense: int = Field(default=0, ge=0)
     speed: int = Field(default=0, ge=0)
     sensor_range: int = Field(default=0, ge=0)
-    tech_attack: int = Field(default=0, ge=0)
+    tech_attack: int = Field(default=0)
     heat_cap: int = Field(default=0, ge=0)
     repair_cap: int = Field(default=0, ge=0)
     save_target: int = Field(default=10, ge=0)
@@ -47,5 +56,6 @@ class MechFrameDefinition(BaseModel):
     mounts: list[MountSlot] = Field(default_factory=list)
     system_points: int = Field(default=0, ge=0)
     core_system: CoreSystemDefinition | None = None
+    traits: list[FrameTrait] = Field(default_factory=list)
 
     model_config = {"frozen": True}

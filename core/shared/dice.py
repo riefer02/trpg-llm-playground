@@ -74,6 +74,10 @@ class DiceExpression(BaseModel):
         """Expected average roll."""
         return (self.count * (self.size + 1) / 2) + self.modifier
 
+    def roll(self) -> list[int]:
+        """Roll the dice and return individual results (no modifier)."""
+        return [random.randint(1, self.size) for _ in range(self.count)]
+
 
 def roll_dice(expr: str | DiceExpression) -> int:
     """

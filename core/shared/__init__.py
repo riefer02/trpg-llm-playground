@@ -2,6 +2,8 @@
 
 from core.shared.enums import (
     ActionType,
+    AttackType,
+    CoverType,
     DamageType,
     RangeType,
     SizeClass,
@@ -28,6 +30,18 @@ from core.shared.rolls import (
     SaveRoll,
     ContestedCheck,
 )
+from core.shared.narrative import (
+    NarrativeCheckTier,
+    NarrativeCheckTierRule,
+    NarrativeHelpRule,
+    NarrativePushRule,
+    NarrativeCheckRules,
+    NARRATIVE_TIER_RULES,
+    NARRATIVE_TIER_RULES_BY_TIER,
+    NARRATIVE_PUSH_RULES,
+    DEFAULT_NARRATIVE_CHECK_RULES,
+    get_narrative_tier_rule,
+)
 from core.shared.effects import (
     StatType,
     ConditionType,
@@ -49,6 +63,8 @@ from core.shared.effects import (
 __all__ = [
     # Enums
     "ActionType",
+    "AttackType",
+    "CoverType",
     "DamageType", 
     "RangeType",
     "SizeClass",
@@ -72,6 +88,17 @@ __all__ = [
     "AttackRoll",
     "SaveRoll",
     "ContestedCheck",
+    # Narrative checks
+    "NarrativeCheckTier",
+    "NarrativeCheckTierRule",
+    "NarrativeHelpRule",
+    "NarrativePushRule",
+    "NarrativeCheckRules",
+    "NARRATIVE_TIER_RULES",
+    "NARRATIVE_TIER_RULES_BY_TIER",
+    "NARRATIVE_PUSH_RULES",
+    "DEFAULT_NARRATIVE_CHECK_RULES",
+    "get_narrative_tier_rule",
     # Effects
     "StatType",
     "ConditionType",

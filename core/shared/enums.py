@@ -9,6 +9,14 @@ ActionType = Literal[
     "full",       # Full action (1 per turn, ends quick actions)
     "reaction",   # Triggered reaction
     "protocol",   # Start-of-turn protocol
+    "move",       # Regular move action
+]
+
+# Attack Types
+AttackType = Literal[
+    "melee",
+    "ranged",
+    "tech",
 ]
 
 # Damage Types
@@ -28,6 +36,7 @@ RangeType = Literal[
     "cone",        # Cone attack
     "burst",       # Burst area
     "blast",       # Blast area
+    "sensors",     # Sensor range
 ]
 
 # Size Classes (for mechs)
@@ -36,6 +45,8 @@ SizeClass = Literal[
     "size_1",      # Size 1 (standard)
     "size_2",      # Size 2 (larger)
     "size_3",      # Size 3 (very large)
+    "size_4",      # Size 4 (titanic)
+    "size_5",      # Size 5 (massive)
 ]
 
 # Mech Manufacturers (for licenses and core bonuses)
@@ -67,6 +78,7 @@ SystemType = Literal[
 
 # Status/Condition Types
 StatusType = Literal[
+    "braced",
     "immobilized",
     "impaired",
     "jammed",
@@ -82,3 +94,9 @@ StatusType = Literal[
     "engaged",
 ]
 
+# Cover Types
+CoverType = Literal[
+    "none",
+    "soft",
+    "hard",
+]

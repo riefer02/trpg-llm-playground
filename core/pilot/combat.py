@@ -83,3 +83,17 @@ class PilotCombatRules(BaseModel):
 
 
 DEFAULT_PILOT_COMBAT_RULES = PilotCombatRules()
+
+
+class PilotInMechCombatRules(BaseModel):
+    """Overrides for pilots while fighting in mech combat."""
+
+    use_grit_for_attacks_and_saves: bool = True
+    immune_to_tech_actions: bool = True
+    heat_converts_to_energy_damage: bool = True
+    cannot_engage_mechs: bool = True
+
+    model_config = {"frozen": True}
+
+
+DEFAULT_PILOT_IN_MECH_RULES = PilotInMechCombatRules()

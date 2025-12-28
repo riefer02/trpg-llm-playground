@@ -4,7 +4,8 @@ from pydantic import BaseModel, Field
 
 from core.pilot.skill import SkillSet
 from core.mech.frame import MechFrameDefinition
-from core.mech.weapon import WeaponSize
+from core.mech.weapon import MechWeaponDefinition, WeaponSize
+from core.mech.system import MechSystemDefinition
 from core.shared.enums import SizeClass
 from core.shared.effects import MechanicalEffect, StatModifier
 
@@ -37,9 +38,72 @@ class MechBuild(BaseModel):
 
     model_config = {"frozen": True}
 
-    def total_sp(self) -> int:
-        """Total system points spent (if provided)."""
-        return sum(system.sp_cost or 0 for system in self.systems)
+    def total_sp(self, system_definitions: dict[str, MechSystemDefinition] | None = None) -> int:
+        """Total system points spent (uses definitions if needed)."""
+        total = 0
+        for system in self.systems:
+            if system.sp_cost is not None:
+                total += system.sp_cost
+                continue
+            if system_definitions:
+                definition = system_definitions.get(system.system_id)
+                if definition:
+                    total += definition.sp_cost
+        return total
+
+
+def build_mounted_weapon(
+    mount_index: int,
+    weapon_id: str,
+    weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
+) -> MountedWeapon:
+    """Create a mounted weapon using compendium definitions."""
+    if weapon_definitions is None:
+        from core.mech.compendium import WEAPON_DEFINITIONS_BY_ID
+
+        weapon_definitions = WEAPON_DEFINITIONS_BY_ID
+    weapon_def = weapon_definitions.get(weapon_id)
+    if not weapon_def:
+        raise ValueError(f"Unknown weapon ID: {weapon_id}")
+    return MountedWeapon(
+        mount_index=mount_index,
+        weapon_id=weapon_id,
+        weapon_size=weapon_def.size,
+    )
+
+
+def build_installed_system(
+    system_id: str,
+    system_definitions: dict[str, MechSystemDefinition] | None = None,
+) -> InstalledSystem:
+    """Create an installed system using compendium definitions."""
+    if system_definitions is None:
+        from core.mech.compendium import SYSTEM_DEFINITIONS_BY_ID
+
+        system_definitions = SYSTEM_DEFINITIONS_BY_ID
+    system_def = system_definitions.get(system_id)
+    if not system_def:
+        raise ValueError(f"Unknown system ID: {system_id}")
+    return InstalledSystem(system_id=system_id, sp_cost=system_def.sp_cost)
+
+
+def build_mech_from_compendium(
+    frame_id: str,
+    weapon_mounts: list[tuple[int, str]],
+    system_ids: list[str],
+    weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
+    system_definitions: dict[str, MechSystemDefinition] | None = None,
+) -> MechBuild:
+    """Build a mech loadout from compendium IDs."""
+    weapons = [
+        build_mounted_weapon(mount_index, weapon_id, weapon_definitions)
+        for mount_index, weapon_id in weapon_mounts
+    ]
+    systems = [
+        build_installed_system(system_id, system_definitions)
+        for system_id in system_ids
+    ]
+    return MechBuild(frame_id=frame_id, weapons=weapons, systems=systems)
 
 
 class MechDerivedStats(BaseModel):
@@ -72,6 +136,7 @@ def compute_mech_stats(
 ) -> MechDerivedStats:
     """Compute final mech stats from a frame, skill bonuses, grit, and effects."""
     base = frame.base_stats
+    size = base.size
     hull = skills.hull
     agility = skills.agility
     systems = skills.systems
@@ -93,8 +158,9 @@ def compute_mech_stats(
     if bonus_effects:
         for effect in bonus_effects:
             for mod in effect.stat_mods:
-                hp, armor, evasion, e_defense, speed, sensor_range, tech_attack, heat_cap, repair_cap, save_target, limited_bonus, system_points = _apply_stat_modifier(
+                size, hp, armor, evasion, e_defense, speed, sensor_range, tech_attack, heat_cap, repair_cap, save_target, limited_bonus, system_points = _apply_stat_modifier(
                     mod,
+                    size,
                     hp,
                     armor,
                     evasion,
@@ -110,7 +176,7 @@ def compute_mech_stats(
                 )
 
     return MechDerivedStats(
-        size=base.size,
+        size=size,
         armor=armor,
         hp=hp,
         evasion=evasion,
@@ -130,6 +196,7 @@ def compute_mech_stats(
 
 def _apply_stat_modifier(
     mod: StatModifier,
+    size: SizeClass,
     hp: int,
     armor: int,
     evasion: int,
@@ -142,7 +209,7 @@ def _apply_stat_modifier(
     save_target: int,
     limited_bonus: int,
     system_points: int,
-) -> tuple[int, int, int, int, int, int, int, int, int, int, int, int]:
+) -> tuple[SizeClass, int, int, int, int, int, int, int, int, int, int, int, int]:
     """Apply a stat modifier to mech stats."""
     if mod.stat == "hp":
         hp += mod.value
@@ -168,8 +235,11 @@ def _apply_stat_modifier(
         limited_bonus += mod.value
     elif mod.stat == "system_points":
         system_points += mod.value
+    elif mod.stat == "size":
+        size = _adjust_size(size, mod.value)
 
     return (
+        size,
         hp,
         armor,
         evasion,
@@ -183,3 +253,11 @@ def _apply_stat_modifier(
         limited_bonus,
         system_points,
     )
+
+
+def _adjust_size(size: SizeClass, delta: int) -> SizeClass:
+    order: list[SizeClass] = ["size_half", "size_1", "size_2", "size_3", "size_4", "size_5"]
+    index = order.index(size) + delta
+    if index < 0 or index >= len(order):
+        raise ValueError(f"Size adjustment {delta} out of bounds for {size}")
+    return order[index]

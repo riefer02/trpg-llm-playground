@@ -33,6 +33,8 @@ StatType = Literal[
     "size",
     # Mounts
     "limited_bonus",  # +N to Limited weapon uses
+    # System budget
+    "system_points",
 ]
 
 # Conditions for conditional effects
@@ -45,15 +47,29 @@ ConditionType = Literal[
     "target_larger",
     "target_smaller",
     "target_same_size",
+    "target_hidden",
+    "target_jammed",
+    "target_shredded",
+    "target_impaired",
+    "target_slowed",
+    "target_stunned",
+    "target_exposed",
+    "target_invisible",
+    "target_engaged",
     # Attacker conditions
     "after_boost",
     "after_move_8_plus",
     "in_danger_zone",
     "hidden",
+    "engaged",
+    "exposed",
+    "overheated",
     # Attack type conditions
     "melee_attack",
     "ranged_attack",
     "tech_attack",
+    # Save conditions
+    "save_vs_knockback_or_prone",
 ]
 
 
@@ -77,9 +93,9 @@ class DamageModifier(BaseModel):
     
     Examples:
         DamageModifier(flat=1, condition="melee_attack")  # +1 melee damage
-        DamageModifier(dice="1d6", damage_type="kinetic")  # +1d6 kinetic
+        DamageModifier(dice=DiceExpression.parse("1d6"), damage_type="kinetic")  # +1d6 kinetic
     """
-    dice: str | None = Field(default=None, description="Bonus dice (e.g., '1d6')")
+    dice: DiceExpression | None = Field(default=None, description="Bonus dice (e.g., DiceExpression.parse('1d6'))")
     flat: int = Field(default=0, description="Flat bonus damage")
     damage_type: DamageType | None = Field(default=None)
     condition: ConditionType | None = Field(default=None)
@@ -249,12 +265,16 @@ def stat_bonus(stat: StatType, value: int) -> MechanicalEffect:
     return MechanicalEffect(stat_mods=[StatModifier(stat=stat, value=value)])
 
 
-def damage_bonus(flat: int = 0, dice: str | None = None, condition: ConditionType | None = None) -> MechanicalEffect:
+def damage_bonus(
+    flat: int = 0,
+    dice: DiceExpression | str | None = None,
+    condition: ConditionType | None = None,
+) -> MechanicalEffect:
     """Create a damage bonus effect."""
-    return MechanicalEffect(damage_mods=[DamageModifier(flat=flat, dice=dice, condition=condition)])
+    bonus_dice = DiceExpression.parse(dice) if isinstance(dice, str) else dice
+    return MechanicalEffect(damage_mods=[DamageModifier(flat=flat, dice=bonus_dice, condition=condition)])
 
 
 def immunity_to(target: str, condition: str | None = None) -> MechanicalEffect:
     """Create an immunity effect."""
     return MechanicalEffect(immunities=[Immunity(target=target, condition=condition)])
-
