@@ -330,6 +330,7 @@ def build_example_combat_scenario_with_area() -> MechCombatScenario:
                         action_id="skirmish",
                         action_type="quick",
                         weapon=demo_weapon,
+                        target_id="bravo",
                         target_ids=["bravo", "charlie"],
                         weapon_count=1,
                         uses_aux_bonus_attack=False,
@@ -503,6 +504,9 @@ def build_example_combat_scenario_with_ai() -> MechCombatScenario:
     combatants = list(scenario.combatants)
     ai_combatant = combatants[0].model_copy(update={"ai_controlled": True})
     combatants[0] = ai_combatant
+    combatants[1] = combatants[1].model_copy(
+        update={"position": HexPosition(coord=HexCoord(q=1, r=0), elevation=0)}
+    )
     round_one = CombatRound(
         round_index=1,
         turns=[
@@ -627,6 +631,8 @@ def build_example_combat_scenario_with_stabilize() -> MechCombatScenario:
             ActionUse(
                 action_id="stabilize",
                 action_type="full",
+                stabilize_primary="cool_heat",
+                stabilize_secondary="reload_loading",
             ),
         ],
     )

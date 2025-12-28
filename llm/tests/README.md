@@ -7,6 +7,7 @@ This directory contains scripts to verify the pipeline logic locally on your Mac
 We use `uv` to manage dependencies and run the test in an isolated environment (avoiding the heavy GPU dependencies in `requirements.txt`).
 
 ```bash
+cd llm
 uv run --with PyYAML --with tqdm --with openai python tests/smoke_test.py
 ```
 
@@ -15,6 +16,7 @@ uv run --with PyYAML --with tqdm --with openai python tests/smoke_test.py
 If you want a quick end-to-end API check (without running the full pipeline), run:
 
 ```bash
+cd llm
 uv run --with PyYAML --with openai python tests/openai_smoke_test.py
 ```
 
@@ -27,6 +29,6 @@ uv run --with PyYAML --with openai python tests/openai_smoke_test.py
 
 ## Output
 
-Artifacts are generated in `tests/artifacts/`:
+Artifacts are generated in `tests/artifacts/` (relative to `llm/`):
 *   `mock_raw.json`: The fake ingested text.
 *   `mock_synthetic.jsonl`: The resulting training data samples.

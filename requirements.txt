@@ -12,6 +12,7 @@ pydantic
 bitsandbytes
 scipy
 psutil
+pytest
 
 # For local (non-Colab) use only - uncomment if running locally:
 # unsloth

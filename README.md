@@ -10,7 +10,11 @@ This project is organized into three domains:
 trpg-llm-playground/
 ├── core/                   # Type-driven Lancer schemas (Pydantic v2)
 │   ├── pilot/              # Pilot domain (skills, talents, licenses, etc.)
+│   │   └── tests/           # Pilot schema tests
+│   ├── mech/               # Mech domain (frames, weapons, combat)
+│   │   └── tests/           # Mech schema tests
 │   ├── shared/             # Shared types (dice, enums, damage types)
+│   │   └── tests/           # Shared schema tests
 │   └── export.py           # JSON Schema export utility
 │
 ├── llm/                    # LLM fine-tuning pipeline
@@ -18,13 +22,13 @@ trpg-llm-playground/
 │   ├── colab/              # Google Colab notebooks
 │   ├── scripts/            # CLI tools
 │   ├── config/             # YAML configuration
-│   └── dataset/            # Generated datasets
+│   ├── dataset/            # Generated datasets
+│   └── tests/              # LLM pipeline tests
 │
 ├── app/                    # Future application layer (placeholder)
 │
 ├── books/                  # Source PDFs (not committed)
-├── models/                 # GGUF models for local inference
-└── tests/                  # Cross-domain tests
+└── models/                 # GGUF models for local inference
 ```
 
 ## Quick Start
@@ -132,17 +136,27 @@ Edit configs in `llm/config/`:
 ### Local Development
 
 ```bash
-cd llm
+# Run core schema tests
+make test-core
 
-# Run smoke tests
-python -m pytest ../tests/
+# Run LLM tests
+make test-llm
+
+# Run all tests
+make test
 
 # Validate synthetic data
+cd llm
 python scripts/validate_synth.py --input dataset/*.jsonl
 
 # Generate quality report
 python -m src.data.synth_report --input dataset/my_synthetic.jsonl
 ```
+
+### Testing Expectations
+
+- Core changes should always run `make test-core` before committing.
+- LLM changes should run `make test-llm` (no third-party calls; mock mode is supported).
 
 See `llm/docs/` for detailed documentation:
 - `CONFIG.md` - Configuration reference

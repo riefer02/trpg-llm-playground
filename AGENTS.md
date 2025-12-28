@@ -12,18 +12,22 @@ This project is a **monorepo** for Lancer TTRPG tooling with three domains:
 trpg-llm-playground/
 ├── core/                   # Type-driven Lancer schemas
 │   ├── pilot/              # Pilot domain models
+│   │   └── tests/           # Pilot schema tests
+│   ├── mech/               # Mech domain models
+│   │   └── tests/           # Mech schema tests
 │   ├── shared/             # Shared types (dice, enums)
+│   │   └── tests/           # Shared schema tests
 │   └── export.py           # JSON Schema export
 ├── llm/                    # LLM pipeline (moved from root)
 │   ├── src/                # Data, RAG, training modules
 │   ├── colab/              # Notebooks (run from llm/)
 │   ├── scripts/            # CLI tools
 │   ├── config/             # YAML configs
-│   └── dataset/            # Generated data
+│   ├── dataset/            # Generated data
+│   └── tests/              # LLM pipeline tests
 ├── app/                    # Future web application
 ├── books/                  # Source PDFs (shared)
 ├── models/                 # GGUF models (shared)
-└── tests/                  # Cross-domain tests
 ```
 
 ## Core Type System (`/core`)
@@ -94,6 +98,10 @@ trpg-llm-playground/
 - **Paths**: Relative to `llm/` directory
 - **Config-Driven**: All settings in YAML, no hardcoded values
 - **Logging**: Clear status updates for Colab monitoring
+
+### Testing
+- **Core changes**: Run `make test-core` before committing.
+- **LLM changes**: Run `make test-llm` (no third-party calls; mock mode is supported).
 
 ## Completed Features
 
