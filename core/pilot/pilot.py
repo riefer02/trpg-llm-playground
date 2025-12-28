@@ -5,12 +5,12 @@ Pilots have skills, backgrounds, talents, licenses, and stats
 that define their capabilities both in and out of the mech.
 """
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 from uuid import uuid4
 
 from core.pilot.skill import SkillSet, PilotTrigger
 from core.pilot.background import Background
-from core.pilot.gear import PilotLoadout
+from core.pilot.gear import PilotLoadout, get_pilot_gear_stat_mods, validate_pilot_loadout
 from core.pilot.combat import DEFAULT_PILOT_COMBAT_STATS
 from core.shared.enums import SizeClass
 from core.pilot.talent import Talent
@@ -63,6 +63,23 @@ class Pilot(BaseModel):
     armor_bonus: int = Field(default=0, description="Bonus armor from gear")
     
     model_config = {"validate_assignment": True}
+
+    @model_validator(mode="after")
+    def _validate_pilot_gear(self) -> "Pilot":
+        if self.pilot_gear is None:
+            return self
+        validation = validate_pilot_loadout(self.pilot_gear)
+        if not validation.valid:
+            messages = "; ".join(
+                issue.message for issue in validation.issues if issue.severity == "error"
+            )
+            raise ValueError(f"Invalid pilot gear loadout: {messages}")
+        return self
+
+    def _gear_stat_mods(self) -> dict[str, int]:
+        if not self.pilot_gear:
+            return {}
+        return get_pilot_gear_stat_mods(self.pilot_gear)
     
     @computed_field
     @property
@@ -81,31 +98,36 @@ class Pilot(BaseModel):
         Pilot HP = 6 + Grit + any bonuses.
         This is for when the pilot is out of the mech.
         """
-        return DEFAULT_PILOT_COMBAT_STATS.hp + self.grit + self.hp_bonus
+        mods = self._gear_stat_mods()
+        return DEFAULT_PILOT_COMBAT_STATS.hp + self.grit + self.hp_bonus + mods.get("hp", 0)
     
     @computed_field
     @property
     def armor(self) -> int:
         """Pilot armor (usually 0 unless wearing hardsuit)."""
-        return self.armor_bonus
+        mods = self._gear_stat_mods()
+        return self.armor_bonus + mods.get("armor", 0)
     
     @computed_field
     @property
     def evasion(self) -> int:
         """Pilot evasion = 10 by default."""
-        return DEFAULT_PILOT_COMBAT_STATS.evasion
+        mods = self._gear_stat_mods()
+        return DEFAULT_PILOT_COMBAT_STATS.evasion + mods.get("evasion", 0)
     
     @computed_field
     @property
     def e_defense(self) -> int:
         """Pilot e-defense = 10 by default."""
-        return DEFAULT_PILOT_COMBAT_STATS.e_defense
+        mods = self._gear_stat_mods()
+        return DEFAULT_PILOT_COMBAT_STATS.e_defense + mods.get("e_defense", 0)
     
     @computed_field
     @property
     def speed(self) -> int:
         """Pilot speed = 4 by default."""
-        return DEFAULT_PILOT_COMBAT_STATS.speed
+        mods = self._gear_stat_mods()
+        return DEFAULT_PILOT_COMBAT_STATS.speed + mods.get("speed", 0)
 
     @computed_field
     @property
@@ -198,6 +220,8 @@ def create_ll0_pilot(
     background: Background | None = None,
     skills: SkillSet | None = None,
     triggers: list[PilotTrigger] | None = None,
+    talents: list[Talent] | None = None,
+    pilot_gear: PilotLoadout | None = None,
 ) -> Pilot:
     """
     Create a new License Level 0 pilot.
@@ -205,15 +229,28 @@ def create_ll0_pilot(
     LL0 pilots start with:
     - 2 skill points to distribute
     - 4 triggers at +2 each
-    - No talents
+    - Three rank I talents
     - No licenses
     - No core bonuses
     """
+    resolved_skills = skills or SkillSet()
+    resolved_triggers = triggers or []
+    resolved_talents = talents or []
+
+    if resolved_skills.total_points() != 2:
+        raise ValueError("LL0 pilots must allocate exactly 2 mech skill points.")
+    if len(resolved_triggers) != 4 or any(trigger.rank != 2 for trigger in resolved_triggers):
+        raise ValueError("LL0 pilots must have exactly 4 triggers at +2 each.")
+    if sum(talent.rank for talent in resolved_talents) != 3 or any(talent.rank != 1 for talent in resolved_talents):
+        raise ValueError("LL0 pilots must have exactly three rank I talents.")
+
     return Pilot(
         callsign=callsign,
         name=name,
         background=background,
         level=0,
-        skills=skills or SkillSet(),
-        triggers=triggers or [],
+        skills=resolved_skills,
+        triggers=resolved_triggers,
+        talents=resolved_talents,
+        pilot_gear=pilot_gear,
     )

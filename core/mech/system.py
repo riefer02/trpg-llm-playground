@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from core.shared.effects import MechanicalEffect
-from core.shared.enums import ActionType, CoverType, DamageType, RangeType, SizeClass, SystemType
+from core.shared.enums import ActionType, CoverType, DamageType, RangeType, SaveType, SizeClass, SystemType
 from core.shared.dice import DiceExpression
 
 
@@ -30,9 +30,6 @@ class SystemTag(BaseModel):
     value: int | None = None
 
     model_config = {"frozen": True}
-
-
-SaveType = Literal["hull", "agility", "systems", "engineering"]
 
 
 class DamageSpec(BaseModel):
@@ -154,7 +151,13 @@ class DronePayload(BaseModel):
     e_defense: int = Field(default=10, ge=0)
     reactions: list[DroneReaction] = Field(default_factory=list)
     deploy_range_type: RangeType = "sensors"
+    deploy_requires_line_of_sight: bool = False
+    invisible: bool = False
     attach_to_surface: bool = True
+    redeploy_action: ActionType | None = None
+    redeploy_requires_line_of_sight: bool = False
+    recall_action: ActionType | None = None
+    recall_requires_line_of_sight: bool = False
 
     model_config = {"frozen": True}
 
@@ -166,6 +169,16 @@ class MechSystemDefinition(BaseModel):
     name: str = Field(..., description="Display name")
     system_type: SystemType = "system"
     sp_cost: int = Field(default=0, ge=0)
+    license_id: str | None = Field(
+        default=None,
+        description="License ID required to use this system (None for GMS/general)",
+    )
+    license_rank: int | None = Field(
+        default=None,
+        ge=1,
+        le=3,
+        description="Required license rank if gated by a specific license",
+    )
     unique: bool = False
     limited_uses: int | None = Field(default=None, ge=0)
     tags: list[SystemTag] = Field(default_factory=list)

@@ -35,6 +35,27 @@ def validate_pilot_progression(pilot: Pilot) -> ProgressionValidation:
     progression = get_level_progression(pilot.level)
     issues: list[ProgressionIssue] = []
 
+    trigger_ids = [trigger.trigger_id for trigger in pilot.triggers]
+    if len(set(trigger_ids)) != len(trigger_ids):
+        issues.append(
+            ProgressionIssue(
+                code="duplicate_triggers",
+                message="Trigger list contains duplicates; increase ranks instead.",
+            )
+        )
+
+    for trigger in pilot.triggers:
+        if trigger.rank % 2 != 0:
+            issues.append(
+                ProgressionIssue(
+                    code="invalid_trigger_rank",
+                    message=(
+                        f"Trigger '{trigger.trigger_id}' rank {trigger.rank} is invalid; "
+                        "trigger ranks must be in +2 increments."
+                    ),
+                )
+            )
+
     if pilot.total_license_levels() > progression.license_points:
         issues.append(
             ProgressionIssue(
@@ -86,6 +107,29 @@ def validate_pilot_progression(pilot: Pilot) -> ProgressionValidation:
                 message="Pilots should have at least 4 triggers.",
             )
         )
+
+    if pilot.level == 0:
+        if pilot.skills.total_points() != progression.total_mech_skill_points:
+            issues.append(
+                ProgressionIssue(
+                    code="ll0_skill_points_invalid",
+                    message="LL0 pilots must allocate exactly 2 mech skill points.",
+                )
+            )
+        if pilot.total_talent_ranks() != progression.total_talent_points:
+            issues.append(
+                ProgressionIssue(
+                    code="ll0_talent_points_invalid",
+                    message="LL0 pilots must have exactly three rank I talents.",
+                )
+            )
+        if pilot.total_trigger_points() != progression.pilot_trigger_points or len(pilot.triggers) != 4:
+            issues.append(
+                ProgressionIssue(
+                    code="ll0_trigger_points_invalid",
+                    message="LL0 pilots must have exactly four triggers at +2 each.",
+                )
+            )
 
     if pilot.total_license_levels() < progression.license_points:
         issues.append(

@@ -1,5 +1,6 @@
 """Pilot gear models for Lancer TTRPG."""
 
+from collections import Counter
 from typing import Literal
 from pydantic import BaseModel, Field
 
@@ -524,7 +525,157 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
 
 def get_pilot_gear_definition(gear_id: str) -> PilotGearItemDefinition | None:
     """Look up a pilot gear definition by ID."""
-    for item in PILOT_GEAR_DEFINITIONS:
-        if item.id == gear_id:
-            return item
-    return None
+    return PILOT_GEAR_DEFINITIONS_BY_ID.get(gear_id)
+
+
+PILOT_GEAR_DEFINITIONS_BY_ID = {item.id: item for item in PILOT_GEAR_DEFINITIONS}
+
+
+class PilotGearIssue(BaseModel):
+    """A pilot gear validation issue."""
+
+    code: str
+    message: str
+    severity: Literal["error", "warning"] = "error"
+
+    model_config = {"frozen": True}
+
+
+class PilotGearValidation(BaseModel):
+    """Validation result for pilot gear loadouts."""
+
+    valid: bool
+    issues: list[PilotGearIssue] = Field(default_factory=list)
+
+    model_config = {"frozen": True}
+
+
+def _iter_loadout_ids(loadout: PilotLoadout) -> list[str]:
+    ids: list[str] = []
+    if loadout.clothing:
+        ids.append(loadout.clothing)
+    if loadout.armor:
+        ids.append(loadout.armor)
+    ids.extend(loadout.weapons)
+    ids.extend(loadout.gear)
+    return ids
+
+
+def validate_pilot_loadout(
+    loadout: PilotLoadout,
+    rules: PilotGearRules = DEFAULT_PILOT_GEAR_RULES,
+    gear_definitions: dict[str, PilotGearItemDefinition] | None = None,
+) -> PilotGearValidation:
+    """Validate a pilot gear loadout against selection rules."""
+    issues: list[PilotGearIssue] = []
+    definitions = gear_definitions or PILOT_GEAR_DEFINITIONS_BY_ID
+
+    if rules.clothing_required and not loadout.clothing:
+        issues.append(
+            PilotGearIssue(
+                code="missing_clothing",
+                message="Pilot loadout must include clothing.",
+            )
+        )
+
+    if not rules.armor_optional and not loadout.armor:
+        issues.append(
+            PilotGearIssue(
+                code="missing_armor",
+                message="Pilot loadout must include armor.",
+            )
+        )
+
+    if len(loadout.weapons) > rules.max_weapons:
+        issues.append(
+            PilotGearIssue(
+                code="too_many_weapons",
+                message=f"Pilot loadout exceeds max weapons ({rules.max_weapons}).",
+            )
+        )
+
+    if len(loadout.gear) > rules.max_gear:
+        issues.append(
+            PilotGearIssue(
+                code="too_many_gear_items",
+                message=f"Pilot loadout exceeds max gear items ({rules.max_gear}).",
+            )
+        )
+
+    for gear_id in _iter_loadout_ids(loadout):
+        definition = definitions.get(gear_id)
+        if not definition:
+            issues.append(
+                PilotGearIssue(
+                    code="unknown_gear_id",
+                    message=f"Unknown pilot gear ID: {gear_id}.",
+                )
+            )
+
+    if loadout.clothing:
+        definition = definitions.get(loadout.clothing)
+        if definition and definition.category != "clothing":
+            issues.append(
+                PilotGearIssue(
+                    code="invalid_clothing_category",
+                    message=f"Clothing item '{loadout.clothing}' is not clothing.",
+                )
+            )
+
+    if loadout.armor:
+        definition = definitions.get(loadout.armor)
+        if definition and definition.category != "armor":
+            issues.append(
+                PilotGearIssue(
+                    code="invalid_armor_category",
+                    message=f"Armor item '{loadout.armor}' is not armor.",
+                )
+            )
+
+    for weapon_id in loadout.weapons:
+        definition = definitions.get(weapon_id)
+        if definition and definition.category != "weapon":
+            issues.append(
+                PilotGearIssue(
+                    code="invalid_weapon_category",
+                    message=f"Weapon item '{weapon_id}' is not a weapon.",
+                )
+            )
+
+    for gear_id in loadout.gear:
+        definition = definitions.get(gear_id)
+        if definition and definition.category != "gear":
+            issues.append(
+                PilotGearIssue(
+                    code="invalid_gear_category",
+                    message=f"Gear item '{gear_id}' is not gear.",
+                )
+            )
+
+    id_counts = Counter(_iter_loadout_ids(loadout))
+    duplicates = [gear_id for gear_id, count in id_counts.items() if count > 1]
+    if duplicates:
+        issues.append(
+            PilotGearIssue(
+                code="duplicate_gear_items",
+                message=f"Duplicate gear items are not allowed: {', '.join(duplicates)}.",
+            )
+        )
+
+    return PilotGearValidation(valid=not any(i.severity == "error" for i in issues), issues=issues)
+
+
+def get_pilot_gear_stat_mods(
+    loadout: PilotLoadout,
+    gear_definitions: dict[str, PilotGearItemDefinition] | None = None,
+) -> dict[str, int]:
+    """Aggregate stat modifiers provided by a pilot gear loadout."""
+    totals: dict[str, int] = {}
+    definitions = gear_definitions or PILOT_GEAR_DEFINITIONS_BY_ID
+    for gear_id in _iter_loadout_ids(loadout):
+        definition = definitions.get(gear_id)
+        if not definition:
+            continue
+        for mod in definition.effects.stat_mods:
+            totals[mod.stat] = totals.get(mod.stat, 0) + mod.value
+    return totals

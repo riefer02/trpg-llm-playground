@@ -25,7 +25,6 @@ class TriggerDefinition(BaseModel):
 
     id: str = Field(..., description="Unique trigger identifier")
     name: str = Field(..., description="Display name")
-    skill_type: SkillType
 
     model_config = {"frozen": True}
 
@@ -34,56 +33,42 @@ class PilotTrigger(BaseModel):
     """A pilot's trigger rank (+2 to +6)."""
 
     trigger_id: str = Field(..., description="ID of the trigger definition")
-    rank: int = Field(default=2, ge=2, le=6, description="Trigger bonus (+2 to +6)")
+    rank: int = Field(
+        default=2,
+        ge=2,
+        le=6,
+        multiple_of=2,
+        description="Trigger bonus (+2 to +6, in +2 increments)",
+    )
 
     model_config = {"frozen": True}
 
 
-# Trigger definitions grouped by associated mech skill
+# Trigger definitions (no mech skill linkage in the core rules)
 TRIGGER_DEFINITIONS: list[TriggerDefinition] = [
-    # HULL
-    TriggerDefinition(id="assault", name="Assault", skill_type="hull"),
-    TriggerDefinition(id="threaten", name="Threaten", skill_type="hull"),
-    TriggerDefinition(id="apply_fists_to_faces", name="Apply Fists to Faces", skill_type="hull"),
-    TriggerDefinition(id="survive", name="Survive", skill_type="hull"),
-    TriggerDefinition(id="take_control", name="Take Control", skill_type="hull"),
-    # AGILITY
-    TriggerDefinition(id="act_unseen_or_unheard", name="Act Unseen or Unheard", skill_type="agility"),
-    TriggerDefinition(id="get_somewhere_fast", name="Get Somewhere Fast", skill_type="agility"),
-    TriggerDefinition(
-        id="perform_a_feat_of_dexterity",
-        name="Perform a Feat of Dexterity",
-        skill_type="agility",
-    ),
-    TriggerDefinition(id="stay_cool_under_fire", name="Stay Cool Under Fire", skill_type="agility"),
-    TriggerDefinition(id="take_someone_out", name="Take Someone Out", skill_type="agility"),
-    # SYSTEMS
-    TriggerDefinition(id="hack_or_fix", name="Hack or Fix", skill_type="systems"),
-    TriggerDefinition(id="invent_or_create", name="Invent or Create", skill_type="systems"),
-    TriggerDefinition(id="read_a_situation", name="Read a Situation", skill_type="systems"),
-    TriggerDefinition(id="spot", name="Spot", skill_type="systems"),
-    TriggerDefinition(id="investigate", name="Investigate", skill_type="systems"),
-    # ENGINEERING
-    TriggerDefinition(id="blow_something_up", name="Blow Something Up", skill_type="engineering"),
-    TriggerDefinition(id="charm", name="Charm", skill_type="engineering"),
-    TriggerDefinition(id="get_a_hold_of_something", name="Get a Hold of Something", skill_type="engineering"),
-    TriggerDefinition(id="lead_or_inspire", name="Lead or Inspire", skill_type="engineering"),
-    TriggerDefinition(id="pull_rank", name="Pull Rank", skill_type="engineering"),
-    TriggerDefinition(id="word_on_the_street", name="Word on the Street", skill_type="engineering"),
+    TriggerDefinition(id="apply_fists_to_faces", name="Apply Fists to Faces"),
+    TriggerDefinition(id="assault", name="Assault"),
+    TriggerDefinition(id="blow_something_up", name="Blow Something Up"),
+    TriggerDefinition(id="threaten", name="Threaten"),
+    TriggerDefinition(id="take_control", name="Take Control"),
+    TriggerDefinition(id="survive", name="Survive"),
+    TriggerDefinition(id="stay_cool", name="Stay Cool"),
+    TriggerDefinition(id="take_someone_out", name="Take Someone Out"),
+    TriggerDefinition(id="show_off", name="Show Off"),
+    TriggerDefinition(id="get_somewhere_quickly", name="Get Somewhere Quickly"),
+    TriggerDefinition(id="act_unseen_or_unheard", name="Act Unseen or Unheard"),
+    TriggerDefinition(id="hack_or_fix", name="Hack or Fix"),
+    TriggerDefinition(id="patch", name="Patch"),
+    TriggerDefinition(id="invent_or_create", name="Invent or Create"),
+    TriggerDefinition(id="read_a_situation", name="Read A Situation"),
+    TriggerDefinition(id="spot", name="Spot"),
+    TriggerDefinition(id="investigate", name="Investigate"),
+    TriggerDefinition(id="charm", name="Charm"),
+    TriggerDefinition(id="pull_rank", name="Pull Rank"),
+    TriggerDefinition(id="word_on_the_streets", name="Word On the Streets"),
+    TriggerDefinition(id="get_a_hold_of_something", name="Get a Hold of Something"),
+    TriggerDefinition(id="lead_or_inspire", name="Lead or Inspire"),
 ]
-
-TRIGGERS_BY_SKILL: dict[SkillType, list[str]] = {
-    skill: [trigger.name for trigger in TRIGGER_DEFINITIONS if trigger.skill_type == skill]
-    for skill in SKILLS
-}
-
-TRIGGER_IDS_BY_SKILL: dict[SkillType, list[str]] = {
-    skill: [trigger.id for trigger in TRIGGER_DEFINITIONS if trigger.skill_type == skill]
-    for skill in SKILLS
-}
-
-# Backwards-compatible alias
-SKILL_TRIGGERS = TRIGGERS_BY_SKILL
 
 
 def get_trigger_definition(trigger_id: str) -> TriggerDefinition | None:
@@ -112,16 +97,6 @@ class Skill(BaseModel):
     def abbreviation(self) -> str:
         """Get the abbreviated form (HULL, AGI, SYS, ENG)."""
         return SKILLS[self.skill_type]
-    
-    @property
-    def triggers(self) -> list[str]:
-        """Get the triggers associated with this skill."""
-        return TRIGGERS_BY_SKILL[self.skill_type]
-
-    @property
-    def trigger_ids(self) -> list[str]:
-        """Get trigger IDs associated with this skill."""
-        return TRIGGER_IDS_BY_SKILL[self.skill_type]
     
     def __str__(self) -> str:
         return f"{self.abbreviation} +{self.rank}"

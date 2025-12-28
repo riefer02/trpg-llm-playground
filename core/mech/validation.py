@@ -6,12 +6,19 @@ from typing import Literal
 from collections import Counter
 from pydantic import BaseModel, Field
 
-from core.mech.build import MechBuild, compute_mech_stats
+from core.mech.build import (
+    MechBuild,
+    MountedWeapon,
+    compute_mech_stats,
+    compute_limited_uses,
+    LimitedUseSummary,
+)
 from core.mech.frame import MechFrameDefinition
 from core.mech.mounts import allowed_weapon_sizes
 from core.mech.weapon import MechWeaponDefinition, WeaponSize
 from core.mech.system import MechSystemDefinition
 from core.pilot.skill import SkillSet
+from core.pilot.license import License
 
 
 class MechBuildIssue(BaseModel):
@@ -29,6 +36,7 @@ class MechBuildValidation(BaseModel):
 
     valid: bool
     issues: list[MechBuildIssue] = Field(default_factory=list)
+    limited_uses: LimitedUseSummary = Field(default_factory=LimitedUseSummary)
 
     model_config = {"frozen": True}
 
@@ -39,7 +47,7 @@ def _validate_mount_allocation(
 ) -> list[MechBuildIssue]:
     issues: list[MechBuildIssue] = []
     mount_count = len(frame.mounts)
-    weapons_by_mount: dict[int, list[WeaponSize]] = {}
+    weapons_by_mount: dict[int, list[MountedWeapon]] = {}
 
     for mounted in build.weapons:
         if mounted.mount_index < 0 or mounted.mount_index >= mount_count:
@@ -50,19 +58,41 @@ def _validate_mount_allocation(
                 )
             )
             continue
-        weapons_by_mount.setdefault(mounted.mount_index, []).append(mounted.weapon_size)
+        weapons_by_mount.setdefault(mounted.mount_index, []).append(mounted)
 
-    for index, sizes in weapons_by_mount.items():
+    for index, mounted_weapons in weapons_by_mount.items():
         slot = frame.mounts[index]
-        allowed = allowed_weapon_sizes(slot.slot_type)
-        if slot.slot_type == "integrated" and slot.integrated_weapon_id:
-            issues.append(
-                MechBuildIssue(
-                    code="integrated_mount_locked",
-                    message=f"Mount {index} is integrated and cannot be reassigned.",
+        if slot.slot_type == "integrated":
+            if not slot.integrated_weapon_id:
+                issues.append(
+                    MechBuildIssue(
+                        code="integrated_mount_missing_weapon",
+                        message=f"Mount {index} is integrated but has no weapon assigned.",
+                    )
                 )
-            )
+                continue
+            if len(mounted_weapons) > 1:
+                issues.append(
+                    MechBuildIssue(
+                        code="integrated_mount_capacity",
+                        message=f"Mount {index} allows only its integrated weapon.",
+                    )
+                )
+            for mounted in mounted_weapons:
+                if mounted.weapon_id != slot.integrated_weapon_id:
+                    issues.append(
+                        MechBuildIssue(
+                            code="integrated_weapon_mismatch",
+                            message=(
+                                f"Mount {index} only allows integrated weapon "
+                                f"'{slot.integrated_weapon_id}'."
+                            ),
+                        )
+                    )
             continue
+
+        sizes = [mounted.weapon_size for mounted in mounted_weapons]
+        allowed = allowed_weapon_sizes(slot.slot_type)
 
         for size in sizes:
             if size not in allowed:
@@ -151,11 +181,65 @@ def _validate_mount_allocation(
     return issues
 
 
+def _validate_integrated_weapon_restrictions(
+    frame: MechFrameDefinition,
+    build: MechBuild,
+    weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
+) -> list[MechBuildIssue]:
+    issues: list[MechBuildIssue] = []
+    if not weapon_definitions:
+        return issues
+    mount_count = len(frame.mounts)
+
+    for mounted in build.weapons:
+        definition = weapon_definitions.get(mounted.weapon_id)
+        if not definition or not definition.integrated_only:
+            continue
+        if definition.integrated_frame_id and frame.id != definition.integrated_frame_id:
+            issues.append(
+                MechBuildIssue(
+                    code="integrated_weapon_frame_mismatch",
+                    message=(
+                        f"Weapon '{definition.name}' is integrated to frame "
+                        f"'{definition.integrated_frame_id}', not '{frame.id}'."
+                    ),
+                )
+            )
+        if mounted.mount_index < 0 or mounted.mount_index >= mount_count:
+            continue
+        slot = frame.mounts[mounted.mount_index]
+        if slot.slot_type != "integrated":
+            issues.append(
+                MechBuildIssue(
+                    code="integrated_weapon_requires_integrated_mount",
+                    message=(
+                        f"Weapon '{definition.name}' must be mounted in an integrated slot."
+                    ),
+                )
+            )
+            continue
+        if slot.integrated_weapon_id and slot.integrated_weapon_id != mounted.weapon_id:
+            issues.append(
+                MechBuildIssue(
+                    code="integrated_weapon_mismatch",
+                    message=(
+                        f"Mount {mounted.mount_index} only allows integrated weapon "
+                        f"'{slot.integrated_weapon_id}'."
+                    ),
+                )
+            )
+
+    return issues
+
+
 def _validate_superheavy(
     frame: MechFrameDefinition,
     build: MechBuild,
 ) -> list[MechBuildIssue]:
     issues: list[MechBuildIssue] = []
+    available_mounts = [
+        index for index, slot in enumerate(frame.mounts) if slot.slot_type != "integrated"
+    ]
     superheavy_mounts = [
         mounted.mount_index for mounted in build.weapons if mounted.weapon_size == "superheavy"
     ]
@@ -173,7 +257,8 @@ def _validate_superheavy(
             )
 
     used_mounts = {mounted.mount_index for mounted in build.weapons}
-    free_mounts = len(frame.mounts) - len(used_mounts)
+    used_non_integrated = {index for index in used_mounts if index in available_mounts}
+    free_mounts = len(available_mounts) - len(used_non_integrated)
     if free_mounts < len(superheavy_mounts):
         issues.append(
             MechBuildIssue(
@@ -202,6 +287,41 @@ def _validate_system_points(
                 message=(
                     f"System points spent {total_sp} exceed budget "
                     f"{stats.system_points}."
+                ),
+            )
+        )
+    return issues
+
+
+def _build_license_lookup(
+    licenses: list[License] | None,
+    license_ranks: dict[str, int] | None,
+) -> dict[str, int] | None:
+    if license_ranks is not None:
+        return license_ranks
+    if licenses is None:
+        return None
+    return {lic.license_id: lic.rank for lic in licenses}
+
+
+def _validate_license_access(
+    label: str,
+    license_id: str | None,
+    license_rank: int | None,
+    license_lookup: dict[str, int] | None,
+) -> list[MechBuildIssue]:
+    issues: list[MechBuildIssue] = []
+    if not license_lookup or not license_id:
+        return issues
+    required_rank = license_rank or 1
+    current_rank = license_lookup.get(license_id, 0)
+    if current_rank < required_rank:
+        issues.append(
+            MechBuildIssue(
+                code="license_requirement_not_met",
+                message=(
+                    f"{label} requires license '{license_id}' rank {required_rank}, "
+                    f"but current rank is {current_rank}."
                 ),
             )
         )
@@ -253,6 +373,8 @@ def validate_mech_build(
     grit: int,
     weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
     system_definitions: dict[str, MechSystemDefinition] | None = None,
+    licenses: list[License] | None = None,
+    license_ranks: dict[str, int] | None = None,
 ) -> MechBuildValidation:
     """Validate a mech build against frame, skills, and grit."""
     issues: list[MechBuildIssue] = []
@@ -267,6 +389,51 @@ def validate_mech_build(
     issues.extend(_validate_superheavy(frame, build))
     issues.extend(_validate_system_points(frame, build, skills, grit, system_definitions))
     issues.extend(_validate_unique_tags(build, weapon_definitions, system_definitions))
+    issues.extend(_validate_integrated_weapon_restrictions(frame, build, weapon_definitions))
+
+    license_lookup = _build_license_lookup(licenses, license_ranks)
+    issues.extend(
+        _validate_license_access(
+            label=f"Frame '{frame.name}'",
+            license_id=frame.license_id,
+            license_rank=frame.license_rank,
+            license_lookup=license_lookup,
+        )
+    )
+
+    for mounted in build.weapons:
+        definition = weapon_definitions.get(mounted.weapon_id)
+        if not definition:
+            continue
+        issues.extend(
+            _validate_license_access(
+                label=f"Weapon '{definition.name}'",
+                license_id=definition.license_id,
+                license_rank=definition.license_rank,
+                license_lookup=license_lookup,
+            )
+        )
+
+    for system in build.systems:
+        definition = system_definitions.get(system.system_id)
+        if not definition:
+            continue
+        issues.extend(
+            _validate_license_access(
+                label=f"System '{definition.name}'",
+                license_id=definition.license_id,
+                license_rank=definition.license_rank,
+                license_lookup=license_lookup,
+            )
+        )
+
+    stats = compute_mech_stats(frame, skills, grit)
+    limited_uses = compute_limited_uses(
+        build,
+        stats,
+        weapon_definitions,
+        system_definitions,
+    )
 
     valid = not any(issue.severity == "error" for issue in issues)
-    return MechBuildValidation(valid=valid, issues=issues)
+    return MechBuildValidation(valid=valid, issues=issues, limited_uses=limited_uses)

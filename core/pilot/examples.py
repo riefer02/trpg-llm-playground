@@ -92,8 +92,9 @@ def build_oda_ll0_pilot() -> Pilot:
             Talent(talent_id="leader", rank=1),
         ],
         pilot_gear=PilotLoadout(
+            clothing="flight_suit",
             armor="light_hardsuit",
-            weapons=["hunting_rifle"],
+            weapons=["signature_weapon_combat"],
             gear=["extra_rations", "cooking_gear"],
         ),
     )
@@ -134,8 +135,9 @@ def build_oda_ll3_pilot() -> Pilot:
             CoreBonus(core_bonus_id="ipsn_reinforced_frame"),
         ],
         pilot_gear=PilotLoadout(
+            clothing="flight_suit",
             armor="light_hardsuit",
-            weapons=["hunting_rifle"],
+            weapons=["signature_weapon_combat"],
             gear=["extra_rations", "cooking_gear"],
         ),
     )
@@ -151,6 +153,7 @@ def evaluate_oda_ll0_example() -> tuple[ProgressionValidation, MechBuildValidati
         build,
         skills,
         grit,
+        licenses=pilot.licenses,
         weapon_definitions=WEAPON_DEFINITIONS_BY_ID,
         system_definitions=SYSTEM_DEFINITIONS_BY_ID,
     )
@@ -182,6 +185,7 @@ def evaluate_oda_ll3_example() -> tuple[ProgressionValidation, MechBuildValidati
         build,
         skills,
         grit,
+        licenses=pilot.licenses,
         weapon_definitions=WEAPON_DEFINITIONS_BY_ID,
         system_definitions=SYSTEM_DEFINITIONS_BY_ID,
     )

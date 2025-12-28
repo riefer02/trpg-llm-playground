@@ -128,6 +128,58 @@ class MechDerivedStats(BaseModel):
     model_config = {"frozen": True}
 
 
+class LimitedUseEntry(BaseModel):
+    """Effective limited uses for a single item instance."""
+
+    item_id: str
+    uses: int
+
+    model_config = {"frozen": True}
+
+
+class LimitedUseSummary(BaseModel):
+    """Effective limited uses for weapons and systems."""
+
+    weapons: list[LimitedUseEntry] = Field(default_factory=list)
+    systems: list[LimitedUseEntry] = Field(default_factory=list)
+
+    model_config = {"frozen": True}
+
+
+def compute_limited_uses(
+    build: MechBuild,
+    stats: MechDerivedStats,
+    weapon_definitions: dict[str, MechWeaponDefinition],
+    system_definitions: dict[str, MechSystemDefinition],
+) -> LimitedUseSummary:
+    """Compute effective limited uses after applying engineering bonuses."""
+    limited_bonus = stats.limited_bonus
+    weapon_entries: list[LimitedUseEntry] = []
+    system_entries: list[LimitedUseEntry] = []
+
+    for mounted in build.weapons:
+        definition = weapon_definitions.get(mounted.weapon_id)
+        if definition and definition.limited_uses is not None:
+            weapon_entries.append(
+                LimitedUseEntry(
+                    item_id=mounted.weapon_id,
+                    uses=definition.limited_uses + limited_bonus,
+                )
+            )
+
+    for system in build.systems:
+        definition = system_definitions.get(system.system_id)
+        if definition and definition.limited_uses is not None:
+            system_entries.append(
+                LimitedUseEntry(
+                    item_id=system.system_id,
+                    uses=definition.limited_uses + limited_bonus,
+                )
+            )
+
+    return LimitedUseSummary(weapons=weapon_entries, systems=system_entries)
+
+
 def compute_mech_stats(
     frame: MechFrameDefinition,
     skills: SkillSet,

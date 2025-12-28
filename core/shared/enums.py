@@ -27,6 +27,14 @@ DamageType = Literal[
     "burn",        # Heat-based, causes heat buildup
 ]
 
+# Save Types (for mech saves)
+SaveType = Literal[
+    "hull",
+    "agility",
+    "systems",
+    "engineering",
+]
+
 # Range Types
 RangeType = Literal[
     "range",       # Standard ranged (in spaces)

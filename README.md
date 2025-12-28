@@ -36,15 +36,26 @@ trpg-llm-playground/
 ### Using the Type System
 
 ```python
-from core import Pilot, SkillSet, Background, create_ll0_pilot
-from core.pilot import get_background, STANDARD_BACKGROUNDS
+from core import Pilot, SkillSet, create_ll0_pilot, PilotTrigger, Talent
+from core.pilot import STANDARD_BACKGROUNDS
 
 # Create a new pilot
 pilot = create_ll0_pilot(
     callsign="PHOENIX",
     name="Alex Chen",
-    background=get_background("soldier"),
+    background=STANDARD_BACKGROUNDS[0],
     skills=SkillSet(hull=1, agility=1),
+    triggers=[
+        PilotTrigger(trigger_id="assault", rank=2),
+        PilotTrigger(trigger_id="threaten", rank=2),
+        PilotTrigger(trigger_id="survive", rank=2),
+        PilotTrigger(trigger_id="take_control", rank=2),
+    ],
+    talents=[
+        Talent(talent_id="ace", rank=1),
+        Talent(talent_id="bonded", rank=1),
+        Talent(talent_id="brutal", rank=1),
+    ],
 )
 
 print(f"{pilot.callsign} - LL{pilot.level}, HP: {pilot.hp}, Grit: {pilot.grit}")

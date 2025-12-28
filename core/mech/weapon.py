@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from core.shared.enums import DamageType
 from core.shared.dice import DiceExpression
 from core.shared.enums import RangeType
+from core.shared.effects import MechanicalEffect
 
 
 WeaponSize = Literal["aux", "main", "heavy", "superheavy"]
@@ -71,11 +72,30 @@ class MechWeaponDefinition(BaseModel):
     name: str = Field(..., description="Display name")
     size: WeaponSize
     weapon_type: WeaponType
-    damage_type: WeaponDamageType
+    damage_type: WeaponDamageType | None = Field(
+        default=None,
+        description="Base damage type (None for non-damaging weapons)",
+    )
+    license_id: str | None = Field(
+        default=None,
+        description="License ID required to use this weapon (None for GMS/general)",
+    )
+    license_rank: int | None = Field(
+        default=None,
+        ge=1,
+        le=3,
+        description="Required license rank if gated by a specific license",
+    )
+    integrated_only: bool = False
+    integrated_frame_id: str | None = Field(
+        default=None,
+        description="Frame ID that provides this weapon as an integrated mount",
+    )
     unique: bool = False
     ranges: list[WeaponRange] = Field(default_factory=list)
     damage: list[WeaponDamage] = Field(default_factory=list)
     tags: list[WeaponTag] = Field(default_factory=list)
     limited_uses: int | None = Field(default=None, ge=0)
+    effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
 
     model_config = {"frozen": True}

@@ -52,6 +52,16 @@ class MechFrameDefinition(BaseModel):
     id: str = Field(..., description="Unique frame identifier")
     name: str = Field(..., description="Display name")
     manufacturer: ManufacturerType
+    license_id: str | None = Field(
+        default=None,
+        description="License ID required to use this frame (None for GMS/general)",
+    )
+    license_rank: int | None = Field(
+        default=2,
+        ge=1,
+        le=3,
+        description="Required license rank for this frame (typically rank II)",
+    )
     base_stats: MechFrameBaseStats
     mounts: list[MountSlot] = Field(default_factory=list)
     system_points: int = Field(default=0, ge=0)

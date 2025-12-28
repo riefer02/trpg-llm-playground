@@ -5,12 +5,9 @@ from core.pilot.skill import (
     SkillSet,
     SkillType,
     SKILLS,
-    SKILL_TRIGGERS,
     TriggerDefinition,
     PilotTrigger,
     TRIGGER_DEFINITIONS,
-    TRIGGERS_BY_SKILL,
-    TRIGGER_IDS_BY_SKILL,
     get_trigger_definition,
 )
 from core.pilot.background import (
@@ -98,7 +95,12 @@ from core.pilot.gear import (
     PilotMedicalEffect,
     PilotStimEffect,
     PILOT_GEAR_DEFINITIONS,
+    PILOT_GEAR_DEFINITIONS_BY_ID,
     get_pilot_gear_definition,
+    PilotGearIssue,
+    PilotGearValidation,
+    validate_pilot_loadout,
+    get_pilot_gear_stat_mods,
 )
 from core.pilot.combat import (
     PilotCombatBaseStats,
@@ -124,12 +126,9 @@ __all__ = [
     "SkillSet",
     "SkillType",
     "SKILLS",
-    "SKILL_TRIGGERS",
     "TriggerDefinition",
     "PilotTrigger",
     "TRIGGER_DEFINITIONS",
-    "TRIGGERS_BY_SKILL",
-    "TRIGGER_IDS_BY_SKILL",
     "get_trigger_definition",
     # Backgrounds
     "Background",
@@ -211,7 +210,12 @@ __all__ = [
     "PilotMedicalEffect",
     "PilotStimEffect",
     "PILOT_GEAR_DEFINITIONS",
+    "PILOT_GEAR_DEFINITIONS_BY_ID",
     "get_pilot_gear_definition",
+    "PilotGearIssue",
+    "PilotGearValidation",
+    "validate_pilot_loadout",
+    "get_pilot_gear_stat_mods",
     # Combat
     "PilotCombatBaseStats",
     "DEFAULT_PILOT_COMBAT_STATS",

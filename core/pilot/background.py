@@ -62,7 +62,7 @@ EXAMPLE_BACKGROUNDS: list[Background] = [
         name="Example Background 1",
         triggers=[
             "survive",
-            "word_on_the_street",
+            "word_on_the_streets",
             "get_a_hold_of_something",
             "hack_or_fix",
         ],
@@ -101,9 +101,9 @@ EXAMPLE_BACKGROUNDS: list[Background] = [
         id="background_5",
         name="Example Background 5",
         triggers=[
-            "get_somewhere_fast",
-            "stay_cool_under_fire",
-            "perform_a_feat_of_dexterity",
+            "get_somewhere_quickly",
+            "stay_cool",
+            "show_off",
             "act_unseen_or_unheard",
         ],
     ),
@@ -114,7 +114,7 @@ EXAMPLE_BACKGROUNDS: list[Background] = [
             "act_unseen_or_unheard",
             "get_a_hold_of_something",
             "spot",
-            "word_on_the_street",
+            "word_on_the_streets",
         ],
     ),
     Background(
@@ -124,7 +124,7 @@ EXAMPLE_BACKGROUNDS: list[Background] = [
             "charm",
             "lead_or_inspire",
             "pull_rank",
-            "word_on_the_street",
+            "word_on_the_streets",
         ],
     ),
     Background(
@@ -132,8 +132,8 @@ EXAMPLE_BACKGROUNDS: list[Background] = [
         name="Example Background 8",
         triggers=[
             "survive",
-            "get_somewhere_fast",
-            "stay_cool_under_fire",
+            "get_somewhere_quickly",
+            "stay_cool",
             "hack_or_fix",
         ],
     ),
