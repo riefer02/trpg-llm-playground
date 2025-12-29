@@ -50,6 +50,7 @@ from core.shared.effects import (
     ResourceChange,
     SaveCheck,
     ScaledResourceChange,
+    StatModifier,
     StatOverrideEffect,
     ActionRestriction,
     EffectRemoval,
@@ -2625,6 +2626,548 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                                     ),
                                 )
                             ],
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    # === Batch 2: Tech/Drone focused talents ===
+    TalentDefinition(
+        id="engineer",
+        name="ENGINEER",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Field Repairs",
+                effects=MechanicalEffect(
+                    repair_actions=[
+                        RepairActionEffect(
+                            name="field_repairs",
+                            action_type="quick",
+                            repairs_cost=1,
+                            target="self",
+                            restore_hp=6,
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Jury-Rig",
+                effects=MechanicalEffect(
+                    limited_use_recharges=[
+                        LimitedUseRechargeEffect(
+                            bonus_uses=1,
+                            applies_to=["weapon", "system"],
+                            cost_repairs=1,
+                            uses_per="rest",
+                            condition="during_rest",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Battlefield Technician",
+                effects=MechanicalEffect(
+                    repair_actions=[
+                        RepairActionEffect(
+                            name="battlefield_structure_repair",
+                            action_type="full",
+                            repairs_cost=2,
+                            target="ally",
+                            restore_structure=1,
+                        ),
+                    ],
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_stabilize",
+                            effect=MechanicalEffect(
+                                repair_actions=[
+                                    RepairActionEffect(
+                                        name="stabilize_bonus_repair",
+                                        action_type="free",
+                                        repairs_cost=0,
+                                        target="self",
+                                        restore_hp=4,
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
+        id="technophile",
+        name="TECHNOPHILE",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Systems Integration",
+                effects=MechanicalEffect(
+                    stat_mods=[
+                        StatModifier(stat="system_points", value=2),
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Efficient Targeting",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_tech_attack_hit",
+                            condition="lock_on_action",
+                            effect=MechanicalEffect(
+                                accuracy_mods=[
+                                    AccuracyModifier(
+                                        value=1,
+                                        applies_to="tech",
+                                        condition="tech_attack",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Systems Cascade",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_tech_attack_hit",
+                            condition="invade_action",
+                            effect=MechanicalEffect(
+                                direct_damages=[
+                                    DirectDamage(
+                                        damage_type="heat",
+                                        flat=2,
+                                        target="enemy",
+                                    )
+                                ],
+                                status_grants=[
+                                    StatusGrant(
+                                        status="lock_on",
+                                        target="enemy",
+                                        duration="until_cleared",
+                                    )
+                                ],
+                            ),
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
+        id="drone_commander",
+        name="DRONE COMMANDER",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Drone Network",
+                effects=MechanicalEffect(
+                    accuracy_mods=[
+                        AccuracyModifier(
+                            value=1,
+                            applies_to="all",
+                            condition="lock_on_consumed_drone_or_nexus_attack",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Resilient Drones",
+                effects=MechanicalEffect(
+                    stat_mods=[
+                        StatModifier(stat="limited_bonus", value=1),
+                    ],
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_stabilize",
+                            effect=MechanicalEffect(
+                                limited_use_recharges=[
+                                    LimitedUseRechargeEffect(
+                                        bonus_uses=1,
+                                        applies_to=["deployable"],
+                                        cost_repairs=0,
+                                        uses_per="scene",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Autonomous Swarm",
+                effects=MechanicalEffect(
+                    action_grants=[
+                        ActionGrant(
+                            action_type="quick",
+                            name="Swarm Command",
+                            uses_per="round",
+                        )
+                    ],
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_ally_hit",
+                            condition="lock_on_consumed_drone_or_nexus_attack",
+                            effect=MechanicalEffect(
+                                direct_damages=[
+                                    DirectDamage(
+                                        damage_type="kinetic",
+                                        flat=2,
+                                        target="enemy",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    # === Batch 3: Weapon/action focused talents ===
+    TalentDefinition(
+        id="armsman",
+        name="ARMSMAN",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Weapon Mastery",
+                effects=MechanicalEffect(
+                    accuracy_mods=[
+                        AccuracyModifier(
+                            value=1,
+                            applies_to="melee",
+                            condition="main_melee_attack",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Combat Stance",
+                effects=MechanicalEffect(
+                    damage_mods=[
+                        DamageModifier(
+                            flat=2,
+                            applies_to="melee",
+                            condition="melee_attack",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Master at Arms",
+                effects=MechanicalEffect(
+                    attack_sequence_mods=[
+                        AttackSequenceModifierEffect(
+                            trigger="on_crit",
+                            condition="melee_attack",
+                            first_attack_accuracy=1,
+                            duration="end_of_turn",
+                        )
+                    ],
+                    action_grants=[
+                        ActionGrant(
+                            action_type="reaction",
+                            name="Riposte",
+                            trigger="on_miss",
+                            uses_per="round",
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
+        id="soldier",
+        name="SOLDIER",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Combat Training",
+                effects=MechanicalEffect(
+                    stat_mods=[
+                        StatModifier(stat="hp", value=2),
+                    ],
+                    check_mods=[
+                        CheckModifierEffect(
+                            value=1,
+                            check_types=["hull"],
+                            check_kinds=["save"],
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Disciplined Action",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_turn_start",
+                            effect=MechanicalEffect(
+                                status_clears=[
+                                    StatusClear(status="impaired", target="self"),
+                                    StatusClear(status="slowed", target="self"),
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Veteran Resilience",
+                effects=MechanicalEffect(
+                    damage_reduction_rolls=[
+                        DamageReductionRollEffect(
+                            roll=DiceExpression.parse("1d3"),
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
+        id="striker",
+        name="STRIKER",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Hit and Run",
+                effects=MechanicalEffect(
+                    movement_grants=[
+                        MovementGrant(
+                            spaces=2,
+                            trigger="on_hit",
+                            condition="melee_attack",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Swift Action",
+                effects=MechanicalEffect(
+                    attack_sequence_mods=[
+                        AttackSequenceModifierEffect(
+                            trigger="on_turn_start",
+                            condition="after_boost",
+                            first_attack_accuracy=1,
+                            duration="end_of_turn",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Blitz",
+                effects=MechanicalEffect(
+                    action_grants=[
+                        ActionGrant(
+                            action_type="quick",
+                            name="Blitz Attack",
+                            uses_per="round",
+                        )
+                    ],
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_kill",
+                            effect=MechanicalEffect(
+                                movement_grants=[
+                                    MovementGrant(
+                                        spaces=3,
+                                        movement_type="boost",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    # === Batch 4: Miscellaneous talents ===
+    TalentDefinition(
+        id="veteran",
+        name="VETERAN",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Battle Hardened",
+                effects=MechanicalEffect(
+                    stat_mods=[
+                        StatModifier(stat="hp", value=4),
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Tactical Awareness",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_turn_start",
+                            effect=MechanicalEffect(
+                                accuracy_mods=[
+                                    AccuracyModifier(
+                                        value=1,
+                                        applies_to="all",
+                                        condition="on_turn",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Seasoned Commander",
+                effects=MechanicalEffect(
+                    action_grants=[
+                        ActionGrant(
+                            action_type="free",
+                            name="Rally",
+                            uses_per="round",
+                        )
+                    ],
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_ally_turn_start",
+                            effect=MechanicalEffect(
+                                accuracy_mods=[
+                                    AccuracyModifier(
+                                        value=1,
+                                        applies_to="all",
+                                        target="ally",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
+        id="walking_armory",
+        name="WALKING ARMORY",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Heavy Loadout",
+                effects=MechanicalEffect(
+                    stat_mods=[
+                        StatModifier(stat="limited_bonus", value=2),
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Weapon Flexibility",
+                effects=MechanicalEffect(
+                    weapon_mods=[
+                        WeaponModEffect(
+                            tag_grants=[
+                                WeaponTagGrant(tag="reliable"),
+                            ],
+                            condition="selected_weapon",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Arsenal Master",
+                effects=MechanicalEffect(
+                    action_grants=[
+                        ActionGrant(
+                            action_type="quick",
+                            name="Switch Weapon",
+                            uses_per="round",
+                        ),
+                        ActionGrant(
+                            action_type="free",
+                            name="Quick Reload",
+                            uses_per="round",
+                        ),
+                    ],
+                    reload_effects=[
+                        ReloadEffect(
+                            target="self",
+                            count="all",
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
+        id="black_thumb",
+        name="BLACK THUMB",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Improvised Solutions",
+                effects=MechanicalEffect(
+                    check_mods=[
+                        CheckModifierEffect(
+                            value=1,
+                            check_types=["engineering"],
+                            check_kinds=["check"],
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Scrapyard Genius",
+                effects=MechanicalEffect(
+                    repair_actions=[
+                        RepairActionEffect(
+                            name="scrap_repair",
+                            action_type="quick",
+                            repairs_cost=0,
+                            target="self",
+                            restore_hp=2,
+                            condition="structure_damage",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Make It Work",
+                effects=MechanicalEffect(
+                    limited_use_recharges=[
+                        LimitedUseRechargeEffect(
+                            bonus_uses=1,
+                            applies_to=["weapon", "system"],
+                            cost_repairs=0,
+                            uses_per="scene",
+                        )
+                    ],
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_stabilize",
+                            effect=MechanicalEffect(
+                                status_clears=[
+                                    StatusClear(status="jammed", target="self"),
+                                ]
+                            ),
                         )
                     ],
                 ),

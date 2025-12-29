@@ -3651,7 +3651,13 @@ SSC_FRAMES: list[MechFrameDefinition] = [
                 name="Fragile",
                 effects=MechanicalEffect(
                     accuracy_mods=[
-                        AccuracyModifier(value=-1, condition="hull_checks_and_saves")
+                        AccuracyModifier(
+                            value=-1,
+                            condition=CheckContextCondition(
+                                check_kinds=["check", "save"],
+                                saves=["hull"],
+                            ),
+                        )
                     ],
                 ),
             ),
@@ -3965,7 +3971,13 @@ SSC_FRAMES: list[MechFrameDefinition] = [
                 name="Biotic Components",
                 effects=MechanicalEffect(
                     accuracy_mods=[
-                        AccuracyModifier(value=1, condition="agility_checks_and_saves")
+                        AccuracyModifier(
+                            value=1,
+                            condition=CheckContextCondition(
+                                check_kinds=["check", "save"],
+                                saves=["agility"],
+                            ),
+                        )
                     ],
                 ),
             ),

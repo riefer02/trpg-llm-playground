@@ -190,6 +190,74 @@ ConditionType = Literal[
     "melee_crit",
     # Save conditions
     "save_vs_knockback_or_prone",
+    # Spatial/targeting conditions (from compendium migration)
+    "adjacent",
+    "adjacent_recover_charged_stake",
+    "adjacent_start_or_move",
+    "ally_target",
+    "ally_target_range_5",
+    "hostile_target_range_5",
+    "target_empty_space",
+    "target_destroyed",
+    "target_is_object",
+    "target_prone_or_immobilized_or_stunned",
+    # Attack context conditions (from compendium migration)
+    "after_boost_melee_attack",
+    "first_ranged_attack_each_round",
+    "attacks_from_owner",
+    "attacks_within_range_3",
+    "attacker_within_range_3_before_attack",
+    "kinetic_attack_against_self_or_adjacent_ally",
+    "launcher_attack_consumes_lock_on",
+    "next_loading_attack",
+    "next_ranged_attack",
+    "ranged_attack_vs_marked_target_no_cover_outside_range_5",
+    "ram_attack_vs_object",
+    # State/mode conditions (from compendium migration)
+    "ai_controlled_until_protocol_resume",
+    "core_power_active",
+    "core_power_full_action_mag_field",
+    "protocol_ends",
+    "stabilizer_attached",
+    "structure_damage",
+    # Movement conditions (from compendium migration)
+    "after_move_or_boost",
+    "boost_speed_plus_2",
+    "hover_no_landing_required",
+    "must_move_max_speed_each_move",
+    "no_move",
+    "slipstream_jump",
+    # Miscellaneous conditions (from compendium migration)
+    "exclusive_target",
+    "from_triggering_attack",
+    "half_damage",
+    "melee_knockback_plus_2",
+    "melee_attack_knockback_bonus",
+    "melee_weapon_spend_charge",
+    # Complex conditions (from compendium - kept as literals for specificity)
+    "first_turn",
+    "gm_approved_non_combat_check",
+    "no_attacks_or_forced_saves",
+    "toward_self_stop_adjacent_if_possible",
+    "deactivate_start_turn",
+    "ranged_threat_minimum",
+    "sekhmet_auto_pilot_melee_only",
+    "snare_trap_immobilize",
+    "charged_stake_immobilized",
+    "charged_stake_immobilize",
+    "willing_or_stunned_adjacent_target",
+    "unwilling_adjacent_target",
+    "enter_zone_metal_target",
+    "in_zone_metal_target",
+    "reaction_parry_kinetic_attack_against_self_or_adjacent_ally",
+    "hull_checks_and_saves",
+    "stabilize_singularity",
+    "agility_checks_and_saves",
+    "until_end_of_next_turn",
+    "invisible_to_chosen_target_only",
+    "benefiting_from_trail_cover",
+    "source_is_chosen_target",
+    "ally_other_than_self_hits_markerlight_target",
 ]
 
 # Structured condition primitives
@@ -366,6 +434,12 @@ TriggerType = Literal[
     "on_stabilize",
     "on_skirmish",
     "on_enter",
+    # Triggers from compendium migration
+    "on_brace",
+    "on_move_or_boost",
+    "on_slipstream_jump",
+    "on_extra_overwatch",
+    "on_ally_hit_target_within_range",
 ]
 ReactionTriggerEvent = Literal[
     "enemy_starts_movement_in_threat",
@@ -877,8 +951,12 @@ class DicePoolSpendOption(FrozenModel):
         if self.effect_per_die and not (self.spend_any_number or self.spend_all):
             raise ValueError("effect_per_die requires spend_any_number or spend_all")
         if self.bonus_requires_spend_at_least is not None and self.bonus_effect is None:
-            raise ValueError("bonus_effect is required when bonus_requires_spend_at_least is set")
-        if self.bonus_effect is not None and not (self.spend_any_number or self.spend_all):
+            raise ValueError(
+                "bonus_effect is required when bonus_requires_spend_at_least is set"
+            )
+        if self.bonus_effect is not None and not (
+            self.spend_any_number or self.spend_all
+        ):
             raise ValueError("bonus_effect requires spend_any_number or spend_all")
         return self
 
@@ -1059,7 +1137,9 @@ class Immunity(FrozenModel):
     target: str = Field(
         ..., description="What you're immune to (condition, damage type, or effect)"
     )
-    condition: EffectCondition | None = Field(default=None, description="Conditional immunity")
+    condition: EffectCondition | None = Field(
+        default=None, description="Conditional immunity"
+    )
 
 
 class TagImmunityEffect(FrozenModel):
@@ -3002,6 +3082,8 @@ def damage_bonus(
     )
 
 
-def immunity_to(target: str, condition: EffectCondition | None = None) -> MechanicalEffect:
+def immunity_to(
+    target: str, condition: EffectCondition | None = None
+) -> MechanicalEffect:
     """Create an immunity effect."""
     return MechanicalEffect(immunities=[Immunity(target=target, condition=condition)])
