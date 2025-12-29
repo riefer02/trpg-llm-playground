@@ -6,6 +6,7 @@ from pydantic import Field, model_validator
 from core.shared.models import FrozenModel
 
 from core.shared.effects import BreakTriggerType, EffectDuration, MechanicalEffect, StatModifier
+from core.shared.effects_validation import validate_mechanical_effects
 from core.shared.enums import ActionType, StatusType
 from core.shared.payloads import (
     PilotAreaEffect,
@@ -781,6 +782,20 @@ def validate_pilot_loadout(
             PilotGearIssue(
                 code="duplicate_gear_items",
                 message=f"Duplicate gear items are not allowed: {', '.join(duplicates)}.",
+            )
+        )
+
+    effects: list[MechanicalEffect] = []
+    for gear_id in _iter_loadout_ids(loadout):
+        definition = definitions.get(gear_id)
+        if definition:
+            effects.append(definition.effects)
+    for issue in validate_mechanical_effects(effects):
+        issues.append(
+            PilotGearIssue(
+                code=f"effect_validation_{issue.severity}",
+                message=f"Effect validation: {issue.message}",
+                severity=issue.severity,
             )
         )
 

@@ -13,14 +13,16 @@ from core.mech.build import (
     compute_mech_stats,
     compute_limited_uses,
     LimitedUseSummary,
+    resolve_weapon_grants,
 )
 from core.mech.frame import MechFrameDefinition
-from core.mech.mounts import allowed_weapon_sizes
+from core.mech.mounts import MountSlot, allowed_weapon_sizes
 from core.mech.weapon import MechWeaponDefinition, WeaponSize
 from core.mech.system import MechSystemDefinition
 from core.pilot.skill import SkillSet
 from core.pilot.license import License
 from core.shared.effects import MechanicalEffect, OverchargeCostCapEffect, ModeEffect
+from core.shared.effects_validation import validate_mechanical_effects
 
 
 class MechBuildIssue(FrozenModel):
@@ -47,9 +49,11 @@ class MechBuildValidation(FrozenModel):
 def _validate_mount_allocation(
     frame: MechFrameDefinition,
     build: MechBuild,
+    mounts: list[MountSlot] | None = None,
 ) -> list[MechBuildIssue]:
     issues: list[MechBuildIssue] = []
-    mount_count = len(frame.mounts)
+    mount_slots = mounts or frame.mounts
+    mount_count = len(mount_slots)
     weapons_by_mount: dict[int, list[MountedWeapon]] = {}
 
     for mounted in build.weapons:
@@ -64,7 +68,7 @@ def _validate_mount_allocation(
         weapons_by_mount.setdefault(mounted.mount_index, []).append(mounted)
 
     for index, mounted_weapons in weapons_by_mount.items():
-        slot = frame.mounts[index]
+        slot = mount_slots[index]
         if slot.slot_type == "integrated":
             if not slot.integrated_weapon_id:
                 issues.append(
@@ -188,11 +192,13 @@ def _validate_integrated_weapon_restrictions(
     frame: MechFrameDefinition,
     build: MechBuild,
     weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
+    mounts: list[MountSlot] | None = None,
 ) -> list[MechBuildIssue]:
     issues: list[MechBuildIssue] = []
     if not weapon_definitions:
         return issues
-    mount_count = len(frame.mounts)
+    mount_slots = mounts or frame.mounts
+    mount_count = len(mount_slots)
 
     for mounted in build.weapons:
         definition = weapon_definitions.get(mounted.weapon_id)
@@ -210,7 +216,7 @@ def _validate_integrated_weapon_restrictions(
             )
         if mounted.mount_index < 0 or mounted.mount_index >= mount_count:
             continue
-        slot = frame.mounts[mounted.mount_index]
+        slot = mount_slots[mounted.mount_index]
         if slot.slot_type != "integrated":
             issues.append(
                 MechBuildIssue(
@@ -279,10 +285,12 @@ def _collect_mode_effects(
 def _validate_superheavy(
     frame: MechFrameDefinition,
     build: MechBuild,
+    mounts: list[MountSlot] | None = None,
 ) -> list[MechBuildIssue]:
     issues: list[MechBuildIssue] = []
+    mount_slots = mounts or frame.mounts
     available_mounts = [
-        index for index, slot in enumerate(frame.mounts) if slot.slot_type != "integrated"
+        index for index, slot in enumerate(mount_slots) if slot.slot_type != "integrated"
     ]
     superheavy_mounts = [
         mounted.mount_index for mounted in build.weapons if mounted.weapon_size == "superheavy"
@@ -291,7 +299,7 @@ def _validate_superheavy(
         return issues
 
     for mount_index in superheavy_mounts:
-        slot = frame.mounts[mount_index]
+        slot = mount_slots[mount_index]
         if slot.slot_type != "heavy":
             issues.append(
                 MechBuildIssue(
@@ -430,11 +438,37 @@ def validate_mech_build(
         weapon_definitions = weapon_definitions or WEAPON_DEFINITIONS_BY_ID
         system_definitions = system_definitions or SYSTEM_DEFINITIONS_BY_ID
 
-    issues.extend(_validate_mount_allocation(frame, build))
-    issues.extend(_validate_superheavy(frame, build))
+    grant_definitions: dict[str, MechWeaponDefinition] = {}
+    grant_mounts: list[MountSlot] = []
+    try:
+        grant_definitions, grant_mounts = resolve_weapon_grants(
+            bonus_effects,
+            weapon_definitions,
+        )
+    except ValueError as exc:
+        issues.append(
+            MechBuildIssue(
+                code="weapon_grant_conflict",
+                message=str(exc),
+            )
+        )
+    if grant_definitions:
+        weapon_definitions = {**weapon_definitions, **grant_definitions}
+
+    effective_mounts = [*frame.mounts, *grant_mounts]
+
+    issues.extend(_validate_mount_allocation(frame, build, mounts=effective_mounts))
+    issues.extend(_validate_superheavy(frame, build, mounts=effective_mounts))
     issues.extend(_validate_system_points(frame, build, skills, grit, system_definitions))
     issues.extend(_validate_unique_tags(build, weapon_definitions, system_definitions))
-    issues.extend(_validate_integrated_weapon_restrictions(frame, build, weapon_definitions))
+    issues.extend(
+        _validate_integrated_weapon_restrictions(
+            frame,
+            build,
+            weapon_definitions,
+            mounts=effective_mounts,
+        )
+    )
 
     license_lookup = _build_license_lookup(licenses, license_ranks)
     issues.extend(
@@ -469,6 +503,28 @@ def validate_mech_build(
                 license_id=definition.license_id,
                 license_rank=definition.license_rank,
                 license_lookup=license_lookup,
+            )
+        )
+
+    effect_sources: list[MechanicalEffect] = []
+    if frame.core_system:
+        effect_sources.append(frame.core_system.effects)
+    effect_sources.extend(trait.effects for trait in frame.traits)
+    effect_sources.extend(bonus_effects or [])
+    for mounted in build.weapons:
+        definition = weapon_definitions.get(mounted.weapon_id)
+        if definition:
+            effect_sources.append(definition.effects)
+    for system in build.systems:
+        definition = system_definitions.get(system.system_id)
+        if definition:
+            effect_sources.append(definition.effects)
+    for issue in validate_mechanical_effects(effect_sources):
+        issues.append(
+            MechBuildIssue(
+                code=f"effect_validation_{issue.severity}",
+                message=f"Effect validation: {issue.message}",
+                severity=issue.severity,
             )
         )
 

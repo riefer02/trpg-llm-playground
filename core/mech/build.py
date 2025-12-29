@@ -1,12 +1,21 @@
 """Mech build models and stat calculations for Lancer TTRPG."""
 
+import re
+
 from pydantic import Field
 from core.shared.models import FrozenModel
 
 from core.pilot.skill import SkillSet
 from core.mech.frame import MechFrameDefinition
-from core.mech.weapon import MechWeaponDefinition, WeaponSize
+from core.mech.weapon import (
+    MechWeaponDefinition,
+    WeaponSize,
+    WeaponRange,
+    WeaponDamage,
+    WeaponTag,
+)
 from core.mech.system import MechSystemDefinition
+from core.mech.mounts import MountSlot
 from core.shared.enums import SizeClass
 from core.shared.effects import (
     MechanicalEffect,
@@ -14,6 +23,7 @@ from core.shared.effects import (
     LimitedUseBonusEffect,
     OverchargeCostCapEffect,
     AISystemLimitEffect,
+    WeaponGrantEffect,
 )
 
 
@@ -91,14 +101,129 @@ def build_installed_system(
     return InstalledSystem(system_id=system_id, sp_cost=system_def.sp_cost)
 
 
+def _slugify_weapon_name(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower())
+    return slug.strip("_")
+
+
+def _resolve_weapon_grant_id(
+    grant: WeaponGrantEffect,
+    index: int,
+    existing_ids: set[str],
+) -> str:
+    if grant.weapon_id:
+        if grant.weapon_id in existing_ids:
+            raise ValueError(f"Weapon grant ID '{grant.weapon_id}' already exists.")
+        return grant.weapon_id
+    base = _slugify_weapon_name(grant.name)
+    if not base:
+        base = f"weapon_grant_{index + 1}"
+    else:
+        base = f"grant_{base}"
+    candidate = base
+    suffix = 1
+    while candidate in existing_ids:
+        suffix += 1
+        candidate = f"{base}_{suffix}"
+    return candidate
+
+
+def build_weapon_definition_from_grant(
+    grant: WeaponGrantEffect,
+    weapon_id: str,
+) -> MechWeaponDefinition:
+    """Build a weapon definition from a weapon grant effect."""
+    ranges = [
+        WeaponRange(range_type=range_spec.range_type, value=range_spec.value)
+        for range_spec in grant.ranges
+    ]
+    tags = [WeaponTag(tag=tag.tag, value=tag.value) for tag in grant.tags]
+    if any(spec.ap for spec in grant.damage) and not any(tag.tag == "ap" for tag in tags):
+        tags.append(WeaponTag(tag="ap"))
+
+    damage: list[WeaponDamage] = []
+    for spec in grant.damage:
+        if spec.damage_type == "burn":
+            if spec.dice is not None:
+                raise ValueError(
+                    "Weapon grant burn damage with dice is unsupported; use burn tags instead."
+                )
+            if spec.flat > 0 and not any(tag.tag == "burn" for tag in tags):
+                tags.append(WeaponTag(tag="burn", value=spec.flat))
+            continue
+        damage.append(
+            WeaponDamage(damage_type=spec.damage_type, dice=spec.dice, flat=spec.flat)
+        )
+
+    return MechWeaponDefinition(
+        id=weapon_id,
+        name=grant.name,
+        size=grant.size,
+        weapon_type=grant.weapon_type,
+        damage_type=damage[0].damage_type if damage else None,
+        ranges=ranges,
+        damage=damage,
+        tags=tags,
+        limited_uses=grant.limited_uses,
+        unique=grant.unique,
+        integrated_only=grant.integrated_mount,
+    )
+
+
+def resolve_weapon_grants(
+    bonus_effects: list[MechanicalEffect] | None,
+    weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
+) -> tuple[dict[str, MechWeaponDefinition], list[MountSlot]]:
+    """Resolve weapon grant effects into weapon definitions and integrated mounts."""
+    if not bonus_effects:
+        return {}, []
+    grants: list[WeaponGrantEffect] = []
+    for effect in bonus_effects:
+        grants.extend(effect.weapon_grants)
+    if not grants:
+        return {}, []
+    existing_ids = set(weapon_definitions or {})
+    definitions: dict[str, MechWeaponDefinition] = {}
+    integrated_mounts: list[MountSlot] = []
+    for index, grant in enumerate(grants):
+        weapon_id = _resolve_weapon_grant_id(grant, index, existing_ids)
+        existing_ids.add(weapon_id)
+        definitions[weapon_id] = build_weapon_definition_from_grant(grant, weapon_id)
+        if grant.integrated_mount:
+            integrated_mounts.append(
+                MountSlot(slot_type="integrated", integrated_weapon_id=weapon_id)
+            )
+    return definitions, integrated_mounts
+
+
+def build_weapon_definitions_with_grants(
+    weapon_definitions: dict[str, MechWeaponDefinition],
+    bonus_effects: list[MechanicalEffect] | None = None,
+) -> dict[str, MechWeaponDefinition]:
+    """Extend weapon definitions with any weapon grants from effects."""
+    grant_definitions, _ = resolve_weapon_grants(bonus_effects, weapon_definitions)
+    if not grant_definitions:
+        return weapon_definitions
+    return {**weapon_definitions, **grant_definitions}
+
+
 def build_mech_from_compendium(
     frame_id: str,
     weapon_mounts: list[tuple[int, str]],
     system_ids: list[str],
     weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
     system_definitions: dict[str, MechSystemDefinition] | None = None,
+    bonus_effects: list[MechanicalEffect] | None = None,
 ) -> MechBuild:
     """Build a mech loadout from compendium IDs."""
+    if weapon_definitions is None:
+        from core.mech.compendium import WEAPON_DEFINITIONS_BY_ID
+
+        weapon_definitions = WEAPON_DEFINITIONS_BY_ID
+    weapon_definitions = build_weapon_definitions_with_grants(
+        weapon_definitions,
+        bonus_effects,
+    )
     weapons = [
         build_mounted_weapon(mount_index, weapon_id, weapon_definitions)
         for mount_index, weapon_id in weapon_mounts

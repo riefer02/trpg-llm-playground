@@ -10,6 +10,7 @@ the Lancer Third Party License). No copyrighted flavor text.
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.dice import DiceExpression
+from core.shared.payloads import DamageSpec
 
 from core.shared.effects import (
     MechanicalEffect,
@@ -23,6 +24,7 @@ from core.shared.effects import (
     CoverGrant,
     CoverRestriction,
     CheckModifierEffect,
+    IntelEffect,
     AttackOutcomeEffect,
     AttackRollOverrideEffect,
     AttackSequenceModifierEffect,
@@ -43,12 +45,17 @@ from core.shared.effects import (
     ModeEffect,
     MoveAdjacentEffect,
     MovementRestrictionEffect,
+    MovementSurfaceEffect,
     ProtocolEffect,
+    ResourceChange,
     SaveCheck,
     ScaledResourceChange,
     StatOverrideEffect,
     ActionRestriction,
+    EffectRemoval,
+    TechAction,
     TechActionRestriction,
+    TechRange,
     TagImmunityEffect,
     TargetMarkEffect,
     ForcedMovement,
@@ -59,7 +66,9 @@ from core.shared.effects import (
     RepairActionEffect,
     ReloadEffect,
     WeaponModEffect,
+    WeaponGrantEffect,
     WeaponTagGrant,
+    WeaponRangeSpec,
 )
 
 
@@ -1632,6 +1641,169 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
         ],
     ),
     TalentDefinition(
+        id="hacker",
+        name="HACKER",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Snow_Crash",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_hit",
+                            condition="lock_on_consumed_tech_attack",
+                            effect=MechanicalEffect(
+                                choices=[
+                                    EffectChoice(
+                                        name="Extra Heat",
+                                        effect=MechanicalEffect(
+                                            direct_damages=[
+                                                DirectDamage(
+                                                    damage_type="heat",
+                                                    flat=2,
+                                                    target="enemy",
+                                                )
+                                            ]
+                                        ),
+                                        target="enemy",
+                                    ),
+                                    EffectChoice(
+                                        name="Push",
+                                        effect=MechanicalEffect(
+                                            forced_movements=[
+                                                ForcedMovement(
+                                                    direction="push",
+                                                    distance=3,
+                                                    target="enemy",
+                                                )
+                                            ]
+                                        ),
+                                        target="enemy",
+                                    ),
+                                ]
+                            ),
+                        )
+                    ]
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Safe_Cracker",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_tech_attack_hit",
+                            condition="invade_action",
+                            effect=MechanicalEffect(
+                                choices=[
+                                    EffectChoice(
+                                        name="Jam Cockpit",
+                                        effect=MechanicalEffect(
+                                            action_restrictions=[
+                                                ActionRestriction(
+                                                    action_ids=["mount", "dismount"],
+                                                    target="enemy",
+                                                    duration="until_cleared",
+                                                    condition="hacker_jam_cockpit",
+                                                )
+                                            ],
+                                            effect_removals=[
+                                                EffectRemoval(
+                                                    action_type="full",
+                                                    check_type="engineering",
+                                                    check_kind="check",
+                                                    target="enemy",
+                                                    condition="hacker_jam_cockpit",
+                                                )
+                                            ],
+                                        ),
+                                        target="enemy",
+                                    ),
+                                    EffectChoice(
+                                        name="Disable Life Support",
+                                        effect=MechanicalEffect(
+                                            check_mods=[
+                                                CheckModifierEffect(
+                                                    value=-1,
+                                                    check_kinds=["save"],
+                                                    target="enemy",
+                                                    condition="hacker_disable_life_support",
+                                                )
+                                            ],
+                                            effect_removals=[
+                                                EffectRemoval(
+                                                    action_type="quick",
+                                                    check_type="systems",
+                                                    check_kind="check",
+                                                    target="enemy",
+                                                    condition="hacker_disable_life_support",
+                                                )
+                                            ],
+                                        ),
+                                        target="enemy",
+                                    ),
+                                    EffectChoice(
+                                        name="Hack/Slash",
+                                        effect=MechanicalEffect(
+                                            tech_restrictions=[
+                                                TechActionRestriction(
+                                                    disallow_tech_actions=True,
+                                                    end_tech_effects=True,
+                                                    target="enemy",
+                                                    condition="hacker_hack_slash",
+                                                )
+                                            ],
+                                            effect_removals=[
+                                                EffectRemoval(
+                                                    action_type="quick",
+                                                    check_type="systems",
+                                                    check_kind="check",
+                                                    target="enemy",
+                                                    condition="hacker_hack_slash",
+                                                ),
+                                                EffectRemoval(
+                                                    action_type="quick",
+                                                    target="enemy",
+                                                    condition="shutdown_action",
+                                                ),
+                                            ],
+                                        ),
+                                        target="enemy",
+                                    ),
+                                ]
+                            ),
+                        )
+                    ]
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Last Argument of Kings",
+                effects=MechanicalEffect(
+                    tech_actions=[
+                        TechAction(
+                            name="Last Argument of Kings",
+                            action_type="full",
+                            target="enemy",
+                            range=TechRange(range_type="sensors"),
+                            is_attack=True,
+                            on_hit=MechanicalEffect(
+                                direct_damages=[
+                                    DirectDamage(
+                                        damage_type="burn",
+                                        flat=0,
+                                        target="enemy",
+                                        condition="burn_equals_current_heat",
+                                    )
+                                ]
+                            ),
+                        )
+                    ]
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
         id="heavy_gunner",
         name="HEAVY GUNNER",
         ranks=[
@@ -1824,6 +1996,231 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
         ],
     ),
     TalentDefinition(
+        id="juggernaut",
+        name="JUGGERNAUT",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Momentum",
+                effects=MechanicalEffect(
+                    accuracy_mods=[
+                        AccuracyModifier(
+                            value=1,
+                            condition="ram_attack_after_boost",
+                        )
+                    ],
+                    forced_movements=[
+                        ForcedMovement(
+                            direction="push",
+                            distance=2,
+                            target="enemy",
+                            condition="ram_attack_after_boost",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Kinetic Mass Transfer",
+                effects=MechanicalEffect(
+                    save_checks=[
+                        SaveCheck(
+                            trigger="on_hit",
+                            save="hull",
+                            target="enemy",
+                            condition="ram_knockback_into_character",
+                            on_failure=MechanicalEffect(
+                                status_grants=[
+                                    StatusGrant(
+                                        status="prone",
+                                        target="enemy",
+                                        duration="until_cleared",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                    direct_damages=[
+                        DirectDamage(
+                            damage_type="kinetic",
+                            dice=DiceExpression.parse("1d6"),
+                            target="enemy",
+                            condition="ram_knockback_into_obstacle",
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Unstoppable Force",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_move",
+                            uses_per="round",
+                            condition="after_boost",
+                            effect=MechanicalEffect(
+                                choices=[
+                                    EffectChoice(
+                                        name="Supercharge",
+                                        effect=MechanicalEffect(
+                                            resource_changes=[
+                                                ResourceChange(
+                                                    resource="heat",
+                                                    amount=DiceExpression.parse("1d3+3"),
+                                                    direction="gain",
+                                                    target="self",
+                                                )
+                                            ],
+                                            movement_restrictions=[
+                                                MovementRestrictionEffect(
+                                                    target="self",
+                                                    must_move_straight_line=True,
+                                                    duration="end_of_turn",
+                                                    condition="juggernaut_supercharge",
+                                                )
+                                            ],
+                                            movement_surface_effects=[
+                                                MovementSurfaceEffect(
+                                                    target="self",
+                                                    ignore_difficult_terrain=True,
+                                                    duration="end_of_turn",
+                                                    condition="juggernaut_supercharge",
+                                                )
+                                            ],
+                                            movement_grants=[
+                                                MovementGrant(
+                                                    spaces="speed",
+                                                    movement_type="boost",
+                                                    distance_is_maximum=True,
+                                                    ignores_engagement=True,
+                                                    provokes_reactions=False,
+                                                )
+                                            ],
+                                            save_checks=[
+                                                SaveCheck(
+                                                    trigger="on_move",
+                                                    save="hull",
+                                                    target="enemy",
+                                                    condition="juggernaut_supercharge_through_character",
+                                                    on_failure=MechanicalEffect(
+                                                        status_grants=[
+                                                            StatusGrant(
+                                                                status="prone",
+                                                                target="enemy",
+                                                                duration="until_cleared",
+                                                            )
+                                                        ]
+                                                    ),
+                                                )
+                                            ],
+                                            direct_damages=[
+                                                DirectDamage(
+                                                    damage_type="kinetic",
+                                                    flat=20,
+                                                    ap=True,
+                                                    target="object",
+                                                    condition="juggernaut_supercharge_through_obstacle",
+                                                )
+                                            ],
+                                        ),
+                                        target="self",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
+        id="nuclear_cavalier",
+        name="NUCLEAR CAVALIER",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Aggressive Heat Bleed",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_hit",
+                            uses_per="round",
+                            condition="in_danger_zone",
+                            effect=MechanicalEffect(
+                                direct_damages=[
+                                    DirectDamage(
+                                        damage_type="heat",
+                                        flat=2,
+                                        target="enemy",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Fusion Hemorrhage",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_hit",
+                            uses_per="round",
+                            condition="in_danger_zone",
+                            effect=MechanicalEffect(
+                                direct_damages=[
+                                    DirectDamage(
+                                        damage_type="energy",
+                                        dice=DiceExpression.parse("1d6"),
+                                        target="enemy",
+                                    )
+                                ]
+                            ),
+                        )
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Here, Catch!",
+                effects=MechanicalEffect(
+                    weapon_grants=[
+                        WeaponGrantEffect(
+                            weapon_id="nuclear_cavalier_fuel_rod_gun",
+                            name="Fuel Rod Gun",
+                            size="main",
+                            weapon_type="cqb",
+                            ranges=[
+                                WeaponRangeSpec(range_type="range", value=8),
+                                WeaponRangeSpec(range_type="threat", value=3),
+                            ],
+                            damage=[
+                                DamageSpec(
+                                    damage_type="energy",
+                                    dice=DiceExpression.parse("1d3+2"),
+                                )
+                            ],
+                            limited_uses=3,
+                            unique=True,
+                            integrated_mount=True,
+                        )
+                    ],
+                    resource_changes=[
+                        ResourceChange(
+                            resource="heat",
+                            amount=4,
+                            direction="lose",
+                            target="self",
+                            condition="fuel_rod_gun_attack",
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
         id="siege_specialist",
         name="SIEGE SPECIALIST",
         ranks=[
@@ -1876,26 +2273,26 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                                         SaveCheck(
                                             trigger="on_attack_roll",
                                             save="hull",
-                                            target="any",
+                                            target="adjacent",
                                             condition="adjacent_to_self",
-                                        on_failure=MechanicalEffect(
-                                            forced_movements=[
-                                                ForcedMovement(
-                                                    direction="push",
-                                                    distance=2,
-                                                    target="any",
-                                                )
-                                            ],
-                                            status_grants=[
-                                                StatusGrant(
-                                                    status="prone",
-                                                    target="any",
-                                                    duration="until_cleared",
-                                                )
-                                            ],
-                                        ),
-                                    )
-                                ],
+                                            on_failure=MechanicalEffect(
+                                                forced_movements=[
+                                                    ForcedMovement(
+                                                        direction="push",
+                                                        distance=2,
+                                                        target="adjacent",
+                                                    )
+                                                ],
+                                                status_grants=[
+                                                    StatusGrant(
+                                                        status="prone",
+                                                        target="adjacent",
+                                                        duration="until_cleared",
+                                                    )
+                                                ],
+                                            ),
+                                        )
+                                    ],
                                 forced_movements=[
                                     ForcedMovement(
                                         direction="push",
@@ -1959,6 +2356,95 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                             ),
                         )
                     ],
+                ),
+            ),
+        ],
+    ),
+    TalentDefinition(
+        id="spotter",
+        name="SPOTTER",
+        ranks=[
+            TalentRank(
+                rank=1,
+                name="Particularize",
+                effects=MechanicalEffect(
+                    attack_rerolls=[
+                        AttackRerollEffect(
+                            trigger="on_attack_roll",
+                            allowed_attack_types=["melee", "ranged", "tech"],
+                            keep_second=False,
+                            condition="spotter_adjacent_ally_consumes_lock_on",
+                        )
+                    ]
+                ),
+            ),
+            TalentRank(
+                rank=2,
+                name="Panopticon",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_turn_end",
+                            condition="performed_tech_action",
+                            effect=MechanicalEffect(
+                                action_grants=[
+                                    ActionGrant(
+                                        action_type="free",
+                                        name="Lock On",
+                                        trigger="on_turn_end",
+                                        uses_per="round",
+                                    )
+                                ]
+                            ),
+                        ),
+                        TriggeredEffect(
+                            trigger="on_action",
+                            condition="lock_on_action",
+                            effect=MechanicalEffect(
+                                intel_effects=[
+                                    IntelEffect(
+                                        reveal=[
+                                            "hp",
+                                            "armor",
+                                            "speed",
+                                            "hase",
+                                            "evasion",
+                                            "e_defense",
+                                        ],
+                                        audience="allies",
+                                        target="enemy",
+                                        duration="end_of_turn",
+                                    )
+                                ]
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+            TalentRank(
+                rank=3,
+                name="Bentham/Foucault Elimination",
+                effects=MechanicalEffect(
+                    target_marks=[
+                        TargetMarkEffect(
+                            name="Spotter Nomination",
+                            action_type="quick",
+                            target="ally",
+                            range=1,
+                            duration="end_of_turn",
+                            exclusive=True,
+                            condition="lock_on_action",
+                            target_effects=MechanicalEffect(
+                                action_grants=[
+                                    ActionGrant(
+                                        action_type="reaction",
+                                        name="Spotter Quick Action",
+                                        uses_per="round",
+                                    )
+                                ]
+                            ),
+                        )
+                    ]
                 ),
             ),
         ],

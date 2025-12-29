@@ -25,13 +25,14 @@ from core.shared.enums import (
     StatusType,
 )
 from core.shared.dice import DiceExpression
+from core.shared.payloads import DamageSpec
 
 
 # Stats that can be modified
 StatType = Literal[
     # Pilot stats
     "hp",
-    "armor", 
+    "armor",
     "evasion",
     "e_defense",
     "speed",
@@ -81,6 +82,7 @@ ConditionType = Literal[
     "threat_except_original_target",
     "exemplar_marked_target",
     "ally_attacks_exemplar_marked_target",
+    "spotter_adjacent_ally_consumes_lock_on",
     "exemplar_marked_target_attacks_other_within_3",
     "exemplar_challenge_active",
     "exemplar_challenge_other_targets",
@@ -91,6 +93,9 @@ ConditionType = Literal[
     "hidden_at_turn_start",
     "hidden_end_turn",
     "after_boost",
+    "juggernaut_supercharge",
+    "juggernaut_supercharge_through_character",
+    "juggernaut_supercharge_through_obstacle",
     "after_move_8_plus",
     "in_danger_zone",
     "hidden",
@@ -124,6 +129,14 @@ ConditionType = Literal[
     "gain_stress",
     "stabilize_cool",
     "tech_attack_hit",
+    "invade_action",
+    "performed_tech_action",
+    "lock_on_action",
+    "hacker_jam_cockpit",
+    "hacker_disable_life_support",
+    "hacker_hack_slash",
+    "shutdown_action",
+    "burn_equals_current_heat",
     "on_turn",
     "next_melee_vs_tech_hit_target",
     "ally_engaged_with_target",
@@ -140,6 +153,7 @@ ConditionType = Literal[
     "cqb_overwatch",
     "nexus_weapon_crit",
     "lock_on_consumed_drone_or_nexus_attack",
+    "lock_on_consumed_tech_attack",
     "chaff_soft_cover_break_on_attack_or_save",
     "stormbringer_concussive_action",
     "stormbringer_torrent_attack",
@@ -156,6 +170,9 @@ ConditionType = Literal[
     "ranged_attack",
     "tech_attack",
     "ram_attack",
+    "ram_attack_after_boost",
+    "ram_knockback_into_character",
+    "ram_knockback_into_obstacle",
     "improvised_attack",
     "main_melee_attack",
     "aux_ranged_attack",
@@ -163,6 +180,7 @@ ConditionType = Literal[
     "launcher_attack",
     "lock_on_consumed_launcher_attack",
     "cannon_attack",
+    "fuel_rod_gun_attack",
     "melee_attack_no_other_adjacent",
     "melee_crit",
     # Save conditions
@@ -232,8 +250,10 @@ IntelAudience = Literal["self", "allies", "all"]
 IntelType = Literal[
     "location",
     "hp",
+    "armor",
     "structure",
     "heat",
+    "hase",
     "speed",
     "evasion",
     "e_defense",
@@ -268,7 +288,9 @@ ZoneEndTriggerType = Literal[
 ]
 ZoneEndScope = Literal["zone", "triggered_space"]
 RollPatternType = Literal["triples", "doubles"]
-OutOfPlayDuration = Literal["until_cleared", "until_rest", "scene", "mission", "start_of_next_turn"]
+OutOfPlayDuration = Literal[
+    "until_cleared", "until_rest", "scene", "mission", "start_of_next_turn"
+]
 
 ResourceType = Literal["hp", "heat", "repairs", "structure", "stress", "core_power"]
 ResourceAmount = int | DiceExpression | Literal["half_max", "full"]
@@ -282,7 +304,9 @@ DeploymentActivationCondition = Literal[
     "on_prime",
     "pass_over",
 ]
-DelayedImpactTiming = Literal["end_of_next_round", "end_of_next_turn", "start_of_next_turn"]
+DelayedImpactTiming = Literal[
+    "end_of_next_round", "end_of_next_turn", "start_of_next_turn"
+]
 PhaseState = Literal["in_phase", "out_of_phase"]
 HologramTrailTrigger = Literal["move", "boost", "move_or_boost"]
 HologramDetonationTrigger = Literal["start_turn", "move_through", "move_adjacent"]
@@ -291,17 +315,20 @@ EffectTargetNoAll = Literal["self", "enemy", "ally", "adjacent"]
 EffectTargetWithObject = Literal["self", "enemy", "ally", "adjacent", "all", "object"]
 EffectTargetWithObjectNoAll = Literal["self", "enemy", "ally", "adjacent", "object"]
 UsesPer = Literal["unlimited", "round", "scene", "mission", "rest", "full_repair"]
+
+
 class StatModifier(FrozenModel):
     """
     Numeric modifier to a stat.
-    
+
     Examples:
         StatModifier(stat="hp", value=5)  # +5 HP
         StatModifier(stat="size", value=1)  # +1 Size
     """
+
     stat: StatType
     value: int
-    
+
 
 class StatOverrideEffect(FrozenModel):
     """
@@ -310,12 +337,12 @@ class StatOverrideEffect(FrozenModel):
     Examples:
         StatOverrideEffect(stat="evasion", value=5, condition="reserve_power_mode")
     """
+
     stat: StatType
     value: int
     target: EffectTargetNoAll = "self"
     duration: EffectDuration | None = None
     condition: ConditionType | str | None = None
-
 
 
 class MountSlotGrant(FrozenModel):
@@ -325,6 +352,7 @@ class MountSlotGrant(FrozenModel):
     Examples:
         MountSlotGrant(slot_type="flexible", count=1, requires_mount_count_lt=3)
     """
+
     slot_type: MountSlotType
     count: int = Field(default=1, ge=1)
     requires_mount_count_lt: int | None = Field(default=None, ge=0)
@@ -339,6 +367,7 @@ class MountSlotReplacement(FrozenModel):
     Examples:
         MountSlotReplacement(new_slot_type="main_aux", count=1)
     """
+
     new_slot_type: MountSlotType
     count: int = Field(default=1, ge=1)
     target: EffectTargetNoAll = "self"
@@ -352,6 +381,7 @@ class MountSizeUpgradeEffect(FrozenModel):
     Examples:
         MountSizeUpgradeEffect(increase_by=1, count=1)
     """
+
     increase_by: int = Field(default=1, ge=1)
     count: int = Field(default=1, ge=1)
     max_size: WeaponSizeType | None = None
@@ -366,6 +396,7 @@ class IntegratedWeaponEffect(FrozenModel):
     Examples:
         IntegratedWeaponEffect(weapon_size="aux", free_attack_uses_per="round")
     """
+
     weapon_size: WeaponSizeType = "aux"
     free_attack_action_type: ActionType = "free"
     free_attack_uses_per: UsesPer = "round"
@@ -379,17 +410,19 @@ class IntegratedWeaponEffect(FrozenModel):
 class DamageModifier(FrozenModel):
     """
     Bonus damage under specific conditions.
-    
+
     Examples:
         DamageModifier(flat=1, condition="melee_attack")  # +1 melee damage
         DamageModifier(dice=DiceExpression.parse("1d6"), damage_type="kinetic")  # +1d6 kinetic
     """
-    dice: DiceExpression | None = Field(default=None, description="Bonus dice (e.g., DiceExpression.parse('1d6'))")
+
+    dice: DiceExpression | None = Field(
+        default=None, description="Bonus dice (e.g., DiceExpression.parse('1d6'))"
+    )
     flat: int = Field(default=0, description="Flat bonus damage")
     damage_type: DamageType | None = Field(default=None)
     condition: ConditionType | str | None = Field(default=None)
-    
-    
+
 
 DamageTypeScope = DamageType | Literal["heat", "burn", "all"]
 
@@ -401,6 +434,7 @@ class DamageMultiplierEffect(FrozenModel):
     Examples:
         DamageMultiplierEffect(multiplier=0.5, applies_to="outgoing", condition="target_range_gt_5")
     """
+
     multiplier: float = Field(..., ge=0)
     damage_types: list[DamageTypeScope] = Field(default_factory=list)
     applies_to: Literal["outgoing", "incoming"] = "outgoing"
@@ -411,15 +445,15 @@ class DamageMultiplierEffect(FrozenModel):
 class RangeModifier(FrozenModel):
     """
     Modifier to range or threat.
-    
+
     Examples:
         RangeModifier(range_type="threat", value=1)  # +1 Threat
         RangeModifier(range_type="range", value=5)  # +5 Range
     """
+
     range_type: Literal["range", "threat", "sensors"]
     value: int
     condition: str | None = None
-    
 
 
 DirectDamageType = DamageType | Literal["heat"]
@@ -432,6 +466,7 @@ class DirectDamage(FrozenModel):
     Examples:
         DirectDamage(damage_type="explosive", dice=DiceExpression.parse("1d3"), ap=True)
     """
+
     damage_type: DirectDamageType
     dice: DiceExpression | None = None
     flat: int = 0
@@ -441,20 +476,22 @@ class DirectDamage(FrozenModel):
     condition: str | None = None
 
 
-
 class ActionGrant(FrozenModel):
     """
     Grants a new action or ability.
-    
+
     Examples:
         ActionGrant(action_type="quick", name="Afterburner", trigger="after_boost")
         ActionGrant(action_type="reaction", name="Juke", trigger="on_successful_agility_save")
     """
+
     action_type: ActionType
     name: str
-    trigger: TriggerType | str | None = Field(default=None, description="When this action can be used")
+    trigger: TriggerType | str | None = Field(
+        default=None, description="When this action can be used"
+    )
     uses_per: UsesPer = "unlimited"
-    
+
 
 class ReactionTriggerEffect(FrozenModel):
     """
@@ -463,6 +500,7 @@ class ReactionTriggerEffect(FrozenModel):
     Examples:
         ReactionTriggerEffect(reaction_id="overwatch", trigger_events=["enemy_enters_threat"])
     """
+
     reaction_id: str
     trigger_events: list[ReactionTriggerEvent] = Field(default_factory=list)
     uses_per: UsesPer = "unlimited"
@@ -477,6 +515,7 @@ class NonCombatCapacityEffect(FrozenModel):
         NonCombatCapacityEffect(extra_limb_pairs=1, interaction_scope="pilot_scale")
         NonCombatCapacityEffect(extra_passenger_slots=1, max_passenger_size="size_half")
     """
+
     non_combat_only: bool = True
     interaction_scope: NonCombatInteractionScope | None = None
     extra_limb_pairs: int | None = Field(default=None, ge=1)
@@ -488,7 +527,6 @@ class NonCombatCapacityEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class BondmateEffect(FrozenModel):
     """
     Defines a bondmate relationship for pilot talents or systems.
@@ -496,6 +534,7 @@ class BondmateEffect(FrozenModel):
     Examples:
         BondmateEffect(allowed_target_types=["pilot", "npc"], can_change_between_missions=True)
     """
+
     allowed_target_types: list[Literal["pilot", "npc"]] = Field(default_factory=list)
     can_change_between_missions: bool = True
     target: EffectTargetNoAll = "self"
@@ -516,6 +555,7 @@ class TargetMarkEffect(FrozenModel):
             attack_effects=MechanicalEffect(...),
         )
     """
+
     name: str
     action_type: ActionType
     target: Literal["enemy", "ally", "any"] = "enemy"
@@ -532,7 +572,6 @@ class TargetMarkEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class TechRange(FrozenModel):
     """
     Range descriptor for tech actions.
@@ -541,9 +580,9 @@ class TechRange(FrozenModel):
         TechRange(range_type="sensors")  # Within sensors
         TechRange(range_type="range", value=10)  # Range 10
     """
+
     range_type: TechRangeType = "sensors"
     value: int | None = Field(default=None, ge=0)
-
 
 
 TechActionScope = Literal["all", "hack", "invade", "quick_tech", "full_tech"]
@@ -556,6 +595,7 @@ class TechActionOverrideEffect(FrozenModel):
     Examples:
         TechActionOverrideEffect(requires_line_of_sight=False, range_override=TechRange(range_type="range", value=50))
     """
+
     applies_to: TechActionScope = "all"
     requires_line_of_sight: bool | None = None
     range_override: TechRange | None = None
@@ -570,6 +610,7 @@ class TechAction(FrozenModel):
     Examples:
         TechAction(name="Track", action_type="quick", is_attack=True, range=TechRange(range_type="sensors"))
     """
+
     name: str
     action_type: ActionType
     target: EffectTargetWithObjectNoAll = "enemy"
@@ -585,7 +626,6 @@ class TechAction(FrozenModel):
     special: str | None = None
 
 
-
 class TechAttackModifier(FrozenModel):
     """
     Accuracy/difficulty modifiers for tech attacks.
@@ -593,12 +633,14 @@ class TechAttackModifier(FrozenModel):
     Examples:
         TechAttackModifier(value=-1, target="ally", condition="adjacent", max_stacks=3)
     """
+
     value: int = Field(..., description="Positive = accuracy, negative = difficulty")
     target: EffectTarget = "self"
     condition: str | None = None
     max_stacks: int | None = Field(default=None, ge=1)
-    reset_trigger: Literal["turn_start", "turn_end", "round_end", "scene_end"] | None = None
-
+    reset_trigger: (
+        Literal["turn_start", "turn_end", "round_end", "scene_end"] | None
+    ) = None
 
 
 class TechActionRestriction(FrozenModel):
@@ -608,12 +650,12 @@ class TechActionRestriction(FrozenModel):
     Examples:
         TechActionRestriction(disallow_tech_actions=True, end_tech_effects=True)
     """
+
     disallow_tech_actions: bool = False
     immune_to_tech: bool = False
     end_tech_effects: bool = False
     target: EffectTarget = "self"
     condition: str | None = None
-
 
 
 class EffectChoice(FrozenModel):
@@ -623,12 +665,12 @@ class EffectChoice(FrozenModel):
     Examples:
         EffectChoice(name="Option A", effect=MechanicalEffect(...))
     """
+
     name: str
     effect: MechanicalEffect
     target: EffectTarget = "enemy"
     range: TechRange | None = None
     condition: str | None = None
-
 
 
 class DicePoolGain(FrozenModel):
@@ -638,6 +680,7 @@ class DicePoolGain(FrozenModel):
     Examples:
         DicePoolGain(trigger="on_hit", amount=1, uses_per="round")
     """
+
     trigger: TriggerType
     amount: int = Field(default=1, ge=1)
     uses_per: UsesPer = "unlimited"
@@ -652,6 +695,7 @@ class DicePoolSpendOption(FrozenModel):
         DicePoolSpendOption(name="Parry", action_type="reaction", dice_cost=1,
                             effect=MechanicalEffect(damage_multipliers=[...]))
     """
+
     name: str
     effect: MechanicalEffect
     action_type: ActionType | None = None
@@ -690,6 +734,7 @@ class DicePoolEffect(FrozenModel):
             spend_options=[DicePoolSpendOption(name="Parry", action_type="reaction", dice_cost=1)],
         )
     """
+
     pool_name: str
     die_size: int = Field(default=6, ge=2)
     max_dice: int | None = Field(default=None, ge=1)
@@ -715,6 +760,7 @@ class CountdownDieTrigger(FrozenModel):
     Examples:
         CountdownDieTrigger(trigger="on_hit", condition="aux_ranged_attack", optional=True)
     """
+
     trigger: TriggerType
     decrement: int = Field(default=1, ge=1)
     optional: bool = False
@@ -736,6 +782,7 @@ class CountdownDieEffect(FrozenModel):
             reset_value=6,
         )
     """
+
     die_name: str
     die_size: int = Field(default=6, ge=2)
     starting_value: int = Field(default=6, ge=1)
@@ -773,6 +820,7 @@ class LeadershipDicePoolEffect(FrozenModel):
     Examples:
         LeadershipDicePoolEffect(dice_count=3, grant_action_type="free")
     """
+
     pool_name: str = "leadership"
     die_size: int = Field(default=6, ge=2)
     dice_count: int = Field(..., ge=1)
@@ -795,6 +843,7 @@ class ActionRestriction(FrozenModel):
         ActionRestriction(disallow_attack_rolls=True)
         ActionRestriction(action_ids=["hide"], target="enemy")
     """
+
     disallow_attack_rolls: bool = False
     disallow_heat_generation: bool = False
     action_ids: list[str] = Field(default_factory=list)
@@ -804,7 +853,6 @@ class ActionRestriction(FrozenModel):
     condition: str | None = None
 
 
-
 class StatusActionOverrideEffect(FrozenModel):
     """
     Allows actions that are normally restricted by a status.
@@ -812,6 +860,7 @@ class StatusActionOverrideEffect(FrozenModel):
     Examples:
         StatusActionOverrideEffect(status="jammed", allow_attack_types=["ranged"])
     """
+
     status: StatusType
     allow_attack_types: list[AttackType] = Field(default_factory=list)
     allow_action_categories: list[ActionCategoryType] = Field(default_factory=list)
@@ -826,6 +875,7 @@ class LineOfSightRestriction(FrozenModel):
     Examples:
         LineOfSightRestriction(cannot_trace_outside_zone=True, target="all")
     """
+
     target: EffectTarget = "all"
     cannot_trace_outside_zone: bool = False
     only_adjacent: bool = False
@@ -834,18 +884,19 @@ class LineOfSightRestriction(FrozenModel):
     condition: str | None = None
 
 
-
 class Immunity(FrozenModel):
     """
     Immunity to a condition, damage type, or effect.
-    
+
     Examples:
         Immunity(target="burn")  # Immune to Burn
         Immunity(target="knockback", condition="from_smaller")  # Immune to knockback from smaller
     """
-    target: str = Field(..., description="What you're immune to (condition, damage type, or effect)")
+
+    target: str = Field(
+        ..., description="What you're immune to (condition, damage type, or effect)"
+    )
     condition: str | None = Field(default=None, description="Conditional immunity")
-    
 
 
 class TagImmunityEffect(FrozenModel):
@@ -855,6 +906,7 @@ class TagImmunityEffect(FrozenModel):
     Examples:
         TagImmunityEffect(tags=["smart", "seeking"], immune_to_damage=True)
     """
+
     tags: list[str] = Field(default_factory=list)
     immune_to_damage: bool = True
     immune_to_effects: bool = True
@@ -865,16 +917,16 @@ class TagImmunityEffect(FrozenModel):
 class Resistance(FrozenModel):
     """
     Resistance (half damage) to a damage type.
-    
+
     Examples:
         Resistance(damage_type="energy")
         Resistance(damage_type="all", condition="can_see_bondmate")
     """
+
     damage_type: DamageType | Literal["all"]
     target: EffectTarget = "self"
     condition: str | None = Field(default=None)
     duration: EffectDuration | None = None
-    
 
 
 class HeatResistanceEffect(FrozenModel):
@@ -884,6 +936,7 @@ class HeatResistanceEffect(FrozenModel):
     Examples:
         HeatResistanceEffect(condition="blast_line_cone")
     """
+
     multiplier: float = Field(default=0.5, ge=0)
     target: EffectTarget = "self"
     condition: str | None = None
@@ -892,15 +945,16 @@ class HeatResistanceEffect(FrozenModel):
 class AccuracyModifier(FrozenModel):
     """
     Modifier to accuracy/difficulty on rolls.
-    
+
     Examples:
         AccuracyModifier(value=1, condition="target_has_lock_on")  # +1 Accuracy vs Lock On
         AccuracyModifier(value=-1)  # -1 Accuracy (difficulty)
     """
+
     value: int = Field(..., description="Positive = accuracy, negative = difficulty")
     condition: ConditionType | str | None = Field(default=None)
     applies_to: Literal["all", "melee", "ranged", "tech"] = "all"
-    
+
 
 class CheckModifierEffect(FrozenModel):
     """
@@ -910,12 +964,12 @@ class CheckModifierEffect(FrozenModel):
         CheckModifierEffect(value=-1, check_types=["engineering"], check_kinds=["check", "save"])
         CheckModifierEffect(value=1, condition="gm_approved_non_combat_check")
     """
+
     value: int = Field(..., description="Positive = accuracy, negative = difficulty")
     check_types: list[SaveType] = Field(default_factory=list)
     check_kinds: list[CheckKind] = Field(default_factory=list)
     target: EffectTargetNoAll = "self"
     condition: ConditionType | str | None = Field(default=None)
-
 
 
 class CheckValueModifierEffect(FrozenModel):
@@ -925,6 +979,7 @@ class CheckValueModifierEffect(FrozenModel):
     Examples:
         CheckValueModifierEffect(value=2, check_kinds=["save"])
     """
+
     value: int
     check_types: list[SaveType] = Field(default_factory=list)
     check_kinds: list[CheckKind] = Field(default_factory=list)
@@ -939,6 +994,7 @@ class DamageReduction(FrozenModel):
     Examples:
         DamageReduction(amount=2, damage_type="all")
     """
+
     amount: int = Field(..., ge=0)
     damage_type: DamageType | Literal["all", "heat", "burn"] = "all"
     target: EffectTargetWithObject = "self"
@@ -953,6 +1009,7 @@ class DamageReductionRollEffect(FrozenModel):
     Examples:
         DamageReductionRollEffect(roll=DiceExpression.parse("1d6"))
     """
+
     roll: DiceExpression
     damage_type: DamageType | Literal["all", "heat", "burn"] = "all"
     target: EffectTargetWithObject = "self"
@@ -960,16 +1017,16 @@ class DamageReductionRollEffect(FrozenModel):
     condition: ConditionType | str | None = None
 
 
-
 class MovementGrant(FrozenModel):
     """
     Grants movement or teleportation.
-    
+
     Examples:
         MovementGrant(spaces=2, movement_type="fly", trigger="on_successful_save")
         MovementGrant(spaces=3, movement_type="teleport", trigger="after_boost")
         MovementGrant(spaces="speed", movement_type="walk", trigger="brace")
     """
+
     spaces: MovementDistanceType
     movement_type: Literal["walk", "fly", "teleport", "boost"] = "walk"
     trigger: TriggerType | str | None = Field(default=None)
@@ -980,7 +1037,6 @@ class MovementGrant(FrozenModel):
     fails_if_occupied: bool = False
     ignores_engagement: bool = False
     provokes_reactions: bool = True
-    
 
 
 class MoveAdjacentEffect(FrozenModel):
@@ -990,6 +1046,7 @@ class MoveAdjacentEffect(FrozenModel):
     Examples:
         MoveAdjacentEffect(target="enemy", movement_type="fly", trigger="on_turn_end")
     """
+
     target: Literal["enemy", "ally", "any"] = "enemy"
     movement_type: Literal["walk", "fly", "teleport"] = "walk"
     trigger: TriggerType | None = None
@@ -1010,6 +1067,7 @@ class PositionSwapEffect(FrozenModel):
     Examples:
         PositionSwapEffect(action_type="quick", range=10, range_type="sensors", uses_per="scene")
     """
+
     action_type: ActionType
     target: EffectTargetNoAll = "ally"
     range: int | None = Field(default=None, ge=0)
@@ -1026,6 +1084,7 @@ class ForcedMovement(FrozenModel):
     Examples:
         ForcedMovement(direction="pull", distance=5, ignores_engagement=True)
     """
+
     direction: Literal["pull", "push"]
     distance: ForcedMovementDistanceType
     target: EffectTarget = "enemy"
@@ -1035,7 +1094,6 @@ class ForcedMovement(FrozenModel):
     must_obey_obstructions: bool = True
     on_collision: MechanicalEffect | None = None
     condition: ConditionType | str | None = None
-
 
 
 class StatusToggleEffect(FrozenModel):
@@ -1049,6 +1107,7 @@ class StatusToggleEffect(FrozenModel):
                            deactivation_timing="on_turn_start",
                            duration="end_of_next_turn")
     """
+
     status: StatusType
     target: EffectTargetNoAll = "self"
     activation_action: ActionType = "protocol"
@@ -1059,15 +1118,15 @@ class StatusToggleEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class StatusGrant(FrozenModel):
     """
     Grants or inflicts a status condition.
-    
+
     Examples:
         StatusGrant(status="invisible", target="self", trigger="after_move_8_plus")
         StatusGrant(status="prone", target="enemy", trigger="on_hit")
     """
+
     status: StatusType | Literal["invisible", "flying"]
     target: EffectTarget
     trigger: TriggerType | str | None = Field(default=None)
@@ -1081,7 +1140,6 @@ class StatusGrant(FrozenModel):
         "match_trigger",
         "scene",
     ] = "end_of_turn"
-    
 
 
 class StatusClear(FrozenModel):
@@ -1092,10 +1150,10 @@ class StatusClear(FrozenModel):
         StatusClear(status="burn", target="ally")
         StatusClear(status="any", target="self")
     """
+
     status: StatusType | Literal["burn", "any", "tech"]
     target: EffectTarget
     count: int = Field(default=1, ge=1)
-
 
 
 class StatusBreakCondition(FrozenModel):
@@ -1105,11 +1163,11 @@ class StatusBreakCondition(FrozenModel):
     Examples:
         StatusBreakCondition(status="invisible", break_triggers=["move", "reaction"])
     """
+
     status: StatusType
     target: EffectTarget = "self"
     break_triggers: list[BreakTriggerType]
     condition: str | None = None
-
 
 
 class StatusStackLimit(FrozenModel):
@@ -1119,11 +1177,11 @@ class StatusStackLimit(FrozenModel):
     Examples:
         StatusStackLimit(status="invisible", max_stacks=1)
     """
+
     status: StatusType
     max_stacks: int = Field(default=1, ge=1)
     target: EffectTarget = "self"
     condition: str | None = None
-
 
 
 class MovementScopedStatus(FrozenModel):
@@ -1133,12 +1191,12 @@ class MovementScopedStatus(FrozenModel):
     Examples:
         MovementScopedStatus(status="invisible", movement_modes=["any"], ends_on="movement_end")
     """
+
     status: StatusType
     target: EffectTargetNoAll
     movement_modes: list[MovementMode] = Field(default_factory=list)
     ends_on: Literal["movement_end", "turn_end"] = "movement_end"
     condition: str | None = None
-
 
 
 class StatusRestriction(FrozenModel):
@@ -1148,12 +1206,12 @@ class StatusRestriction(FrozenModel):
     Examples:
         StatusRestriction(statuses=["invisible"], restriction="cannot_benefit", target="enemy")
     """
+
     statuses: list[StatusType]
     restriction: Literal["cannot_gain", "cannot_benefit"] = "cannot_gain"
     target: EffectTarget = "enemy"
     duration: EffectDuration = "end_of_turn"
     condition: str | None = None
-
 
 
 class CoverRestriction(FrozenModel):
@@ -1163,11 +1221,11 @@ class CoverRestriction(FrozenModel):
     Examples:
         CoverRestriction(max_cover="none", target="enemy")
     """
+
     max_cover: CoverType = "none"
     target: EffectTarget = "enemy"
     duration: EffectDuration = "end_of_turn"
     condition: str | None = None
-
 
 
 class CoverGrant(FrozenModel):
@@ -1177,11 +1235,11 @@ class CoverGrant(FrozenModel):
     Examples:
         CoverGrant(cover="soft", target="ally", duration="start_of_next_turn")
     """
+
     cover: CoverType
     target: EffectTarget = "ally"
     duration: EffectDuration = "end_of_turn"
     condition: str | None = None
-
 
 
 class IntelEffect(FrozenModel):
@@ -1191,6 +1249,7 @@ class IntelEffect(FrozenModel):
     Examples:
         IntelEffect(reveal=["location", "hp"], audience="self", duration="until_cleared")
     """
+
     reveal: list[IntelType] = Field(default_factory=list)
     audience: IntelAudience = "self"
     target: EffectTarget = "enemy"
@@ -1200,7 +1259,6 @@ class IntelEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class MovementRestrictionEffect(FrozenModel):
     """
     Movement restriction applied to a target.
@@ -1208,6 +1266,7 @@ class MovementRestrictionEffect(FrozenModel):
     Examples:
         MovementRestrictionEffect(target="enemy", cannot_move_closer_to_source=True)
     """
+
     target: EffectTarget = "enemy"
     movement_modes: list[MovementMode] = Field(default_factory=list)
     max_voluntary_speed: int | None = Field(default=None, ge=0)
@@ -1218,7 +1277,6 @@ class MovementRestrictionEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class MovementSurfaceEffect(FrozenModel):
     """
     Modifies terrain/surface rules for movement.
@@ -1227,13 +1285,13 @@ class MovementSurfaceEffect(FrozenModel):
         MovementSurfaceEffect(ignore_difficult_terrain=True)
         MovementSurfaceEffect(treat_vertical_as_ground=True, fall_if_prone=True)
     """
+
     target: EffectTarget = "self"
     ignore_difficult_terrain: bool = False
     treat_vertical_as_ground: bool = False
     fall_if_prone: bool = False
     duration: EffectDuration = "scene"
     condition: str | None = None
-
 
 
 class MovementModeAccessEffect(FrozenModel):
@@ -1243,6 +1301,7 @@ class MovementModeAccessEffect(FrozenModel):
     Examples:
         MovementModeAccessEffect(climb_at_full_speed=True, swim_at_full_speed=True)
     """
+
     target: EffectTargetNoAll = "self"
     climb_at_full_speed: bool = False
     swim_at_full_speed: bool = False
@@ -1256,6 +1315,7 @@ class JumpDistanceEffect(FrozenModel):
     Examples:
         JumpDistanceEffect(horizontal_multiplier=1.0, vertical_multiplier=0.5)
     """
+
     target: EffectTargetNoAll = "self"
     horizontal_multiplier: float | None = Field(default=None, ge=0)
     vertical_multiplier: float | None = Field(default=None, ge=0)
@@ -1269,6 +1329,7 @@ class MovementOverrideEffect(FrozenModel):
     Examples:
         MovementOverrideEffect(movement_modes=["move", "boost"], override_type="teleport")
     """
+
     target: EffectTargetNoAll = "self"
     movement_modes: list[MovementMode] = Field(default_factory=list)
     override_type: Literal["walk", "fly", "teleport"] = "teleport"
@@ -1276,7 +1337,6 @@ class MovementOverrideEffect(FrozenModel):
     must_end_on_surface: bool = False
     duration: EffectDuration = "end_of_turn"
     condition: str | None = None
-
 
 
 class ResourceChange(FrozenModel):
@@ -1287,6 +1347,7 @@ class ResourceChange(FrozenModel):
         ResourceChange(resource="hp", amount="half_max", target="ally", cost_repairs=1)
         ResourceChange(resource="heat", amount=DiceExpression.parse("1d6"), direction="lose", target="self")
     """
+
     resource: ResourceType
     amount: ResourceAmount
     direction: ResourceDirection = "gain"
@@ -1302,6 +1363,7 @@ class ScaledResourceChange(FrozenModel):
     Examples:
         ScaledResourceChange(resource="heat", roll=DiceExpression.parse("1d6"), multiplier=0.5)
     """
+
     resource: ResourceType
     roll: DiceExpression
     multiplier: float = Field(default=1.0, ge=0)
@@ -1318,6 +1380,7 @@ class OverchargeCostCapEffect(FrozenModel):
     Examples:
         OverchargeCostCapEffect(max_cost=DiceExpression.parse("1d6"))
     """
+
     max_cost: int | DiceExpression
     target: EffectTargetNoAll = "self"
     condition: ConditionType | str | None = None
@@ -1330,8 +1393,11 @@ class LimitedUseBonusEffect(FrozenModel):
     Examples:
         LimitedUseBonusEffect(bonus_uses=2, applies_to=["system", "deployable"])
     """
+
     bonus_uses: int = Field(..., ge=1)
-    applies_to: list[Literal["system", "deployable", "weapon"]] = Field(default_factory=list)
+    applies_to: list[Literal["system", "deployable", "weapon"]] = Field(
+        default_factory=list
+    )
     requires_tag: str = "limited"
     condition: ConditionType | str | None = None
 
@@ -1343,8 +1409,11 @@ class LimitedUseRechargeEffect(FrozenModel):
     Examples:
         LimitedUseRechargeEffect(bonus_uses=1, applies_to=["weapon", "deployable"], cost_repairs=2, uses_per="rest")
     """
+
     bonus_uses: int = Field(..., ge=1)
-    applies_to: list[Literal["system", "deployable", "weapon"]] = Field(default_factory=list)
+    applies_to: list[Literal["system", "deployable", "weapon"]] = Field(
+        default_factory=list
+    )
     requires_tag: str = "limited"
     cost_repairs: int = Field(default=0, ge=0)
     uses_per: UsesPer = "rest"
@@ -1359,6 +1428,7 @@ class RepairCostModifier(FrozenModel):
     Examples:
         RepairCostModifier(structure_repair_cost=1)
     """
+
     structure_repair_cost: int | None = Field(default=None, ge=0)
     target: EffectTargetNoAll = "self"
     condition: str | None = None
@@ -1371,6 +1441,7 @@ class RepairShareEffect(FrozenModel):
     Examples:
         RepairShareEffect(target="ally", range=1, requires_adjacent=True, requires_choice=True)
     """
+
     target: EffectTargetNoAll = "ally"
     range: int | None = Field(default=None, ge=0)
     requires_adjacent: bool = False
@@ -1395,6 +1466,7 @@ class RepairActionEffect(FrozenModel):
             condition="target_destroyed",
         )
     """
+
     name: str
     action_type: ActionType
     repairs_cost: int = Field(..., ge=0)
@@ -1420,6 +1492,7 @@ class StructureDamageAvoidanceEffect(FrozenModel):
             condition="structure_damage",
         )
     """
+
     trigger: TriggerType = "on_take_damage"
     roll: DiceExpression
     success_threshold: int = Field(..., ge=1)
@@ -1430,7 +1503,6 @@ class StructureDamageAvoidanceEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class ZeroHpSurvivalEffect(FrozenModel):
     """
     Prevents destruction at 0 HP and enforces structure checks on damage.
@@ -1438,6 +1510,7 @@ class ZeroHpSurvivalEffect(FrozenModel):
     Examples:
         ZeroHpSurvivalEffect(block_hp_regain=True, duration="until_rest")
     """
+
     trigger: TriggerType = "on_take_damage"
     prevent_destruction_at_zero_hp: bool = True
     structure_check_on_damage: bool = True
@@ -1455,6 +1528,7 @@ class AreaSelectionEffect(FrozenModel):
         AreaSelectionEffect(scope_options=["area"], shape="blast", size=1, count_options=[1, 2],
                             non_overlapping=True, range=20)
     """
+
     scope_options: list[AreaSelectionScope] = Field(default_factory=list)
     shape: ZoneShape | None = None
     size: int | None = Field(default=None, ge=0)
@@ -1470,7 +1544,6 @@ class AreaSelectionEffect(FrozenModel):
     origin: Literal["self", "point"] = "self"
 
 
-
 class AttackRollOverrideEffect(FrozenModel):
     """
     Overrides attack roll resolution details for a weapon or effect.
@@ -1479,6 +1552,7 @@ class AttackRollOverrideEffect(FrozenModel):
         AttackRollOverrideEffect(attack_vs="evasion", fixed_target_defense=8, target="ally",
                                  allowed_attack_types=["ranged"])
     """
+
     attack_vs: Literal["evasion", "e_defense"] = "e_defense"
     fixed_target_defense: int | None = Field(default=None, ge=0)
     target: EffectTarget = "enemy"
@@ -1495,11 +1569,11 @@ class AttackTargetingEffect(FrozenModel):
     Examples:
         AttackTargetingEffect(target_count_options=[1, 2], separate_attack_rolls=True)
     """
+
     target_count_options: list[int] = Field(default_factory=list)
     separate_attack_rolls: bool = True
     require_distinct_targets: bool = True
     condition: str | None = None
-
 
 
 class AreaAttackPattern(FrozenModel):
@@ -1509,11 +1583,11 @@ class AreaAttackPattern(FrozenModel):
     Examples:
         AreaAttackPattern(area_shape="blast", area_size=1, area_count_options=[1, 2], non_overlapping=True)
     """
+
     area_shape: Literal["blast", "burst", "line", "cone"]
     area_size: int = Field(..., ge=0)
     area_count_options: list[int] = Field(default_factory=list)
     non_overlapping: bool = False
-
 
 
 class LineAttackEffect(FrozenModel):
@@ -1532,7 +1606,12 @@ class LineAttackEffect(FrozenModel):
             line_hits_objects=True,
         )
     """
-    length: int | None = Field(default=None, ge=0, description="Line length in spaces; None = between self and target")
+
+    length: int | None = Field(
+        default=None,
+        ge=0,
+        description="Line length in spaces; None = between self and target",
+    )
     between_self_and_target: bool = False
     attack_origin_at_line_end: bool = False
     measure_range_from_line_end: bool = False
@@ -1559,6 +1638,7 @@ class AttackSequenceModifierEffect(FrozenModel):
             duration="end_of_turn",
         )
     """
+
     trigger: TriggerType = "on_turn_start"
     first_attack_accuracy: int = 0
     first_attack_optional: bool = False
@@ -1575,6 +1655,7 @@ class AttackRerollEffect(FrozenModel):
         AttackRerollEffect(trigger="on_miss", allowed_attack_types=["melee", "ranged"],
                            require_new_target=True, max_rerolls_per_attack=1)
     """
+
     trigger: TriggerType = "on_miss"
     allowed_attack_types: list[AttackType] = Field(default_factory=list)
     require_new_target: bool = False
@@ -1589,7 +1670,6 @@ class AttackRerollEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class AttackOutcomeEffect(FrozenModel):
     """
     Modifies the outcome of an attack (e.g., upgrade to critical).
@@ -1597,6 +1677,7 @@ class AttackOutcomeEffect(FrozenModel):
     Examples:
         AttackOutcomeEffect(trigger="on_ally_hit", upgrade_to_crit=True, uses_reaction=True)
     """
+
     trigger: TriggerType
     upgrade_to_crit: bool = False
     force_miss: bool = False
@@ -1608,7 +1689,6 @@ class AttackOutcomeEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class CriticalDamageOverrideEffect(FrozenModel):
     """
     Overrides critical damage resolution.
@@ -1616,6 +1696,7 @@ class CriticalDamageOverrideEffect(FrozenModel):
     Examples:
         CriticalDamageOverrideEffect(mode="max", requires_natural_20=True)
     """
+
     trigger: TriggerType = "on_crit"
     applies_to: list[AttackType] = Field(default_factory=list)
     mode: Literal["max"] = "max"
@@ -1632,6 +1713,7 @@ class AccuracyTradeEffect(FrozenModel):
     Examples:
         AccuracyTradeEffect(accuracy_cost=1, bonus_damage=DiceExpression.parse("1d6"), requires_crit=True)
     """
+
     accuracy_cost: int = Field(..., ge=1)
     bonus_damage: DiceExpression
     bonus_damage_type: DamageType | DirectDamageType | None = None
@@ -1655,6 +1737,7 @@ class DelayedImpactEffect(FrozenModel):
             reveal_area=True,
         )
     """
+
     delay_optional: bool = True
     delay_timing: DelayedImpactTiming = "end_of_next_round"
     delayed_damage: DiceExpression | None = None
@@ -1664,7 +1747,6 @@ class DelayedImpactEffect(FrozenModel):
     reveal_audience: IntelAudience = "all"
 
 
-
 class WeaponTagGrant(FrozenModel):
     """
     Tag granted to a weapon.
@@ -1672,9 +1754,21 @@ class WeaponTagGrant(FrozenModel):
     Examples:
         WeaponTagGrant(tag="ordnance")
     """
+
     tag: str
     value: int | None = None
 
+
+class WeaponRangeSpec(FrozenModel):
+    """
+    Range entry for a granted weapon profile.
+
+    Examples:
+        WeaponRangeSpec(range_type="range", value=8)
+    """
+
+    range_type: RangeType
+    value: int = Field(..., ge=0)
 
 
 class WeaponSizeBonus(FrozenModel):
@@ -1684,9 +1778,40 @@ class WeaponSizeBonus(FrozenModel):
     Examples:
         WeaponSizeBonus(size="main", burn=2)
     """
+
     size: WeaponSizeType
     burn: int = Field(..., ge=0)
 
+
+class WeaponGrantEffect(FrozenModel):
+    """
+    Grants a specific weapon profile as part of an effect.
+
+    Examples:
+        WeaponGrantEffect(
+            weapon_id="nuclear_cavalier_fuel_rod_gun",
+            name="Fuel Rod Gun",
+            size="main",
+            weapon_type="cqb",
+            ranges=[WeaponRangeSpec(range_type="range", value=8)],
+            damage=[DamageSpec(damage_type="energy", dice=DiceExpression.parse("1d3+2"))],
+            limited_uses=3,
+            integrated_mount=True,
+        )
+    """
+
+    weapon_id: str | None = None
+    name: str
+    size: WeaponSizeType
+    weapon_type: WeaponTypeType
+    ranges: list[WeaponRangeSpec] = Field(default_factory=list)
+    damage: list[DamageSpec] = Field(default_factory=list)
+    tags: list[WeaponTagGrant] = Field(default_factory=list)
+    limited_uses: int | None = Field(default=None, ge=0)
+    unique: bool = False
+    integrated_mount: bool = False
+    target: EffectTargetNoAll = "self"
+    condition: ConditionType | str | None = None
 
 
 class WeaponModEffect(FrozenModel):
@@ -1700,6 +1825,7 @@ class WeaponModEffect(FrozenModel):
             add_tags=[WeaponTagGrant(tag="ordnance")],
         )
     """
+
     allowed_weapon_types: list[WeaponTypeType] = Field(default_factory=list)
     allowed_weapon_sizes: list[WeaponSizeType] = Field(default_factory=list)
     range_bonus: int = 0
@@ -1725,12 +1851,15 @@ class WeaponSpinUpEffect(FrozenModel):
             ),
         )
     """
+
     spin_up_action_type: ActionType
     spin_down_action_type: ActionType | None = None
     spin_down_timing: Literal["start_of_turn", "end_of_turn", "anytime"] | None = None
     allow_skirmish_with_base_profile: bool = False
     requires_barrage_while_spun_up: bool = False
-    effects_while_spun_up: MechanicalEffect = Field(default_factory=lambda: MechanicalEffect())
+    effects_while_spun_up: MechanicalEffect = Field(
+        default_factory=lambda: MechanicalEffect()
+    )
     condition: str | None = None
 
 
@@ -1747,6 +1876,7 @@ class WeaponAIControlEffect(FrozenModel):
             ai_selects_target_if_unshackled=True,
         )
     """
+
     allowed_weapon_sizes: list[WeaponSizeType] = Field(default_factory=list)
     free_attack_action_type: ActionType = "free"
     free_attack_uses_per: UsesPer = "round"
@@ -1765,6 +1895,7 @@ class AISystemLimitEffect(FrozenModel):
     Examples:
         AISystemLimitEffect(bonus_systems=1, max_ai_systems=2)
     """
+
     bonus_systems: int = 0
     max_ai_systems: int | None = Field(default=None, ge=0)
     condition: ConditionType | str | None = None
@@ -1777,6 +1908,7 @@ class AIControlTransferEffect(FrozenModel):
     Examples:
         AIControlTransferEffect(transfer_on_unshackle=True)
     """
+
     transfer_on_unshackle: bool = True
     source_tag: str = "ai"
     target_tag: str = "ai"
@@ -1799,6 +1931,7 @@ class DeploymentEffect(FrozenModel):
             consumes_on_activation=True,
         )
     """
+
     action_type: ActionType
     placement_range: int = Field(..., ge=0)
     placement_relation: Literal["adjacent", "range"] = "adjacent"
@@ -1815,7 +1948,6 @@ class DeploymentEffect(FrozenModel):
     can_deactivate: bool = True
 
 
-
 class AttachmentEffect(FrozenModel):
     """
     Attaches a device or effect to a target.
@@ -1823,6 +1955,7 @@ class AttachmentEffect(FrozenModel):
     Examples:
         AttachmentEffect(action_type="quick", range=5, target="ally")
     """
+
     action_type: ActionType
     range: int = Field(..., ge=0)
     target: EffectTargetNoAll = "ally"
@@ -1845,12 +1978,15 @@ class PhaseShiftEffect(FrozenModel):
             duration="scene",
         )
     """
+
     activation_action: ActionType
     starts_out_of_phase: bool = True
     roll_trigger: TriggerType = "on_turn_start"
     roll: DiceExpression
     success_threshold: int = Field(..., ge=1)
-    out_of_phase_duration: Literal["start_of_next_turn", "end_of_turn"] = "start_of_next_turn"
+    out_of_phase_duration: Literal["start_of_next_turn", "end_of_turn"] = (
+        "start_of_next_turn"
+    )
     duration: EffectDuration = "scene"
     deactivation_action: ActionType | None = None
     intangible: bool = True
@@ -1858,7 +1994,6 @@ class PhaseShiftEffect(FrozenModel):
     cannot_end_in_obstruction: bool = True
     cannot_interact: bool = True
     immune_to_damage: bool = True
-
 
 
 ZoneShape = Literal["burst", "blast", "line", "cone", "square"]
@@ -1871,11 +2006,11 @@ class ZoneEndCondition(FrozenModel):
     Examples:
         ZoneEndCondition(trigger="enter", end_scope="triggered_space")
     """
+
     trigger: ZoneEndTriggerType
     target: EffectTarget = "all"
     end_scope: ZoneEndScope = "zone"
     condition: str | None = None
-
 
 
 class AttackCaptureEffect(FrozenModel):
@@ -1894,6 +2029,7 @@ class AttackCaptureEffect(FrozenModel):
             damage_type="kinetic",
         )
     """
+
     attack_types: list[AttackType] = Field(default_factory=list)
     damage_types: list[DamageType] = Field(default_factory=list)
     block_crossing_boundary: bool = True
@@ -1909,7 +2045,6 @@ class AttackCaptureEffect(FrozenModel):
     negate_damage_on_capture: bool = True
 
 
-
 class ZoneEffect(FrozenModel):
     """
     Persistent area effects such as hazard zones or shield fields.
@@ -1917,6 +2052,7 @@ class ZoneEffect(FrozenModel):
     Examples:
         ZoneEffect(shape="burst", size=1, duration="scene", difficult_terrain=True)
     """
+
     shape: ZoneShape
     size: int | None = Field(default=None, ge=0)
     width: int | None = Field(default=None, ge=0)
@@ -1961,7 +2097,6 @@ class ZoneEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class TetherEffect(FrozenModel):
     """
     Represents a tether/drag connection between two entities.
@@ -1969,6 +2104,7 @@ class TetherEffect(FrozenModel):
     Examples:
         TetherEffect(action_type="quick", range=1, max_distance=5, tow_slowed=True)
     """
+
     action_type: ActionType
     range: int = Field(..., ge=0)
     max_distance: int = Field(..., ge=0)
@@ -1981,7 +2117,6 @@ class TetherEffect(FrozenModel):
     object_attach_range: int | None = Field(default=None, ge=0)
     object_strain_capacity: int | None = Field(default=None, ge=0)
     climb_no_speed_penalty: bool = False
-
 
 
 class GrappleEffect(FrozenModel):
@@ -2001,6 +2136,7 @@ class GrappleEffect(FrozenModel):
             fall_if_prone_or_knockback=True,
         )
     """
+
     range: int | None = Field(default=None, ge=0)
     requires_line_of_sight: bool = True
     pull_grappler_adjacent: bool = False
@@ -2039,6 +2175,7 @@ class SizeInteractionEffect(FrozenModel):
             drag_capacity_multiplier=2,
         )
     """
+
     applies_to_actions: list[Literal["ram", "grapple"]] = Field(default_factory=list)
     treat_as_same_size_if_target_larger: bool = False
     treat_as_larger_if_target_same_or_smaller: bool = False
@@ -2054,6 +2191,7 @@ class MountedAllyEffect(FrozenModel):
     Examples:
         MountedAllyEffect(max_total_size_relative="self_minus_half", mount_action_type="quick")
     """
+
     max_total_size_relative: Literal["self_minus_half"] | None = None
     max_total_size: SizeClass | None = None
     mount_action_type: ActionType = "quick"
@@ -2076,12 +2214,12 @@ class EffectRemoval(FrozenModel):
     Examples:
         EffectRemoval(action_type="quick", check_type="engineering", check_kind="check")
     """
+
     action_type: ActionType
     check_type: SaveType | None = None
     check_kind: Literal["check", "save"] = "check"
     target: EffectTargetNoAll = "self"
     condition: str | None = None
-
 
 
 class HolographicDuplicateEffect(FrozenModel):
@@ -2091,6 +2229,7 @@ class HolographicDuplicateEffect(FrozenModel):
     Examples:
         HolographicDuplicateEffect(duration="scene", breaks_on_hit=True)
     """
+
     duration: EffectDuration = "scene"
     breaks_on_hit: bool = True
     target: EffectTargetNoAll = "self"
@@ -2104,6 +2243,7 @@ class MovementTrailEffect(FrozenModel):
     Examples:
         MovementTrailEffect(trigger="move_or_boost", cover="hard", trail_height=1)
     """
+
     trigger: HologramTrailTrigger
     trail_height: int = Field(default=1, ge=0)
     length_matches_movement: bool = True
@@ -2117,7 +2257,6 @@ class MovementTrailEffect(FrozenModel):
     trail_duration: EffectDuration = "scene"
     ends_on_reactivation: bool = False
     condition: str | None = None
-
 
 
 class HologramTrailEffect(FrozenModel):
@@ -2136,6 +2275,7 @@ class HologramTrailEffect(FrozenModel):
             suppress_new_until="start_of_next_turn",
         )
     """
+
     trigger: HologramTrailTrigger
     hologram_size: Literal["match_self"] = "match_self"
     detonation_triggers: list[HologramDetonationTrigger]
@@ -2152,7 +2292,6 @@ class HologramTrailEffect(FrozenModel):
     duration: EffectDuration = "scene"
 
 
-
 class ReloadRestrictionEffect(FrozenModel):
     """
     Restricts reload actions for specific weapon types.
@@ -2160,6 +2299,7 @@ class ReloadRestrictionEffect(FrozenModel):
     Examples:
         ReloadRestrictionEffect(applies_to="limited", disallow_reload=True)
     """
+
     applies_to: Literal["limited", "all"] = "limited"
     disallow_reload: bool = True
     target: EffectTargetNoAll = "self"
@@ -2174,11 +2314,11 @@ class ReloadEffect(FrozenModel):
         ReloadEffect(target="ally", count=1, requires_tag="loading")
         ReloadEffect(target="self", count="all", requires_tag="loading")
     """
+
     target: EffectTargetNoAll
     count: int | Literal["all"] = 1
     requires_tag: str | None = "loading"
     consumes_source: bool = False
-
 
 
 class DamageShareEffect(FrozenModel):
@@ -2188,10 +2328,13 @@ class DamageShareEffect(FrozenModel):
     Examples:
         DamageShareEffect(share_fraction=0.5, source="self", target="ally", requires_adjacent=True)
     """
+
     share_fraction: float = Field(..., ge=0, le=1)
     source: EffectTargetNoAll = "self"
     target: EffectTargetNoAll = "ally"
-    timing: Literal["before_armor_and_reduction", "after_armor_and_reduction"] = "before_armor_and_reduction"
+    timing: Literal["before_armor_and_reduction", "after_armor_and_reduction"] = (
+        "before_armor_and_reduction"
+    )
     requires_adjacent: bool = False
     breaks_on_separation: bool = False
     condition: str | None = None
@@ -2204,6 +2347,7 @@ class DamageNegationEffect(FrozenModel):
     Examples:
         DamageNegationEffect(target="self")
     """
+
     target: EffectTargetNoAll = "self"
     negate_damage: bool = True
     negate_heat: bool = False
@@ -2218,6 +2362,7 @@ class DamageAbsorption(FrozenModel):
     Examples:
         DamageAbsorption(target="ally", base_hp=4, bonus_hp_per_grit=1)
     """
+
     target: EffectTargetNoAll
     base_hp: int = Field(..., ge=0)
     bonus_hp_per_grit: int = Field(default=0, ge=0)
@@ -2227,7 +2372,6 @@ class DamageAbsorption(FrozenModel):
     duration: Literal["scene", "until_destroyed"] = "until_destroyed"
 
 
-
 class OutOfPlayEffect(FrozenModel):
     """
     Removes a target from play for a duration.
@@ -2235,13 +2379,13 @@ class OutOfPlayEffect(FrozenModel):
     Examples:
         OutOfPlayEffect(target="self", duration="until_rest", gm_may_override=True)
     """
+
     target: EffectTargetNoAll = "self"
     duration: OutOfPlayDuration = "until_cleared"
     return_to_previous_space: bool = True
     fallback_to_nearest_free: bool = True
     gm_may_override: bool = False
     condition: str | None = None
-
 
 
 class SaveOverrideEffect(FrozenModel):
@@ -2251,6 +2395,7 @@ class SaveOverrideEffect(FrozenModel):
     Examples:
         SaveOverrideEffect(saves=["hull", "agility"], auto_pass=True, include_contested_checks=True)
     """
+
     saves: list[SaveType] = Field(default_factory=list)
     auto_pass: bool = False
     auto_fail: bool = False
@@ -2270,13 +2415,13 @@ class SaveCheck(FrozenModel):
             on_failure=MechanicalEffect(status_grants=[StatusGrant(status="prone", target="enemy")]),
         )
     """
+
     trigger: TriggerType = "on_hit"
     condition: str | None = None
     save: SaveType
     target: EffectTarget = "enemy"
     on_success: MechanicalEffect | None = None
     on_failure: MechanicalEffect | None = None
-
 
 
 class RandomCheckEffect(FrozenModel):
@@ -2291,6 +2436,7 @@ class RandomCheckEffect(FrozenModel):
             on_success=MechanicalEffect(...),
         )
     """
+
     trigger: TriggerType
     roll: DiceExpression
     success_threshold: int = Field(..., ge=1)
@@ -2301,7 +2447,6 @@ class RandomCheckEffect(FrozenModel):
     condition: str | None = None
 
 
-
 class RollPatternEffect(FrozenModel):
     """
     Triggers an effect based on a roll pattern (e.g., triples).
@@ -2310,13 +2455,13 @@ class RollPatternEffect(FrozenModel):
         RollPatternEffect(trigger="on_activation", roll=DiceExpression.parse("3d6"),
                           pattern="triples", effect=MechanicalEffect(...))
     """
+
     trigger: TriggerType
     roll: DiceExpression
     pattern: RollPatternType
     target: EffectTargetNoAll = "self"
     effect: MechanicalEffect
     condition: str | None = None
-
 
 
 class StatusTrigger(FrozenModel):
@@ -2328,13 +2473,13 @@ class StatusTrigger(FrozenModel):
                       effect=MechanicalEffect(status_grants=[StatusGrant(status="shredded", target="enemy",
                       duration="match_trigger")]))
     """
+
     trigger: Literal["on_inflict", "on_clear"]
     status: StatusType
     target: EffectTargetNoAll = "enemy"
     effect: MechanicalEffect
     condition: str | None = None
     uses_per: UsesPer = "unlimited"
-
 
 
 class TriggeredEffect(FrozenModel):
@@ -2347,6 +2492,7 @@ class TriggeredEffect(FrozenModel):
             effect=MechanicalEffect(action_grants=[ActionGrant(action_type="free", name="reload_fire")]),
         )
     """
+
     trigger: TriggerType
     condition: str | None = None
     effect: MechanicalEffect
@@ -2367,6 +2513,7 @@ class ModeEffect(FrozenModel):
             effects=MechanicalEffect(...),
         )
     """
+
     name: str
     activation_action_id: str
     activation_action_type: ActionType
@@ -2388,6 +2535,7 @@ class ProtocolEffect(FrozenModel):
             effects=MechanicalEffect(movement_grants=[MovementGrant(spaces=4, movement_type="walk")]),
         )
     """
+
     name: str
     action_type: ActionType = "protocol"
     trigger: TriggerType = "on_activation"
@@ -2407,6 +2555,7 @@ class CorePowerEffect(FrozenModel):
             effects=MechanicalEffect(movement_grants=[MovementGrant(spaces=4, movement_type="walk")]),
         )
     """
+
     name: str
     action_type: ActionType
     trigger: TriggerType = "on_activation"
@@ -2414,20 +2563,20 @@ class CorePowerEffect(FrozenModel):
     effects: MechanicalEffect = Field(default_factory=lambda: MechanicalEffect())
 
 
-
 class MechanicalEffect(FrozenModel):
     """
     Composable mechanical effect for talents, core bonuses, systems, etc.
-    
+
     This is the primary building block for encoding game mechanics
     without relying on natural language descriptions.
-    
+
     Example:
         MechanicalEffect(
             stat_mods=[StatModifier(stat="hp", value=5)],
             immunities=[Immunity(target="burn")],
         )
     """
+
     # Stat modifications
     stat_mods: list[StatModifier] = Field(default_factory=list)
     stat_overrides: list[StatOverrideEffect] = Field(default_factory=list)
@@ -2447,7 +2596,7 @@ class MechanicalEffect(FrozenModel):
     limited_use_bonuses: list[LimitedUseBonusEffect] = Field(default_factory=list)
     limited_use_recharges: list[LimitedUseRechargeEffect] = Field(default_factory=list)
     non_combat_capabilities: list[NonCombatCapacityEffect] = Field(default_factory=list)
-    
+
     # Grants and immunities
     action_grants: list[ActionGrant] = Field(default_factory=list)
     reaction_triggers: list[ReactionTriggerEffect] = Field(default_factory=list)
@@ -2471,8 +2620,12 @@ class MechanicalEffect(FrozenModel):
     status_stack_limits: list[StatusStackLimit] = Field(default_factory=list)
     movement_scoped_statuses: list[MovementScopedStatus] = Field(default_factory=list)
     action_restrictions: list[ActionRestriction] = Field(default_factory=list)
-    status_action_overrides: list[StatusActionOverrideEffect] = Field(default_factory=list)
-    line_of_sight_restrictions: list[LineOfSightRestriction] = Field(default_factory=list)
+    status_action_overrides: list[StatusActionOverrideEffect] = Field(
+        default_factory=list
+    )
+    line_of_sight_restrictions: list[LineOfSightRestriction] = Field(
+        default_factory=list
+    )
     status_restrictions: list[StatusRestriction] = Field(default_factory=list)
     cover_restrictions: list[CoverRestriction] = Field(default_factory=list)
     cover_grants: list[CoverGrant] = Field(default_factory=list)
@@ -2487,7 +2640,9 @@ class MechanicalEffect(FrozenModel):
     resistances: list[Resistance] = Field(default_factory=list)
     heat_resistances: list[HeatResistanceEffect] = Field(default_factory=list)
     damage_reductions: list[DamageReduction] = Field(default_factory=list)
-    damage_reduction_rolls: list[DamageReductionRollEffect] = Field(default_factory=list)
+    damage_reduction_rolls: list[DamageReductionRollEffect] = Field(
+        default_factory=list
+    )
     damage_negations: list[DamageNegationEffect] = Field(default_factory=list)
     resource_changes: list[ResourceChange] = Field(default_factory=list)
     scaled_resource_changes: list[ScaledResourceChange] = Field(default_factory=list)
@@ -2495,9 +2650,13 @@ class MechanicalEffect(FrozenModel):
     repair_cost_mods: list[RepairCostModifier] = Field(default_factory=list)
     repair_share_effects: list[RepairShareEffect] = Field(default_factory=list)
     repair_actions: list[RepairActionEffect] = Field(default_factory=list)
-    structure_damage_avoidances: list[StructureDamageAvoidanceEffect] = Field(default_factory=list)
+    structure_damage_avoidances: list[StructureDamageAvoidanceEffect] = Field(
+        default_factory=list
+    )
     zero_hp_survival_effects: list[ZeroHpSurvivalEffect] = Field(default_factory=list)
-    attack_sequence_mods: list[AttackSequenceModifierEffect] = Field(default_factory=list)
+    attack_sequence_mods: list[AttackSequenceModifierEffect] = Field(
+        default_factory=list
+    )
     attack_roll_overrides: list[AttackRollOverrideEffect] = Field(default_factory=list)
     targetings: list[AttackTargetingEffect] = Field(default_factory=list)
     area_selections: list[AreaSelectionEffect] = Field(default_factory=list)
@@ -2505,9 +2664,12 @@ class MechanicalEffect(FrozenModel):
     line_attacks: list[LineAttackEffect] = Field(default_factory=list)
     attack_rerolls: list[AttackRerollEffect] = Field(default_factory=list)
     attack_outcomes: list[AttackOutcomeEffect] = Field(default_factory=list)
-    critical_damage_overrides: list[CriticalDamageOverrideEffect] = Field(default_factory=list)
+    critical_damage_overrides: list[CriticalDamageOverrideEffect] = Field(
+        default_factory=list
+    )
     accuracy_trade_effects: list[AccuracyTradeEffect] = Field(default_factory=list)
     delayed_impacts: list[DelayedImpactEffect] = Field(default_factory=list)
+    weapon_grants: list[WeaponGrantEffect] = Field(default_factory=list)
     weapon_mods: list[WeaponModEffect] = Field(default_factory=list)
     weapon_spin_ups: list[WeaponSpinUpEffect] = Field(default_factory=list)
     weapon_ai_controls: list[WeaponAIControlEffect] = Field(default_factory=list)
@@ -2537,8 +2699,10 @@ class MechanicalEffect(FrozenModel):
     effect_removals: list[EffectRemoval] = Field(default_factory=list)
     movement_trails: list[MovementTrailEffect] = Field(default_factory=list)
     hologram_trails: list[HologramTrailEffect] = Field(default_factory=list)
-    holographic_duplicates: list[HolographicDuplicateEffect] = Field(default_factory=list)
-    
+    holographic_duplicates: list[HolographicDuplicateEffect] = Field(
+        default_factory=list
+    )
+
     def is_empty(self) -> bool:
         """Check if this effect has no components."""
         return (
@@ -2619,6 +2783,7 @@ class MechanicalEffect(FrozenModel):
             and not self.critical_damage_overrides
             and not self.accuracy_trade_effects
             and not self.delayed_impacts
+            and not self.weapon_grants
             and not self.weapon_mods
             and not self.weapon_spin_ups
             and not self.weapon_ai_controls
@@ -2654,6 +2819,7 @@ class MechanicalEffect(FrozenModel):
 
 # Convenience constructors for common patterns
 
+
 def stat_bonus(stat: StatType, value: int) -> MechanicalEffect:
     """Create a simple stat bonus effect."""
     return MechanicalEffect(stat_mods=[StatModifier(stat=stat, value=value)])
@@ -2666,7 +2832,9 @@ def damage_bonus(
 ) -> MechanicalEffect:
     """Create a damage bonus effect."""
     bonus_dice = DiceExpression.parse(dice) if isinstance(dice, str) else dice
-    return MechanicalEffect(damage_mods=[DamageModifier(flat=flat, dice=bonus_dice, condition=condition)])
+    return MechanicalEffect(
+        damage_mods=[DamageModifier(flat=flat, dice=bonus_dice, condition=condition)]
+    )
 
 
 def immunity_to(target: str, condition: str | None = None) -> MechanicalEffect:
