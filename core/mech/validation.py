@@ -20,6 +20,7 @@ from core.mech.weapon import MechWeaponDefinition, WeaponSize
 from core.mech.system import MechSystemDefinition
 from core.pilot.skill import SkillSet
 from core.pilot.license import License
+from core.shared.effects import MechanicalEffect, OverchargeCostCapEffect, ModeEffect
 
 
 class MechBuildIssue(FrozenModel):
@@ -37,6 +38,9 @@ class MechBuildValidation(FrozenModel):
     valid: bool
     issues: list[MechBuildIssue] = Field(default_factory=list)
     limited_uses: LimitedUseSummary = Field(default_factory=LimitedUseSummary)
+    overcharge_cost_caps: list[OverchargeCostCapEffect] = Field(default_factory=list)
+    ai_system_limit: int | None = None
+    mode_effects: list[ModeEffect] = Field(default_factory=list)
 
 
 
@@ -231,6 +235,47 @@ def _validate_integrated_weapon_restrictions(
     return issues
 
 
+def _validate_ai_system_limits(
+    build: MechBuild,
+    system_definitions: dict[str, MechSystemDefinition] | None,
+    ai_system_limit: int | None,
+) -> list[MechBuildIssue]:
+    issues: list[MechBuildIssue] = []
+    if ai_system_limit is None or system_definitions is None:
+        return issues
+
+    ai_count = 0
+    for system in build.systems:
+        definition = system_definitions.get(system.system_id)
+        if not definition:
+            continue
+        if any(tag.tag == "ai" for tag in definition.tags):
+            ai_count += 1
+
+    if ai_count > ai_system_limit:
+        issues.append(
+            MechBuildIssue(
+                code="ai_system_limit_exceeded",
+                message=(
+                    f"AI systems installed ({ai_count}) exceed allowed limit "
+                    f"({ai_system_limit})."
+                ),
+            )
+        )
+    return issues
+
+
+def _collect_mode_effects(
+    bonus_effects: list[MechanicalEffect] | None,
+) -> list[ModeEffect]:
+    if not bonus_effects:
+        return []
+    modes: list[ModeEffect] = []
+    for effect in bonus_effects:
+        modes.extend(effect.mode_effects)
+    return modes
+
+
 def _validate_superheavy(
     frame: MechFrameDefinition,
     build: MechBuild,
@@ -374,6 +419,7 @@ def validate_mech_build(
     system_definitions: dict[str, MechSystemDefinition] | None = None,
     licenses: list[License] | None = None,
     license_ranks: dict[str, int] | None = None,
+    bonus_effects: list[MechanicalEffect] | None = None,
 ) -> MechBuildValidation:
     """Validate a mech build against frame, skills, and grit."""
     issues: list[MechBuildIssue] = []
@@ -426,13 +472,24 @@ def validate_mech_build(
             )
         )
 
-    stats = compute_mech_stats(frame, skills, grit)
+    stats = compute_mech_stats(frame, skills, grit, bonus_effects=bonus_effects)
+    ai_system_limit = stats.ai_system_limit
+    issues.extend(_validate_ai_system_limits(build, system_definitions, ai_system_limit))
     limited_uses = compute_limited_uses(
         build,
         stats,
         weapon_definitions,
         system_definitions,
+        bonus_effects=bonus_effects,
     )
+    mode_effects = _collect_mode_effects(bonus_effects)
 
     valid = not any(issue.severity == "error" for issue in issues)
-    return MechBuildValidation(valid=valid, issues=issues, limited_uses=limited_uses)
+    return MechBuildValidation(
+        valid=valid,
+        issues=issues,
+        limited_uses=limited_uses,
+        overcharge_cost_caps=stats.overcharge_cost_caps,
+        ai_system_limit=ai_system_limit,
+        mode_effects=mode_effects,
+    )

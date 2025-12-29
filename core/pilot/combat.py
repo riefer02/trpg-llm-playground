@@ -17,7 +17,6 @@ class PilotCombatBaseStats(FrozenModel):
     speed: int = Field(default=4, ge=0)
 
 
-
 DEFAULT_PILOT_COMBAT_STATS = PilotCombatBaseStats()
 
 
@@ -27,7 +26,6 @@ class PilotDamageSeverity(FrozenModel):
     name: Literal["minor", "major", "lethal"]
     min_damage: int = Field(..., ge=0)
     max_damage: int | None = Field(default=None, ge=0)
-
 
 
 PILOT_DAMAGE_SEVERITY_BANDS: list[PilotDamageSeverity] = [
@@ -50,7 +48,6 @@ class DownAndOutRule(FrozenModel):
     voluntary_death_allowed: bool = True
 
 
-
 DEFAULT_DOWN_AND_OUT_RULE = DownAndOutRule()
 
 
@@ -62,7 +59,6 @@ class PilotRestRule(FrozenModel):
     full_rest_hours: int = Field(default=10, ge=1)
 
 
-
 DEFAULT_PILOT_REST_RULE = PilotRestRule()
 
 
@@ -70,12 +66,13 @@ class PilotCombatRules(FrozenModel):
     """Combined pilot combat rule references."""
 
     base_stats: PilotCombatBaseStats = DEFAULT_PILOT_COMBAT_STATS
-    damage_bands: list[PilotDamageSeverity] = Field(default_factory=lambda: PILOT_DAMAGE_SEVERITY_BANDS)
+    damage_bands: list[PilotDamageSeverity] = Field(
+        default_factory=lambda: PILOT_DAMAGE_SEVERITY_BANDS
+    )
     down_and_out: DownAndOutRule = DEFAULT_DOWN_AND_OUT_RULE
     rest: PilotRestRule = DEFAULT_PILOT_REST_RULE
     max_armor: int = Field(default=2, ge=0)
     armor_piercing_ignores_armor: bool = True
-
 
 
 DEFAULT_PILOT_COMBAT_RULES = PilotCombatRules()
@@ -88,7 +85,6 @@ class PilotInMechCombatRules(FrozenModel):
     immune_to_tech_actions: bool = True
     heat_converts_to_energy_damage: bool = True
     cannot_engage_mechs: bool = True
-
 
 
 DEFAULT_PILOT_IN_MECH_RULES = PilotInMechCombatRules()

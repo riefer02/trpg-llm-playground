@@ -9,7 +9,7 @@ from core.mech.compendium import (
     WEAPON_DEFINITIONS_BY_ID,
 )
 from core.pilot.skill import SkillSet
-from core.shared.effects import MechanicalEffect, StatModifier
+from core.shared.effects import MechanicalEffect, StatModifier, ReactionTriggerEffect
 from core.mech.combat_state import (
     MechCombatScenario,
     CombatantState,
@@ -97,7 +97,7 @@ def build_oda_ll3_mech_example() -> tuple[MechFrameDefinition, MechBuild, SkillS
 
 def evaluate_oda_ll0_mech_example() -> MechBuildValidation:
     """Validate the LL0 Everest build."""
-    frame, build, skills, grit, _ = build_oda_ll0_mech_example()
+    frame, build, skills, grit, effects = build_oda_ll0_mech_example()
     return validate_mech_build(
         frame,
         build,
@@ -105,12 +105,13 @@ def evaluate_oda_ll0_mech_example() -> MechBuildValidation:
         grit,
         weapon_definitions=WEAPON_DEFINITIONS_BY_ID,
         system_definitions=SYSTEM_DEFINITIONS_BY_ID,
+        bonus_effects=effects,
     )
 
 
 def evaluate_oda_ll3_mech_example() -> MechBuildValidation:
     """Validate the LL3 Raleigh build."""
-    frame, build, skills, grit, _ = build_oda_ll3_mech_example()
+    frame, build, skills, grit, effects = build_oda_ll3_mech_example()
     return validate_mech_build(
         frame,
         build,
@@ -118,6 +119,7 @@ def evaluate_oda_ll3_mech_example() -> MechBuildValidation:
         grit,
         weapon_definitions=WEAPON_DEFINITIONS_BY_ID,
         system_definitions=SYSTEM_DEFINITIONS_BY_ID,
+        bonus_effects=effects,
     )
 
 
@@ -213,7 +215,7 @@ def build_example_combat_scenario() -> MechCombatScenario:
                         action_type="quick",
                         target_id="bravo",
                     ),
-                    ActionUse(action_id="overcharge", action_type="free"),
+                    ActionUse(action_id="overcharge", action_type="free", heat_generated=1),
                     ActionUse(
                         action_id="boost",
                         action_type="quick",
@@ -245,6 +247,98 @@ def build_example_combat_scenario() -> MechCombatScenario:
 def evaluate_example_combat_scenario() -> CombatValidation:
     """Validate the example combat scenario."""
     scenario = build_example_combat_scenario()
+    return validate_combat_scenario(scenario)
+
+
+def build_example_combat_scenario_with_reaction_metadata() -> MechCombatScenario:
+    """Build a combat scenario that uses reaction trigger + heat metadata."""
+    player = CombatantState(
+        id="alpha",
+        name="Alpha",
+        side="players",
+        kind="mech",
+        stats=CombatStats(
+            size="size_1",
+            hp_max=10,
+            evasion=10,
+            e_defense=8,
+            armor=0,
+            speed=4,
+            sensor_range=10,
+            tech_attack=0,
+        ),
+        resources=CombatResources(
+            hp_current=10,
+            heat_current=0,
+            heat_cap=6,
+            structure_current=4,
+            stress_current=4,
+            repairs_remaining=4,
+        ),
+        position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        statuses=[],
+        conditions=[],
+        reaction_triggers=[
+            ReactionTriggerEffect(
+                reaction_id="overwatch",
+                trigger_events=["enemy_enters_threat"],
+                uses_per="round",
+            )
+        ],
+    )
+    hostile = CombatantState(
+        id="bravo",
+        name="Bravo",
+        side="hostiles",
+        kind="mech",
+        stats=CombatStats(
+            size="size_1",
+            hp_max=8,
+            evasion=9,
+            e_defense=8,
+            armor=0,
+            speed=3,
+            sensor_range=8,
+            tech_attack=0,
+        ),
+        resources=CombatResources(
+            hp_current=8,
+            heat_current=0,
+            heat_cap=6,
+            structure_current=4,
+            stress_current=4,
+            repairs_remaining=4,
+        ),
+        position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        statuses=[],
+        conditions=[],
+    )
+    round_one = CombatRound(
+        round_index=1,
+        turns=[
+            CombatTurn(
+                actor_id="alpha",
+                move_used=False,
+                actions=[
+                    ActionUse(action_id="overcharge", action_type="free", heat_generated=1),
+                    ActionUse(
+                        action_id="overwatch",
+                        action_type="reaction",
+                        target_id="bravo",
+                        range_spaces=1,
+                        used_as_reaction=True,
+                        reaction_trigger="enemy_enters_threat",
+                    ),
+                ],
+            ),
+        ],
+    )
+    return MechCombatScenario(combatants=[player, hostile], rounds=[round_one])
+
+
+def evaluate_example_combat_scenario_with_reaction_metadata() -> CombatValidation:
+    """Validate the reaction/heat metadata combat scenario."""
+    scenario = build_example_combat_scenario_with_reaction_metadata()
     return validate_combat_scenario(scenario)
 
 

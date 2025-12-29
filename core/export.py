@@ -58,9 +58,15 @@ from core.shared.effects import (
     DirectDamage,
     RangeModifier,
     LimitedUseBonusEffect,
+    LimitedUseRechargeEffect,
     ActionGrant,
     TargetMarkEffect,
     LeadershipDicePoolEffect,
+    DicePoolGain,
+    DicePoolSpendOption,
+    DicePoolEffect,
+    CountdownDieTrigger,
+    CountdownDieEffect,
     TechRange,
     TechAction,
     TechAttackModifier,
@@ -264,9 +270,15 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "DirectDamage": DirectDamage,
     "RangeModifier": RangeModifier,
     "LimitedUseBonusEffect": LimitedUseBonusEffect,
+    "LimitedUseRechargeEffect": LimitedUseRechargeEffect,
     "ActionGrant": ActionGrant,
     "TargetMarkEffect": TargetMarkEffect,
     "LeadershipDicePoolEffect": LeadershipDicePoolEffect,
+    "DicePoolGain": DicePoolGain,
+    "DicePoolSpendOption": DicePoolSpendOption,
+    "DicePoolEffect": DicePoolEffect,
+    "CountdownDieTrigger": CountdownDieTrigger,
+    "CountdownDieEffect": CountdownDieEffect,
     "TechRange": TechRange,
     "TechAction": TechAction,
     "TechAttackModifier": TechAttackModifier,
@@ -417,14 +429,16 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
 }
 
 
-def export_schema(model: type[BaseModel], mode: str = "serialization") -> dict[str, Any]:
+def export_schema(
+    model: type[BaseModel], mode: str = "serialization"
+) -> dict[str, Any]:
     """
     Export a single model to JSON Schema.
-    
+
     Args:
         model: The Pydantic model class to export
         mode: "serialization" or "validation" schema mode
-        
+
     Returns:
         JSON Schema as a dictionary
     """
@@ -437,29 +451,29 @@ def export_all_schemas(
 ) -> dict[str, Path]:
     """
     Export all models to individual JSON Schema files.
-    
+
     Args:
         output_dir: Directory to write schema files
         mode: "serialization" or "validation" schema mode
-        
+
     Returns:
         Dictionary mapping model names to their schema file paths
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     exported: dict[str, Path] = {}
-    
+
     for name, model in EXPORTABLE_MODELS.items():
         schema = export_schema(model, mode)
         file_path = output_dir / f"{name.lower()}.json"
-        
+
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(schema, f, indent=2)
-        
+
         exported[name] = file_path
         print(f"Exported: {name} -> {file_path}")
-    
+
     return exported
 
 
@@ -469,20 +483,20 @@ def export_combined_schema(
 ) -> Path:
     """
     Export all models to a single combined JSON Schema file.
-    
+
     The combined schema uses $defs for shared definitions
     and allows referencing any model type.
-    
+
     Args:
         output_path: Path to write the combined schema
         mode: "serialization" or "validation" schema mode
-        
+
     Returns:
         Path to the created schema file
     """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Build combined schema with $defs
     combined_schema: dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -492,25 +506,25 @@ def export_combined_schema(
         "$defs": {},
         "oneOf": [],
     }
-    
+
     for name, model in EXPORTABLE_MODELS.items():
         schema = export_schema(model, mode)
-        
+
         # Extract $defs from individual schemas and merge
         if "$defs" in schema:
             for def_name, def_schema in schema["$defs"].items():
                 combined_schema["$defs"][def_name] = def_schema
             del schema["$defs"]
-        
+
         # Add the main schema to $defs
         combined_schema["$defs"][name] = schema
-        
+
         # Add reference to oneOf
         combined_schema["oneOf"].append({"$ref": f"#/$defs/{name}"})
-    
+
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(combined_schema, f, indent=2)
-    
+
     print(f"Exported combined schema: {output_path}")
     return output_path
 
@@ -524,7 +538,7 @@ def print_schema(model: type[BaseModel], mode: str = "serialization") -> None:
 # CLI interface
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Export Lancer schemas to JSON Schema")
     parser.add_argument(
         "--output-dir",
@@ -548,7 +562,7 @@ if __name__ == "__main__":
         help="Export only a specific model",
     )
     args = parser.parse_args()
-    
+
     if args.model:
         # Export single model
         model = EXPORTABLE_MODELS[args.model]
@@ -556,8 +570,8 @@ if __name__ == "__main__":
     else:
         # Export all models
         export_all_schemas(args.output_dir, args.mode)
-        
+
         if args.combined:
             export_combined_schema(f"{args.output_dir}/lancer.json", args.mode)
-        
+
         print(f"\nAll schemas exported to: {args.output_dir}/")

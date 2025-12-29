@@ -15,7 +15,6 @@ class AccuracyDifficulty(FrozenModel):
     accuracy: int = Field(default=0, ge=0)
     difficulty: int = Field(default=0, ge=0)
 
-
     @computed_field
     @property
     def net(self) -> int:
@@ -45,13 +44,11 @@ class FlatBonus(FrozenModel):
     value: int = Field(default=0, ge=0, le=6)
 
 
-
 class RollModifiers(FrozenModel):
     """Combined modifiers for a roll."""
 
     accuracy_difficulty: AccuracyDifficulty = Field(default_factory=AccuracyDifficulty)
     flat_bonus: FlatBonus | None = None
-
 
 
 class SkillCheck(FrozenModel):
@@ -62,14 +59,12 @@ class SkillCheck(FrozenModel):
     modifiers: RollModifiers = Field(default_factory=RollModifiers)
 
 
-
 class AttackRoll(FrozenModel):
     """An attack roll against a defense value."""
 
     roll_type: Literal["attack"] = "attack"
     target: int = Field(..., ge=0, description="Target defense value")
     modifiers: RollModifiers = Field(default_factory=RollModifiers)
-
 
 
 class SaveRoll(FrozenModel):
@@ -80,11 +75,9 @@ class SaveRoll(FrozenModel):
     modifiers: RollModifiers = Field(default_factory=RollModifiers)
 
 
-
 class ContestedCheck(FrozenModel):
     """Two opposed skill checks; ties go to the attacker."""
 
     attacker: SkillCheck
     defender: SkillCheck
     tie_breaker: Literal["attacker"] = "attacker"
-

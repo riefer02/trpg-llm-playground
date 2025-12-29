@@ -10,7 +10,7 @@ Lancer Third Party License), not copyrighted expression/flavor text.
 
 from __future__ import annotations
 from typing import Literal
-from pydantic import Field
+from pydantic import Field, model_validator
 from core.shared.models import FrozenModel
 
 from core.shared.enums import (
@@ -69,6 +69,22 @@ ConditionType = Literal[
     "target_invisible",
     "target_engaged",
     "target_marked",
+    "target_within_range_3",
+    "covering_fire_target",
+    "covering_fire_target_moves",
+    "covering_fire_bracketing",
+    "covering_fire_overwatch",
+    "jackhammer_target_object",
+    "jackhammer_adjacent_to_object",
+    "cannon_collateral_burst",
+    "different_target_in_threat",
+    "threat_except_original_target",
+    "exemplar_marked_target",
+    "ally_attacks_exemplar_marked_target",
+    "exemplar_marked_target_attacks_other_within_3",
+    "exemplar_challenge_active",
+    "exemplar_challenge_other_targets",
+    "during_rest",
     # Attacker conditions
     "while_flying",
     "while_hidden",
@@ -95,6 +111,7 @@ ConditionType = Literal[
     "steel_assassin_charge",
     "selected_mount",
     "selected_weapon",
+    "exclude_integrated_mounts",
     "structure_1_or_less",
     "zero_hp",
     "ram_or_grapple",
@@ -107,12 +124,45 @@ ConditionType = Literal[
     "gain_stress",
     "stabilize_cool",
     "tech_attack_hit",
+    "on_turn",
     "next_melee_vs_tech_hit_target",
+    "ally_engaged_with_target",
+    "higher_elevation_than_target",
+    "target_not_in_cover",
+    "cqb_target_within_3",
+    "cqb_target_within_3_with_los",
+    "next_ranged_vs_target_after_melee_hit",
+    "next_melee_vs_target_after_ranged_hit",
+    "adjacent_to_engaged_self",
+    "before_or_after_skirmish",
+    "first_reaction_attack_against_self",
+    "flank_overwatch",
+    "cqb_overwatch",
+    "nexus_weapon_crit",
+    "lock_on_consumed_drone_or_nexus_attack",
+    "chaff_soft_cover_break_on_attack_or_save",
+    "stormbringer_concussive_action",
+    "stormbringer_torrent_attack",
+    "stormbringer_thunder_blast",
+    "thrown_aux_melee_attack",
+    "adjacent_to_target",
+    "adjacent_to_self",
+    "restricting_swarm_active",
+    "target_grappled_by_self",
     # Attack type conditions
+    "heavy_or_superheavy_melee_attack",
+    "backswing_cut_followup",
     "melee_attack",
     "ranged_attack",
     "tech_attack",
     "ram_attack",
+    "improvised_attack",
+    "main_melee_attack",
+    "aux_ranged_attack",
+    "aux_melee_attack",
+    "launcher_attack",
+    "lock_on_consumed_launcher_attack",
+    "cannon_attack",
     "melee_attack_no_other_adjacent",
     "melee_crit",
     # Save conditions
@@ -133,10 +183,12 @@ TriggerType = Literal[
     "on_detonate",
     "on_move",
     "on_reaction",
+    "on_action",
     "on_take_damage",
     "on_hide",
     "on_overheat",
     "on_ally_hit",
+    "on_ally_miss",
     "on_ally_damaged",
     "on_ally_targeted",
     "on_turn_start",
@@ -148,6 +200,16 @@ TriggerType = Literal[
     "on_tech_attack_hit",
     "on_ally_turn_start",
     "on_stabilize",
+    "on_skirmish",
+]
+ReactionTriggerEvent = Literal[
+    "enemy_starts_movement_in_threat",
+    "enemy_enters_threat",
+    "enemy_leaves_threat",
+    "enemy_exits_threat",
+    "ally_hits_target",
+    "enemy_attacks_ally",
+    "covering_fire_target_moves",
 ]
 ActionCategoryType = Literal[
     "attack",
@@ -228,7 +290,7 @@ EffectTarget = Literal["self", "enemy", "ally", "adjacent", "all"]
 EffectTargetNoAll = Literal["self", "enemy", "ally", "adjacent"]
 EffectTargetWithObject = Literal["self", "enemy", "ally", "adjacent", "all", "object"]
 EffectTargetWithObjectNoAll = Literal["self", "enemy", "ally", "adjacent", "object"]
-UsesPer = Literal["unlimited", "round", "scene", "mission", "full_repair"]
+UsesPer = Literal["unlimited", "round", "scene", "mission", "rest", "full_repair"]
 class StatModifier(FrozenModel):
     """
     Numeric modifier to a stat.
@@ -394,6 +456,19 @@ class ActionGrant(FrozenModel):
     uses_per: UsesPer = "unlimited"
     
 
+class ReactionTriggerEffect(FrozenModel):
+    """
+    Grants or extends reaction triggers for a specific reaction action.
+
+    Examples:
+        ReactionTriggerEffect(reaction_id="overwatch", trigger_events=["enemy_enters_threat"])
+    """
+    reaction_id: str
+    trigger_events: list[ReactionTriggerEvent] = Field(default_factory=list)
+    uses_per: UsesPer = "unlimited"
+    condition: ConditionType | str | None = None
+
+
 class NonCombatCapacityEffect(FrozenModel):
     """
     Non-combat capabilities such as extra limbs or passenger space.
@@ -554,6 +629,141 @@ class EffectChoice(FrozenModel):
     range: TechRange | None = None
     condition: str | None = None
 
+
+
+class DicePoolGain(FrozenModel):
+    """
+    Gain dice in a named dice pool when a trigger occurs.
+
+    Examples:
+        DicePoolGain(trigger="on_hit", amount=1, uses_per="round")
+    """
+    trigger: TriggerType
+    amount: int = Field(default=1, ge=1)
+    uses_per: UsesPer = "unlimited"
+    condition: ConditionType | str | None = None
+
+
+class DicePoolSpendOption(FrozenModel):
+    """
+    Spend dice from a pool for a specific effect.
+
+    Examples:
+        DicePoolSpendOption(name="Parry", action_type="reaction", dice_cost=1,
+                            effect=MechanicalEffect(damage_multipliers=[...]))
+    """
+    name: str
+    effect: MechanicalEffect
+    action_type: ActionType | None = None
+    trigger: TriggerType | None = None
+    dice_cost: int | None = Field(default=1)
+    spend_any_number: bool = False
+    roll: DiceExpression | None = None
+    roll_threshold: int | None = Field(default=None, ge=1)
+    condition: ConditionType | str | None = None
+
+    @model_validator(mode="after")
+    def _validate_spend_option(self) -> "DicePoolSpendOption":
+        if self.spend_any_number:
+            if self.dice_cost is not None:
+                raise ValueError("dice_cost must be None when spend_any_number is True")
+        else:
+            if self.dice_cost is None:
+                raise ValueError("dice_cost is required when spend_any_number is False")
+            if self.dice_cost < 1:
+                raise ValueError("dice_cost must be >= 1")
+        if (self.roll_threshold is None) ^ (self.roll is None):
+            raise ValueError("roll and roll_threshold must be provided together")
+        return self
+
+
+class DicePoolEffect(FrozenModel):
+    """
+    Named pool of dice that can be gained and spent for effects.
+
+    Examples:
+        DicePoolEffect(
+            pool_name="blademaster",
+            die_size=6,
+            max_dice=3,
+            gain_triggers=[DicePoolGain(trigger="on_hit", uses_per="round")],
+            spend_options=[DicePoolSpendOption(name="Parry", action_type="reaction", dice_cost=1)],
+        )
+    """
+    pool_name: str
+    die_size: int = Field(default=6, ge=2)
+    max_dice: int | None = Field(default=None, ge=1)
+    starting_dice: int = Field(default=0, ge=0)
+    gain_triggers: list[DicePoolGain] = Field(default_factory=list)
+    spend_options: list[DicePoolSpendOption] = Field(default_factory=list)
+    expires_on_scene_end: bool = False
+    lost_on_rest: bool = False
+    lost_on_full_repair: bool = False
+    condition: ConditionType | str | None = None
+
+    @model_validator(mode="after")
+    def _validate_pool(self) -> "DicePoolEffect":
+        if self.max_dice is not None and self.starting_dice > self.max_dice:
+            raise ValueError("starting_dice cannot exceed max_dice")
+        return self
+
+
+class CountdownDieTrigger(FrozenModel):
+    """
+    Trigger that decrements a countdown die.
+
+    Examples:
+        CountdownDieTrigger(trigger="on_hit", condition="aux_ranged_attack", optional=True)
+    """
+    trigger: TriggerType
+    decrement: int = Field(default=1, ge=1)
+    optional: bool = False
+    uses_per: UsesPer = "unlimited"
+    condition: ConditionType | str | None = None
+
+
+class CountdownDieEffect(FrozenModel):
+    """
+    Countdown die that changes value based on triggers and can be spent at a threshold.
+
+    Examples:
+        CountdownDieEffect(
+            die_name="gunslinger",
+            die_size=6,
+            starting_value=6,
+            decrement_triggers=[CountdownDieTrigger(trigger="on_hit", condition="aux_ranged_attack", optional=True)],
+            spend_requires_value=1,
+            reset_value=6,
+        )
+    """
+    die_name: str
+    die_size: int = Field(default=6, ge=2)
+    starting_value: int = Field(default=6, ge=1)
+    minimum_value: int = Field(default=1, ge=1)
+    decrement_triggers: list[CountdownDieTrigger] = Field(default_factory=list)
+    spend_options: list[DicePoolSpendOption] = Field(default_factory=list)
+    spend_requires_value: int = Field(default=1, ge=1)
+    reset_value: int | None = Field(default=None, ge=1)
+    expires_on_scene_end: bool = False
+    lost_on_rest: bool = False
+    lost_on_full_repair: bool = False
+    condition: ConditionType | str | None = None
+
+    @model_validator(mode="after")
+    def _validate_countdown(self) -> "CountdownDieEffect":
+        if self.starting_value < self.minimum_value:
+            raise ValueError("starting_value cannot be below minimum_value")
+        if self.starting_value > self.die_size:
+            raise ValueError("starting_value cannot exceed die_size")
+        if self.spend_requires_value < self.minimum_value:
+            raise ValueError("spend_requires_value cannot be below minimum_value")
+        if self.spend_requires_value > self.die_size:
+            raise ValueError("spend_requires_value cannot exceed die_size")
+        if self.reset_value is not None and (
+            self.reset_value < self.minimum_value or self.reset_value > self.die_size
+        ):
+            raise ValueError("reset_value must be within die range")
+        return self
 
 
 class LeadershipDicePoolEffect(FrozenModel):
@@ -768,6 +978,8 @@ class MovementGrant(FrozenModel):
     requires_line_of_sight: bool = True
     requires_free_space: bool = False
     fails_if_occupied: bool = False
+    ignores_engagement: bool = False
+    provokes_reactions: bool = True
     
 
 
@@ -778,7 +990,7 @@ class MoveAdjacentEffect(FrozenModel):
     Examples:
         MoveAdjacentEffect(target="enemy", movement_type="fly", trigger="on_turn_end")
     """
-    target: EffectTargetNoAll = "enemy"
+    target: Literal["enemy", "ally", "any"] = "enemy"
     movement_type: Literal["walk", "fly", "teleport"] = "walk"
     trigger: TriggerType | None = None
     action_type: ActionType | None = None
@@ -1000,6 +1212,7 @@ class MovementRestrictionEffect(FrozenModel):
     movement_modes: list[MovementMode] = Field(default_factory=list)
     max_voluntary_speed: int | None = Field(default=None, ge=0)
     cannot_move_closer_to_source: bool = False
+    cannot_move_further_from_source: bool = False
     must_move_straight_line: bool = False
     duration: EffectDuration = "end_of_turn"
     condition: str | None = None
@@ -1120,6 +1333,22 @@ class LimitedUseBonusEffect(FrozenModel):
     bonus_uses: int = Field(..., ge=1)
     applies_to: list[Literal["system", "deployable", "weapon"]] = Field(default_factory=list)
     requires_tag: str = "limited"
+    condition: ConditionType | str | None = None
+
+
+class LimitedUseRechargeEffect(FrozenModel):
+    """
+    Replenishes limited-use charges as part of a rest or downtime action.
+
+    Examples:
+        LimitedUseRechargeEffect(bonus_uses=1, applies_to=["weapon", "deployable"], cost_repairs=2, uses_per="rest")
+    """
+    bonus_uses: int = Field(..., ge=1)
+    applies_to: list[Literal["system", "deployable", "weapon"]] = Field(default_factory=list)
+    requires_tag: str = "limited"
+    cost_repairs: int = Field(default=0, ge=0)
+    uses_per: UsesPer = "rest"
+    target: EffectTarget = "self"
     condition: ConditionType | str | None = None
 
 
@@ -1354,6 +1583,7 @@ class AttackRerollEffect(FrozenModel):
     max_rerolls_per_attack: int = Field(default=1, ge=1)
     disallow_already_hit_targets: bool = False
     keep_second: bool = False
+    uses_reaction: bool = False
     duration: EffectDuration = "end_of_turn"
     uses_per: UsesPer = "unlimited"
     condition: str | None = None
@@ -2215,13 +2445,17 @@ class MechanicalEffect(FrozenModel):
     direct_damages: list[DirectDamage] = Field(default_factory=list)
     range_mods: list[RangeModifier] = Field(default_factory=list)
     limited_use_bonuses: list[LimitedUseBonusEffect] = Field(default_factory=list)
+    limited_use_recharges: list[LimitedUseRechargeEffect] = Field(default_factory=list)
     non_combat_capabilities: list[NonCombatCapacityEffect] = Field(default_factory=list)
     
     # Grants and immunities
     action_grants: list[ActionGrant] = Field(default_factory=list)
+    reaction_triggers: list[ReactionTriggerEffect] = Field(default_factory=list)
     bondmates: list[BondmateEffect] = Field(default_factory=list)
     target_marks: list[TargetMarkEffect] = Field(default_factory=list)
     leadership_dice_pools: list[LeadershipDicePoolEffect] = Field(default_factory=list)
+    dice_pools: list[DicePoolEffect] = Field(default_factory=list)
+    countdown_dice: list[CountdownDieEffect] = Field(default_factory=list)
     tech_actions: list[TechAction] = Field(default_factory=list)
     tech_attack_mods: list[TechAttackModifier] = Field(default_factory=list)
     tech_restrictions: list[TechActionRestriction] = Field(default_factory=list)
@@ -2324,11 +2558,15 @@ class MechanicalEffect(FrozenModel):
             and not self.direct_damages
             and not self.range_mods
             and not self.limited_use_bonuses
+            and not self.limited_use_recharges
             and not self.non_combat_capabilities
             and not self.action_grants
+            and not self.reaction_triggers
             and not self.bondmates
             and not self.target_marks
             and not self.leadership_dice_pools
+            and not self.dice_pools
+            and not self.countdown_dice
             and not self.tech_actions
             and not self.tech_attack_mods
             and not self.tech_restrictions

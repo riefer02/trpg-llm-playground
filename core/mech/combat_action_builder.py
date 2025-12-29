@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from core.shared.enums import ActionType, AttackType, RangeType
+from core.shared.effects import ReactionTriggerEvent
 from core.mech.combat_rules import AttackPatternDefinition
 from core.mech.combat_state import ActionUse
 from core.mech.grid import HexCoord, HexPosition
@@ -27,6 +28,8 @@ def build_action_use_from_weapon(
     area_origin: HexPosition | None = None,
     area_direction: HexCoord | None = None,
     area_affected: list[HexCoord] | None = None,
+    reaction_trigger: ReactionTriggerEvent | None = None,
+    heat_generated: int | None = None,
 ) -> ActionUse:
     """Create an ActionUse enriched with weapon tags and patterns."""
     weapon_tags = [tag.tag for tag in weapon.tags]
@@ -61,6 +64,8 @@ def build_action_use_from_weapon(
         weapon_count=weapon_count,
         uses_superheavy=weapon.size == "superheavy",
         uses_aux_bonus_attack=uses_aux_bonus_attack,
+        reaction_trigger=reaction_trigger,
+        heat_generated=heat_generated,
     )
 
 

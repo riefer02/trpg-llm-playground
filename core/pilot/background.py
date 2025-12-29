@@ -25,29 +25,27 @@ class BackgroundInvokeRule(FrozenModel):
     applies_to: Literal["skill_check"] = "skill_check"
 
 
-
 class Background(FrozenModel):
     """
     A pilot's background - their life before becoming a lancer.
-    
+
     Backgrounds provide 4 triggers that define what situations
     the pilot is particularly skilled at handling based on their
     past experience.
-    
+
     Note: The 'description' field has been intentionally removed
     to avoid including copyrighted flavor text. Users can provide
     their own descriptions if needed.
     """
-    
+
     id: str = Field(..., description="Unique identifier (e.g., 'background_1')")
     name: str = Field(..., description="Display name")
     triggers: list[str] = Field(
         ...,
         min_length=4,
         max_length=4,
-        description="Four trigger IDs from this background"
+        description="Four trigger IDs from this background",
     )
-    
 
 
 # Background invoke rule (mechanical only)

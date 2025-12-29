@@ -5,6 +5,7 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 
 from core.shared.enums import StatusType, SizeClass, ActionType, AttackType
+from core.shared.effects import ModeEffect, ReactionTriggerEffect, ReactionTriggerEvent
 from core.shared.rolls import ContestedCheck
 from core.mech.grid import HexPosition, HexCoord
 from core.mech.terrain import TerrainMap
@@ -95,6 +96,8 @@ class CombatantState(FrozenModel):
     conditions: list[StatusType] = Field(default_factory=list)
     inventory: MechInventory | None = None
     ai_controlled: bool = False
+    active_mode_effects: list[ModeEffect] = Field(default_factory=list)
+    reaction_triggers: list[ReactionTriggerEffect] = Field(default_factory=list)
 
 
 
@@ -134,6 +137,8 @@ class ActionUse(FrozenModel):
     used_as_free_action: bool = False
     used_as_reaction: bool = False
     granted_by_overcharge: bool = False
+    heat_generated: int | None = Field(default=None, ge=0)
+    reaction_trigger: ReactionTriggerEvent | None = None
     contested_check: ContestedCheck | None = None
     consumes_lock_on: bool = False
 
@@ -166,4 +171,3 @@ class MechCombatScenario(FrozenModel):
     rounds: list[CombatRound] = Field(default_factory=list)
     terrain: TerrainMap | None = None
     environment: CombatEnvironment = "standard"
-

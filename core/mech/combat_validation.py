@@ -374,8 +374,14 @@ def _validate_turn(
         )
 
     actor_statuses: list[str] = []
+    mode_effects = actor.active_mode_effects if actor else []
+    mode_statuses = [
+        grant.status
+        for mode in mode_effects
+        for grant in mode.effects.status_grants
+    ]
     if actor:
-        actor_statuses = list(actor.statuses) + list(actor.conditions)
+        actor_statuses = list(actor.statuses) + list(actor.conditions) + mode_statuses
     hostiles = _hostiles_for(actor, combatants_by_id) if actor else []
     engaged = False
     if actor:
@@ -389,6 +395,18 @@ def _validate_turn(
         STATUS_DEFINITIONS_BY_ID[status].effects.movement_restrictions
         for status in actor_statuses
         if status in STATUS_DEFINITIONS_BY_ID
+    ]
+    mode_action_restrictions = [
+        restriction
+        for mode in mode_effects
+        for restriction in mode.effects.action_restrictions
+        if restriction.target == "self"
+    ]
+    mode_tech_restrictions = [
+        restriction
+        for mode in mode_effects
+        for restriction in mode.effects.tech_restrictions
+        if restriction.target == "self"
     ]
 
     if actor_movement_restrictions:
@@ -728,6 +746,63 @@ def _validate_turn(
                         )
                     )
 
+        if mode_action_restrictions:
+            for restriction in mode_action_restrictions:
+                if restriction.action_ids and action.action_id in restriction.action_ids:
+                    issues.append(
+                        CombatValidationIssue(
+                            code="mode_action_disallowed",
+                            message=(
+                                f"{turn.actor_id} cannot take action {action.action_id} "
+                                "due to mode restrictions."
+                            ),
+                        )
+                    )
+                if rule and restriction.action_categories and rule.category in restriction.action_categories:
+                    issues.append(
+                        CombatValidationIssue(
+                            code="mode_action_category_disallowed",
+                            message=(
+                                f"{turn.actor_id} cannot take {rule.category} actions "
+                                "due to mode restrictions."
+                            ),
+                        )
+                    )
+                if rule and restriction.disallow_attack_rolls and (rule.attack or (rule.tech and rule.tech.is_attack)):
+                    issues.append(
+                        CombatValidationIssue(
+                            code="mode_attack_roll_disallowed",
+                            message=(
+                                f"{turn.actor_id} cannot make attack rolls "
+                                "due to mode restrictions."
+                            ),
+                        )
+                    )
+                if restriction.disallow_heat_generation:
+                    heat_generated = action.heat_generated or 0
+                    if action.action_id == "overcharge" or heat_generated > 0:
+                        issues.append(
+                            CombatValidationIssue(
+                                code="mode_heat_generation_disallowed",
+                                message=(
+                                    f"{turn.actor_id} cannot take action {action.action_id} "
+                                    "that generates heat while in current mode."
+                                ),
+                            )
+                        )
+
+        if mode_tech_restrictions and rule and rule.category == "tech":
+            if any(restriction.disallow_tech_actions for restriction in mode_tech_restrictions):
+                issues.append(
+                    CombatValidationIssue(
+                        code="mode_tech_action_disallowed",
+                        message=(
+                            f"{turn.actor_id} cannot take tech action {action.action_id} "
+                            "due to mode restrictions."
+                        ),
+                    )
+                )
+
         if actor_movement_restrictions and rule.movement:
             if any(restriction.max_voluntary_speed == 0 for restriction in actor_movement_restrictions):
                 issues.append(
@@ -855,7 +930,24 @@ def _validate_turn(
                             ),
                         )
                     )
-                target_statuses = list(target.statuses) + list(target.conditions)
+                target_mode_effects = target.active_mode_effects
+                target_mode_statuses = [
+                    grant.status
+                    for mode in target_mode_effects
+                    for grant in mode.effects.status_grants
+                ]
+                target_statuses = list(target.statuses) + list(target.conditions) + target_mode_statuses
+                target_mode_tech_restrictions = [
+                    restriction
+                    for mode in target_mode_effects
+                    for restriction in mode.effects.tech_restrictions
+                    if restriction.target == "self"
+                ]
+                target_tag_immunities = [
+                    immunity
+                    for mode in target_mode_effects
+                    for immunity in mode.effects.tag_immunities
+                ]
                 for status in target_statuses:
                     status_def = STATUS_DEFINITIONS_BY_ID.get(status)
                     if not status_def:
@@ -879,6 +971,39 @@ def _validate_turn(
                                 message=(
                                     f"Action {action.action_id} targets {target.name} "
                                     f"with {status} miss chance {targeting.miss_chance:.0%}."
+                                ),
+                                severity="warning",
+                            )
+                        )
+                if rule and rule.category == "tech":
+                    immune_to_tech = any(
+                        STATUS_DEFINITIONS_BY_ID.get(status)
+                        and STATUS_DEFINITIONS_BY_ID[status].effects.immune_to_tech
+                        for status in target_statuses
+                    )
+                    immune_to_tech = immune_to_tech or any(
+                        restriction.immune_to_tech for restriction in target_mode_tech_restrictions
+                    )
+                    if immune_to_tech:
+                        issues.append(
+                            CombatValidationIssue(
+                                code="target_immune_to_tech",
+                                message=(
+                                    f"Action {action.action_id} targets {target.name} "
+                                    "but the target is immune to tech effects."
+                                ),
+                                severity="warning",
+                            )
+                        )
+                if action.weapon_tags and target_tag_immunities:
+                    immune_tags = {tag for immunity in target_tag_immunities for tag in immunity.tags}
+                    if immune_tags.intersection(action.weapon_tags):
+                        issues.append(
+                            CombatValidationIssue(
+                                code="target_tag_immune",
+                                message=(
+                                    f"Action {action.action_id} targets {target.name} "
+                                    "but the target is immune to the action's tags."
                                 ),
                                 severity="warning",
                             )
@@ -1316,6 +1441,33 @@ def _validate_turn(
                     severity="warning",
                 )
             )
+        if action.action_id == "overwatch" and rule and rule.overwatch:
+            allowed_triggers = {rule.overwatch.trigger}
+            if actor:
+                for trigger in actor.reaction_triggers:
+                    if trigger.reaction_id == "overwatch":
+                        allowed_triggers.update(trigger.trigger_events)
+            if action.reaction_trigger:
+                if action.reaction_trigger not in allowed_triggers:
+                    issues.append(
+                        CombatValidationIssue(
+                            code="overwatch_trigger_invalid",
+                            message=(
+                                f"{turn.actor_id} uses overwatch with trigger "
+                                f"{action.reaction_trigger}, which is not permitted."
+                            ),
+                        )
+                    )
+            elif action.used_as_reaction or action.action_type == "reaction":
+                issues.append(
+                    CombatValidationIssue(
+                        code="overwatch_trigger_missing",
+                        message=(
+                            f"{turn.actor_id} uses overwatch as a reaction without a trigger event."
+                        ),
+                        severity="warning",
+                    )
+                )
         is_free = action.used_as_free_action or action.action_type == "free"
         is_reaction = action.used_as_reaction or action.action_type == "reaction"
 

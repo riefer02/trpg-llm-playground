@@ -33,6 +33,7 @@ from core.shared.effects import (
     ActionGrant,
     CoverGrant,
     MovementGrant,
+    ForcedMovement,
     MovementOverrideEffect,
     MovementSurfaceEffect,
     MovementModeAccessEffect,
@@ -51,24 +52,22 @@ from core.shared.effects import (
 class CoreBonusDefinition(FrozenModel):
     """
     A core bonus definition - the template for a learnable core bonus.
-    
+
     Core bonuses are powerful, permanent upgrades to a pilot's mech.
     They're earned by reaching LL3 in any manufacturer's licenses
     (3 total license levels with that manufacturer).
     """
-    
+
     id: str = Field(..., description="Unique identifier")
     name: str = Field(..., description="Display name")
     manufacturer: Manufacturer
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
-    
 
 
 class CoreBonus(FrozenModel):
     """A core bonus that a pilot has earned."""
-    
+
     core_bonus_id: str = Field(..., description="ID of the core bonus definition")
-    
 
 
 # GMS Core Bonuses (available to all pilots)
@@ -149,8 +148,18 @@ GMS_CORE_BONUSES: list[CoreBonusDefinition] = [
                     trigger="on_core_power_spent",
                     effect=MechanicalEffect(
                         resource_changes=[
-                            ResourceChange(resource="hp", amount="full", direction="set", target="self"),
-                            ResourceChange(resource="heat", amount=0, direction="set", target="self"),
+                            ResourceChange(
+                                resource="hp",
+                                amount="full",
+                                direction="set",
+                                target="self",
+                            ),
+                            ResourceChange(
+                                resource="heat",
+                                amount=0,
+                                direction="set",
+                                target="self",
+                            ),
                         ],
                     ),
                 )
@@ -163,7 +172,12 @@ GMS_CORE_BONUSES: list[CoreBonusDefinition] = [
                     target="self",
                     on_success=MechanicalEffect(
                         resource_changes=[
-                            ResourceChange(resource="core_power", amount=1, direction="gain", target="self")
+                            ResourceChange(
+                                resource="core_power",
+                                amount=1,
+                                direction="gain",
+                                target="self",
+                            )
                         ],
                     ),
                 )
@@ -182,9 +196,7 @@ IPSN_CORE_BONUSES: list[CoreBonusDefinition] = [
             resistances=[
                 Resistance(damage_type="all", condition="structure_1_or_less")
             ],
-            zero_hp_survival_effects=[
-                ZeroHpSurvivalEffect(condition="zero_hp")
-            ],
+            zero_hp_survival_effects=[ZeroHpSurvivalEffect(condition="zero_hp")],
         ),
     ),
     CoreBonusDefinition(
@@ -389,7 +401,12 @@ SSC_CORE_BONUSES: list[CoreBonusDefinition] = [
                     condition="flying_this_turn",
                     effect=MechanicalEffect(
                         resource_changes=[
-                            ResourceChange(resource="heat", amount=1, direction="gain", target="self")
+                            ResourceChange(
+                                resource="heat",
+                                amount=1,
+                                direction="gain",
+                                target="self",
+                            )
                         ],
                     ),
                 )
@@ -500,9 +517,7 @@ HORUS_CORE_BONUSES: list[CoreBonusDefinition] = [
         name="The Lesson of Shaping",
         manufacturer="HORUS",
         effects=MechanicalEffect(
-            ai_system_limits=[
-                AISystemLimitEffect(bonus_systems=1, max_ai_systems=2)
-            ],
+            ai_system_limits=[AISystemLimitEffect(bonus_systems=1, max_ai_systems=2)],
             ai_control_transfers=[AIControlTransferEffect()],
         ),
     ),
@@ -511,20 +526,73 @@ HORUS_CORE_BONUSES: list[CoreBonusDefinition] = [
 # Harrison Armory Core Bonuses
 HA_CORE_BONUSES: list[CoreBonusDefinition] = [
     CoreBonusDefinition(
-        id="ha_superior_by_design",
-        name="Superior by Design",
+        id="ha_armory_sculpted",
+        name="Armory Sculpted",
         manufacturer="HA",
         effects=MechanicalEffect(
-            stat_mods=[StatModifier(stat="heat_cap", value=2)],
+            check_mods=[
+                CheckModifierEffect(
+                    value=1,
+                    check_types=["engineering"],
+                    check_kinds=["check", "save"],
+                )
+            ],
             triggered_effects=[
                 TriggeredEffect(
-                    trigger="on_overheat",
+                    trigger="on_overcharge",
                     effect=MechanicalEffect(
-                        direct_damages=[
-                            DirectDamage(
-                                damage_type="energy",
-                                flat=2,
-                                target="adjacent",
+                        cover_grants=[
+                            CoverGrant(
+                                cover="soft",
+                                target="self",
+                                duration="start_of_next_turn",
+                            )
+                        ],
+                    ),
+                )
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="ha_heatfall_coolant",
+        name="Heatfall Coolant System",
+        manufacturer="HA",
+        effects=MechanicalEffect(
+            overcharge_cost_caps=[
+                OverchargeCostCapEffect(max_cost=DiceExpression.parse("1d6"))
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="ha_integrated_ammo_feeds",
+        name="Integrated Ammo Feeds",
+        manufacturer="HA",
+        effects=MechanicalEffect(
+            limited_use_bonuses=[
+                LimitedUseBonusEffect(
+                    bonus_uses=2,
+                    applies_to=["system", "deployable"],
+                )
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="ha_adaptive_reactor",
+        name="Adaptive Reactor",
+        manufacturer="HA",
+        effects=MechanicalEffect(
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_stabilize",
+                    condition="stabilize_cool",
+                    effect=MechanicalEffect(
+                        resource_changes=[
+                            ResourceChange(
+                                resource="stress",
+                                amount=1,
+                                direction="lose",
+                                target="self",
+                                cost_repairs=3,
                             )
                         ]
                     ),
@@ -533,49 +601,41 @@ HA_CORE_BONUSES: list[CoreBonusDefinition] = [
         ),
     ),
     CoreBonusDefinition(
-        id="ha_ammofeeds",
-        name="Ammofeeds",
+        id="ha_stasis_shielding",
+        name="Stasis Shielding",
         manufacturer="HA",
         effects=MechanicalEffect(
-            stat_mods=[StatModifier(stat="limited_bonus", value=2)],
-            reload_restrictions=[
-                ReloadRestrictionEffect(
-                    applies_to="limited",
-                    disallow_reload=True,
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_overheat",
+                    condition="gain_stress",
+                    effect=MechanicalEffect(
+                        resistances=[
+                            Resistance(damage_type="all", duration="start_of_next_turn")
+                        ],
+                    ),
                 )
             ],
         ),
     ),
     CoreBonusDefinition(
-        id="ha_burnout_insulation",
-        name="Burnout Insulation",
+        id="ha_superior_by_design",
+        name="Superior by Design",
         manufacturer="HA",
         effects=MechanicalEffect(
-            immunities=[Immunity(target="burn")],
-            accuracy_mods=[AccuracyModifier(value=1, applies_to="all", condition="deals_burn_or_heat")],
-        ),
-    ),
-    CoreBonusDefinition(
-        id="ha_integrated_nervesuit",
-        name="Integrated Nervesuit",
-        manufacturer="HA",
-        effects=MechanicalEffect(
-            immunities=[Immunity(target="reactions_from_movement")],
-            check_value_mods=[
-                CheckValueModifierEffect(
-                    value=2,
-                    check_kinds=["save"],
-                    condition="avoid_immobilized",
-                )
-            ],
+            stat_mods=[StatModifier(stat="heat_cap", value=2)],
+            immunities=[Immunity(target="impaired")],
         ),
     ),
 ]
 
 # All core bonuses combined
 ALL_CORE_BONUSES: list[CoreBonusDefinition] = (
-    GMS_CORE_BONUSES + IPSN_CORE_BONUSES + SSC_CORE_BONUSES + 
-    HORUS_CORE_BONUSES + HA_CORE_BONUSES
+    GMS_CORE_BONUSES
+    + IPSN_CORE_BONUSES
+    + SSC_CORE_BONUSES
+    + HORUS_CORE_BONUSES
+    + HA_CORE_BONUSES
 )
 
 
@@ -587,6 +647,8 @@ def get_core_bonus_definition(core_bonus_id: str) -> CoreBonusDefinition | None:
     return None
 
 
-def get_core_bonuses_by_manufacturer(manufacturer: Manufacturer) -> list[CoreBonusDefinition]:
+def get_core_bonuses_by_manufacturer(
+    manufacturer: Manufacturer,
+) -> list[CoreBonusDefinition]:
     """Get all core bonuses from a specific manufacturer."""
     return [cb for cb in ALL_CORE_BONUSES if cb.manufacturer == manufacturer]

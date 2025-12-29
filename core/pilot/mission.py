@@ -39,7 +39,6 @@ class MissionCadenceRules(FrozenModel):
     reserve_pool_scope: Literal["shared", "per_pilot"] = "shared"
 
 
-
 DEFAULT_MISSION_CADENCE_RULES = MissionCadenceRules()
 
 
@@ -52,7 +51,6 @@ class ReserveEntry(FrozenModel):
     uses_remaining: int = Field(default=1, ge=0)
     shared: bool = True
     expires_on_mission_end: bool = True
-
 
 
 class DowntimeActionDefinition(FrozenModel):
@@ -69,7 +67,6 @@ class DowntimeActionDefinition(FrozenModel):
     grants_reserve: bool = False
 
 
-
 class DowntimeActionUse(FrozenModel):
     """A single downtime action taken by a pilot."""
 
@@ -78,13 +75,11 @@ class DowntimeActionUse(FrozenModel):
     reserve: ReserveEntry | None = None
 
 
-
 class DowntimePlan(FrozenModel):
     """Recorded downtime actions for a pilot."""
 
     pilot_id: str
     actions: list[DowntimeActionUse] = Field(default_factory=list)
-
 
 
 DOWNTIME_ACTION_DEFINITIONS: list[DowntimeActionDefinition] = [
@@ -147,13 +142,11 @@ class DowntimeIssue(FrozenModel):
     severity: Literal["error", "warning"] = "error"
 
 
-
 class DowntimeValidation(FrozenModel):
     """Validation result for downtime planning."""
 
     valid: bool
     issues: list[DowntimeIssue] = Field(default_factory=list)
-
 
 
 def validate_downtime_plan(
@@ -239,4 +232,6 @@ def validate_downtime_plan(
                     )
                 )
 
-    return DowntimeValidation(valid=not any(i.severity == "error" for i in issues), issues=issues)
+    return DowntimeValidation(
+        valid=not any(i.severity == "error" for i in issues), issues=issues
+    )

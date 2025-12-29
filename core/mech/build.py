@@ -8,7 +8,13 @@ from core.mech.frame import MechFrameDefinition
 from core.mech.weapon import MechWeaponDefinition, WeaponSize
 from core.mech.system import MechSystemDefinition
 from core.shared.enums import SizeClass
-from core.shared.effects import MechanicalEffect, StatModifier
+from core.shared.effects import (
+    MechanicalEffect,
+    StatModifier,
+    LimitedUseBonusEffect,
+    OverchargeCostCapEffect,
+    AISystemLimitEffect,
+)
 
 
 class MountedWeapon(FrozenModel):
@@ -122,6 +128,8 @@ class MechDerivedStats(FrozenModel):
     system_points: int
     attack_bonus: int
     limited_bonus: int
+    overcharge_cost_caps: list[OverchargeCostCapEffect] = Field(default_factory=list)
+    ai_system_limit: int = Field(default=1, ge=0)
 
 
 
@@ -146,29 +154,39 @@ def compute_limited_uses(
     stats: MechDerivedStats,
     weapon_definitions: dict[str, MechWeaponDefinition],
     system_definitions: dict[str, MechSystemDefinition],
+    bonus_effects: list[MechanicalEffect] | None = None,
 ) -> LimitedUseSummary:
     """Compute effective limited uses after applying engineering bonuses."""
     limited_bonus = stats.limited_bonus
+    limited_use_bonuses = _collect_limited_use_bonuses(bonus_effects)
     weapon_entries: list[LimitedUseEntry] = []
     system_entries: list[LimitedUseEntry] = []
 
     for mounted in build.weapons:
         definition = weapon_definitions.get(mounted.weapon_id)
         if definition and definition.limited_uses is not None:
+            extra_uses = _limited_use_bonus_for_weapon(
+                definition,
+                limited_use_bonuses,
+            )
             weapon_entries.append(
                 LimitedUseEntry(
                     item_id=mounted.weapon_id,
-                    uses=definition.limited_uses + limited_bonus,
+                    uses=definition.limited_uses + limited_bonus + extra_uses,
                 )
             )
 
     for system in build.systems:
         definition = system_definitions.get(system.system_id)
         if definition and definition.limited_uses is not None:
+            extra_uses = _limited_use_bonus_for_system(
+                definition,
+                limited_use_bonuses,
+            )
             system_entries.append(
                 LimitedUseEntry(
                     item_id=system.system_id,
-                    uses=definition.limited_uses + limited_bonus,
+                    uses=definition.limited_uses + limited_bonus + extra_uses,
                 )
             )
 
@@ -183,6 +201,8 @@ def compute_mech_stats(
 ) -> MechDerivedStats:
     """Compute final mech stats from a frame, skill bonuses, grit, and effects."""
     base = frame.base_stats
+    overcharge_cost_caps = _collect_overcharge_cost_caps(bonus_effects)
+    ai_system_limit = compute_ai_system_limit(bonus_effects)
     size = base.size
     hull = skills.hull
     agility = skills.agility
@@ -238,6 +258,8 @@ def compute_mech_stats(
         system_points=system_points,
         attack_bonus=grit,
         limited_bonus=limited_bonus,
+        overcharge_cost_caps=overcharge_cost_caps,
+        ai_system_limit=ai_system_limit,
     )
 
 
@@ -308,3 +330,119 @@ def _adjust_size(size: SizeClass, delta: int) -> SizeClass:
     if index < 0 or index >= len(order):
         raise ValueError(f"Size adjustment {delta} out of bounds for {size}")
     return order[index]
+
+
+def _collect_limited_use_bonuses(
+    bonus_effects: list[MechanicalEffect] | None,
+) -> list[LimitedUseBonusEffect]:
+    if not bonus_effects:
+        return []
+    bonuses: list[LimitedUseBonusEffect] = []
+    for effect in bonus_effects:
+        bonuses.extend(effect.limited_use_bonuses)
+    return bonuses
+
+
+def _collect_overcharge_cost_caps(
+    bonus_effects: list[MechanicalEffect] | None,
+) -> list[OverchargeCostCapEffect]:
+    if not bonus_effects:
+        return []
+    caps: list[OverchargeCostCapEffect] = []
+    for effect in bonus_effects:
+        caps.extend(effect.overcharge_cost_caps)
+    return caps
+
+
+def _collect_ai_system_limits(
+    bonus_effects: list[MechanicalEffect] | None,
+) -> list[AISystemLimitEffect]:
+    if not bonus_effects:
+        return []
+    limits: list[AISystemLimitEffect] = []
+    for effect in bonus_effects:
+        limits.extend(effect.ai_system_limits)
+    return limits
+
+
+def compute_ai_system_limit(
+    bonus_effects: list[MechanicalEffect] | None,
+    base_limit: int = 1,
+) -> int:
+    """Resolve the maximum number of AI systems allowed."""
+    limits = _collect_ai_system_limits(bonus_effects)
+    if not limits:
+        return base_limit
+    bonus_total = sum(limit.bonus_systems for limit in limits)
+    effective = base_limit + bonus_total
+    explicit_limits = [
+        limit.max_ai_systems for limit in limits if limit.max_ai_systems is not None
+    ]
+    if explicit_limits:
+        effective = max(effective, max(explicit_limits))
+    return effective
+
+
+def _limited_use_bonus_for_weapon(
+    definition: MechWeaponDefinition,
+    bonuses: list[LimitedUseBonusEffect],
+) -> int:
+    tags = {tag.tag for tag in definition.tags}
+    return _apply_limited_use_bonuses(
+        bonuses,
+        tags=tags,
+        limited_uses=definition.limited_uses,
+        item_type="weapon",
+        is_deployable=False,
+    )
+
+
+def _limited_use_bonus_for_system(
+    definition: MechSystemDefinition,
+    bonuses: list[LimitedUseBonusEffect],
+) -> int:
+    tags = {tag.tag for tag in definition.tags}
+    is_deployable = definition.deployable is not None or "deployable" in tags
+    return _apply_limited_use_bonuses(
+        bonuses,
+        tags=tags,
+        limited_uses=definition.limited_uses,
+        item_type="system",
+        is_deployable=is_deployable,
+    )
+
+
+def _apply_limited_use_bonuses(
+    bonuses: list[LimitedUseBonusEffect],
+    tags: set[str],
+    limited_uses: int | None,
+    item_type: str,
+    is_deployable: bool,
+) -> int:
+    if limited_uses is None:
+        return 0
+    extra = 0
+    for bonus in bonuses:
+        applies_to = bonus.applies_to or ["weapon", "system", "deployable"]
+        if item_type == "weapon" and "weapon" not in applies_to:
+            continue
+        if item_type == "system":
+            type_match = "system" in applies_to or (is_deployable and "deployable" in applies_to)
+            if not type_match:
+                continue
+        if not _limited_use_tag_match(bonus, tags, limited_uses):
+            continue
+        extra += bonus.bonus_uses
+    return extra
+
+
+def _limited_use_tag_match(
+    bonus: LimitedUseBonusEffect,
+    tags: set[str],
+    limited_uses: int | None,
+) -> bool:
+    if not bonus.requires_tag:
+        return True
+    if bonus.requires_tag in tags:
+        return True
+    return bonus.requires_tag == "limited" and limited_uses is not None

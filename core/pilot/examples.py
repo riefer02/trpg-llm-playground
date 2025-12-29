@@ -156,6 +156,7 @@ def evaluate_oda_ll0_example() -> tuple[ProgressionValidation, MechBuildValidati
         licenses=pilot.licenses,
         weapon_definitions=WEAPON_DEFINITIONS_BY_ID,
         system_definitions=SYSTEM_DEFINITIONS_BY_ID,
+        bonus_effects=effects,
     )
     stats = compute_mech_stats(frame, skills, grit, bonus_effects=effects)
     expected = {
@@ -188,6 +189,7 @@ def evaluate_oda_ll3_example() -> tuple[ProgressionValidation, MechBuildValidati
         licenses=pilot.licenses,
         weapon_definitions=WEAPON_DEFINITIONS_BY_ID,
         system_definitions=SYSTEM_DEFINITIONS_BY_ID,
+        bonus_effects=effects,
     )
     stats = compute_mech_stats(frame, skills, grit, bonus_effects=effects)
     expected = {
