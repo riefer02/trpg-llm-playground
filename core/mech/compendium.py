@@ -31,11 +31,14 @@ from core.shared.effects import (
     AccuracyModifier,
     ActionGrant,
     ActionRestriction,
+    AttackContextCondition,
     AreaSelectionEffect,
     AreaAttackPattern,
     AttackOutcomeEffect,
     AttackRerollEffect,
     AttackCaptureEffect,
+    CheckContextCondition,
+    ConditionGroup,
     CoverRestriction,
     CoverGrant,
     DelayedImpactEffect,
@@ -43,6 +46,9 @@ from core.shared.effects import (
     DamageMultiplierEffect,
     DamageReduction,
     DamageShareEffect,
+    DicePoolEffect,
+    DicePoolGain,
+    DicePoolSpendOption,
     DirectDamage,
     CheckModifierEffect,
     EffectRemoval,
@@ -69,6 +75,7 @@ from core.shared.effects import (
     RandomCheckEffect,
     RollPatternEffect,
     ResourceChange,
+    ReactionCondition,
     RepairActionEffect,
     RepairCostModifier,
     RepairShareEffect,
@@ -83,6 +90,7 @@ from core.shared.effects import (
     GrappleEffect,
     SaveOverrideEffect,
     SizeInteractionEffect,
+    SizeCondition,
     MountedAllyEffect,
     SaveCheck,
     StatModifier,
@@ -104,10 +112,12 @@ from core.shared.effects import (
     TriggeredEffect,
     CorePowerEffect,
     ProtocolEffect,
+    ModeEffect,
     TechAction,
     TechAttackModifier,
     TechActionRestriction,
     TechRange,
+    SpatialCondition,
     ZoneEffect,
     ZoneEndCondition,
 )
@@ -592,7 +602,11 @@ GMS_SYSTEMS: list[MechSystemDefinition] = [
                             AccuracyModifier(
                                 value=-2,
                                 applies_to="all",
-                                condition="mutual_attacks_between_self_and_target",
+                                condition=AttackContextCondition(
+                                    attack_types=["melee", "ranged"],
+                                    applies_to="mutual",
+                                    requires_line_of_sight=True,
+                                ),
                             )
                         ],
                         triggered_effects=[
@@ -802,39 +816,60 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                         action_type="protocol",
                         duration="scene",
                         effects=MechanicalEffect(
-                            triggered_effects=[
-                                TriggeredEffect(
-                                    trigger="on_turn_end",
-                                    condition="if_mjolnir_not_fired_gain_2_chambers_max_6",
-                                    effect=MechanicalEffect(),
-                                ),
-                                TriggeredEffect(
-                                    trigger="on_activation",
-                                    condition="fire_all_chambers_4_damage_each_max_6",
-                                    effect=MechanicalEffect(
-                                        direct_damages=[
-                                            DirectDamage(
-                                                damage_type="kinetic",
-                                                flat=4,
-                                                condition="per_chamber",
+                            dice_pools=[
+                                DicePoolEffect(
+                                    pool_name="mjolnir_chambers",
+                                    die_size=6,
+                                    max_dice=6,
+                                    starting_dice=0,
+                                    weapon_id="ipsn_m35_mjolnir",
+                                    gain_triggers=[
+                                        DicePoolGain(
+                                            trigger="on_turn_end",
+                                            amount=2,
+                                            uses_per="round",
+                                            requires_no_spend_this_turn=True,
+                                        )
+                                    ],
+                                    spend_options=[
+                                        DicePoolSpendOption(
+                                            name="Fire Chambers",
+                                            effect=MechanicalEffect(),
+                                            trigger="on_attack_roll",
+                                            spend_any_number=True,
+                                            spend_all=True,
+                                            dice_cost=None,
+                                            condition=AttackContextCondition(
+                                                weapon_ids=["ipsn_m35_mjolnir"],
+                                                applies_to="outgoing",
                                             ),
-                                            DirectDamage(
-                                                damage_type="kinetic",
-                                                flat=4,
-                                                ap=True,
-                                                condition="per_chamber_if_4_plus",
+                                            effect_per_die=MechanicalEffect(
+                                                damage_mods=[
+                                                    DamageModifier(
+                                                        flat=4,
+                                                        damage_type="kinetic",
+                                                    )
+                                                ]
                                             ),
-                                        ],
-                                        status_grants=[
-                                            StatusGrant(
-                                                status="shredded",
-                                                target="enemy",
-                                                duration="end_of_next_turn",
-                                                condition="chambers_4_plus",
-                                            )
-                                        ],
-                                    ),
-                                ),
+                                            bonus_requires_spend_at_least=4,
+                                            bonus_effect=MechanicalEffect(
+                                                weapon_mods=[
+                                                    WeaponModEffect(
+                                                        add_tags=[WeaponTagGrant(tag="ap")]
+                                                    )
+                                                ],
+                                                status_grants=[
+                                                    StatusGrant(
+                                                        status="shredded",
+                                                        target="enemy",
+                                                        duration="end_of_next_turn",
+                                                        trigger="on_hit",
+                                                    )
+                                                ],
+                                            ),
+                                        )
+                                    ],
+                                )
                             ],
                         ),
                     )
@@ -913,7 +948,12 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                             targetings=[
                                 AttackTargetingEffect(
                                     separate_attack_rolls=True,
-                                    condition="any_number_range_5_line_of_sight",
+                                    condition=SpatialCondition(
+                                        relation="within_range",
+                                        range=5,
+                                        range_type="range",
+                                        requires_line_of_sight=True,
+                                    ),
                                 )
                             ],
                             save_checks=[
@@ -1050,28 +1090,51 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                                     cover="hard",
                                     target="self",
                                     duration="scene",
-                                    condition="fortress_protocol_active",
                                 )
                             ],
                             immunities=[
                                 Immunity(
                                     target="knockback",
-                                    condition="using_drake_hard_cover",
+                                    condition=SpatialCondition(
+                                        relation="using_cover_from_source",
+                                        cover="hard",
+                                        target="self",
+                                    ),
                                 ),
                                 Immunity(
                                     target="prone",
-                                    condition="using_drake_hard_cover",
+                                    condition=SpatialCondition(
+                                        relation="using_cover_from_source",
+                                        cover="hard",
+                                        target="self",
+                                    ),
                                 ),
                                 Immunity(
                                     target="involuntary_movement",
-                                    condition="using_drake_hard_cover",
+                                    condition=SpatialCondition(
+                                        relation="using_cover_from_source",
+                                        cover="hard",
+                                        target="self",
+                                    ),
                                 ),
                             ],
                             resistances=[
                                 Resistance(
                                     damage_type="all",
                                     target="all",
-                                    condition="using_drake_hard_cover_blast_line_cone",
+                                    condition=ConditionGroup(
+                                        all_of=[
+                                            SpatialCondition(
+                                                relation="using_cover_from_source",
+                                                cover="hard",
+                                                target="self",
+                                            ),
+                                            AttackContextCondition(
+                                                area_shapes=["blast", "line", "cone"],
+                                                applies_to="incoming",
+                                            ),
+                                        ]
+                                    ),
                                 )
                             ],
                             zones=[
@@ -1099,7 +1162,7 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                             triggered_effects=[
                                 TriggeredEffect(
                                     trigger="on_reaction",
-                                    condition="brace_grants_full_action_next_turn",
+                                    condition=ReactionCondition(reaction_id="brace"),
                                     effect=MechanicalEffect(
                                         action_grants=[
                                             ActionGrant(
@@ -1136,10 +1199,21 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                 name="Blast Plating",
                 effects=MechanicalEffect(
                     resistances=[
-                        Resistance(damage_type="all", condition="blast_line_cone")
+                        Resistance(
+                            damage_type="all",
+                            condition=AttackContextCondition(
+                                area_shapes=["blast", "line", "cone"],
+                                applies_to="incoming",
+                            ),
+                        )
                     ],
                     heat_resistances=[
-                        HeatResistanceEffect(condition="blast_line_cone"),
+                        HeatResistanceEffect(
+                            condition=AttackContextCondition(
+                                area_shapes=["blast", "line", "cone"],
+                                applies_to="incoming",
+                            ),
+                        ),
                     ],
                 ),
             ),
@@ -1207,7 +1281,6 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                             triggered_effects=[
                                 TriggeredEffect(
                                     trigger="on_turn_start",
-                                    condition="self_heat_1_while_active",
                                     effect=MechanicalEffect(
                                         resource_changes=[
                                             ResourceChange(
@@ -1221,7 +1294,9 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                                 ),
                                 TriggeredEffect(
                                     trigger="on_turn_start",
-                                    condition="end_if_self_or_target_stunned",
+                                    condition=ConditionGroup(
+                                        any_of=["stunned", "target_stunned"]
+                                    ),
                                     effect=MechanicalEffect(),
                                 ),
                             ],
@@ -1229,22 +1304,53 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                                 AccuracyModifier(
                                     value=1,
                                     applies_to="all",
-                                    condition="supercharged_target_attacks_checks_saves",
+                                    target="ally",
+                                )
+                            ],
+                            check_mods=[
+                                CheckModifierEffect(
+                                    value=1,
+                                    check_kinds=["check", "save"],
+                                    target="ally",
                                 )
                             ],
                             immunities=[
-                                Immunity(target="impaired", condition="source_not_self"),
-                                Immunity(target="jammed", condition="source_not_self"),
-                                Immunity(target="slowed", condition="source_not_self"),
-                                Immunity(target="shredded", condition="source_not_self"),
-                                Immunity(target="immobilized", condition="source_not_self"),
+                                Immunity(
+                                    target="impaired",
+                                    condition=ConditionGroup(
+                                        none_of=["caused_by_self"]
+                                    ),
+                                ),
+                                Immunity(
+                                    target="jammed",
+                                    condition=ConditionGroup(
+                                        none_of=["caused_by_self"]
+                                    ),
+                                ),
+                                Immunity(
+                                    target="slowed",
+                                    condition=ConditionGroup(
+                                        none_of=["caused_by_self"]
+                                    ),
+                                ),
+                                Immunity(
+                                    target="shredded",
+                                    condition=ConditionGroup(
+                                        none_of=["caused_by_self"]
+                                    ),
+                                ),
+                                Immunity(
+                                    target="immobilized",
+                                    condition=ConditionGroup(
+                                        none_of=["caused_by_self"]
+                                    ),
+                                ),
                             ],
                             action_restrictions=[
                                 ActionRestriction(
                                     action_ids=["latch_drone_attack"],
                                     target="self",
                                     duration="scene",
-                                    condition="cannot_fire_latch_drone_while_active",
                                 )
                             ],
                         ),
@@ -1404,7 +1510,10 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                 triggered_effects=[
                     TriggeredEffect(
                         trigger="on_hit",
-                        condition="overwatch_attack",
+                        condition=ReactionCondition(
+                            reaction_id="overwatch",
+                            is_attack=True,
+                        ),
                         effect=MechanicalEffect(
                             status_grants=[
                                 StatusGrant(
@@ -1447,7 +1556,10 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                 name="Sentinel",
                 effects=MechanicalEffect(
                     accuracy_mods=[
-                        AccuracyModifier(value=1, condition="reaction_attack")
+                        AccuracyModifier(
+                            value=1,
+                            condition=ReactionCondition(is_attack=True),
+                        )
                     ],
                 ),
             ),
@@ -1675,7 +1787,9 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
             triggered_effects=[
                 TriggeredEffect(
                     trigger="on_hit",
-                    condition="target_grappled_or_biological",
+                    condition=ConditionGroup(
+                        any_of=["target_grappled", "target_biological"]
+                    ),
                     effect=MechanicalEffect(
                         damage_mods=[DamageModifier(flat=2)],
                     ),
@@ -2314,22 +2428,33 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         license_rank=1,
         tags=[SystemTag(tag="quick_action"), SystemTag(tag="shield")],
         effects=MechanicalEffect(
-            resistances=[
-                Resistance(
-                    damage_type="all",
-                    target="ally",
-                    condition="argonaut_shield_active_adjacent",
-                )
-            ],
-            damage_shares=[
-                DamageShareEffect(
-                    share_fraction=0.5,
-                    source="self",
-                    target="ally",
-                    timing="before_armor_and_reduction",
-                    requires_adjacent=True,
-                    breaks_on_separation=True,
-                    condition="argonaut_shield_active",
+            mode_effects=[
+                ModeEffect(
+                    name="Argonaut Shield",
+                    activation_action_id="argonaut_shield",
+                    activation_action_type="quick",
+                    effects=MechanicalEffect(
+                        resistances=[
+                            Resistance(
+                                damage_type="all",
+                                target="ally",
+                                condition=SpatialCondition(
+                                    relation="adjacent",
+                                    target="ally",
+                                ),
+                            )
+                        ],
+                        damage_shares=[
+                            DamageShareEffect(
+                                share_fraction=0.5,
+                                source="self",
+                                target="ally",
+                                timing="before_armor_and_reduction",
+                                requires_adjacent=True,
+                                breaks_on_separation=True,
+                            )
+                        ],
+                    ),
                 )
             ],
         ),
@@ -2414,7 +2539,14 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                     cover_all_directions=True,
                     continuous_effects=MechanicalEffect(
                         resistances=[
-                            Resistance(damage_type="all", condition="blast_line_cone_from_outside")
+                            Resistance(
+                                damage_type="all",
+                                condition=AttackContextCondition(
+                                    area_shapes=["blast", "line", "cone"],
+                                    applies_to="incoming",
+                                    requires_line_of_effect_crossing_zone=True,
+                                ),
+                            )
                         ],
                     ),
                 )
@@ -2475,7 +2607,7 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
             triggered_effects=[
                 TriggeredEffect(
                     trigger="on_reaction",
-                    condition="brace",
+                    condition=ReactionCondition(reaction_id="brace"),
                     effect=MechanicalEffect(
                         resource_changes=[
                             ResourceChange(
@@ -2489,7 +2621,14 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                             AccuracyModifier(
                                 value=-1,
                                 applies_to="all",
-                                condition="attacks_against_self_until_end_next_turn_after_brace",
+                                condition=ConditionGroup(
+                                    all_of=[
+                                        AttackContextCondition(
+                                            applies_to="incoming",
+                                        ),
+                                        "braced",
+                                    ]
+                                ),
                             )
                         ],
                         save_overrides=[
@@ -2498,28 +2637,69 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                                 auto_pass=True,
                                 include_contested_checks=True,
                                 duration="end_of_next_turn",
-                                condition="after_brace",
+                                condition="braced",
                             )
                         ],
                         immunities=[
                             Immunity(
                                 target="knockback",
-                                condition="from_smaller_than_size_5_until_end_next_turn_after_brace",
+                                condition=ConditionGroup(
+                                    all_of=[
+                                        "braced",
+                                        SizeCondition(
+                                            subject="source",
+                                            comparator="lt",
+                                            size="size_5",
+                                        ),
+                                    ]
+                                ),
                             ),
                             Immunity(
                                 target="grapple",
-                                condition="from_smaller_than_size_5_until_end_next_turn_after_brace",
+                                condition=ConditionGroup(
+                                    all_of=[
+                                        "braced",
+                                        SizeCondition(
+                                            subject="source",
+                                            comparator="lt",
+                                            size="size_5",
+                                        ),
+                                    ]
+                                ),
                             ),
                             Immunity(
                                 target="prone",
-                                condition="from_smaller_than_size_5_until_end_next_turn_after_brace",
+                                condition=ConditionGroup(
+                                    all_of=[
+                                        "braced",
+                                        SizeCondition(
+                                            subject="source",
+                                            comparator="lt",
+                                            size="size_5",
+                                        ),
+                                    ]
+                                ),
                             ),
                             Immunity(
                                 target="forced_movement",
-                                condition="from_smaller_than_size_5_until_end_next_turn_after_brace",
+                                condition=ConditionGroup(
+                                    all_of=[
+                                        "braced",
+                                        SizeCondition(
+                                            subject="source",
+                                            comparator="lt",
+                                            size="size_5",
+                                        ),
+                                    ]
+                                ),
                             ),
                         ],
-                        grapple_effects=[GrappleEffect(break_all_grapples=True, condition="on_brace")],
+                        grapple_effects=[
+                            GrappleEffect(
+                                break_all_grapples=True,
+                                condition=ReactionCondition(reaction_id="brace"),
+                            )
+                        ],
                     ),
                 )
             ],
@@ -2658,34 +2838,56 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         system_type="shield",
         tags=[SystemTag(tag="shield"), SystemTag(tag="quick_action")],
         effects=MechanicalEffect(
-            status_toggles=[
-                StatusToggleEffect(
-                    status="slowed",
-                    target="self",
-                    activation_action="quick",
-                    activation_timing="on_activation",
-                    deactivation_action="quick",
-                    deactivation_timing="on_activation",
-                    condition="hyper_dense_armor_active",
-                )
-            ],
-            resistances=[
-                Resistance(
-                    damage_type="all",
-                    condition="hyper_dense_armor_active_and_attack_range_gt_5",
-                )
-            ],
-            heat_resistances=[
-                HeatResistanceEffect(
-                    condition="hyper_dense_armor_active_and_attack_range_gt_5",
-                )
-            ],
-            damage_multipliers=[
-                DamageMultiplierEffect(
-                    multiplier=0.5,
-                    damage_types=["all", "heat", "burn"],
-                    applies_to="outgoing",
-                    condition="hyper_dense_armor_active_and_target_range_gt_5",
+            mode_effects=[
+                ModeEffect(
+                    name="Hyper Dense Armor",
+                    activation_action_id="hyper_dense_armor",
+                    activation_action_type="quick",
+                    deactivation_action_id="hyper_dense_armor_deactivate",
+                    deactivation_action_type="quick",
+                    effects=MechanicalEffect(
+                        status_grants=[
+                            StatusGrant(
+                                status="slowed",
+                                target="self",
+                                duration="until_cleared",
+                            )
+                        ],
+                        resistances=[
+                            Resistance(
+                                damage_type="all",
+                                condition=AttackContextCondition(
+                                    applies_to="incoming",
+                                    range_comparator="gt",
+                                    range=5,
+                                    range_type="range",
+                                ),
+                            )
+                        ],
+                        heat_resistances=[
+                            HeatResistanceEffect(
+                                condition=AttackContextCondition(
+                                    applies_to="incoming",
+                                    range_comparator="gt",
+                                    range=5,
+                                    range_type="range",
+                                ),
+                            )
+                        ],
+                        damage_multipliers=[
+                            DamageMultiplierEffect(
+                                multiplier=0.5,
+                                damage_types=["all", "heat", "burn"],
+                                applies_to="outgoing",
+                                condition=AttackContextCondition(
+                                    applies_to="outgoing",
+                                    range_comparator="gt",
+                                    range=5,
+                                    range_type="range",
+                                ),
+                            )
+                        ],
+                    ),
                 )
             ],
         ),
@@ -3519,7 +3721,19 @@ SSC_FRAMES: list[MechFrameDefinition] = [
                     accuracy_mods=[
                         AccuracyModifier(
                             value=-1,
-                            condition="ranged_attacks_against_self_in_soft_cover",
+                            condition=ConditionGroup(
+                                all_of=[
+                                    AttackContextCondition(
+                                        attack_types=["ranged"],
+                                        applies_to="incoming",
+                                    ),
+                                    SpatialCondition(
+                                        relation="using_cover_from_source",
+                                        cover="soft",
+                                        target="self",
+                                    ),
+                                ]
+                            ),
                         )
                     ],
                 ),
@@ -3606,7 +3820,20 @@ SSC_FRAMES: list[MechFrameDefinition] = [
                     triggered_effects=[
                         TriggeredEffect(
                             trigger="on_crit",
-                            condition="ranged_weapon_other_target_range_15_los",
+                            condition=ConditionGroup(
+                                all_of=[
+                                    AttackContextCondition(
+                                        attack_types=["ranged"],
+                                        applies_to="outgoing",
+                                    ),
+                                    SpatialCondition(
+                                        relation="within_range",
+                                        range=15,
+                                        range_type="range",
+                                        requires_line_of_sight=True,
+                                    ),
+                                ]
+                            ),
                             uses_per="round",
                             effect=MechanicalEffect(
                                 direct_damages=[
@@ -3779,7 +4006,18 @@ SSC_FRAMES: list[MechFrameDefinition] = [
                         success_threshold=4,
                         target="ally",
                         uses_per="round",
-                        condition="reaction_visible_source_and_target",
+                        condition=ConditionGroup(
+                            all_of=[
+                                SpatialCondition(
+                                    relation="line_of_sight",
+                                    target="ally",
+                                ),
+                                SpatialCondition(
+                                    relation="line_of_sight",
+                                    target="enemy",
+                                ),
+                            ]
+                        ),
                         on_success=MechanicalEffect(
                             resistances=[
                                 Resistance(
@@ -3883,7 +4121,10 @@ SSC_WEAPONS: list[MechWeaponDefinition] = [
             save_checks=[
                 SaveCheck(
                     trigger="on_hit",
-                    condition="line_targets",
+                    condition=AttackContextCondition(
+                        area_shapes=["line"],
+                        applies_to="outgoing",
+                    ),
                     save="hull",
                     target="enemy",
                     on_failure=MechanicalEffect(
@@ -3948,7 +4189,10 @@ SSC_WEAPONS: list[MechWeaponDefinition] = [
                     cover="soft",
                     target="ally",
                     duration="start_of_next_turn",
-                    condition="in_line_of_attack",
+                    condition=SpatialCondition(
+                        relation="line_of_attack",
+                        target="ally",
+                    ),
                 )
             ],
         ),
@@ -4281,33 +4525,93 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
             ),
         ),
         effects=MechanicalEffect(
-            zones=[
-                ZoneEffect(
-                    shape="square",
-                    width=2,
-                    height=2,
-                    placement="deployable",
-                    placement_range=5,
-                    duration="scene",
-                    max_instances_per_source=1,
-                    effects_on_enter=MechanicalEffect(
-                        save_checks=[
-                            SaveCheck(
-                                trigger="on_activation",
-                                condition="repulse_mode_hostile_enter",
-                                save="hull",
-                                target="enemy",
-                                on_failure=MechanicalEffect(
-                                    forced_movements=[
-                                        ForcedMovement(
-                                            direction="push",
-                                            distance=3,
+            choices=[
+                EffectChoice(
+                    name="Repulse",
+                    effect=MechanicalEffect(
+                        zones=[
+                            ZoneEffect(
+                                shape="square",
+                                width=2,
+                                height=2,
+                                placement="deployable",
+                                placement_range=5,
+                                duration="scene",
+                                max_instances_per_source=1,
+                                effects_on_enter=MechanicalEffect(
+                                    save_checks=[
+                                        SaveCheck(
+                                            trigger="on_enter",
+                                            condition=SpatialCondition(
+                                                relation="enter_zone",
+                                                target="enemy",
+                                            ),
+                                            save="hull",
                                             target="enemy",
-                                            on_collision=MechanicalEffect(
+                                            on_failure=MechanicalEffect(
+                                                forced_movements=[
+                                                    ForcedMovement(
+                                                        direction="push",
+                                                        distance=3,
+                                                        target="enemy",
+                                                        on_collision=MechanicalEffect(
+                                                            status_grants=[
+                                                                StatusGrant(
+                                                                    status="prone",
+                                                                    target="enemy",
+                                                                    duration="until_cleared",
+                                                                )
+                                                            ],
+                                                        ),
+                                                    )
+                                                ],
+                                            ),
+                                        )
+                                    ],
+                                    movement_grants=[
+                                        MovementGrant(
+                                            spaces=3,
+                                            movement_type="fly",
+                                            trigger="on_enter",
+                                            target="ally",
+                                            condition=SpatialCondition(
+                                                relation="enter_zone",
+                                                target="ally",
+                                            ),
+                                        )
+                                    ],
+                                ),
+                            )
+                        ],
+                    ),
+                ),
+                EffectChoice(
+                    name="Attract",
+                    effect=MechanicalEffect(
+                        zones=[
+                            ZoneEffect(
+                                shape="square",
+                                width=2,
+                                height=2,
+                                placement="deployable",
+                                placement_range=5,
+                                duration="scene",
+                                max_instances_per_source=1,
+                                effects_on_enter=MechanicalEffect(
+                                    save_checks=[
+                                        SaveCheck(
+                                            trigger="on_enter",
+                                            condition=SpatialCondition(
+                                                relation="enter_zone",
+                                                target="all",
+                                            ),
+                                            save="hull",
+                                            target="all",
+                                            on_failure=MechanicalEffect(
                                                 status_grants=[
                                                     StatusGrant(
-                                                        status="prone",
-                                                        target="enemy",
+                                                        status="immobilized",
+                                                        target="all",
                                                         duration="until_cleared",
                                                     )
                                                 ],
@@ -4315,49 +4619,25 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                                         )
                                     ],
                                 ),
-                            ),
-                            SaveCheck(
-                                trigger="on_activation",
-                                condition="attract_mode_any_enter",
-                                save="hull",
-                                target="enemy",
-                                on_failure=MechanicalEffect(
-                                    status_grants=[
-                                        StatusGrant(
-                                            status="immobilized",
-                                            target="enemy",
-                                            duration="until_cleared",
-                                        )
-                                    ],
-                                ),
-                            ),
+                            )
                         ],
-                        movement_grants=[
-                            MovementGrant(
-                                spaces=3,
-                                movement_type="fly",
-                                trigger="repulse_mode_ally_enter_free",
+                        effect_removals=[
+                            EffectRemoval(
+                                action_type="quick",
+                                check_type="hull",
+                                check_kind="save",
+                                target="self",
+                            )
+                        ],
+                        status_breaks=[
+                            StatusBreakCondition(
+                                status="immobilized",
+                                target="all",
+                                break_triggers=["source_destroyed"],
                             )
                         ],
                     ),
-                )
-            ],
-            effect_removals=[
-                EffectRemoval(
-                    action_type="quick",
-                    check_type="hull",
-                    check_kind="save",
-                    target="enemy",
-                    condition="attract_mode_immobilized",
-                )
-            ],
-            status_breaks=[
-                StatusBreakCondition(
-                    status="immobilized",
-                    target="enemy",
-                    break_triggers=["source_destroyed"],
-                    condition="attract_mode_immobilized",
-                )
+                ),
             ],
         ),
     ),
@@ -4400,13 +4680,27 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                     vertical_range=4,
                     duration="scene",
                     blocks_movement=True,
-                    blocks_movement_condition="metallic_armor_or_wielding_metal",
+                    blocks_movement_condition=CheckContextCondition(
+                        equipment_materials=["metal"],
+                    ),
                     counts_as_obstruction=True,
                     blocks_line_of_sight=False,
                     continuous_effects=MechanicalEffect(
                         resistances=[
-                            Resistance(damage_type="kinetic", condition="attacks_through_field"),
-                            Resistance(damage_type="explosive", condition="attacks_through_field"),
+                            Resistance(
+                                damage_type="kinetic",
+                                condition=AttackContextCondition(
+                                    applies_to="incoming",
+                                    requires_line_of_effect_crossing_zone=True,
+                                ),
+                            ),
+                            Resistance(
+                                damage_type="explosive",
+                                condition=AttackContextCondition(
+                                    applies_to="incoming",
+                                    requires_line_of_effect_crossing_zone=True,
+                                ),
+                            ),
                         ],
                     ),
                     max_instances_per_source=1,
@@ -4583,7 +4877,18 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                             EffectChoice(
                                 name="Mirage",
                                 target="ally",
-                                condition="choose_self_or_ally_in_los",
+                                condition=ConditionGroup(
+                                    any_of=[
+                                        SpatialCondition(
+                                            relation="line_of_sight",
+                                            target="self",
+                                        ),
+                                        SpatialCondition(
+                                            relation="line_of_sight",
+                                            target="ally",
+                                        ),
+                                    ]
+                                ),
                                 effect=MechanicalEffect(
                                     status_grants=[
                                         StatusGrant(
@@ -4642,7 +4947,26 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
             save_checks=[
                 SaveCheck(
                     trigger="on_activation",
-                    condition="burst_3_visible_no_cover",
+                    condition=ConditionGroup(
+                        all_of=[
+                            SpatialCondition(
+                                relation="within_range",
+                                range=3,
+                                range_type="burst",
+                                requires_line_of_sight=True,
+                            )
+                        ],
+                        none_of=[
+                            SpatialCondition(
+                                relation="using_cover_from_source",
+                                cover="soft",
+                            ),
+                            SpatialCondition(
+                                relation="using_cover_from_source",
+                                cover="hard",
+                            ),
+                        ],
+                    ),
                     save="agility",
                     target="enemy",
                     on_failure=MechanicalEffect(
@@ -4657,7 +4981,26 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                 ),
                 SaveCheck(
                     trigger="on_activation",
-                    condition="burst_3_visible_no_cover",
+                    condition=ConditionGroup(
+                        all_of=[
+                            SpatialCondition(
+                                relation="within_range",
+                                range=3,
+                                range_type="burst",
+                                requires_line_of_sight=True,
+                            )
+                        ],
+                        none_of=[
+                            SpatialCondition(
+                                relation="using_cover_from_source",
+                                cover="soft",
+                            ),
+                            SpatialCondition(
+                                relation="using_cover_from_source",
+                                cover="hard",
+                            ),
+                        ],
+                    ),
                     save="systems",
                     target="enemy",
                     on_failure=MechanicalEffect(
@@ -4820,7 +5163,7 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
             triggered_effects=[
                 TriggeredEffect(
                     trigger="on_activation",
-                    condition="brace",
+                    condition=ReactionCondition(reaction_id="brace"),
                     effect=MechanicalEffect(
                         movement_grants=[
                             MovementGrant(
@@ -5279,8 +5622,21 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
         tags=[SystemTag(tag="protocol")],
         effects=MechanicalEffect(
             accuracy_mods=[
-                AccuracyModifier(value=-1, condition="search_hidden_against_self"),
-                AccuracyModifier(value=-1, condition="ranged_or_tech_attacks_against_self"),
+                AccuracyModifier(
+                    value=-1,
+                    condition=AttackContextCondition(
+                        attack_types=["ranged", "tech"],
+                        applies_to="incoming",
+                    ),
+                )
+            ],
+            check_mods=[
+                CheckModifierEffect(
+                    value=-1,
+                    check_kinds=["search"],
+                    target="enemy",
+                    condition="hidden",
+                )
             ],
             status_grants=[
                 StatusGrant(

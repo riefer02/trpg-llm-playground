@@ -63,6 +63,13 @@ from core.shared.narrative import (
 from core.shared.effects import (
     StatType,
     ConditionType,
+    EffectCondition,
+    SpatialCondition,
+    AttackContextCondition,
+    CheckContextCondition,
+    ReactionCondition,
+    SizeCondition,
+    ConditionGroup,
     TriggerType,
     ReactionTriggerEvent,
     ActionCategoryType,

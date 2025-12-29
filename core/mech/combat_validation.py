@@ -14,6 +14,14 @@ from core.mech.grid import HexPosition
 from core.mech.terrain import terrain_index, TerrainHex
 from core.mech.statuses import STATUS_DEFINITIONS_BY_ID
 from core.shared.enums import CoverType
+from core.shared.effects import (
+    AttackContextCondition,
+    CheckContextCondition,
+    ConditionGroup,
+    EffectCondition,
+    SizeCondition,
+    SpatialCondition,
+)
 
 
 class CombatValidationIssue(FrozenModel):
@@ -30,6 +38,36 @@ class CombatValidation(FrozenModel):
 
     valid: bool
     issues: list[CombatValidationIssue] = Field(default_factory=list)
+
+
+def _condition_matches_statuses(
+    condition: EffectCondition | None,
+    statuses: set[str],
+) -> bool:
+    if condition is None:
+        return True
+    if isinstance(condition, str):
+        return condition in statuses
+    if isinstance(condition, ConditionGroup):
+        if condition.all_of and not all(
+            _condition_matches_statuses(item, statuses) for item in condition.all_of
+        ):
+            return False
+        if condition.any_of and not any(
+            _condition_matches_statuses(item, statuses) for item in condition.any_of
+        ):
+            return False
+        if condition.none_of and any(
+            _condition_matches_statuses(item, statuses) for item in condition.none_of
+        ):
+            return False
+        return True
+    if isinstance(
+        condition,
+        (SpatialCondition, AttackContextCondition, CheckContextCondition, SizeCondition),
+    ):
+        return False
+    return False
 
 
 
@@ -375,13 +413,15 @@ def _validate_turn(
 
     actor_statuses: list[str] = []
     mode_effects = actor.active_mode_effects if actor else []
+    base_statuses = list(actor.statuses) + list(actor.conditions) if actor else []
     mode_statuses = [
         grant.status
         for mode in mode_effects
         for grant in mode.effects.status_grants
+        if _condition_matches_statuses(grant.condition, set(base_statuses))
     ]
     if actor:
-        actor_statuses = list(actor.statuses) + list(actor.conditions) + mode_statuses
+        actor_statuses = base_statuses + mode_statuses
     hostiles = _hostiles_for(actor, combatants_by_id) if actor else []
     engaged = False
     if actor:
@@ -396,17 +436,20 @@ def _validate_turn(
         for status in actor_statuses
         if status in STATUS_DEFINITIONS_BY_ID
     ]
+    actor_status_set = set(actor_statuses)
     mode_action_restrictions = [
         restriction
         for mode in mode_effects
         for restriction in mode.effects.action_restrictions
         if restriction.target == "self"
+        and _condition_matches_statuses(restriction.condition, actor_status_set)
     ]
     mode_tech_restrictions = [
         restriction
         for mode in mode_effects
         for restriction in mode.effects.tech_restrictions
         if restriction.target == "self"
+        and _condition_matches_statuses(restriction.condition, actor_status_set)
     ]
 
     if actor_movement_restrictions:
