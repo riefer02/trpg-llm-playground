@@ -1,7 +1,8 @@
 """Mission cadence, downtime actions, and reserve handling models for Lancer TTRPG."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 
 MissionPhaseType = Literal["uptime", "downtime"]
@@ -25,7 +26,7 @@ DowntimeOutcomeType = Literal[
 ReserveSource = Literal["downtime_action", "mission_reward", "other"]
 
 
-class MissionCadenceRules(BaseModel):
+class MissionCadenceRules(FrozenModel):
     """Cadence and refresh rules for missions."""
 
     min_uptime_scenes: int = Field(default=1, ge=0)
@@ -37,13 +38,12 @@ class MissionCadenceRules(BaseModel):
     reserves_expire_on_mission_end: bool = True
     reserve_pool_scope: Literal["shared", "per_pilot"] = "shared"
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_MISSION_CADENCE_RULES = MissionCadenceRules()
 
 
-class ReserveEntry(BaseModel):
+class ReserveEntry(FrozenModel):
     """A single reserve available during a mission."""
 
     id: str = Field(..., description="Unique reserve identifier")
@@ -53,10 +53,9 @@ class ReserveEntry(BaseModel):
     shared: bool = True
     expires_on_mission_end: bool = True
 
-    model_config = {"frozen": True}
 
 
-class DowntimeActionDefinition(BaseModel):
+class DowntimeActionDefinition(FrozenModel):
     """Definition for a downtime action."""
 
     id: str = Field(..., description="Unique downtime action identifier")
@@ -69,26 +68,23 @@ class DowntimeActionDefinition(BaseModel):
     )
     grants_reserve: bool = False
 
-    model_config = {"frozen": True}
 
 
-class DowntimeActionUse(BaseModel):
+class DowntimeActionUse(FrozenModel):
     """A single downtime action taken by a pilot."""
 
     action_id: str
     outcome: DowntimeOutcomeType
     reserve: ReserveEntry | None = None
 
-    model_config = {"frozen": True}
 
 
-class DowntimePlan(BaseModel):
+class DowntimePlan(FrozenModel):
     """Recorded downtime actions for a pilot."""
 
     pilot_id: str
     actions: list[DowntimeActionUse] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
 DOWNTIME_ACTION_DEFINITIONS: list[DowntimeActionDefinition] = [
@@ -143,23 +139,21 @@ def get_downtime_action_definition(action_id: str) -> DowntimeActionDefinition |
     return DOWNTIME_ACTIONS_BY_ID.get(action_id)
 
 
-class DowntimeIssue(BaseModel):
+class DowntimeIssue(FrozenModel):
     """A downtime validation issue."""
 
     code: str
     message: str
     severity: Literal["error", "warning"] = "error"
 
-    model_config = {"frozen": True}
 
 
-class DowntimeValidation(BaseModel):
+class DowntimeValidation(FrozenModel):
     """Validation result for downtime planning."""
 
     valid: bool
     issues: list[DowntimeIssue] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
 def validate_downtime_plan(

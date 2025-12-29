@@ -1,7 +1,8 @@
 """Action rule definitions for mech combat."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.dice import DiceExpression
 from core.shared.enums import ActionType, AttackType, DamageType, StatusType
@@ -19,7 +20,7 @@ ActionCategory = Literal[
 ]
 
 
-class AttackActionProfile(BaseModel):
+class AttackActionProfile(FrozenModel):
     """Attack profile for an action."""
 
     attack_type: AttackType | None = None
@@ -34,10 +35,9 @@ class AttackActionProfile(BaseModel):
     on_hit_statuses: list[StatusType] = Field(default_factory=list)
     knockback_spaces: int | None = Field(default=None, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class MovementActionProfile(BaseModel):
+class MovementActionProfile(FrozenModel):
     """Movement profile for an action."""
 
     distance_multiplier: float = Field(default=1.0, ge=0.0)
@@ -45,10 +45,9 @@ class MovementActionProfile(BaseModel):
     ignore_reactions: bool = False
     counts_as_boost: bool = False
 
-    model_config = {"frozen": True}
 
 
-class TechActionProfile(BaseModel):
+class TechActionProfile(FrozenModel):
     """Tech action profile."""
 
     is_attack: bool = False
@@ -62,23 +61,21 @@ class TechActionProfile(BaseModel):
     repeat_same_option_allowed: bool = True
     repeat_same_option_requires_free_action: bool = False
 
-    model_config = {"frozen": True}
 
 
 CheckStat = Literal["systems", "agility", "skill_check"]
 
 
-class ContestedCheckRule(BaseModel):
+class ContestedCheckRule(FrozenModel):
     """Contested check definition for an action."""
 
     attacker_stat: CheckStat
     defender_stat: CheckStat
     tie_breaker: Literal["attacker", "defender"] = "attacker"
 
-    model_config = {"frozen": True}
 
 
-class LockOnRule(BaseModel):
+class LockOnRule(FrozenModel):
     """Lock on action effect and consumption behavior."""
 
     condition: StatusType = "lock_on"
@@ -87,10 +84,9 @@ class LockOnRule(BaseModel):
     consumed_by: Literal["hostile_attack"] = "hostile_attack"
     accuracy_bonus: int = Field(default=1, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class HideRule(BaseModel):
+class HideRule(FrozenModel):
     """Hide action requirements."""
 
     grants_condition: StatusType = "hidden"
@@ -100,10 +96,9 @@ class HideRule(BaseModel):
     allow_without_cover_if_no_los: bool = True
     allow_without_cover_if_invisible: bool = True
 
-    model_config = {"frozen": True}
 
 
-class SearchRule(BaseModel):
+class SearchRule(FrozenModel):
     """Search contested check and targeting requirements."""
 
     requires_hidden_target: bool = True
@@ -116,10 +111,9 @@ class SearchRule(BaseModel):
     pilot_range: int = Field(default=5, ge=0)
     reveals_on_success: bool = True
 
-    model_config = {"frozen": True}
 
 
-class GrappleRule(BaseModel):
+class GrappleRule(FrozenModel):
     """Grapple-specific restrictions."""
 
     no_boost_or_reactions: bool = True
@@ -131,10 +125,9 @@ class GrappleRule(BaseModel):
     defender_contested_hull: bool = True
     equal_size_contested_hull_each_turn: bool = True
 
-    model_config = {"frozen": True}
 
 
-class StabilizeRule(BaseModel):
+class StabilizeRule(FrozenModel):
     """Stabilize action options."""
 
     primary_options: list[Literal["cool_heat", "spend_repair_full_hp"]] = Field(
@@ -159,10 +152,9 @@ class StabilizeRule(BaseModel):
         ]
     )
 
-    model_config = {"frozen": True}
 
 
-class PrepareRule(BaseModel):
+class PrepareRule(FrozenModel):
     """Prepared action rule."""
 
     held_action_type: ActionType = "quick"
@@ -171,10 +163,9 @@ class PrepareRule(BaseModel):
     requires_trigger: bool = True
     expires_start_next_turn: bool = True
 
-    model_config = {"frozen": True}
 
 
-class ShutdownRule(BaseModel):
+class ShutdownRule(FrozenModel):
     """Shutdown action effect."""
 
     applies_status: StatusType = "shutdown"
@@ -183,28 +174,25 @@ class ShutdownRule(BaseModel):
     ends_tech_effects: bool = True
     immune_to_tech: bool = True
 
-    model_config = {"frozen": True}
 
 
-class BootUpRule(BaseModel):
+class BootUpRule(FrozenModel):
     """Boot up action effect."""
 
     clears_status: StatusType = "shutdown"
 
-    model_config = {"frozen": True}
 
 
-class MountRule(BaseModel):
+class MountRule(FrozenModel):
     """Mount/dismount/eject rules."""
 
     requires_adjacent: bool = True
     eject_distance: int | None = Field(default=None, ge=0)
     eject_causes_impaired_until_full_repair: bool = False
 
-    model_config = {"frozen": True}
 
 
-class SelfDestructRule(BaseModel):
+class SelfDestructRule(FrozenModel):
     """Self-destruct rules."""
 
     delay_turns_min: int = Field(default=1, ge=0)
@@ -215,18 +203,16 @@ class SelfDestructRule(BaseModel):
     save_skill: Literal["agility"] = "agility"
     save_halves_damage: bool = True
 
-    model_config = {"frozen": True}
 
 
-class OverchargeActionRule(BaseModel):
+class OverchargeActionRule(FrozenModel):
     """Overcharge action effect."""
 
     grants_extra_quick_action: bool = True
 
-    model_config = {"frozen": True}
 
 
-class BraceRule(BaseModel):
+class BraceRule(FrozenModel):
     """Brace reaction effects."""
 
     grants_status: StatusType = "braced"
@@ -234,10 +220,9 @@ class BraceRule(BaseModel):
     resist_heat_from_trigger: bool = True
     resist_burn_from_trigger: bool = True
 
-    model_config = {"frozen": True}
 
 
-class OverwatchRule(BaseModel):
+class OverwatchRule(FrozenModel):
     """Overwatch reaction trigger and behavior."""
 
     trigger: Literal["enemy_starts_movement_in_threat"] = "enemy_starts_movement_in_threat"
@@ -245,19 +230,17 @@ class OverwatchRule(BaseModel):
     uses_skirmish_attack: bool = True
     uses_per_round: int = Field(default=1, ge=1)
 
-    model_config = {"frozen": True}
 
 
-class FightRule(BaseModel):
+class FightRule(FrozenModel):
     """Pilot fight action rule."""
 
     uses_pilot_weapon: bool = True
     sidearm_can_be_quick: bool = True
 
-    model_config = {"frozen": True}
 
 
-class JockeyOption(BaseModel):
+class JockeyOption(FrozenModel):
     """Jockey follow-up option."""
 
     name: Literal["distract", "shred", "damage"]
@@ -266,19 +249,17 @@ class JockeyOption(BaseModel):
     damage: int = 0
     damage_type: DamageType | None = None
 
-    model_config = {"frozen": True}
 
 
-class JockeyRule(BaseModel):
+class JockeyRule(FrozenModel):
     """Pilot jockey action rule."""
 
     contested_check: Literal["grit_vs_hull"] = "grit_vs_hull"
     options: list[JockeyOption] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
-class ActionRule(BaseModel):
+class ActionRule(FrozenModel):
     """Rule definition for a combat action."""
 
     id: str
@@ -310,7 +291,6 @@ class ActionRule(BaseModel):
     hide: HideRule | None = None
     search: SearchRule | None = None
 
-    model_config = {"frozen": True}
 
 
 COMBAT_ACTION_RULES: list[ActionRule] = [

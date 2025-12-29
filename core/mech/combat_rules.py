@@ -1,7 +1,8 @@
 """Comprehensive mech combat ruleset models."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.enums import DamageType
 from core.shared.dice import DiceExpression
@@ -20,7 +21,7 @@ from core.mech.rules import (
 )
 
 
-class TurnOrderRules(BaseModel):
+class TurnOrderRules(FrozenModel):
     """Turn order and round cadence rules."""
 
     players_act_first: bool = True
@@ -30,10 +31,9 @@ class TurnOrderRules(BaseModel):
     remaining_side_any_order: bool = True
     next_round_start_other_side: bool = True
 
-    model_config = {"frozen": True}
 
 
-class TurnActionRules(BaseModel):
+class TurnActionRules(FrozenModel):
     """Per-turn action economy rules."""
 
     move_per_turn: int = Field(default=1, ge=0)
@@ -41,19 +41,17 @@ class TurnActionRules(BaseModel):
     free_actions_on_turn_only: bool = True
     overcharge_limit_per_turn: int = Field(default=1, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class EngagementRules(BaseModel):
+class EngagementRules(FrozenModel):
     """Engagement rules and penalties."""
 
     ranged_attack_difficulty: int = Field(default=1, ge=0)
     stop_on_engage_same_size_or_larger: bool = True
 
-    model_config = {"frozen": True}
 
 
-class ObstructionRules(BaseModel):
+class ObstructionRules(FrozenModel):
     """Obstruction and pass-through rules."""
 
     allies_obstruct: bool = False
@@ -62,10 +60,9 @@ class ObstructionRules(BaseModel):
     can_move_through_smaller: bool = True
     can_end_in_smaller_space: bool = False
 
-    model_config = {"frozen": True}
 
 
-class TerrainRules(BaseModel):
+class TerrainRules(FrozenModel):
     """Terrain interaction rules."""
 
     difficult_terrain_cost: int = Field(default=2, ge=1)
@@ -74,10 +71,9 @@ class TerrainRules(BaseModel):
     dangerous_terrain_check_once_per_round: bool = True
     climb_cost: int = Field(default=2, ge=1)
 
-    model_config = {"frozen": True}
 
 
-class FallingRules(BaseModel):
+class FallingRules(FrozenModel):
     """Falling damage rules."""
 
     min_distance_for_damage: int = Field(default=3, ge=0)
@@ -87,20 +83,18 @@ class FallingRules(BaseModel):
     max_damage: int = Field(default=9, ge=0)
     resolves_end_of_turn: bool = True
 
-    model_config = {"frozen": True}
 
 
-class ZeroGRules(BaseModel):
+class ZeroGRules(FrozenModel):
     """Zero-g or underwater movement rules."""
 
     slowed_without_propulsion: bool = True
     can_fly_while_moving: bool = True
     no_falling: bool = True
 
-    model_config = {"frozen": True}
 
 
-class TeleportRules(BaseModel):
+class TeleportRules(FrozenModel):
     """Teleport rules."""
 
     counts_as_movement_spaces: int = Field(default=1, ge=0)
@@ -112,10 +106,9 @@ class TeleportRules(BaseModel):
     ignores_line_of_sight: bool = True
     fails_if_destination_occupied: bool = True
 
-    model_config = {"frozen": True}
 
 
-class FlightRules(BaseModel):
+class FlightRules(FrozenModel):
     """Flight rules and restrictions."""
 
     must_move_min_spaces: int = Field(default=1, ge=0)
@@ -133,10 +126,9 @@ class FlightRules(BaseModel):
     carry_max_total_size: float = Field(default=0.5, ge=0.0)
     carry_limit_ignored_in_zero_g: bool = True
 
-    model_config = {"frozen": True}
 
 
-class AttackPatternDefinition(BaseModel):
+class AttackPatternDefinition(FrozenModel):
     """Definition for area attack patterns."""
 
     pattern: Literal["line", "cone", "blast", "burst"]
@@ -144,10 +136,9 @@ class AttackPatternDefinition(BaseModel):
     separate_attack_per_target: bool = True
     single_damage_roll: bool = True
 
-    model_config = {"frozen": True}
 
 
-class LineOfSightRules(BaseModel):
+class LineOfSightRules(FrozenModel):
     """Line of sight interaction rules."""
 
     requires_line_of_sight: bool = True
@@ -158,10 +149,9 @@ class LineOfSightRules(BaseModel):
     seeking_requires_path_clear: bool = True
     adjacent_cover_does_not_block_los: bool = True
 
-    model_config = {"frozen": True}
 
 
-class ValidTargetRules(BaseModel):
+class ValidTargetRules(FrozenModel):
     """Target eligibility rules."""
 
     allow_characters: bool = True
@@ -169,10 +159,9 @@ class ValidTargetRules(BaseModel):
     allow_points: bool = True
     allow_self: bool = False
 
-    model_config = {"frozen": True}
 
 
-class DamageResolutionRules(BaseModel):
+class DamageResolutionRules(FrozenModel):
     """Damage resolution order and constraints."""
 
     armor_applies_to: list[DamageType] = Field(
@@ -183,19 +172,17 @@ class DamageResolutionRules(BaseModel):
     ap_ignores_armor: bool = True
     apply_multipliers_before_reduction: bool = True
 
-    model_config = {"frozen": True}
 
 
-class D6Range(BaseModel):
+class D6Range(FrozenModel):
     """Inclusive d6 roll range."""
 
     roll_min: int = Field(..., ge=1, le=6)
     roll_max: int = Field(..., ge=1, le=6)
 
-    model_config = {"frozen": True}
 
 
-class SystemTraumaRules(BaseModel):
+class SystemTraumaRules(FrozenModel):
     """System trauma selection and fallback rules."""
 
     roll: DiceExpression = Field(default_factory=lambda: DiceExpression.parse("1d6"))
@@ -206,10 +193,9 @@ class SystemTraumaRules(BaseModel):
     fallback_to_other_if_none: bool = True
     fallback_to_direct_hit_if_none: bool = True
 
-    model_config = {"frozen": True}
 
 
-class StructureOutcomeType(BaseModel):
+class StructureOutcomeType(FrozenModel):
     """Outcome detail for structure damage."""
 
     name: Literal["glancing_blow", "system_trauma", "direct_hit", "crushing_hit"]
@@ -220,30 +206,27 @@ class StructureOutcomeType(BaseModel):
     hull_check_required: bool = False
     destroyed: bool = False
 
-    model_config = {"frozen": True}
 
 
-class StructureTableEntry(BaseModel):
+class StructureTableEntry(FrozenModel):
     """Table entry for structure damage results."""
 
     roll_min: int = Field(..., ge=1, le=6)
     roll_max: int = Field(..., ge=1, le=6)
     outcome: StructureOutcomeType
 
-    model_config = {"frozen": True}
 
 
-class DirectHitOutcome(BaseModel):
+class DirectHitOutcome(FrozenModel):
     """Direct hit outcome by remaining structure."""
 
     remaining_structure_min: int = Field(..., ge=0)
     remaining_structure_max: int | None = Field(default=None, ge=0)
     outcome: StructureOutcomeType
 
-    model_config = {"frozen": True}
 
 
-class StructureDamageRules(BaseModel):
+class StructureDamageRules(FrozenModel):
     """Structure damage and check rules."""
 
     pc_structure: int = Field(default=4, ge=0)
@@ -261,10 +244,9 @@ class StructureDamageRules(BaseModel):
     table: list[StructureTableEntry] = Field(default_factory=list)
     direct_hit_outcomes: list[DirectHitOutcome] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
-class OverheatOutcomeType(BaseModel):
+class OverheatOutcomeType(FrozenModel):
     """Outcome detail for overheat checks."""
 
     name: Literal["emergency_shunt", "power_plant_destabilize", "meltdown", "irreversible_meltdown"]
@@ -274,30 +256,27 @@ class OverheatOutcomeType(BaseModel):
     meltdown_countdown: bool = False
     engineering_check_to_delay: bool = False
 
-    model_config = {"frozen": True}
 
 
-class OverheatTableEntry(BaseModel):
+class OverheatTableEntry(FrozenModel):
     """Table entry for overheat results."""
 
     roll_min: int = Field(..., ge=1, le=6)
     roll_max: int = Field(..., ge=1, le=6)
     outcome: OverheatOutcomeType
 
-    model_config = {"frozen": True}
 
 
-class MeltdownOutcome(BaseModel):
+class MeltdownOutcome(FrozenModel):
     """Meltdown outcome by remaining stress."""
 
     remaining_stress_min: int = Field(..., ge=0)
     remaining_stress_max: int | None = Field(default=None, ge=0)
     outcome: OverheatOutcomeType
 
-    model_config = {"frozen": True}
 
 
-class OverheatRules(BaseModel):
+class OverheatRules(FrozenModel):
     """Heat and overheat table rules."""
 
     stress_per_overheat: int = Field(default=1, ge=0)
@@ -314,10 +293,9 @@ class OverheatRules(BaseModel):
         default_factory=lambda: OverheatOutcomeType(name="irreversible_meltdown", meltdown_countdown=True)
     )
 
-    model_config = {"frozen": True}
 
 
-class ReactorMeltdownRules(BaseModel):
+class ReactorMeltdownRules(FrozenModel):
     """Reactor meltdown resolution rules."""
 
     burst_radius: int = Field(default=2, ge=0)
@@ -327,10 +305,9 @@ class ReactorMeltdownRules(BaseModel):
     save_halves_damage: bool = True
     pilot_survival: bool = False
 
-    model_config = {"frozen": True}
 
 
-class RepairSpendOption(BaseModel):
+class RepairSpendOption(FrozenModel):
     """Repairs spend option during rest or stabilize."""
 
     repairs_spent: int = Field(..., ge=0)
@@ -342,10 +319,9 @@ class RepairSpendOption(BaseModel):
         "repair_destroyed_mech",
     ]
 
-    model_config = {"frozen": True}
 
 
-class RestRepairRules(BaseModel):
+class RestRepairRules(FrozenModel):
     """Rest and repair rules."""
 
     rest_hours: int = Field(default=1, ge=0)
@@ -356,7 +332,6 @@ class RestRepairRules(BaseModel):
     destroyed_mech_becomes_cover: bool = True
     destroyed_mech_difficult_terrain: bool = True
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_STRUCTURE_DAMAGE_RULES = StructureDamageRules(
@@ -453,7 +428,7 @@ DEFAULT_REST_REPAIR_RULES = RestRepairRules(
 )
 
 
-class MechCombatRules(BaseModel):
+class MechCombatRules(FrozenModel):
     """Top-level combat rules bundle."""
 
     turn_order: TurnOrderRules = Field(default_factory=TurnOrderRules)
@@ -483,7 +458,6 @@ class MechCombatRules(BaseModel):
     reactor_meltdown: ReactorMeltdownRules = Field(default_factory=ReactorMeltdownRules)
     rest_repair_rules: RestRepairRules = Field(default_factory=lambda: DEFAULT_REST_REPAIR_RULES)
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_MECH_COMBAT_RULES = MechCombatRules()

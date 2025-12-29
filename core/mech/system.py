@@ -1,11 +1,12 @@
 """Mech system definitions for Lancer TTRPG."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.effects import MechanicalEffect
-from core.shared.enums import ActionType, CoverType, DamageType, RangeType, SaveType, SizeClass, SystemType
-from core.shared.dice import DiceExpression
+from core.shared.enums import ActionType, CoverType, RangeType, SaveType, SizeClass, SystemType
+from core.shared.payloads import AreaEffect, DamageSpec, GrenadePayload, MineDetonation, MinePayload
 
 
 SystemTagType = Literal[
@@ -23,77 +24,18 @@ SystemTagType = Literal[
 ]
 
 
-class SystemTag(BaseModel):
+class SystemTag(FrozenModel):
     """Structured tag for a mech system."""
 
     tag: SystemTagType
     value: int | None = None
 
-    model_config = {"frozen": True}
-
-
-class DamageSpec(BaseModel):
-    """Damage specification for area effects."""
-
-    damage_type: DamageType | Literal["heat", "burn"]
-    dice: DiceExpression | None = None
-    flat: int = 0
-    ap: bool = False
-
-    model_config = {"frozen": True}
-
-
-class AreaEffect(BaseModel):
-    """Area effect payload (grenade, mine, etc)."""
-
-    pattern: RangeType
-    size: int = Field(..., ge=0)
-    range: int | None = Field(default=None, ge=0)
-    duration: Literal["instant", "end_of_turn", "end_of_next_turn", "scene"] = "instant"
-    cover: CoverType | None = None
-    damage: DamageSpec | None = None
-    save: SaveType | None = None
-    half_on_success: bool = True
-    attack_vs: Literal["evasion", "e_defense"] | None = None
-    object_damage: DamageSpec | None = None
-    objects_auto_hit: bool = False
-
-    model_config = {"frozen": True}
-
-
-class GrenadePayload(BaseModel):
-    """Grenade option for a system."""
-
-    name: str
-    range: int = Field(..., ge=0)
-    area: AreaEffect
-
-    model_config = {"frozen": True}
-
-
-MineDetonation = Literal[
-    "adjacent_movement",
-    "ally_adjacent_movement",
-    "manual",
-]
-
-
-class MinePayload(BaseModel):
-    """Mine option for a system."""
-
-    name: str
-    area: AreaEffect
-    detonation: MineDetonation = "adjacent_movement"
-    can_attach_to_terrain: bool = False
-    detonation_action: ActionType | None = None
-
-    model_config = {"frozen": True}
 
 
 EnvironmentType = Literal["low_g", "zero_g", "submarine"]
 
 
-class FlightEffect(BaseModel):
+class FlightEffect(FrozenModel):
     """Flight behavior granted by a system."""
 
     mode: Literal["always", "move", "boost", "move_or_boost", "environmental"]
@@ -102,10 +44,9 @@ class FlightEffect(BaseModel):
     heat_on_turn_end: int | Literal["size_plus_1"] | None = None
     ignores_slowed_in_environment: bool = False
 
-    model_config = {"frozen": True}
 
 
-class DeployableObject(BaseModel):
+class DeployableObject(FrozenModel):
     """Single deployable object definition."""
 
     size: int = Field(..., ge=0)
@@ -113,23 +54,21 @@ class DeployableObject(BaseModel):
     evasion: int = Field(default=5, ge=0)
     hp: int = Field(default=10, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class DeployableEffect(BaseModel):
+class DeployableEffect(FrozenModel):
     """Deployable system payload."""
 
     count: int = Field(default=1, ge=1)
     obj: DeployableObject
     pickup_action: ActionType | None = None
 
-    model_config = {"frozen": True}
 
 
 DroneReactionTrigger = Literal["ally_hit_target_within_range"]
 
 
-class DroneReaction(BaseModel):
+class DroneReaction(FrozenModel):
     """Reaction granted by a drone."""
 
     name: str
@@ -138,10 +77,9 @@ class DroneReaction(BaseModel):
     damage: DamageSpec
     uses_per_round: int = Field(default=1, ge=1)
 
-    model_config = {"frozen": True}
 
 
-class DronePayload(BaseModel):
+class DronePayload(FrozenModel):
     """Drone system payload."""
 
     name: str
@@ -159,10 +97,9 @@ class DronePayload(BaseModel):
     recall_action: ActionType | None = None
     recall_requires_line_of_sight: bool = False
 
-    model_config = {"frozen": True}
 
 
-class MechSystemDefinition(BaseModel):
+class MechSystemDefinition(FrozenModel):
     """Definition for a mech system or chassis mod."""
 
     id: str = Field(..., description="Unique system identifier")
@@ -188,5 +125,3 @@ class MechSystemDefinition(BaseModel):
     deployable: DeployableEffect | None = None
     drone: DronePayload | None = None
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
-
-    model_config = {"frozen": True}

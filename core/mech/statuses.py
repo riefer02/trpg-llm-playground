@@ -1,7 +1,8 @@
 """Status and condition definitions for mech combat."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.enums import StatusType
 
@@ -24,7 +25,7 @@ StatusClearTrigger = Literal[
 ]
 
 
-class ActionRestriction(BaseModel):
+class ActionRestriction(FrozenModel):
     """Action limitations caused by a status or condition."""
 
     disallow_actions: bool = False
@@ -40,30 +41,27 @@ class ActionRestriction(BaseModel):
     allowed_action_ids: list[str] = Field(default_factory=list)
     allowed_attack_action_ids: list[str] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
-class MovementRestriction(BaseModel):
+class MovementRestriction(FrozenModel):
     """Movement limitations caused by a status or condition."""
 
     max_voluntary_speed: int | None = Field(default=None, ge=0)
     only_regular_move: bool = False
     counts_as_difficult_terrain: bool = False
 
-    model_config = {"frozen": True}
 
 
-class TargetingRestriction(BaseModel):
+class TargetingRestriction(FrozenModel):
     """Targeting limitations caused by a status or condition."""
 
     cannot_be_targeted: bool = False
     area_attacks_can_target: bool = True
     miss_chance: float | None = Field(default=None, ge=0.0, le=1.0)
 
-    model_config = {"frozen": True}
 
 
-class StatusEffect(BaseModel):
+class StatusEffect(FrozenModel):
     """Mechanical effects for a status or condition."""
 
     ranged_attack_difficulty: int = 0
@@ -89,10 +87,9 @@ class StatusEffect(BaseModel):
     movement_restrictions: MovementRestriction = Field(default_factory=MovementRestriction)
     targeting_restrictions: TargetingRestriction = Field(default_factory=TargetingRestriction)
 
-    model_config = {"frozen": True}
 
 
-class StatusDefinition(BaseModel):
+class StatusDefinition(FrozenModel):
     """Definition for a combat status or condition."""
 
     status: StatusType
@@ -100,7 +97,6 @@ class StatusDefinition(BaseModel):
     effects: StatusEffect = Field(default_factory=StatusEffect)
     clear_triggers: list[StatusClearTrigger] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
 COMBAT_STATUS_DEFINITIONS: list[StatusDefinition] = [

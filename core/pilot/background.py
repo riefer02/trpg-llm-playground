@@ -8,10 +8,11 @@ the Lancer Third Party License). No copyrighted flavor text.
 """
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 
-class BackgroundInvokeRule(BaseModel):
+class BackgroundInvokeRule(FrozenModel):
     """
     Rule for invoking a background during narrative play.
 
@@ -23,10 +24,9 @@ class BackgroundInvokeRule(BaseModel):
     modifier_type: Literal["accuracy", "difficulty", "either"] = "either"
     applies_to: Literal["skill_check"] = "skill_check"
 
-    model_config = {"frozen": True}
 
 
-class Background(BaseModel):
+class Background(FrozenModel):
     """
     A pilot's background - their life before becoming a lancer.
     
@@ -48,7 +48,6 @@ class Background(BaseModel):
         description="Four trigger IDs from this background"
     )
     
-    model_config = {"frozen": True}
 
 
 # Background invoke rule (mechanical only)

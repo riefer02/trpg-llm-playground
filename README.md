@@ -123,6 +123,13 @@ python -m core.export --output-dir schemas/ --combined
 python -m core.export --model Pilot
 ```
 
+### Coverage & Validation Status
+
+- Coverage is focused on **mechanical rules** only (no flavor text), with shared effect primitives in `core/shared/effects.py`.
+- Pilot domain (skills, triggers, gear, talents, licenses, core bonuses) is typed and validated; mech domain (frames, weapons, systems, combat) is actively expanding.
+- Remaining gaps are tracked in `notes/mechanics_coverage_map.md`; new mechanics should extend typed effects rather than add untyped strings.
+- Core validation runs through schema tests (`make test-core`) and example builds; JSON Schema export is supported for integration.
+
 ---
 
 ## LLM Fine-Tuning Pipeline

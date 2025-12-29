@@ -1,7 +1,8 @@
 """Narrative check tier rules and helpers for Lancer TTRPG."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.rolls import RollType
 
@@ -9,7 +10,7 @@ from core.shared.rolls import RollType
 NarrativeCheckTier = Literal["standard", "risky", "heroic"]
 
 
-class NarrativeCheckTierRule(BaseModel):
+class NarrativeCheckTierRule(FrozenModel):
     """Tier-specific narrative check behavior."""
 
     tier: NarrativeCheckTier
@@ -21,29 +22,26 @@ class NarrativeCheckTierRule(BaseModel):
     )
     allows_push: bool = True
 
-    model_config = {"frozen": True}
 
 
-class NarrativeHelpRule(BaseModel):
+class NarrativeHelpRule(FrozenModel):
     """Rules for helping on a narrative check."""
 
     accuracy_bonus: int = Field(default=1, ge=0)
     helpers_share_consequences: bool = True
 
-    model_config = {"frozen": True}
 
 
-class NarrativePushRule(BaseModel):
+class NarrativePushRule(FrozenModel):
     """Rules for pushing a narrative check to a higher tier."""
 
     from_tier: NarrativeCheckTier
     to_tier: NarrativeCheckTier
     requires_gm_approval: bool = False
 
-    model_config = {"frozen": True}
 
 
-class NarrativeCheckRules(BaseModel):
+class NarrativeCheckRules(FrozenModel):
     """Combined narrative check rules."""
 
     default_target: int = Field(default=10, ge=0)
@@ -55,7 +53,6 @@ class NarrativeCheckRules(BaseModel):
         default_factory=lambda: ["skill_check", "save"],
     )
 
-    model_config = {"frozen": True}
 
 
 NARRATIVE_TIER_RULES: list[NarrativeCheckTierRule] = [

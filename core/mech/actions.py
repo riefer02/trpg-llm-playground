@@ -1,7 +1,8 @@
 """Action primitives for mech combat."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.enums import ActionType
 
@@ -10,7 +11,7 @@ ActionScope = Literal["mech", "pilot", "both"]
 ActionTagType = Literal["attack", "tech", "movement", "reaction", "utility", "defense", "protocol"]
 
 
-class ActionDefinition(BaseModel):
+class ActionDefinition(FrozenModel):
     """Definition for a combat action."""
 
     id: str = Field(..., description="Unique action identifier")
@@ -19,7 +20,6 @@ class ActionDefinition(BaseModel):
     scope: ActionScope = "mech"
     tags: list[ActionTagType] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
 BASIC_MECH_ACTIONS: list[ActionDefinition] = [

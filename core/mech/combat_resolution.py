@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.dice import DiceExpression
 from core.mech.combat_rules import (
@@ -17,16 +18,15 @@ from core.mech.combat_rules import (
 from core.mech.combat_state import MechInventory, WeaponState, WeaponMountState, MechSystemState
 
 
-class DiceRollResult(BaseModel):
+class DiceRollResult(FrozenModel):
     """Raw dice roll outcome."""
 
     rolls: list[int] = Field(default_factory=list)
     chosen: list[int] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
-class StructureResolution(BaseModel):
+class StructureResolution(FrozenModel):
     """Resolution result for structure damage."""
 
     outcome: StructureOutcomeType
@@ -37,10 +37,9 @@ class StructureResolution(BaseModel):
     structure_damage: int = 1
     spillover_damage: int = 0
 
-    model_config = {"frozen": True}
 
 
-class OverheatResolution(BaseModel):
+class OverheatResolution(FrozenModel):
     """Resolution result for overheat checks."""
 
     outcome: OverheatOutcomeType
@@ -48,19 +47,17 @@ class OverheatResolution(BaseModel):
     meltdown_outcome: OverheatOutcomeType | None = None
     stress_damage: int = 1
 
-    model_config = {"frozen": True}
 
 
-class ResolutionSettings(BaseModel):
+class ResolutionSettings(FrozenModel):
     """Settings for deterministic or forced resolution."""
 
     forced_rolls: list[int] | None = None
     forced_system_trauma_roll: int | None = Field(default=None, ge=1, le=6)
 
-    model_config = {"frozen": True}
 
 
-class SystemTraumaSelection(BaseModel):
+class SystemTraumaSelection(FrozenModel):
     """Resolved selection for system trauma results."""
 
     roll: int
@@ -72,7 +69,6 @@ class SystemTraumaSelection(BaseModel):
     destroyed_system_id: str | None = None
     fallback_reason: Literal["none", "no_mounts", "no_systems", "none_available"] = "none"
 
-    model_config = {"frozen": True}
 
 
 def resolve_structure_damage(

@@ -8,7 +8,8 @@ Note: This module contains only mechanical definitions (allowed under
 the Lancer Third Party License). No copyrighted flavor text.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.pilot.license import Manufacturer
 from core.shared.dice import DiceExpression
@@ -19,11 +20,35 @@ from core.shared.effects import (
     Immunity,
     Resistance,
     AccuracyModifier,
+    DirectDamage,
     RangeModifier,
+    CheckModifierEffect,
+    ResourceChange,
+    OverchargeCostCapEffect,
+    LimitedUseBonusEffect,
+    IntegratedWeaponEffect,
+    MountSlotGrant,
+    MountSlotReplacement,
+    RandomCheckEffect,
+    ActionGrant,
+    CoverGrant,
+    MovementGrant,
+    MovementOverrideEffect,
+    MovementSurfaceEffect,
+    MovementModeAccessEffect,
+    JumpDistanceEffect,
+    OutOfPlayEffect,
+    StatusBreakCondition,
+    StatusGrant,
+    TriggeredEffect,
+    WeaponModEffect,
+    ZeroHpSurvivalEffect,
+    AISystemLimitEffect,
+    AIControlTransferEffect,
 )
 
 
-class CoreBonusDefinition(BaseModel):
+class CoreBonusDefinition(FrozenModel):
     """
     A core bonus definition - the template for a learnable core bonus.
     
@@ -37,26 +62,39 @@ class CoreBonusDefinition(BaseModel):
     manufacturer: Manufacturer
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
     
-    model_config = {"frozen": True}
 
 
-class CoreBonus(BaseModel):
+class CoreBonus(FrozenModel):
     """A core bonus that a pilot has earned."""
     
     core_bonus_id: str = Field(..., description="ID of the core bonus definition")
     
-    model_config = {"frozen": True}
 
 
 # GMS Core Bonuses (available to all pilots)
 # Note: Only mechanical effects, no flavor text
 GMS_CORE_BONUSES: list[CoreBonusDefinition] = [
     CoreBonusDefinition(
-        id="gms_reinforced_frame",
-        name="Reinforced Frame",
+        id="gms_auto_stabilizing_hardpoints",
+        name="Auto-Stabilizing Hardpoints",
         manufacturer="GMS",
         effects=MechanicalEffect(
-            stat_mods=[StatModifier(stat="hp", value=5)],
+            accuracy_mods=[
+                AccuracyModifier(value=1, applies_to="all", condition="selected_mount")
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="gms_burnout_insulation",
+        name="Burnout Insulation",
+        manufacturer="GMS",
+        effects=MechanicalEffect(
+            damage_mods=[
+                DamageModifier(
+                    dice=DiceExpression.parse("1d6"),
+                    condition="selected_weapon",
+                )
+            ],
         ),
     ),
     CoreBonusDefinition(
@@ -64,7 +102,14 @@ GMS_CORE_BONUSES: list[CoreBonusDefinition] = [
         name="Improved Armament",
         manufacturer="GMS",
         effects=MechanicalEffect(
-            special="mount_extra_any",  # Gain extra mount of any size
+            mount_slot_grants=[
+                MountSlotGrant(
+                    slot_type="flexible",
+                    count=1,
+                    requires_mount_count_lt=3,
+                    condition="exclude_integrated_mounts",
+                )
+            ],
         ),
     ),
     CoreBonusDefinition(
@@ -72,7 +117,16 @@ GMS_CORE_BONUSES: list[CoreBonusDefinition] = [
         name="Integrated Weapon",
         manufacturer="GMS",
         effects=MechanicalEffect(
-            special="weapon_integrated_main_or_aux",  # Main/Aux weapon becomes integrated
+            integrated_weapons=[
+                IntegratedWeaponEffect(
+                    weapon_size="aux",
+                    free_attack_action_type="free",
+                    free_attack_uses_per="round",
+                    free_attack_trigger="on_attack_roll",
+                    requires_other_weapon_attack=True,
+                    cannot_be_modified=True,
+                )
+            ],
         ),
     ),
     CoreBonusDefinition(
@@ -80,7 +134,40 @@ GMS_CORE_BONUSES: list[CoreBonusDefinition] = [
         name="Mount Retrofitting",
         manufacturer="GMS",
         effects=MechanicalEffect(
-            special="mount_size_plus_1",  # Fit weapons one size larger
+            mount_slot_replacements=[
+                MountSlotReplacement(new_slot_type="main_aux", count=1)
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="gms_reserve_capacitors",
+        name="Reserve Capacitors",
+        manufacturer="GMS",
+        effects=MechanicalEffect(
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_core_power_spent",
+                    effect=MechanicalEffect(
+                        resource_changes=[
+                            ResourceChange(resource="hp", amount="full", direction="set", target="self"),
+                            ResourceChange(resource="heat", amount=0, direction="set", target="self"),
+                        ],
+                    ),
+                )
+            ],
+            random_checks=[
+                RandomCheckEffect(
+                    trigger="on_core_power_spent",
+                    roll=DiceExpression.parse("1d20"),
+                    success_threshold=20,
+                    target="self",
+                    on_success=MechanicalEffect(
+                        resource_changes=[
+                            ResourceChange(resource="core_power", amount=1, direction="gain", target="self")
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
 ]
@@ -88,36 +175,62 @@ GMS_CORE_BONUSES: list[CoreBonusDefinition] = [
 # IPS-N Core Bonuses
 IPSN_CORE_BONUSES: list[CoreBonusDefinition] = [
     CoreBonusDefinition(
-        id="ipsn_siege_ram",
-        name="Siege Ram",
+        id="ipsn_briareos_frame",
+        name="Briareos Frame Reinforcement",
         manufacturer="IPS-N",
         effects=MechanicalEffect(
-            damage_mods=[DamageModifier(dice=DiceExpression.parse("1d6"), damage_type="kinetic", condition=None)],
-            special="ram_knockdown",  # Ram knocks prone on hit
+            resistances=[
+                Resistance(damage_type="all", condition="structure_1_or_less")
+            ],
+            zero_hp_survival_effects=[
+                ZeroHpSurvivalEffect(condition="zero_hp")
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="ipsn_fomorian_frame",
+        name="Fomorian Frame Reinforcement",
+        manufacturer="IPS-N",
+        effects=MechanicalEffect(
+            stat_mods=[StatModifier(stat="size", value=1)],
+            immunities=[
+                Immunity(target="knockback", condition="from_smaller"),
+                Immunity(target="prone", condition="from_smaller"),
+                Immunity(target="pull", condition="from_smaller"),
+            ],
         ),
     ),
     CoreBonusDefinition(
         id="ipsn_gyges_frame",
-        name="Gyges Frame",
+        name="Gyges Frame Reinforcement",
         manufacturer="IPS-N",
         effects=MechanicalEffect(
-            stat_mods=[
-                StatModifier(stat="size", value=1),
-                StatModifier(stat="hp", value=5),
+            check_mods=[
+                CheckModifierEffect(
+                    value=1,
+                    check_types=["hull"],
+                    check_kinds=["check", "save"],
+                )
             ],
-            immunities=[
-                Immunity(target="knockback", condition="from_smaller"),
-                Immunity(target="prone", condition="from_smaller"),
+            range_mods=[
+                RangeModifier(range_type="threat", value=1, condition="melee_attack")
             ],
         ),
     ),
     CoreBonusDefinition(
-        id="ipsn_briareos_frame",
-        name="Briareos Frame",
+        id="ipsn_reinforced_frame",
+        name="Reinforced Frame",
         manufacturer="IPS-N",
         effects=MechanicalEffect(
-            accuracy_mods=[AccuracyModifier(value=1, applies_to="all", condition="aux_weapon")],
-            special="mount_aux_extra_2",  # +2 Aux mounts
+            stat_mods=[StatModifier(stat="hp", value=5)],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="ipsn_sloped_plating",
+        name="Sloped Plating",
+        manufacturer="IPS-N",
+        effects=MechanicalEffect(
+            stat_mods=[StatModifier(stat="armor", value=1)],
         ),
     ),
     CoreBonusDefinition(
@@ -125,7 +238,30 @@ IPSN_CORE_BONUSES: list[CoreBonusDefinition] = [
         name="Titanomachy Mesh",
         manufacturer="IPS-N",
         effects=MechanicalEffect(
-            special="damage_reduction_2",  # Reduce all damage by 2 (min 1)
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_hit",
+                    condition="ram_or_grapple",
+                    uses_per="round",
+                    effect=MechanicalEffect(
+                        action_grants=[
+                            ActionGrant(
+                                action_type="free",
+                                name="Bonus Ram/Grapple",
+                                trigger="on_hit",
+                            )
+                        ]
+                    ),
+                )
+            ],
+            forced_movements=[
+                ForcedMovement(
+                    direction="push",
+                    distance=1,
+                    target="enemy",
+                    condition="melee_knockback",
+                )
+            ],
         ),
     ),
 ]
@@ -133,39 +269,131 @@ IPSN_CORE_BONUSES: list[CoreBonusDefinition] = [
 # SSC Core Bonuses
 SSC_CORE_BONUSES: list[CoreBonusDefinition] = [
     CoreBonusDefinition(
-        id="ssc_ghostweave",
-        name="Ghostweave",
-        manufacturer="SSC",
-        effects=MechanicalEffect(
-            special="hide_grants_invisible",  # Invisible when hidden until attack/save
-        ),
-    ),
-    CoreBonusDefinition(
         id="ssc_full_subjectivity_sync",
         name="Full Subjectivity Sync",
         manufacturer="SSC",
         effects=MechanicalEffect(
-            stat_mods=[
-                StatModifier(stat="evasion", value=2),
-                StatModifier(stat="e_defense", value=2),
+            stat_mods=[StatModifier(stat="evasion", value=2)],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="ssc_ghostweave",
+        name="Ghostweave",
+        manufacturer="SSC",
+        effects=MechanicalEffect(
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_turn_start",
+                    effect=MechanicalEffect(
+                        status_grants=[
+                            StatusGrant(
+                                status="invisible",
+                                target="self",
+                                duration="end_of_turn",
+                            )
+                        ],
+                    ),
+                ),
+                TriggeredEffect(
+                    trigger="on_turn_end",
+                    condition="turn_only_move_hide_boost",
+                    effect=MechanicalEffect(
+                        status_grants=[
+                            StatusGrant(
+                                status="invisible",
+                                target="self",
+                                duration="start_of_next_turn",
+                            )
+                        ],
+                    ),
+                ),
             ],
-            accuracy_mods=[AccuracyModifier(value=-1, applies_to="all")],
+            status_breaks=[
+                StatusBreakCondition(
+                    status="invisible",
+                    target="self",
+                    break_triggers=["reaction"],
+                )
+            ],
         ),
     ),
     CoreBonusDefinition(
-        id="ssc_sculpted_light",
-        name="Sculpted Light",
+        id="ssc_integrated_nerveweave",
+        name="Integrated Nerveweave",
         manufacturer="SSC",
         effects=MechanicalEffect(
-            special="teleport_3_after_boost_1_per_round",
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_move",
+                    condition="after_boost",
+                    effect=MechanicalEffect(
+                        movement_grants=[
+                            MovementGrant(spaces=2, movement_type="boost")
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
     CoreBonusDefinition(
-        id="ssc_neurolink_targeting",
-        name="Neurolink Targeting",
+        id="ssc_kai_bioplating",
+        name="Kai Bioplating",
         manufacturer="SSC",
         effects=MechanicalEffect(
-            accuracy_mods=[AccuracyModifier(value=1, applies_to="ranged", condition="target_has_lock_on")],
+            check_mods=[
+                CheckModifierEffect(
+                    value=1,
+                    check_types=["agility"],
+                    check_kinds=["check"],
+                )
+            ],
+            movement_surface_effects=[
+                MovementSurfaceEffect(ignore_difficult_terrain=True),
+            ],
+            movement_mode_accesses=[
+                MovementModeAccessEffect(
+                    climb_at_full_speed=True,
+                    swim_at_full_speed=True,
+                )
+            ],
+            jump_distance_effects=[
+                JumpDistanceEffect(horizontal_multiplier=1.0, vertical_multiplier=0.5)
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="ssc_neurolinked_targeting",
+        name="Neuro-Linked Targeting",
+        manufacturer="SSC",
+        effects=MechanicalEffect(
+            range_mods=[
+                RangeModifier(range_type="range", value=3, condition="ranged_attack")
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="ssc_all_theater_movement",
+        name="All-Theater Movement Suite",
+        manufacturer="SSC",
+        effects=MechanicalEffect(
+            movement_overrides=[
+                MovementOverrideEffect(
+                    movement_modes=["move", "boost"],
+                    override_type="fly",
+                    duration="scene",
+                )
+            ],
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_turn_end",
+                    condition="flying_this_turn",
+                    effect=MechanicalEffect(
+                        resource_changes=[
+                            ResourceChange(resource="heat", amount=1, direction="gain", target="self")
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
 ]
@@ -173,20 +401,38 @@ SSC_CORE_BONUSES: list[CoreBonusDefinition] = [
 # HORUS Core Bonuses
 HORUS_CORE_BONUSES: list[CoreBonusDefinition] = [
     CoreBonusDefinition(
-        id="horus_the_lesson_of_the_open_door",
-        name="The Lesson of the Open Door",
-        manufacturer="HORUS",
-        effects=MechanicalEffect(
-            range_mods=[RangeModifier(range_type="range", value=50)],
-            special="hack_no_los",  # Hack at range 50, no LoS required
-        ),
-    ),
-    CoreBonusDefinition(
         id="horus_the_lesson_of_disbelief",
         name="The Lesson of Disbelief",
         manufacturer="HORUS",
         effects=MechanicalEffect(
-            special="damage_negate_d6_5_plus_1_per_round",  # 1/round, d6, 5+ = ignore damage
+            stat_mods=[StatModifier(stat="e_defense", value=2)],
+            check_mods=[
+                CheckModifierEffect(
+                    value=1,
+                    check_types=["systems"],
+                    check_kinds=["check", "save"],
+                )
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="horus_the_lesson_of_the_open_door",
+        name="The Lesson of the Open Door",
+        manufacturer="HORUS",
+        effects=MechanicalEffect(
+            stat_mods=[StatModifier(stat="save_target", value=2)],
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_target_failed_save",
+                    condition="caused_by_self",
+                    uses_per="round",
+                    effect=MechanicalEffect(
+                        direct_damages=[
+                            DirectDamage(damage_type="heat", flat=2, target="enemy")
+                        ]
+                    ),
+                )
+            ],
         ),
     ),
     CoreBonusDefinition(
@@ -194,7 +440,14 @@ HORUS_CORE_BONUSES: list[CoreBonusDefinition] = [
         name="The Lesson of the Held Image",
         manufacturer="HORUS",
         effects=MechanicalEffect(
-            special="holographic_duplicate",
+            action_grants=[
+                ActionGrant(
+                    action_type="reaction",
+                    name="Lock On (Held Image)",
+                    trigger="on_ally_turn_start",
+                    uses_per="round",
+                )
+            ],
         ),
     ),
     CoreBonusDefinition(
@@ -202,7 +455,55 @@ HORUS_CORE_BONUSES: list[CoreBonusDefinition] = [
         name="The Lesson of Transubstantiation",
         manufacturer="HORUS",
         effects=MechanicalEffect(
-            special="swap_position_ally_sensors_1_per_scene",
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_structure_loss",
+                    effect=MechanicalEffect(
+                        out_of_play_effects=[
+                            OutOfPlayEffect(duration="start_of_next_turn")
+                        ],
+                    ),
+                )
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="horus_the_lesson_of_thinking_tomorrows_thought",
+        name="The Lesson of Thinking-Tomorrow's-Thought",
+        manufacturer="HORUS",
+        effects=MechanicalEffect(
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_tech_attack_hit",
+                    effect=MechanicalEffect(
+                        accuracy_mods=[
+                            AccuracyModifier(
+                                value=1,
+                                applies_to="melee",
+                                condition="next_melee_vs_tech_hit_target",
+                            )
+                        ],
+                        weapon_mods=[
+                            WeaponModEffect(
+                                allowed_weapon_types=["melee"],
+                                damage_unreducible=True,
+                                condition="next_melee_vs_tech_hit_target",
+                            )
+                        ],
+                    ),
+                )
+            ],
+        ),
+    ),
+    CoreBonusDefinition(
+        id="horus_the_lesson_of_shaping",
+        name="The Lesson of Shaping",
+        manufacturer="HORUS",
+        effects=MechanicalEffect(
+            ai_system_limits=[
+                AISystemLimitEffect(bonus_systems=1, max_ai_systems=2)
+            ],
+            ai_control_transfers=[AIControlTransferEffect()],
         ),
     ),
 ]
@@ -215,7 +516,20 @@ HA_CORE_BONUSES: list[CoreBonusDefinition] = [
         manufacturer="HA",
         effects=MechanicalEffect(
             stat_mods=[StatModifier(stat="heat_cap", value=2)],
-            special="overheat_deals_2_energy_adjacent",
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_overheat",
+                    effect=MechanicalEffect(
+                        direct_damages=[
+                            DirectDamage(
+                                damage_type="energy",
+                                flat=2,
+                                target="adjacent",
+                            )
+                        ]
+                    ),
+                )
+            ],
         ),
     ),
     CoreBonusDefinition(
@@ -224,7 +538,12 @@ HA_CORE_BONUSES: list[CoreBonusDefinition] = [
         manufacturer="HA",
         effects=MechanicalEffect(
             stat_mods=[StatModifier(stat="limited_bonus", value=2)],
-            special="limited_no_reload",  # Can no longer reload Limited weapons
+            reload_restrictions=[
+                ReloadRestrictionEffect(
+                    applies_to="limited",
+                    disallow_reload=True,
+                )
+            ],
         ),
     ),
     CoreBonusDefinition(
@@ -242,7 +561,13 @@ HA_CORE_BONUSES: list[CoreBonusDefinition] = [
         manufacturer="HA",
         effects=MechanicalEffect(
             immunities=[Immunity(target="reactions_from_movement")],
-            special="save_immobilized_plus_2",
+            check_value_mods=[
+                CheckValueModifierEffect(
+                    value=2,
+                    check_kinds=["save"],
+                    condition="avoid_immobilized",
+                )
+            ],
         ),
     ),
 ]

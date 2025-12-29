@@ -3,13 +3,14 @@
 This module encodes the mechanical progression table for license levels.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 
 LEVEL_CAP = 12
 
 
-class LevelProgression(BaseModel):
+class LevelProgression(FrozenModel):
     """Progression values for a given license level."""
 
     level: int = Field(..., ge=0, le=LEVEL_CAP)
@@ -20,10 +21,9 @@ class LevelProgression(BaseModel):
     core_bonuses: int = Field(..., ge=0)
     pilot_trigger_points: int = Field(..., ge=0)
 
-    model_config = {"frozen": True}
 
 
-class PilotProgressionRules(BaseModel):
+class PilotProgressionRules(FrozenModel):
     """Rule-of-thumb progression parameters used to build the level chart."""
 
     level_cap: int = LEVEL_CAP
@@ -39,7 +39,6 @@ class PilotProgressionRules(BaseModel):
     license_points_per_level: int = 1
     core_bonus_every_levels: int = 3
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_PILOT_PROGRESSION = PilotProgressionRules()

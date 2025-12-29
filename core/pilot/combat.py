@@ -1,12 +1,13 @@
 """Pilot combat rules and stats for Lancer TTRPG."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.enums import SizeClass
 
 
-class PilotCombatBaseStats(BaseModel):
+class PilotCombatBaseStats(FrozenModel):
     """Base combat stats for a pilot."""
 
     size: SizeClass = "size_half"
@@ -15,20 +16,18 @@ class PilotCombatBaseStats(BaseModel):
     e_defense: int = Field(default=10, ge=0)
     speed: int = Field(default=4, ge=0)
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_PILOT_COMBAT_STATS = PilotCombatBaseStats()
 
 
-class PilotDamageSeverity(BaseModel):
+class PilotDamageSeverity(FrozenModel):
     """Damage severity bands for pilots."""
 
     name: Literal["minor", "major", "lethal"]
     min_damage: int = Field(..., ge=0)
     max_damage: int | None = Field(default=None, ge=0)
 
-    model_config = {"frozen": True}
 
 
 PILOT_DAMAGE_SEVERITY_BANDS: list[PilotDamageSeverity] = [
@@ -38,7 +37,7 @@ PILOT_DAMAGE_SEVERITY_BANDS: list[PilotDamageSeverity] = [
 ]
 
 
-class DownAndOutRule(BaseModel):
+class DownAndOutRule(FrozenModel):
     """Down and out resolution when a pilot hits 0 HP."""
 
     roll_die: Literal["1d6"] = "1d6"
@@ -50,26 +49,24 @@ class DownAndOutRule(BaseModel):
     additional_damage_causes_death: bool = True
     voluntary_death_allowed: bool = True
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_DOWN_AND_OUT_RULE = DownAndOutRule()
 
 
-class PilotRestRule(BaseModel):
+class PilotRestRule(FrozenModel):
     """Rest and recovery rules for pilots."""
 
     short_rest_hours: int = Field(default=1, ge=1)
     short_rest_hp_fraction: float = Field(default=0.5, ge=0.0, le=1.0)
     full_rest_hours: int = Field(default=10, ge=1)
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_PILOT_REST_RULE = PilotRestRule()
 
 
-class PilotCombatRules(BaseModel):
+class PilotCombatRules(FrozenModel):
     """Combined pilot combat rule references."""
 
     base_stats: PilotCombatBaseStats = DEFAULT_PILOT_COMBAT_STATS
@@ -79,13 +76,12 @@ class PilotCombatRules(BaseModel):
     max_armor: int = Field(default=2, ge=0)
     armor_piercing_ignores_armor: bool = True
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_PILOT_COMBAT_RULES = PilotCombatRules()
 
 
-class PilotInMechCombatRules(BaseModel):
+class PilotInMechCombatRules(FrozenModel):
     """Overrides for pilots while fighting in mech combat."""
 
     use_grit_for_attacks_and_saves: bool = True
@@ -93,7 +89,6 @@ class PilotInMechCombatRules(BaseModel):
     heat_converts_to_energy_damage: bool = True
     cannot_engage_mechs: bool = True
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_PILOT_IN_MECH_RULES = PilotInMechCombatRules()

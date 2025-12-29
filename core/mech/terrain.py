@@ -1,12 +1,13 @@
 """Terrain tiles and map data for mech combat."""
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.mech.grid import HexCoord
 from core.shared.enums import SizeClass
 
 
-class TerrainHex(BaseModel):
+class TerrainHex(FrozenModel):
     """Terrain entry for a single hex."""
 
     coord: HexCoord
@@ -18,15 +19,13 @@ class TerrainHex(BaseModel):
     difficult: bool = False
     dangerous: bool = False
 
-    model_config = {"frozen": True}
 
 
-class TerrainMap(BaseModel):
+class TerrainMap(FrozenModel):
     """Sparse terrain map for combat scenarios."""
 
     tiles: list[TerrainHex] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
 def terrain_index(terrain: TerrainMap | None) -> dict[tuple[int, int], TerrainHex]:

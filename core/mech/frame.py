@@ -1,13 +1,14 @@
 """Mech frame definitions and core systems for Lancer TTRPG."""
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.enums import ManufacturerType, SizeClass
 from core.shared.effects import MechanicalEffect
 from core.mech.mounts import MountSlot
 
 
-class CoreSystemDefinition(BaseModel):
+class CoreSystemDefinition(FrozenModel):
     """Core system ability unique to a frame."""
 
     id: str = Field(..., description="Unique core system identifier")
@@ -15,19 +16,17 @@ class CoreSystemDefinition(BaseModel):
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
     uses_per_mission: int = Field(default=1, ge=1)
 
-    model_config = {"frozen": True}
 
 
-class FrameTrait(BaseModel):
+class FrameTrait(FrozenModel):
     """Passive trait provided by a mech frame."""
 
     name: str = Field(..., description="Display name")
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
 
-    model_config = {"frozen": True}
 
 
-class MechFrameBaseStats(BaseModel):
+class MechFrameBaseStats(FrozenModel):
     """Base statistics provided by a frame before pilot bonuses."""
 
     size: SizeClass
@@ -43,10 +42,9 @@ class MechFrameBaseStats(BaseModel):
     save_target: int = Field(default=10, ge=0)
     structure: int = Field(default=4, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class MechFrameDefinition(BaseModel):
+class MechFrameDefinition(FrozenModel):
     """Definition for a mech frame."""
 
     id: str = Field(..., description="Unique frame identifier")
@@ -68,4 +66,3 @@ class MechFrameDefinition(BaseModel):
     core_system: CoreSystemDefinition | None = None
     traits: list[FrameTrait] = Field(default_factory=list)
 
-    model_config = {"frozen": True}

@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from typing import Iterable
-from pydantic import BaseModel, Field, computed_field
+from pydantic import Field, computed_field
+from core.shared.models import FrozenModel
 
 
-class HexCoord(BaseModel):
+class HexCoord(FrozenModel):
     """Axial hex coordinate (q, r)."""
 
     q: int = Field(..., description="Axial q coordinate")
     r: int = Field(..., description="Axial r coordinate")
 
-    model_config = {"frozen": True}
 
     @computed_field
     @property
@@ -44,13 +44,12 @@ class HexCoord(BaseModel):
         return hex_line(self, other)
 
 
-class HexPosition(BaseModel):
+class HexPosition(FrozenModel):
     """Hex position with optional elevation."""
 
     coord: HexCoord
     elevation: int = Field(default=0, ge=0, description="Vertical elevation in spaces")
 
-    model_config = {"frozen": True}
 
     def distance_2d(self, other: "HexPosition") -> int:
         """2D hex distance ignoring elevation."""

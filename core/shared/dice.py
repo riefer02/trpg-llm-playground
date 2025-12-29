@@ -4,13 +4,14 @@ from __future__ import annotations
 import random
 import re
 from typing import Literal
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
+from core.shared.models import FrozenModel
 
 # Standard dice sizes used in Lancer
 DieSize = Literal[3, 6, 20]
 
 
-class DiceExpression(BaseModel):
+class DiceExpression(FrozenModel):
     """
     Represents a dice expression like "1d6", "2d6+2", or "1d20".
     
@@ -24,7 +25,6 @@ class DiceExpression(BaseModel):
     size: DieSize = 6
     modifier: int = 0
     
-    model_config = {"frozen": True}
     
     @field_validator("count")
     @classmethod

@@ -1,6 +1,7 @@
 """Mech build models and stat calculations for Lancer TTRPG."""
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.pilot.skill import SkillSet
 from core.mech.frame import MechFrameDefinition
@@ -10,33 +11,30 @@ from core.shared.enums import SizeClass
 from core.shared.effects import MechanicalEffect, StatModifier
 
 
-class MountedWeapon(BaseModel):
+class MountedWeapon(FrozenModel):
     """Weapon installed on a specific mount slot."""
 
     mount_index: int = Field(..., ge=0)
     weapon_id: str
     weapon_size: WeaponSize
 
-    model_config = {"frozen": True}
 
 
-class InstalledSystem(BaseModel):
+class InstalledSystem(FrozenModel):
     """System installed on a mech."""
 
     system_id: str
     sp_cost: int | None = Field(default=None, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class MechBuild(BaseModel):
+class MechBuild(FrozenModel):
     """A mech build derived from a frame and loadout."""
 
     frame_id: str
     weapons: list[MountedWeapon] = Field(default_factory=list)
     systems: list[InstalledSystem] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
     def total_sp(self, system_definitions: dict[str, MechSystemDefinition] | None = None) -> int:
         """Total system points spent (uses definitions if needed)."""
@@ -106,7 +104,7 @@ def build_mech_from_compendium(
     return MechBuild(frame_id=frame_id, weapons=weapons, systems=systems)
 
 
-class MechDerivedStats(BaseModel):
+class MechDerivedStats(FrozenModel):
     """Final mech stats after pilot bonuses are applied."""
 
     size: SizeClass
@@ -125,25 +123,22 @@ class MechDerivedStats(BaseModel):
     attack_bonus: int
     limited_bonus: int
 
-    model_config = {"frozen": True}
 
 
-class LimitedUseEntry(BaseModel):
+class LimitedUseEntry(FrozenModel):
     """Effective limited uses for a single item instance."""
 
     item_id: str
     uses: int
 
-    model_config = {"frozen": True}
 
 
-class LimitedUseSummary(BaseModel):
+class LimitedUseSummary(FrozenModel):
     """Effective limited uses for weapons and systems."""
 
     weapons: list[LimitedUseEntry] = Field(default_factory=list)
     systems: list[LimitedUseEntry] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
 def compute_limited_uses(

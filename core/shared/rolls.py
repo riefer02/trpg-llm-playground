@@ -1,20 +1,20 @@
 """Roll mechanics models for Lancer TTRPG."""
 
 from typing import Literal
-from pydantic import BaseModel, Field, computed_field
+from pydantic import Field, computed_field
+from core.shared.models import FrozenModel
 
 
 RollType = Literal["skill_check", "attack", "save"]
 FlatBonusSource = Literal["trigger", "mech_skill", "grit"]
 
 
-class AccuracyDifficulty(BaseModel):
+class AccuracyDifficulty(FrozenModel):
     """Accuracy and difficulty dice pool for a roll."""
 
     accuracy: int = Field(default=0, ge=0)
     difficulty: int = Field(default=0, ge=0)
 
-    model_config = {"frozen": True}
 
     @computed_field
     @property
@@ -38,59 +38,53 @@ class AccuracyDifficulty(BaseModel):
         return "none"
 
 
-class FlatBonus(BaseModel):
+class FlatBonus(FrozenModel):
     """Flat bonus applied to a roll (one source at a time)."""
 
     source: FlatBonusSource
     value: int = Field(default=0, ge=0, le=6)
 
-    model_config = {"frozen": True}
 
 
-class RollModifiers(BaseModel):
+class RollModifiers(FrozenModel):
     """Combined modifiers for a roll."""
 
     accuracy_difficulty: AccuracyDifficulty = Field(default_factory=AccuracyDifficulty)
     flat_bonus: FlatBonus | None = None
 
-    model_config = {"frozen": True}
 
 
-class SkillCheck(BaseModel):
+class SkillCheck(FrozenModel):
     """A narrative skill check (target 10 by default)."""
 
     roll_type: Literal["skill_check"] = "skill_check"
     target: int = Field(default=10, ge=0)
     modifiers: RollModifiers = Field(default_factory=RollModifiers)
 
-    model_config = {"frozen": True}
 
 
-class AttackRoll(BaseModel):
+class AttackRoll(FrozenModel):
     """An attack roll against a defense value."""
 
     roll_type: Literal["attack"] = "attack"
     target: int = Field(..., ge=0, description="Target defense value")
     modifiers: RollModifiers = Field(default_factory=RollModifiers)
 
-    model_config = {"frozen": True}
 
 
-class SaveRoll(BaseModel):
+class SaveRoll(FrozenModel):
     """A save roll against an attacker's save target."""
 
     roll_type: Literal["save"] = "save"
     target: int = Field(..., ge=0, description="Attacker save target")
     modifiers: RollModifiers = Field(default_factory=RollModifiers)
 
-    model_config = {"frozen": True}
 
 
-class ContestedCheck(BaseModel):
+class ContestedCheck(FrozenModel):
     """Two opposed skill checks; ties go to the attacker."""
 
     attacker: SkillCheck
     defender: SkillCheck
     tie_breaker: Literal["attacker"] = "attacker"
 
-    model_config = {"frozen": True}

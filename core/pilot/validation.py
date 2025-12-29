@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from typing import Literal, TYPE_CHECKING
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.pilot.progression import get_level_progression
 
@@ -11,23 +12,21 @@ if TYPE_CHECKING:
     from core.pilot.pilot import Pilot
 
 
-class ProgressionIssue(BaseModel):
+class ProgressionIssue(FrozenModel):
     """A progression validation issue."""
 
     code: str
     message: str
     severity: Literal["error", "warning"] = "error"
 
-    model_config = {"frozen": True}
 
 
-class ProgressionValidation(BaseModel):
+class ProgressionValidation(FrozenModel):
     """Validation result for pilot progression."""
 
     valid: bool
     issues: list[ProgressionIssue] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
 def validate_pilot_progression(pilot: Pilot) -> ProgressionValidation:

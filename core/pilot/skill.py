@@ -7,7 +7,8 @@ Skills in Lancer:
 """
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 # The four pilot skills in Lancer
 SkillType = Literal["hull", "agility", "systems", "engineering"]
@@ -20,16 +21,15 @@ SKILLS: dict[SkillType, str] = {
     "engineering": "ENG",
 }
 
-class TriggerDefinition(BaseModel):
+class TriggerDefinition(FrozenModel):
     """A trigger definition usable for pilot skill checks."""
 
     id: str = Field(..., description="Unique trigger identifier")
     name: str = Field(..., description="Display name")
 
-    model_config = {"frozen": True}
 
 
-class PilotTrigger(BaseModel):
+class PilotTrigger(FrozenModel):
     """A pilot's trigger rank (+2 to +6)."""
 
     trigger_id: str = Field(..., description="ID of the trigger definition")
@@ -41,7 +41,6 @@ class PilotTrigger(BaseModel):
         description="Trigger bonus (+2 to +6, in +2 increments)",
     )
 
-    model_config = {"frozen": True}
 
 
 # Trigger definitions (no mech skill linkage in the core rules)
@@ -79,7 +78,7 @@ def get_trigger_definition(trigger_id: str) -> TriggerDefinition | None:
     return None
 
 
-class Skill(BaseModel):
+class Skill(FrozenModel):
     """
     A pilot skill with a rank.
     
@@ -91,7 +90,6 @@ class Skill(BaseModel):
     skill_type: SkillType
     rank: int = Field(default=0, ge=0, le=6)
     
-    model_config = {"frozen": True}
     
     @property
     def abbreviation(self) -> str:
@@ -102,7 +100,7 @@ class Skill(BaseModel):
         return f"{self.abbreviation} +{self.rank}"
 
 
-class SkillSet(BaseModel):
+class SkillSet(FrozenModel):
     """
     A complete set of pilot skills.
     
@@ -115,7 +113,6 @@ class SkillSet(BaseModel):
     systems: int = Field(default=0, ge=0, le=6)
     engineering: int = Field(default=0, ge=0, le=6)
     
-    model_config = {"frozen": True}
     
     def total_points(self) -> int:
         """Total skill points allocated."""

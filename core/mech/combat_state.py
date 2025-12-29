@@ -1,7 +1,8 @@
 """Combat state models for mech combat."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.enums import StatusType, SizeClass, ActionType, AttackType
 from core.shared.rolls import ContestedCheck
@@ -17,7 +18,7 @@ CombatantKind = Literal["mech", "pilot", "npc", "object"]
 CombatEnvironment = Literal["standard", "zero_g", "underwater"]
 
 
-class CombatStats(BaseModel):
+class CombatStats(FrozenModel):
     """Combat-relevant stats for a combatant."""
 
     size: SizeClass
@@ -29,10 +30,9 @@ class CombatStats(BaseModel):
     sensor_range: int = Field(default=0, ge=0)
     tech_attack: int = Field(default=0)
 
-    model_config = {"frozen": True}
 
 
-class CombatResources(BaseModel):
+class CombatResources(FrozenModel):
     """Resource tracks for a combatant."""
 
     hp_current: int = Field(..., ge=0)
@@ -42,10 +42,9 @@ class CombatResources(BaseModel):
     stress_current: int = Field(default=0, ge=0)
     repairs_remaining: int = Field(default=0, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class WeaponState(BaseModel):
+class WeaponState(FrozenModel):
     """Weapon state for a mounted weapon."""
 
     weapon_id: str
@@ -53,10 +52,9 @@ class WeaponState(BaseModel):
     destroyed: bool = False
     limited_charges_remaining: int | None = Field(default=None, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class WeaponMountState(BaseModel):
+class WeaponMountState(FrozenModel):
     """Mount slot state and installed weapons."""
 
     mount_index: int = Field(..., ge=0)
@@ -64,29 +62,26 @@ class WeaponMountState(BaseModel):
     weapons: list[WeaponState] = Field(default_factory=list)
     destroyed: bool = False
 
-    model_config = {"frozen": True}
 
 
-class MechSystemState(BaseModel):
+class MechSystemState(FrozenModel):
     """System state for a mech."""
 
     system_id: str
     destroyed: bool = False
     limited_charges_remaining: int | None = Field(default=None, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class MechInventory(BaseModel):
+class MechInventory(FrozenModel):
     """Inventory state for mounts and systems."""
 
     mounts: list[WeaponMountState] = Field(default_factory=list)
     systems: list[MechSystemState] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
-class CombatantState(BaseModel):
+class CombatantState(FrozenModel):
     """State for a combatant in mech combat."""
 
     id: str
@@ -101,10 +96,9 @@ class CombatantState(BaseModel):
     inventory: MechInventory | None = None
     ai_controlled: bool = False
 
-    model_config = {"frozen": True}
 
 
-class GrappleLink(BaseModel):
+class GrappleLink(FrozenModel):
     """Link between grappling combatants."""
 
     grappler_id: str
@@ -112,10 +106,9 @@ class GrappleLink(BaseModel):
     grappler_total_size: int = Field(default=1, ge=0)
     target_total_size: int = Field(default=1, ge=0)
 
-    model_config = {"frozen": True}
 
 
-class ActionUse(BaseModel):
+class ActionUse(FrozenModel):
     """An action taken during a combat turn."""
 
     action_id: str
@@ -144,10 +137,9 @@ class ActionUse(BaseModel):
     contested_check: ContestedCheck | None = None
     consumes_lock_on: bool = False
 
-    model_config = {"frozen": True}
 
 
-class CombatTurn(BaseModel):
+class CombatTurn(FrozenModel):
     """A single combat turn."""
 
     actor_id: str
@@ -156,19 +148,17 @@ class CombatTurn(BaseModel):
     movement_path: list[HexPosition] = Field(default_factory=list)
     actions: list[ActionUse] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
-class CombatRound(BaseModel):
+class CombatRound(FrozenModel):
     """A combat round."""
 
     round_index: int = Field(..., ge=1)
     turns: list[CombatTurn] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
-class MechCombatScenario(BaseModel):
+class MechCombatScenario(FrozenModel):
     """Full combat scenario for evaluation."""
 
     combatants: list[CombatantState] = Field(default_factory=list)
@@ -177,4 +167,3 @@ class MechCombatScenario(BaseModel):
     terrain: TerrainMap | None = None
     environment: CombatEnvironment = "standard"
 
-    model_config = {"frozen": True}

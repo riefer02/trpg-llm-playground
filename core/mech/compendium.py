@@ -31,49 +31,85 @@ from core.shared.effects import (
     AccuracyModifier,
     ActionGrant,
     ActionRestriction,
+    AreaSelectionEffect,
     AreaAttackPattern,
+    AttackOutcomeEffect,
+    AttackRerollEffect,
+    AttackCaptureEffect,
     CoverRestriction,
     CoverGrant,
     DelayedImpactEffect,
     DamageModifier,
+    DamageMultiplierEffect,
     DamageReduction,
+    DamageShareEffect,
     DirectDamage,
+    CheckModifierEffect,
     EffectRemoval,
     EffectChoice,
     ForcedMovement,
     HologramTrailEffect,
     IntelEffect,
+    LineAttackEffect,
     Immunity,
     Resistance,
+    HeatResistanceEffect,
+    RangeModifier,
     MechanicalEffect,
+    LineOfSightRestriction,
     MovementGrant,
+    MovementOverrideEffect,
     MovementRestrictionEffect,
+    MovementSurfaceEffect,
+    MovementTrailEffect,
     MovementScopedStatus,
+    NonCombatCapacityEffect,
+    OutOfPlayEffect,
     PhaseShiftEffect,
     RandomCheckEffect,
+    RollPatternEffect,
     ResourceChange,
+    RepairActionEffect,
+    RepairCostModifier,
+    RepairShareEffect,
+    StructureDamageAvoidanceEffect,
+    AttackSequenceModifierEffect,
     DeploymentEffect,
+    AttachmentEffect,
     ReloadEffect,
     DamageAbsorption,
+    AttackRollOverrideEffect,
     TetherEffect,
+    GrappleEffect,
+    SaveOverrideEffect,
+    SizeInteractionEffect,
+    MountedAllyEffect,
     SaveCheck,
     StatModifier,
+    StatusActionOverrideEffect,
     StatusBreakCondition,
+    StatusToggleEffect,
     StatusGrant,
     StatusClear,
     StatusStackLimit,
     StatusRestriction,
     StatusTrigger,
     AttackTargetingEffect,
+    TargetMarkEffect,
+    WeaponAIControlEffect,
     WeaponModEffect,
     WeaponSizeBonus,
+    WeaponSpinUpEffect,
     WeaponTagGrant,
     TriggeredEffect,
+    CorePowerEffect,
+    ProtocolEffect,
     TechAction,
     TechAttackModifier,
     TechActionRestriction,
     TechRange,
     ZoneEffect,
+    ZoneEndCondition,
 )
 
 
@@ -107,7 +143,46 @@ GMS_FRAMES: list[MechFrameDefinition] = [
             id="gms_hyperspec_fuel_injector",
             name="GMS Hyperspec Fuel Injector",
             effects=MechanicalEffect(
-                special="core_power_extra_full_or_two_quick_actions_free",
+                core_powers=[
+                    CorePowerEffect(
+                        name="Power Up",
+                        action_type="protocol",
+                        duration="end_of_turn",
+                        effects=MechanicalEffect(
+                            choices=[
+                                EffectChoice(
+                                    name="extra_full_action",
+                                    effect=MechanicalEffect(
+                                        action_grants=[
+                                            ActionGrant(
+                                                action_type="full",
+                                                name="bonus_full_action",
+                                                uses_per="round",
+                                            )
+                                        ]
+                                    ),
+                                ),
+                                EffectChoice(
+                                    name="extra_quick_actions",
+                                    effect=MechanicalEffect(
+                                        action_grants=[
+                                            ActionGrant(
+                                                action_type="quick",
+                                                name="bonus_quick_action",
+                                                uses_per="round",
+                                            ),
+                                            ActionGrant(
+                                                action_type="quick",
+                                                name="bonus_quick_action",
+                                                uses_per="round",
+                                            ),
+                                        ]
+                                    ),
+                                ),
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
@@ -134,7 +209,7 @@ GMS_FRAMES: list[MechFrameDefinition] = [
             FrameTrait(
                 name="Replaceable Parts",
                 effects=MechanicalEffect(
-                    special="repair_structure_cost_1_instead_of_2",
+                    repair_cost_mods=[RepairCostModifier(structure_repair_cost=1)],
                 ),
             ),
         ],
@@ -393,7 +468,13 @@ GMS_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
-            special="extra_limbs_non_combat_interaction",
+            non_combat_capabilities=[
+                NonCombatCapacityEffect(
+                    extra_limb_pairs=1,
+                    non_combat_only=True,
+                    interaction_scope="pilot_scale",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -403,7 +484,15 @@ GMS_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
-            special="extra_size_half_passenger_in_cockpit",
+            non_combat_capabilities=[
+                NonCombatCapacityEffect(
+                    extra_passenger_slots=1,
+                    max_passenger_size="size_half",
+                    passenger_location="cockpit",
+                    passenger_protected_from_external_effects=True,
+                    statuses_if_unlicensed_pilot=["impaired", "slowed"],
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -413,7 +502,15 @@ GMS_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
-            special="structure_damage_ignore_on_6_once_per_full_repair",
+            structure_damage_avoidances=[
+                StructureDamageAvoidanceEffect(
+                    roll=DiceExpression.parse("1d6"),
+                    success_threshold=6,
+                    heal_hp_to=1,
+                    uses_per="full_repair",
+                    condition="structure_damage",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -424,7 +521,13 @@ GMS_SYSTEMS: list[MechSystemDefinition] = [
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
             stat_mods=[StatModifier(stat="hp", value=2)],
-            special="minor_noncombat_mod_plus_1_accuracy_if_relevant",
+            check_mods=[
+                CheckModifierEffect(
+                    value=1,
+                    check_kinds=["check"],
+                    condition="gm_approved_non_combat_check",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -447,7 +550,29 @@ GMS_SYSTEMS: list[MechSystemDefinition] = [
         system_type="ai",
         tags=[SystemTag(tag="ai"), SystemTag(tag="protocol")],
         effects=MechanicalEffect(
-            special="protocol_hand_over_control_ai_no_independent_initiative",
+            protocols=[
+                ProtocolEffect(
+                    name="Hand Over Control",
+                    duration="scene",
+                    effects=MechanicalEffect(
+                        action_restrictions=[
+                            ActionRestriction(
+                                action_categories=[
+                                    "attack",
+                                    "movement",
+                                    "tech",
+                                    "utility",
+                                    "defense",
+                                    "reaction",
+                                ],
+                                target="self",
+                                duration="scene",
+                                condition="ai_controlled_until_protocol_resume",
+                            )
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -458,7 +583,36 @@ GMS_SYSTEMS: list[MechSystemDefinition] = [
         system_type="shield",
         tags=[SystemTag(tag="shield"), SystemTag(tag="protocol")],
         effects=MechanicalEffect(
-            special="protocol_target_mutual_attacks_difficulty_2_until_next_turn",
+            protocols=[
+                ProtocolEffect(
+                    name="Mutual Attack Interference",
+                    duration="start_of_next_turn",
+                    effects=MechanicalEffect(
+                        accuracy_mods=[
+                            AccuracyModifier(
+                                value=-2,
+                                applies_to="all",
+                                condition="mutual_attacks_between_self_and_target",
+                            )
+                        ],
+                        triggered_effects=[
+                            TriggeredEffect(
+                                trigger="on_activation",
+                                effect=MechanicalEffect(
+                                    resource_changes=[
+                                        ResourceChange(
+                                            resource="heat",
+                                            amount=1,
+                                            direction="gain",
+                                            target="self",
+                                        )
+                                    ]
+                                ),
+                            )
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -642,13 +796,49 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
             id="ipsn_thunder_god_protocol",
             name="Thunder God Protocol",
             effects=MechanicalEffect(
-                special=(
-                    "protocol_core_power_thunder_god: "
-                    "if_mjolnir_not_fired_gain_2_chambers_end_turn "
-                    "starts_0 "
-                    "fire_all_chambers_4_damage_each_max_6 "
-                    "if_chambers_4_plus_ap_and_target_shredded_until_end_next_turn"
-                ),
+                core_powers=[
+                    CorePowerEffect(
+                        name="Thunder God Protocol",
+                        action_type="protocol",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            triggered_effects=[
+                                TriggeredEffect(
+                                    trigger="on_turn_end",
+                                    condition="if_mjolnir_not_fired_gain_2_chambers_max_6",
+                                    effect=MechanicalEffect(),
+                                ),
+                                TriggeredEffect(
+                                    trigger="on_activation",
+                                    condition="fire_all_chambers_4_damage_each_max_6",
+                                    effect=MechanicalEffect(
+                                        direct_damages=[
+                                            DirectDamage(
+                                                damage_type="kinetic",
+                                                flat=4,
+                                                condition="per_chamber",
+                                            ),
+                                            DirectDamage(
+                                                damage_type="kinetic",
+                                                flat=4,
+                                                ap=True,
+                                                condition="per_chamber_if_4_plus",
+                                            ),
+                                        ],
+                                        status_grants=[
+                                            StatusGrant(
+                                                status="shredded",
+                                                target="enemy",
+                                                duration="end_of_next_turn",
+                                                condition="chambers_4_plus",
+                                            )
+                                        ],
+                                    ),
+                                ),
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
@@ -660,7 +850,13 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                             trigger="on_turn_end",
                             condition="no_attacks_or_forced_saves",
                             effect=MechanicalEffect(
-                                special="reload_all_loading_weapons",
+                                reloads=[
+                                    ReloadEffect(
+                                        target="self",
+                                        count="all",
+                                        requires_tag="loading",
+                                    )
+                                ],
                             ),
                         )
                     ],
@@ -669,7 +865,12 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
             FrameTrait(
                 name="Shielded Magazines",
                 effects=MechanicalEffect(
-                    special="can_make_ranged_attacks_while_jammed",
+                    status_action_overrides=[
+                        StatusActionOverrideEffect(
+                            status="jammed",
+                            allow_attack_types=["ranged"],
+                        )
+                    ],
                 ),
             ),
         ],
@@ -703,29 +904,101 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
             id="ipsn_assault_grapples",
             name="Assault Grapples",
             effects=MechanicalEffect(
-                special=(
-                    "core_power_quick_action_range_5_multi_target_hull_save_2d6_kinetic "
-                    "half_on_success_fail_prone_pull_adjacent_immobilized_end_next_turn"
-                ),
+                core_powers=[
+                    CorePowerEffect(
+                        name="Omni-harpoon",
+                        action_type="quick",
+                        duration="end_of_turn",
+                        effects=MechanicalEffect(
+                            targetings=[
+                                AttackTargetingEffect(
+                                    separate_attack_rolls=True,
+                                    condition="any_number_range_5_line_of_sight",
+                                )
+                            ],
+                            save_checks=[
+                                SaveCheck(
+                                    trigger="on_activation",
+                                    save="hull",
+                                    target="enemy",
+                                    on_success=MechanicalEffect(
+                                        direct_damages=[
+                                            DirectDamage(
+                                                damage_type="kinetic",
+                                                dice=DiceExpression.parse("2d6"),
+                                                condition="half_damage",
+                                            )
+                                        ]
+                                    ),
+                                    on_failure=MechanicalEffect(
+                                        direct_damages=[
+                                            DirectDamage(
+                                                damage_type="kinetic",
+                                                dice=DiceExpression.parse("2d6"),
+                                            )
+                                        ],
+                                        status_grants=[
+                                            StatusGrant(
+                                                status="prone",
+                                                target="enemy",
+                                                duration="until_cleared",
+                                            ),
+                                            StatusGrant(
+                                                status="immobilized",
+                                                target="enemy",
+                                                duration="end_of_next_turn",
+                                            ),
+                                        ],
+                                        forced_movements=[
+                                            ForcedMovement(
+                                                direction="pull",
+                                                distance="as_far_as_possible",
+                                                target="enemy",
+                                                condition="toward_self_stop_adjacent_if_possible",
+                                            )
+                                        ],
+                                    ),
+                                )
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
             FrameTrait(
                 name="Cable Grapple",
                 effects=MechanicalEffect(
-                    special="grapple_range_5_pull_adjacent_on_success_break_if_no_adjacent_path",
+                    grapple_effects=[
+                        GrappleEffect(
+                            range=5,
+                            pull_grappler_adjacent=True,
+                            break_if_no_adjacent_path=True,
+                        )
+                    ],
                 ),
             ),
             FrameTrait(
                 name="Lock/Kill Subsystem",
                 effects=MechanicalEffect(
-                    special="can_boost_and_react_while_grappling",
+                    grapple_effects=[
+                        GrappleEffect(
+                            allow_boost_while_grappling=True,
+                            allow_reactions_while_grappling=True,
+                        )
+                    ],
                 ),
             ),
             FrameTrait(
                 name="Exposed Reactor",
                 effects=MechanicalEffect(
-                    special="plus_1_difficulty_engineering_checks_and_saves",
+                    check_mods=[
+                        CheckModifierEffect(
+                            value=-1,
+                            check_types=["engineering"],
+                            check_kinds=["check", "save"],
+                        )
+                    ],
                 ),
             ),
         ],
@@ -759,15 +1032,94 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
             id="ipsn_fortress",
             name="Fortress",
             effects=MechanicalEffect(
-                special=(
-                    "core_power_fortress_protocol_immobilized "
-                    "brace_full_action_next_turn "
-                    "deploy_two_line2_size1_hard_cover_immune_damage "
-                    "self_hard_cover "
-                    "allies_using_cover_gain_immunity_knockback_prone_involuntary_movement "
-                    "allies_and_self_resist_damage_heat_burn_from_blast_line_cone "
-                    "deactivate_start_turn_protocol"
-                ),
+                core_powers=[
+                    CorePowerEffect(
+                        name="Fortress Protocol",
+                        action_type="protocol",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            status_grants=[
+                                StatusGrant(
+                                    status="immobilized",
+                                    target="self",
+                                    duration="scene",
+                                )
+                            ],
+                            cover_grants=[
+                                CoverGrant(
+                                    cover="hard",
+                                    target="self",
+                                    duration="scene",
+                                    condition="fortress_protocol_active",
+                                )
+                            ],
+                            immunities=[
+                                Immunity(
+                                    target="knockback",
+                                    condition="using_drake_hard_cover",
+                                ),
+                                Immunity(
+                                    target="prone",
+                                    condition="using_drake_hard_cover",
+                                ),
+                                Immunity(
+                                    target="involuntary_movement",
+                                    condition="using_drake_hard_cover",
+                                ),
+                            ],
+                            resistances=[
+                                Resistance(
+                                    damage_type="all",
+                                    target="all",
+                                    condition="using_drake_hard_cover_blast_line_cone",
+                                )
+                            ],
+                            zones=[
+                                ZoneEffect(
+                                    shape="line",
+                                    size=2,
+                                    width=1,
+                                    cover="hard",
+                                    counts_as_obstruction=True,
+                                    blocks_movement=True,
+                                    placement="self",
+                                    duration="scene",
+                                ),
+                                ZoneEffect(
+                                    shape="line",
+                                    size=2,
+                                    width=1,
+                                    cover="hard",
+                                    counts_as_obstruction=True,
+                                    blocks_movement=True,
+                                    placement="self",
+                                    duration="scene",
+                                ),
+                            ],
+                            triggered_effects=[
+                                TriggeredEffect(
+                                    trigger="on_reaction",
+                                    condition="brace_grants_full_action_next_turn",
+                                    effect=MechanicalEffect(
+                                        action_grants=[
+                                            ActionGrant(
+                                                action_type="full",
+                                                name="brace_full_action_next_turn",
+                                                uses_per="round",
+                                            )
+                                        ]
+                                    ),
+                                )
+                            ],
+                            effect_removals=[
+                                EffectRemoval(
+                                    action_type="protocol",
+                                    condition="deactivate_start_turn",
+                                )
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
@@ -786,7 +1138,9 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                     resistances=[
                         Resistance(damage_type="all", condition="blast_line_cone")
                     ],
-                    special="resist_heat_from_blast_line_cone",
+                    heat_resistances=[
+                        HeatResistanceEffect(condition="blast_line_cone"),
+                    ],
                 ),
             ),
             FrameTrait(
@@ -805,7 +1159,13 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
             FrameTrait(
                 name="Slow",
                 effects=MechanicalEffect(
-                    special="plus_1_difficulty_agility_checks_and_saves",
+                    check_mods=[
+                        CheckModifierEffect(
+                            value=-1,
+                            check_types=["agility"],
+                            check_kinds=["check", "save"],
+                        )
+                    ],
                 ),
             ),
         ],
@@ -838,26 +1198,90 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
             id="ipsn_supercharger",
             name="Supercharger",
             effects=MechanicalEffect(
-                special=(
-                    "core_power_supercharger_quick_action_target_ally_range8 "
-                    "self_heat_each_turn_target_accuracy_all_attacks_checks_saves "
-                    "target_immunity_impaired_jammed_slowed_shredded_immobilized_from_others "
-                    "ends_if_self_or_target_stunned "
-                    "cannot_fire_latch_drone_while_active"
-                ),
+                core_powers=[
+                    CorePowerEffect(
+                        name="Supercharger",
+                        action_type="quick",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            triggered_effects=[
+                                TriggeredEffect(
+                                    trigger="on_turn_start",
+                                    condition="self_heat_1_while_active",
+                                    effect=MechanicalEffect(
+                                        resource_changes=[
+                                            ResourceChange(
+                                                resource="heat",
+                                                amount=1,
+                                                direction="gain",
+                                                target="self",
+                                            )
+                                        ]
+                                    ),
+                                ),
+                                TriggeredEffect(
+                                    trigger="on_turn_start",
+                                    condition="end_if_self_or_target_stunned",
+                                    effect=MechanicalEffect(),
+                                ),
+                            ],
+                            accuracy_mods=[
+                                AccuracyModifier(
+                                    value=1,
+                                    applies_to="all",
+                                    condition="supercharged_target_attacks_checks_saves",
+                                )
+                            ],
+                            immunities=[
+                                Immunity(target="impaired", condition="source_not_self"),
+                                Immunity(target="jammed", condition="source_not_self"),
+                                Immunity(target="slowed", condition="source_not_self"),
+                                Immunity(target="shredded", condition="source_not_self"),
+                                Immunity(target="immobilized", condition="source_not_self"),
+                            ],
+                            action_restrictions=[
+                                ActionRestriction(
+                                    action_ids=["latch_drone_attack"],
+                                    target="self",
+                                    duration="scene",
+                                    condition="cannot_fire_latch_drone_while_active",
+                                )
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
             FrameTrait(
                 name="Redundant Systems",
                 effects=MechanicalEffect(
-                    special="adjacent_allies_can_spend_lancaster_repairs",
+                    repair_share_effects=[
+                        RepairShareEffect(
+                            target="ally",
+                            range=1,
+                            requires_adjacent=True,
+                            requires_choice=True,
+                        )
+                    ],
                 ),
             ),
             FrameTrait(
                 name="Combat Repair",
                 effects=MechanicalEffect(
-                    special="full_action_spend_4_repairs_restore_destroyed_mech_1_structure_1_hp",
+                    repair_actions=[
+                        RepairActionEffect(
+                            name="combat_repair",
+                            action_type="full",
+                            repairs_cost=4,
+                            target="ally",
+                            range=1,
+                            requires_adjacent=True,
+                            restore_structure=1,
+                            restore_hp=1,
+                            condition="target_destroyed",
+                        )
+                    ],
                 ),
             ),
             FrameTrait(
@@ -896,7 +1320,22 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
             id="ipsn_perpetual_momentum_drive",
             name="Perpetual Momentum Drive",
             effects=MechanicalEffect(
-                special="core_power_protocol_skirmisher_move_4_scene",
+                core_powers=[
+                    CorePowerEffect(
+                        name="Skirmisher Protocol",
+                        action_type="protocol",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            movement_grants=[
+                                MovementGrant(
+                                    spaces=4,
+                                    movement_type="walk",
+                                    trigger="on_activation",
+                                )
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
@@ -977,7 +1416,30 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                         ),
                     )
                 ],
-                special="core_power_protocol_ranged_threat_min_5_extra_overwatch_per_round",
+                core_powers=[
+                    CorePowerEffect(
+                        name="Sentinel Protocol",
+                        action_type="protocol",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            range_mods=[
+                                RangeModifier(
+                                    range_type="threat",
+                                    value=5,
+                                    condition="ranged_threat_minimum",
+                                )
+                            ],
+                            action_grants=[
+                                ActionGrant(
+                                    action_type="reaction",
+                                    name="overwatch",
+                                    trigger="extra_overwatch_per_round",
+                                    uses_per="round",
+                                )
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
@@ -1036,7 +1498,15 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                 resistances=[
                     Resistance(damage_type="all", condition="attacks_within_range_3")
                 ],
-                special="core_power_protocol_shrike_damage_to_attackers_3_ap_kinetic",
+                direct_damages=[
+                    DirectDamage(
+                        damage_type="kinetic",
+                        flat=2,
+                        ap=True,
+                        target="enemy",
+                        condition="attacker_within_range_3_before_attack",
+                    )
+                ],
             ),
         ),
         traits=[
@@ -1195,6 +1665,13 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         ranges=[WeaponRange(range_type="burst", value=1)],
         damage=[WeaponDamage(damage_type="kinetic", flat=1)],
         effects=MechanicalEffect(
+            accuracy_mods=[
+                AccuracyModifier(
+                    value=1,
+                    applies_to="ranged",
+                    condition="engaged",
+                )
+            ],
             triggered_effects=[
                 TriggeredEffect(
                     trigger="on_hit",
@@ -1204,7 +1681,6 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
                     ),
                 )
             ],
-            special="ignore_melee_engagement_penalty",
         ),
     ),
     MechWeaponDefinition(
@@ -1231,7 +1707,27 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+2"))],
         tags=[WeaponTag(tag="heat_self", value=1), WeaponTag(tag="overkill")],
         effects=MechanicalEffect(
-            special="quick_action_spin_up_gain_reliable_3_self_slowed_until_stop_free_action",
+            weapon_spin_ups=[
+                WeaponSpinUpEffect(
+                    spin_up_action_type="quick",
+                    spin_down_action_type="free",
+                    spin_down_timing="start_of_turn",
+                    effects_while_spun_up=MechanicalEffect(
+                        status_grants=[
+                            StatusGrant(
+                                status="slowed",
+                                target="self",
+                                duration="until_cleared",
+                            )
+                        ],
+                        weapon_mods=[
+                            WeaponModEffect(
+                                add_tags=[WeaponTagGrant(tag="reliable", value=3)]
+                            )
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
     MechWeaponDefinition(
@@ -1275,13 +1771,39 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         ranges=[WeaponRange(range_type="range", value=8)],
         damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6"))],
         effects=MechanicalEffect(
-            special=(
-                "can_skirmish_with_base_profile "
-                "quick_action_spin_up_self_slowed_damage_4d6_plus_4 "
-                "requires_barrage_when_spun_up "
-                "gain_reliable_5_and_heat_self_2 "
-                "stop_spin_up_free_action_start_turn"
-            ),
+            weapon_spin_ups=[
+                WeaponSpinUpEffect(
+                    spin_up_action_type="quick",
+                    spin_down_action_type="free",
+                    spin_down_timing="start_of_turn",
+                    allow_skirmish_with_base_profile=True,
+                    requires_barrage_while_spun_up=True,
+                    effects_while_spun_up=MechanicalEffect(
+                        status_grants=[
+                            StatusGrant(
+                                status="slowed",
+                                target="self",
+                                duration="until_cleared",
+                            )
+                        ],
+                        damage_mods=[
+                            DamageModifier(
+                                dice=DiceExpression.parse("3d6"),
+                                flat=4,
+                                damage_type="kinetic",
+                            )
+                        ],
+                        weapon_mods=[
+                            WeaponModEffect(
+                                add_tags=[
+                                    WeaponTagGrant(tag="reliable", value=5),
+                                    WeaponTagGrant(tag="heat_self", value=2),
+                                ]
+                            )
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
     MechWeaponDefinition(
@@ -1297,6 +1819,16 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         unique=True,
         ranges=[WeaponRange(range_type="range", value=8)],
         effects=MechanicalEffect(
+            attack_roll_overrides=[
+                AttackRollOverrideEffect(
+                    attack_vs="evasion",
+                    fixed_target_defense=8,
+                    target="ally",
+                    allowed_attack_types=["ranged"],
+                    respects_cover=True,
+                    respects_line_of_sight=True,
+                )
+            ],
             triggered_effects=[
                 TriggeredEffect(
                     trigger="on_hit",
@@ -1313,7 +1845,6 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
                     ),
                 )
             ],
-            special="ranged_attack_vs_evasion_8_target_friendly",
         ),
     ),
     MechWeaponDefinition(
@@ -1339,7 +1870,14 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
                     trigger="on_hit",
                     condition="target_is_object",
                     effect=MechanicalEffect(
-                        special="object_damage_10_ap_energy",
+                        direct_damages=[
+                            DirectDamage(
+                                damage_type="energy",
+                                flat=10,
+                                ap=True,
+                                target="object",
+                            )
+                        ],
                     ),
                 )
             ],
@@ -1467,7 +2005,12 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         ranges=[WeaponRange(range_type="threat", value=3)],
         damage=[WeaponDamage(damage_type="energy", dice=DiceExpression.parse("1d6"))],
         effects=MechanicalEffect(
-            special="line_attack_between_target_and_self_heat_self_per_extra_target",
+            line_attacks=[
+                LineAttackEffect(
+                    between_self_and_target=True,
+                    heat_per_additional_target=1,
+                )
+            ],
         ),
     ),
     MechWeaponDefinition(
@@ -1518,7 +2061,17 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         ],
         tags=[WeaponTag(tag="overkill"), WeaponTag(tag="ap")],
         effects=MechanicalEffect(
-            special="overkill_bonus_vs_prone_immobilized_or_stunned_targets",
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_overkill",
+                    condition="target_prone_or_immobilized_or_stunned",
+                    effect=MechanicalEffect(
+                        damage_mods=[
+                            DamageModifier(dice=DiceExpression.parse("1d6"))
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
 ]
@@ -1632,13 +2185,16 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         system_type="ai",
         tags=[SystemTag(tag="ai"), SystemTag(tag="mod")],
         effects=MechanicalEffect(
-            special=(
-                "choose_weapon_heavy_or_smaller_grant_ai_control "
-                "1_per_turn_free_attack_plus_2_difficulty "
-                "cannot_fire_if_used_this_turn "
-                "after_uncle_attack_weapon_locked_until_next_turn "
-                "if_unshackled_uncle_selects_target_or_no_attack"
-            ),
+            weapon_ai_controls=[
+                WeaponAIControlEffect(
+                    allowed_weapon_sizes=["aux", "main", "heavy"],
+                    free_attack_difficulty=2,
+                    cannot_fire_if_used_this_turn=True,
+                    weapon_locked_until_next_turn_after_ai_attack=True,
+                    ai_selects_target_if_unshackled=True,
+                    ai_control_scope="weapon_only",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1650,7 +2206,15 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
-            special="ram_grapple_size_equal_or_larger_and_lift_drag_double",
+            size_interactions=[
+                SizeInteractionEffect(
+                    applies_to_actions=["ram", "grapple"],
+                    treat_as_same_size_if_target_larger=True,
+                    treat_as_larger_if_target_same_or_smaller=True,
+                    lift_capacity_multiplier=2,
+                    drag_capacity_multiplier=2,
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1660,12 +2224,24 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         license_id="blackbeard",
         license_rank=3,
         effects=MechanicalEffect(
-            special=(
-                "grapple_movement_once_per_turn_move_fly_straight_line "
-                "must_end_on_surface_or_fall_can_hold_surface_if_immobile "
-                "falls_if_prone_or_knockback "
-                "quick_action_drag_down_contested_hull_knock_prone"
-            ),
+            grapple_effects=[
+                GrappleEffect(
+                    movement_trigger="move",
+                    movement_uses_per="round",
+                    movement_type="fly",
+                    movement_distance="speed",
+                    movement_requires_clear_path=True,
+                    movement_must_be_straight_line=True,
+                    movement_requires_surface_end=True,
+                    movement_can_hold_surface_if_immobile=True,
+                    fall_if_prone_or_knockback=True,
+                    drag_down_action_type="quick",
+                    drag_down_range=5,
+                    drag_down_requires_line_of_sight=True,
+                    drag_down_contested_stat="hull",
+                    drag_down_knocks_prone=True,
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1678,12 +2254,56 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         system_type="ai",
         tags=[SystemTag(tag="ai"), SystemTag(tag="protocol")],
         effects=MechanicalEffect(
-            special=(
-                "sekhmet_protocol_melee_crits_bonus_1d6 "
-                "free_melee_skirmish_each_turn "
-                "lose_direct_control_chase_nearest_target_melee "
-                "end_protocol_start_turn_stunned_until_next_turn"
-            ),
+            protocols=[
+                ProtocolEffect(
+                    name="SEKHMET Protocol",
+                    duration="scene",
+                    effects=MechanicalEffect(
+                        damage_mods=[
+                            DamageModifier(
+                                dice=DiceExpression.parse("1d6"),
+                                condition="melee_crit",
+                            )
+                        ],
+                        action_grants=[
+                            ActionGrant(
+                                action_type="free",
+                                name="melee_skirmish",
+                                trigger="on_turn_start",
+                                uses_per="round",
+                            )
+                        ],
+                        action_restrictions=[
+                            ActionRestriction(
+                                action_categories=[
+                                    "tech",
+                                    "utility",
+                                    "defense",
+                                    "reaction",
+                                ],
+                                target="self",
+                                duration="scene",
+                                condition="sekhmet_auto_pilot_melee_only",
+                            )
+                        ],
+                        triggered_effects=[
+                            TriggeredEffect(
+                                trigger="on_turn_start",
+                                condition="protocol_ends",
+                                effect=MechanicalEffect(
+                                    status_grants=[
+                                        StatusGrant(
+                                            status="stunned",
+                                            target="self",
+                                            duration="end_of_next_turn",
+                                        )
+                                    ]
+                                ),
+                            )
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1694,10 +2314,24 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         license_rank=1,
         tags=[SystemTag(tag="quick_action"), SystemTag(tag="shield")],
         effects=MechanicalEffect(
-            special=(
-                "quick_action_adjacent_ally_resistance_all_damage_share_half_damage "
-                "breaks_on_separation_repeat_to_renew"
-            ),
+            resistances=[
+                Resistance(
+                    damage_type="all",
+                    target="ally",
+                    condition="argonaut_shield_active_adjacent",
+                )
+            ],
+            damage_shares=[
+                DamageShareEffect(
+                    share_fraction=0.5,
+                    source="self",
+                    target="ally",
+                    timing="before_armor_and_reduction",
+                    requires_adjacent=True,
+                    breaks_on_separation=True,
+                    condition="argonaut_shield_active",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1724,18 +2358,16 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                     size=1,
                     placement="deployable",
                     duration="scene",
+                    ends_on_source_destroyed=True,
                     continuous_effects=MechanicalEffect(
                         damage_reductions=[
                             DamageReduction(amount=2, damage_type="all", target="all")
                         ],
                     ),
                     total_effect_cap=20,
+                    deactivate_on_effect_cap=True,
                 )
             ],
-            special=(
-                "generator_reduces_total_20_hp_then_deactivates "
-                "ends_scene_or_destroyed"
-            ),
         ),
     ),
     MechSystemDefinition(
@@ -1757,6 +2389,20 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
             ),
         ),
         effects=MechanicalEffect(
+            deployments=[
+                DeploymentEffect(
+                    action_type="quick",
+                    placement_range=1,
+                    placement_relation="adjacent",
+                    placement_requires_free_space=True,
+                    primes_after="turn_end",
+                    activation_condition="on_prime",
+                    consumes_on_activation=False,
+                    open_topped=True,
+                    immobile=True,
+                    can_deactivate=False,
+                )
+            ],
             zones=[
                 ZoneEffect(
                     shape="square",
@@ -1773,10 +2419,6 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                     ),
                 )
             ],
-            special=(
-                "deploy_adjacent_free_4x4_area_unfolds_start_next_turn "
-                "open_topped_immobile_cannot_deactivate"
-            ),
         ),
     ),
     MechSystemDefinition(
@@ -1787,7 +2429,13 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         license_rank=1,
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
-            special="ignore_difficult_terrain",
+            movement_surface_effects=[
+                MovementSurfaceEffect(
+                    ignore_difficult_terrain=True,
+                    target="self",
+                    duration="scene",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1824,13 +2472,57 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
-            special=(
-                "brace_reaction_cost_heat_2 "
-                "attacks_against_you_plus_1_difficulty_until_end_next_turn "
-                "immune_failed_agility_hull_saves_and_contested "
-                "immune_knockback_grapple_prone_or_forced_move_by_smaller_than_size_5 "
-                "end_all_grapples"
-            ),
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_reaction",
+                    condition="brace",
+                    effect=MechanicalEffect(
+                        resource_changes=[
+                            ResourceChange(
+                                resource="heat",
+                                amount=2,
+                                direction="gain",
+                                target="self",
+                            )
+                        ],
+                        accuracy_mods=[
+                            AccuracyModifier(
+                                value=-1,
+                                applies_to="all",
+                                condition="attacks_against_self_until_end_next_turn_after_brace",
+                            )
+                        ],
+                        save_overrides=[
+                            SaveOverrideEffect(
+                                saves=["agility", "hull"],
+                                auto_pass=True,
+                                include_contested_checks=True,
+                                duration="end_of_next_turn",
+                                condition="after_brace",
+                            )
+                        ],
+                        immunities=[
+                            Immunity(
+                                target="knockback",
+                                condition="from_smaller_than_size_5_until_end_next_turn_after_brace",
+                            ),
+                            Immunity(
+                                target="grapple",
+                                condition="from_smaller_than_size_5_until_end_next_turn_after_brace",
+                            ),
+                            Immunity(
+                                target="prone",
+                                condition="from_smaller_than_size_5_until_end_next_turn_after_brace",
+                            ),
+                            Immunity(
+                                target="forced_movement",
+                                condition="from_smaller_than_size_5_until_end_next_turn_after_brace",
+                            ),
+                        ],
+                        grapple_effects=[GrappleEffect(break_all_grapples=True, condition="on_brace")],
+                    ),
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1842,11 +2534,58 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         tags=[SystemTag(tag="protocol")],
         effects=MechanicalEffect(
-            special=(
-                "protocol_heat_self_2_until_start_next_turn "
-                "boost_speed_plus_2_melee_knockback_plus_2 "
-                "must_move_max_speed_each_move_straight_line_only"
-            ),
+            protocols=[
+                ProtocolEffect(
+                    name="RAMJET",
+                    duration="start_of_next_turn",
+                    effects=MechanicalEffect(
+                        triggered_effects=[
+                            TriggeredEffect(
+                                trigger="on_activation",
+                                effect=MechanicalEffect(
+                                    resource_changes=[
+                                        ResourceChange(
+                                            resource="heat",
+                                            amount=2,
+                                            direction="gain",
+                                            target="self",
+                                        )
+                                    ]
+                                ),
+                            ),
+                            TriggeredEffect(
+                                trigger="on_hit",
+                                condition="melee_knockback_plus_2",
+                                effect=MechanicalEffect(
+                                    forced_movements=[
+                                        ForcedMovement(
+                                            direction="push",
+                                            distance=2,
+                                            target="enemy",
+                                            condition="melee_attack_knockback_bonus",
+                                        )
+                                    ]
+                                ),
+                            ),
+                        ],
+                        stat_mods=[
+                            StatModifier(
+                                stat="speed",
+                                value=2,
+                                condition="boost_speed_plus_2",
+                            )
+                        ],
+                        movement_restrictions=[
+                            MovementRestrictionEffect(
+                                target="self",
+                                must_move_straight_line=True,
+                                condition="must_move_max_speed_each_move",
+                                duration="start_of_next_turn",
+                            )
+                        ],
+                    ),
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1865,7 +2604,15 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                     condition="ram_attack",
                 )
             ],
-            special="ram_attacks_vs_objects_deal_10_ap_kinetic",
+            direct_damages=[
+                DirectDamage(
+                    damage_type="kinetic",
+                    flat=10,
+                    ap=True,
+                    target="object",
+                    condition="ram_attack_vs_object",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1877,11 +2624,28 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
-            special=(
-                "weapon_mod_cqb_cannon_rifle "
-                "project_line_3_from_self_attack_origin_at_line_end "
-                "line_deals_1d3_ap_kinetic_to_objects_or_characters"
-            ),
+            weapon_mods=[
+                WeaponModEffect(
+                    allowed_weapon_types=["cqb", "cannon", "rifle"],
+                )
+            ],
+            line_attacks=[
+                LineAttackEffect(
+                    length=3,
+                    attack_origin_at_line_end=True,
+                    measure_range_from_line_end=True,
+                    measure_line_of_sight_from_line_end=True,
+                    measure_cover_from_line_end=True,
+                    line_passes_through_obstacles=True,
+                    fixed_direction_after_firing=True,
+                    line_hits_objects=True,
+                    line_damage=DirectDamage(
+                        damage_type="kinetic",
+                        dice=DiceExpression.parse("1d3"),
+                        ap=True,
+                    ),
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1894,11 +2658,36 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         system_type="shield",
         tags=[SystemTag(tag="shield"), SystemTag(tag="quick_action")],
         effects=MechanicalEffect(
-            special=(
-                "quick_action_resistance_all_damage_heat_burn_from_range_gt_5 "
-                "self_slowed_and_deal_half_damage_heat_burn_to_targets_range_gt_5 "
-                "deactivate_quick_action"
-            ),
+            status_toggles=[
+                StatusToggleEffect(
+                    status="slowed",
+                    target="self",
+                    activation_action="quick",
+                    activation_timing="on_activation",
+                    deactivation_action="quick",
+                    deactivation_timing="on_activation",
+                    condition="hyper_dense_armor_active",
+                )
+            ],
+            resistances=[
+                Resistance(
+                    damage_type="all",
+                    condition="hyper_dense_armor_active_and_attack_range_gt_5",
+                )
+            ],
+            heat_resistances=[
+                HeatResistanceEffect(
+                    condition="hyper_dense_armor_active_and_attack_range_gt_5",
+                )
+            ],
+            damage_multipliers=[
+                DamageMultiplierEffect(
+                    multiplier=0.5,
+                    damage_types=["all", "heat", "burn"],
+                    applies_to="outgoing",
+                    condition="hyper_dense_armor_active_and_target_range_gt_5",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -1924,6 +2713,7 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                     action_type="quick",
                     placement_range=1,
                     placement_relation="adjacent",
+                    placement_requires_free_space=True,
                     primes_after="turn_end",
                     activation_condition="pass_over",
                     activation_action=None,
@@ -1954,13 +2744,18 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                             )
                         ],
                     ),
-                    consumes_on_activation=True,
+                    consumes_on_activation=False,
+                    becomes_object_on_activation=True,
                 )
             ],
-            special=(
-                "trap_becomes_object_on_trigger "
-                "immobilize_persists_while_trap_intact"
-            ),
+            status_breaks=[
+                StatusBreakCondition(
+                    status="immobilized",
+                    target="enemy",
+                    break_triggers=["source_destroyed"],
+                    condition="snare_trap_immobilize",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -2033,12 +2828,47 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                             )
                         ],
                     ),
+                ),
+                SaveCheck(
+                    trigger="on_turn_end",
+                    condition="charged_stake_immobilized",
+                    save="hull",
+                    target="enemy",
+                    on_success=MechanicalEffect(
+                        status_clears=[
+                            StatusClear(
+                                status="immobilized",
+                                target="enemy",
+                            )
+                        ],
+                    ),
+                    on_failure=MechanicalEffect(
+                        direct_damages=[
+                            DirectDamage(
+                                damage_type="energy",
+                                flat=5,
+                                ap=True,
+                                target="enemy",
+                            )
+                        ],
+                    ),
+                ),
+            ],
+            status_stack_limits=[
+                StatusStackLimit(
+                    status="immobilized",
+                    max_stacks=1,
+                    target="enemy",
+                    condition="charged_stake_immobilize",
                 )
             ],
-            special=(
-                "adjacent_target_repeat_hull_save_end_turn_or_take_5_ap_energy "
-                "only_one_target_at_time_quick_action_recover_from_adjacent"
-            ),
+            effect_removals=[
+                EffectRemoval(
+                    action_type="quick",
+                    target="enemy",
+                    condition="adjacent_recover_charged_stake",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -2165,11 +2995,21 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         license_rank=2,
         unique=True,
         effects=MechanicalEffect(
-            special=(
-                "carry_allies_total_size_half_less_than_self "
-                "adjacent_allies_quick_action_mount_soft_cover "
-                "dismount_on_prone_stunned_destroyed_or_immobilized"
-            ),
+            mount_carries=[
+                MountedAllyEffect(
+                    max_total_size_relative="self_minus_half",
+                    mount_action_type="quick",
+                    requires_adjacent=True,
+                    disallow_target_statuses=["immobilized"],
+                    provides_soft_cover=True,
+                    shares_space=True,
+                    moves_with_carrier=True,
+                    dismount_on_carrier_statuses=["prone", "stunned"],
+                    dismount_on_carrier_destroyed=True,
+                    dismount_on_rider_statuses=["immobilized"],
+                    knocks_prone_on_dismount=True,
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -2218,7 +3058,19 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                     ),
                 )
             ],
-            special="target_empty_space_blast_1_difficult_terrain_scene_put_out_fires",
+            zones=[
+                ZoneEffect(
+                    shape="blast",
+                    size=1,
+                    placement_range=5,
+                    placement_requires_line_of_sight=True,
+                    placement_requires_free_space=True,
+                    duration="scene",
+                    difficult_terrain=True,
+                    extinguishes_fires=True,
+                    condition="target_empty_space",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -2246,7 +3098,15 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
                     ends_on_zero=True,
                 )
             ],
-            special="attach_ally_range_5",
+            attachments=[
+                AttachmentEffect(
+                    action_type="quick",
+                    range=5,
+                    target="ally",
+                    requires_line_of_sight=True,
+                    max_instances_per_target=1,
+                )
+            ],
         ),
     ),
 ]
@@ -2280,13 +3140,93 @@ SSC_FRAMES: list[MechFrameDefinition] = [
             id="ssc_mag_projector",
             name="Mag Projector",
             effects=MechanicalEffect(
-                special=(
-                    "core_power_full_action_blast_4_mag_field "
-                    "blocks_ranged_kinetic_explosive_through_field "
-                    "difficult_terrain "
-                    "metal_targets_hull_save_or_pull_to_center_and_immobilized "
-                    "detonation_end_next_turn_resolve_saved_attacks"
-                ),
+                triggered_effects=[
+                    TriggeredEffect(
+                        trigger="on_activation",
+                        condition="core_power_full_action_mag_field",
+                        effect=MechanicalEffect(
+                            zones=[
+                                ZoneEffect(
+                                    shape="blast",
+                                    size=4,
+                                    placement="target_area",
+                                    placement_range=1,
+                                    placement_requires_adjacent=True,
+                                    duration="end_of_next_turn",
+                                    difficult_terrain=True,
+                                    effects_on_enter=MechanicalEffect(
+                                        save_checks=[
+                                            SaveCheck(
+                                                trigger="on_move",
+                                                condition="enter_zone_metal_target",
+                                                save="hull",
+                                                target="all",
+                                                on_failure=MechanicalEffect(
+                                                    forced_movements=[
+                                                        ForcedMovement(
+                                                            direction="pull",
+                                                            distance="as_far_as_possible",
+                                                            target="all",
+                                                            toward="zone_center",
+                                                            ignores_engagement=True,
+                                                            provokes_reactions=False,
+                                                        )
+                                                    ],
+                                                    status_grants=[
+                                                        StatusGrant(
+                                                            status="immobilized",
+                                                            target="all",
+                                                            duration="end_of_next_turn",
+                                                        )
+                                                    ],
+                                                ),
+                                            )
+                                        ]
+                                    ),
+                                    effects_on_start_turn=MechanicalEffect(
+                                        save_checks=[
+                                            SaveCheck(
+                                                trigger="on_turn_start",
+                                                condition="in_zone_metal_target",
+                                                save="hull",
+                                                target="all",
+                                                on_failure=MechanicalEffect(
+                                                    forced_movements=[
+                                                        ForcedMovement(
+                                                            direction="pull",
+                                                            distance="as_far_as_possible",
+                                                            target="all",
+                                                            toward="zone_center",
+                                                            ignores_engagement=True,
+                                                            provokes_reactions=False,
+                                                        )
+                                                    ],
+                                                    status_grants=[
+                                                        StatusGrant(
+                                                            status="immobilized",
+                                                            target="all",
+                                                            duration="end_of_next_turn",
+                                                        )
+                                                    ],
+                                                ),
+                                            )
+                                        ]
+                                    ),
+                                    attack_capture=AttackCaptureEffect(
+                                        attack_types=["ranged"],
+                                        damage_types=["kinetic", "explosive"],
+                                        capture_max=6,
+                                        resolve_trigger="turn_end",
+                                        attack_bonus_per_capture=1,
+                                        attack_bonus_max=6,
+                                        damage_per_capture=DiceExpression.parse("1d6"),
+                                        damage_type="kinetic",
+                                    ),
+                                )
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
@@ -2299,7 +3239,28 @@ SSC_FRAMES: list[MechFrameDefinition] = [
             FrameTrait(
                 name="Mag Parry",
                 effects=MechanicalEffect(
-                    special="reaction_parry_kinetic_attack_1_per_round_roll_5_plus_miss",
+                    random_checks=[
+                        RandomCheckEffect(
+                            trigger="on_attack_roll",
+                            roll=DiceExpression.parse("1d6"),
+                            success_threshold=5,
+                            target="self",
+                            uses_per="round",
+                            condition="reaction_parry_kinetic_attack_against_self_or_adjacent_ally",
+                            on_success=MechanicalEffect(
+                                attack_outcomes=[
+                                    AttackOutcomeEffect(
+                                        trigger="on_attack_roll",
+                                        force_miss=True,
+                                        target="all",
+                                        attacker="enemy",
+                                        uses_reaction=True,
+                                        condition="kinetic_attack_against_self_or_adjacent_ally",
+                                    )
+                                ],
+                            ),
+                        )
+                    ],
                 ),
             ),
         ],
@@ -2332,18 +3293,66 @@ SSC_FRAMES: list[MechFrameDefinition] = [
             id="ssc_precognitive_targeting",
             name="Precognitive Targeting",
             effects=MechanicalEffect(
-                special=(
-                    "core_power_protocol_mark_for_death_full_action_range_30_min_range_5 "
-                    "immobilized_no_reactions_while_concentrating "
-                    "ranged_crits_vs_marked_target_deal_bonus_3d6_if_no_cover"
-                ),
+                target_marks=[
+                    TargetMarkEffect(
+                        name="Mark for Death",
+                        action_type="full",
+                        range=30,
+                        min_range=5,
+                        requires_line_of_sight=True,
+                        duration="until_cleared",
+                        exclusive=True,
+                        end_action="protocol",
+                        end_timing="on_turn_start",
+                        self_effects=MechanicalEffect(
+                            status_grants=[
+                                StatusGrant(
+                                    status="immobilized",
+                                    target="self",
+                                    duration="until_cleared",
+                                )
+                            ],
+                            action_restrictions=[
+                                ActionRestriction(
+                                    action_categories=["reaction"],
+                                    target="self",
+                                    duration="until_cleared",
+                                )
+                            ],
+                        ),
+                        attack_effects=MechanicalEffect(
+                            triggered_effects=[
+                                TriggeredEffect(
+                                    trigger="on_crit",
+                                    condition="ranged_attack_vs_marked_target_no_cover_outside_range_5",
+                                    effect=MechanicalEffect(
+                                        damage_mods=[
+                                            DamageModifier(
+                                                dice=DiceExpression.parse("3d6")
+                                            )
+                                        ],
+                                    ),
+                                )
+                            ],
+                        ),
+                        condition="core_power_active",
+                    )
+                ],
             ),
         ),
         traits=[
             FrameTrait(
                 name="Neuro-Linked",
                 effects=MechanicalEffect(
-                    special="reroll_first_ranged_attack_per_round_keep_second",
+                    attack_rerolls=[
+                        AttackRerollEffect(
+                            trigger="on_attack_roll",
+                            allowed_attack_types=["ranged"],
+                            keep_second=True,
+                            uses_per="round",
+                            condition="first_ranged_attack_each_round",
+                        )
+                    ],
                 ),
             ),
             FrameTrait(
@@ -2407,7 +3416,14 @@ SSC_FRAMES: list[MechFrameDefinition] = [
             FrameTrait(
                 name="Integrated Hover Flight",
                 effects=MechanicalEffect(
-                    special="hover_flight_on_move_or_boost",
+                    movement_overrides=[
+                        MovementOverrideEffect(
+                            movement_modes=["move", "boost"],
+                            override_type="fly",
+                            duration="scene",
+                            condition="hover_no_landing_required",
+                        )
+                    ],
                 ),
             ),
             FrameTrait(
@@ -2539,7 +3555,48 @@ SSC_FRAMES: list[MechFrameDefinition] = [
             id="ssc_avenger_silos",
             name="Avenger Silos",
             effects=MechanicalEffect(
-                special="core_power_full_action_divine_punishment_burst_50_agility_half_1d6_plus_4_explosive_no_los",
+                triggered_effects=[
+                    TriggeredEffect(
+                        trigger="on_activation",
+                        effect=MechanicalEffect(
+                            area_selections=[
+                                AreaSelectionEffect(
+                                    scope_options=["battlefield", "area"],
+                                    shape="burst",
+                                    size=50,
+                                    requires_line_of_sight=False,
+                                    origin="self",
+                                )
+                            ],
+                            save_checks=[
+                                SaveCheck(
+                                    trigger="on_activation",
+                                    save="agility",
+                                    target="enemy",
+                                    on_failure=MechanicalEffect(
+                                        direct_damages=[
+                                            DirectDamage(
+                                                damage_type="explosive",
+                                                dice=DiceExpression.parse("1d6+4"),
+                                                target="enemy",
+                                            )
+                                        ],
+                                    ),
+                                    on_success=MechanicalEffect(
+                                        direct_damages=[
+                                            DirectDamage(
+                                                damage_type="explosive",
+                                                dice=DiceExpression.parse("1d6+4"),
+                                                multiplier=0.5,
+                                                target="enemy",
+                                            )
+                                        ],
+                                    ),
+                                )
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
@@ -2572,7 +3629,13 @@ SSC_FRAMES: list[MechFrameDefinition] = [
                             trigger="on_activation",
                             condition="launcher_attack_consumes_lock_on",
                             effect=MechanicalEffect(
-                                special="gain_seeking_and_damage_unreducible",
+                                weapon_mods=[
+                                    WeaponModEffect(
+                                        allowed_weapon_types=["launcher"],
+                                        add_tags=[WeaponTagGrant(tag="seeking")],
+                                        damage_unreducible=True,
+                                    )
+                                ],
                             ),
                         )
                     ],
@@ -2608,10 +3671,55 @@ SSC_FRAMES: list[MechFrameDefinition] = [
             id="ssc_ex_slipstream_module",
             name="EX Slipstream Module",
             effects=MechanicalEffect(
-                special=(
-                    "full_action_teleport_3d6_fail_if_occupied_triples_vanish "
-                    "core_power_protocol_move_or_boost_teleport_same_distance_scene"
-                ),
+                action_grants=[
+                    ActionGrant(action_type="full", name="Slipstream Jump"),
+                ],
+                movement_grants=[
+                    MovementGrant(
+                        spaces=DiceExpression.parse("3d6"),
+                        movement_type="teleport",
+                        trigger="slipstream_jump",
+                        target="self",
+                        distance_is_maximum=True,
+                        requires_line_of_sight=False,
+                        requires_free_space=True,
+                        fails_if_occupied=True,
+                    )
+                ],
+                roll_patterns=[
+                    RollPatternEffect(
+                        trigger="on_activation",
+                        roll=DiceExpression.parse("3d6"),
+                        pattern="triples",
+                        target="self",
+                        condition="slipstream_jump",
+                        effect=MechanicalEffect(
+                            out_of_play_effects=[
+                                OutOfPlayEffect(
+                                    target="self",
+                                    duration="until_rest",
+                                    gm_may_override=True,
+                                )
+                            ],
+                        ),
+                    )
+                ],
+                triggered_effects=[
+                    TriggeredEffect(
+                        trigger="on_activation",
+                        condition="stabilize_singularity",
+                        effect=MechanicalEffect(
+                            movement_overrides=[
+                                MovementOverrideEffect(
+                                    movement_modes=["move", "boost"],
+                                    override_type="teleport",
+                                    same_distance=True,
+                                    duration="scene",
+                                )
+                            ],
+                        ),
+                    )
+                ],
             ),
         ),
         traits=[
@@ -3181,6 +4289,7 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                     placement="deployable",
                     placement_range=5,
                     duration="scene",
+                    max_instances_per_source=1,
                     effects_on_enter=MechanicalEffect(
                         save_checks=[
                             SaveCheck(
@@ -3233,7 +4342,23 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                     ),
                 )
             ],
-            special="attract_mode_escape_quick_action_hull_save_only_one_deployer",
+            effect_removals=[
+                EffectRemoval(
+                    action_type="quick",
+                    check_type="hull",
+                    check_kind="save",
+                    target="enemy",
+                    condition="attract_mode_immobilized",
+                )
+            ],
+            status_breaks=[
+                StatusBreakCondition(
+                    status="immobilized",
+                    target="enemy",
+                    break_triggers=["source_destroyed"],
+                    condition="attract_mode_immobilized",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -3270,16 +4395,23 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                     shape="line",
                     size=4,
                     placement_range=1,
+                    placement_requires_free_space=True,
+                    placement_requires_adjacent=True,
+                    vertical_range=4,
                     duration="scene",
+                    blocks_movement=True,
+                    blocks_movement_condition="metallic_armor_or_wielding_metal",
+                    counts_as_obstruction=True,
+                    blocks_line_of_sight=False,
                     continuous_effects=MechanicalEffect(
                         resistances=[
                             Resistance(damage_type="kinetic", condition="attacks_through_field"),
                             Resistance(damage_type="explosive", condition="attacks_through_field"),
                         ],
                     ),
+                    max_instances_per_source=1,
                 )
             ],
-            special="line_4_force_field_height_4_blocks_metal_movement_no_cover_or_los_only_one",
         ),
     ),
     MechSystemDefinition(
@@ -3291,7 +4423,14 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
-            special="treat_vertical_surfaces_as_ground_fall_if_prone",
+            movement_surface_effects=[
+                MovementSurfaceEffect(
+                    treat_vertical_as_ground=True,
+                    fall_if_prone=True,
+                    target="self",
+                    duration="scene",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -3360,10 +4499,15 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
         license_rank=2,
         unique=True,
         effects=MechanicalEffect(
-            special=(
-                "start_turn_optional_first_attack_plus_1_accuracy "
-                "additional_attacks_plus_1_difficulty_until_turn_end"
-            ),
+            attack_sequence_mods=[
+                AttackSequenceModifierEffect(
+                    trigger="on_turn_start",
+                    first_attack_accuracy=1,
+                    first_attack_optional=True,
+                    subsequent_attack_difficulty=1,
+                    duration="end_of_turn",
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -3550,13 +4694,37 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                                 target="self",
                             )
                         ],
+                        movement_restrictions=[
+                            MovementRestrictionEffect(
+                                target="self",
+                                movement_modes=["move", "boost"],
+                                must_move_straight_line=True,
+                                duration="start_of_next_turn",
+                            )
+                        ],
+                        movement_trails=[
+                            MovementTrailEffect(
+                                trigger="move_or_boost",
+                                trail_height=1,
+                                cover="hard",
+                                applies_to_adjacent=True,
+                                resistances=[
+                                    Resistance(
+                                        damage_type="energy",
+                                        target="all",
+                                        condition="benefiting_from_trail_cover",
+                                    )
+                                ],
+                                blocks_movement=False,
+                                counts_as_obstruction=False,
+                                creation_duration="start_of_next_turn",
+                                trail_duration="scene",
+                                ends_on_reactivation=True,
+                            )
+                        ],
                     ),
                 )
             ],
-            special=(
-                "protocol_straight_line_movement_light_construct_hard_cover_adjacent_energy_resistance "
-                "lingers_scene_or_until_reactivated"
-            ),
         ),
     ),
     MechSystemDefinition(
@@ -3591,7 +4759,54 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
             )
         ],
         effects=MechanicalEffect(
-            special="grenade_blocks_los_out_mine_fail_los_adjacent_only",
+            choices=[
+                EffectChoice(
+                    name="Flash Grenade",
+                    effect=MechanicalEffect(
+                        zones=[
+                            ZoneEffect(
+                                shape="blast",
+                                size=2,
+                                placement="target_area",
+                                placement_range=5,
+                                placement_requires_line_of_sight=True,
+                                duration="end_of_next_turn",
+                                continuous_effects=MechanicalEffect(
+                                    line_of_sight_restrictions=[
+                                        LineOfSightRestriction(
+                                            target="all",
+                                            cannot_trace_outside_zone=True,
+                                            excludes_source=True,
+                                            duration="end_of_next_turn",
+                                        )
+                                    ],
+                                ),
+                            )
+                        ],
+                    ),
+                ),
+                EffectChoice(
+                    name="Flash Mine",
+                    effect=MechanicalEffect(
+                        save_checks=[
+                            SaveCheck(
+                                trigger="on_detonate",
+                                save="agility",
+                                target="all",
+                                on_failure=MechanicalEffect(
+                                    line_of_sight_restrictions=[
+                                        LineOfSightRestriction(
+                                            target="all",
+                                            only_adjacent=True,
+                                            duration="end_of_next_turn",
+                                        )
+                                    ],
+                                ),
+                            )
+                        ],
+                    ),
+                ),
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -3607,6 +4822,14 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                     trigger="on_activation",
                     condition="brace",
                     effect=MechanicalEffect(
+                        movement_grants=[
+                            MovementGrant(
+                                spaces="speed",
+                                movement_type="walk",
+                                trigger="brace",
+                                target="self",
+                            )
+                        ],
                         status_grants=[
                             StatusGrant(
                                 status="invisible",
@@ -3614,7 +4837,6 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                                 duration="end_of_next_turn",
                             )
                         ],
-                        special="brace_move_speed",
                     ),
                 )
             ],
@@ -3641,25 +4863,26 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                                 target="self",
                             )
                         ],
-                        status_grants=[
-                            StatusGrant(
-                                status="invisible",
-                                target="self",
-                                duration="end_of_next_turn",
-                            )
-                        ],
                     ),
+                )
+            ],
+            status_toggles=[
+                StatusToggleEffect(
+                    status="invisible",
+                    target="self",
+                    activation_action="protocol",
+                    activation_timing="on_turn_start",
+                    deactivation_action="protocol",
+                    deactivation_timing="on_turn_start",
+                    duration="end_of_next_turn",
                 )
             ],
             status_breaks=[
                 StatusBreakCondition(
                     status="invisible",
                     target="self",
-                    break_triggers=["take_damage", "stunned", "manual_deactivate"],
+                    break_triggers=["take_damage"],
                 )
-            ],
-            effect_removals=[
-                EffectRemoval(action_type="protocol", target="self", condition="manual_deactivate")
             ],
         ),
     ),
@@ -3694,7 +4917,64 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         tags=[SystemTag(tag="quick_action")],
         effects=MechanicalEffect(
-            special="mark_three_spaces_range_15_los_non_adjacent_auto_damage_3_kinetic_on_pass_or_start_end_start_next_turn",
+            area_selections=[
+                AreaSelectionEffect(
+                    scope_options=["spaces"],
+                    shape="square",
+                    size=1,
+                    count=3,
+                    range=15,
+                    requires_line_of_sight=True,
+                    requires_free_space=True,
+                    non_adjacent=True,
+                    visible_to_all=True,
+                    vertical_range=10,
+                    origin="self",
+                )
+            ],
+            zones=[
+                ZoneEffect(
+                    shape="square",
+                    width=1,
+                    height=1,
+                    placement="target_area",
+                    placement_range=15,
+                    placement_requires_line_of_sight=True,
+                    placement_requires_free_space=True,
+                    placement_non_adjacent=True,
+                    placement_visible_to_all=True,
+                    vertical_range=10,
+                    duration="start_of_next_turn",
+                    effects_on_enter=MechanicalEffect(
+                        direct_damages=[
+                            DirectDamage(
+                                damage_type="kinetic",
+                                flat=3,
+                                target="all",
+                            )
+                        ],
+                    ),
+                    effects_on_start_turn=MechanicalEffect(
+                        direct_damages=[
+                            DirectDamage(
+                                damage_type="kinetic",
+                                flat=3,
+                                target="all",
+                            )
+                        ],
+                    ),
+                    end_conditions=[
+                        ZoneEndCondition(
+                            trigger="enter",
+                            end_scope="triggered_space",
+                        ),
+                        ZoneEndCondition(
+                            trigger="start_turn",
+                            end_scope="triggered_space",
+                        ),
+                    ],
+                )
+            ],
         ),
     ),
     MechSystemDefinition(
@@ -3743,19 +5023,21 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                                 duration="start_of_next_turn",
                             )
                         ],
-                    ),
-                ),
-                TriggeredEffect(
-                    trigger="on_miss",
-                    condition="melee_or_ranged_attack_different_target",
-                    effect=MechanicalEffect(
-                        action_grants=[
-                            ActionGrant(action_type="free", name="reroll_attack")
+                        attack_rerolls=[
+                            AttackRerollEffect(
+                                trigger="on_miss",
+                                allowed_attack_types=["melee", "ranged"],
+                                require_new_target=True,
+                                allow_same_area_for_aoe=True,
+                                aoe_types=["blast", "line", "cone"],
+                                max_rerolls_per_attack=1,
+                                disallow_already_hit_targets=True,
+                                duration="start_of_next_turn",
+                            )
                         ],
                     ),
                 ),
             ],
-            special="reroll_once_per_attack_no_retarget_same_target",
         ),
     ),
     MechSystemDefinition(
@@ -3769,11 +5051,21 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
         effects=MechanicalEffect(
             triggered_effects=[
                 TriggeredEffect(
-                    trigger="on_activation",
-                    condition="on_take_damage",
+                    trigger="on_take_damage",
                     uses_per="round",
                     effect=MechanicalEffect(
-                        special="teleport_1d6_spaces_on_damage",
+                        movement_grants=[
+                            MovementGrant(
+                                spaces=DiceExpression.parse("1d6"),
+                                movement_type="teleport",
+                                trigger="on_take_damage",
+                                target="self",
+                                distance_is_maximum=True,
+                                requires_line_of_sight=False,
+                                requires_free_space=True,
+                                fails_if_occupied=True,
+                            )
+                        ],
                     ),
                 )
             ],
@@ -3907,7 +5199,18 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                                 duration="until_cleared",
                             )
                         ],
-                        special="ally_hit_reaction_upgrade_to_crit_until_start_next_turn",
+                        attack_outcomes=[
+                            AttackOutcomeEffect(
+                                trigger="on_ally_hit",
+                                upgrade_to_crit=True,
+                                target="enemy",
+                                attacker="ally",
+                                uses_reaction=True,
+                                duration="start_of_next_turn",
+                                uses_per="round",
+                                condition="ally_other_than_self_hits_markerlight_target",
+                            )
+                        ],
                     ),
                 )
             ],

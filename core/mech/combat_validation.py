@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES, LineOfSightRules
 from core.mech.combat_state import MechCombatScenario, CombatTurn, CombatantState, ActionUse
@@ -15,23 +16,21 @@ from core.mech.statuses import STATUS_DEFINITIONS_BY_ID
 from core.shared.enums import CoverType
 
 
-class CombatValidationIssue(BaseModel):
+class CombatValidationIssue(FrozenModel):
     """A combat validation issue."""
 
     code: str
     message: str
     severity: Literal["error", "warning"] = "error"
 
-    model_config = {"frozen": True}
 
 
-class CombatValidation(BaseModel):
+class CombatValidation(FrozenModel):
     """Validation result for a combat scenario."""
 
     valid: bool
     issues: list[CombatValidationIssue] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
 def _adjacent_hard_cover_coords(

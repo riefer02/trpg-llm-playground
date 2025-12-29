@@ -74,6 +74,16 @@ MountType = Literal[
     "superheavy",  # Superheavy mount (takes 2 mounts)
 ]
 
+# Mount Slot Types (for frame mounts)
+MountSlotType = Literal[
+    "main",
+    "heavy",
+    "aux_aux",
+    "main_aux",
+    "flexible",
+    "integrated",
+]
+
 # System Types
 SystemType = Literal[
     "system",      # Standard system

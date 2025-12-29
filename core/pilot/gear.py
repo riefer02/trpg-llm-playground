@@ -2,10 +2,17 @@
 
 from collections import Counter
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field, model_validator
+from core.shared.models import FrozenModel
 
-from core.shared.effects import MechanicalEffect, StatModifier
-from core.shared.enums import ActionType, DamageType, RangeType
+from core.shared.effects import BreakTriggerType, EffectDuration, MechanicalEffect, StatModifier
+from core.shared.enums import ActionType, StatusType
+from core.shared.payloads import (
+    PilotAreaEffect,
+    PilotDamageSpec,
+    PilotGrenadePayload,
+    PilotWeaponProfile,
+)
 
 
 PilotGearCategory = Literal["clothing", "armor", "weapon", "gear"]
@@ -18,47 +25,14 @@ PilotGearTagType = Literal[
 ]
 
 
-class PilotGearTag(BaseModel):
+class PilotGearTag(FrozenModel):
     """Structured tag for pilot gear items."""
 
     tag: PilotGearTagType
     value: int | None = None
 
-    model_config = {"frozen": True}
 
-
-class PilotDamageSpec(BaseModel):
-    """Damage specification for pilot gear."""
-
-    damage_type: DamageType
-    flat: int = 0
-    ap: bool = False
-
-    model_config = {"frozen": True}
-
-
-class PilotAreaEffect(BaseModel):
-    """Area effect payload for pilot gear."""
-
-    pattern: RangeType
-    size: int = Field(..., ge=0)
-    damage: PilotDamageSpec | None = None
-    attack_vs: Literal["evasion", "e_defense"] | None = None
-
-    model_config = {"frozen": True}
-
-
-class PilotGrenadePayload(BaseModel):
-    """Grenade option for pilot gear."""
-
-    name: str
-    range: int = Field(..., ge=0)
-    area: PilotAreaEffect
-
-    model_config = {"frozen": True}
-
-
-class PilotChargePayload(BaseModel):
+class PilotChargePayload(FrozenModel):
     """Planted explosive charge payload for pilot gear."""
 
     name: str
@@ -66,19 +40,17 @@ class PilotChargePayload(BaseModel):
     detonate_action: ActionType
     area: PilotAreaEffect
 
-    model_config = {"frozen": True}
 
 
-class PilotFlightEffect(BaseModel):
+class PilotFlightEffect(FrozenModel):
     """Flight behavior granted by pilot gear."""
 
     mode: Literal["move", "boost", "move_or_boost"]
     must_end_on_surface: bool = False
 
-    model_config = {"frozen": True}
 
 
-class PilotMedicalEffect(BaseModel):
+class PilotMedicalEffect(FrozenModel):
     """Medical gear payload."""
 
     name: str
@@ -90,20 +62,108 @@ class PilotMedicalEffect(BaseModel):
     applies_to_adjacent: bool = True
     affects_mechs: bool = False
 
-    model_config = {"frozen": True}
 
 
-class PilotStimEffect(BaseModel):
+class PilotStimEffect(FrozenModel):
     """Stim gear payload."""
 
     name: str
     effect: Literal["awake_alert", "calm_emotional", "heightened_senses"]
     duration_hours: int | None = Field(default=None, ge=0)
 
-    model_config = {"frozen": True}
+
+PilotEnvironmentalHazard = Literal["vacuum", "radiation"]
+PilotBreathingDuration = Literal["limited", "scene", "mission", "unlimited"]
 
 
-class PilotGearItemDefinition(BaseModel):
+class PilotStealthEffect(FrozenModel):
+    """Stealth action granted by pilot gear."""
+
+    action_type: ActionType = "quick"
+    status: StatusType = "invisible"
+    duration: EffectDuration = "until_cleared"
+    break_triggers: list[BreakTriggerType] = Field(default_factory=lambda: ["take_damage"])
+
+
+class PilotEnvironmentalSeal(FrozenModel):
+    """Environmental sealing provided by pilot gear."""
+
+    protects_from: list[PilotEnvironmentalHazard] = Field(default_factory=list)
+    water_breathing_duration: PilotBreathingDuration | None = None
+
+
+class PilotZeroGEffect(FrozenModel):
+    """Zero-g maneuvering enhancement."""
+
+    maneuverability_bonus: bool = True
+
+
+class PilotSurfaceMarkEffect(FrozenModel):
+    """Surface marking that can transmit simple data when scanned."""
+
+    visibility: Literal["visible", "invisible"] = "invisible"
+    data_capacity: Literal["simple", "limited"] = "simple"
+    requires_scan: bool = True
+
+
+class PilotSustenanceEffect(FrozenModel):
+    """Sustenance and climate control support."""
+
+    duration_days: int = Field(default=0, ge=0)
+    recharge_days_min: int | None = Field(default=None, ge=0)
+    recharge_days_max: int | None = Field(default=None, ge=0)
+    provides_temperature_control: bool = True
+    prevents_hunger: bool = False
+
+
+class PilotHackInterfaceEffect(FrozenModel):
+    """Hack interface without external gear or rigs."""
+
+    requires_external_gear: bool = False
+    requires_rig: bool = False
+    provides_omninet_access: bool = True
+
+
+class PilotDroneEffect(FrozenModel):
+    """Non-combat drone with relay capability."""
+
+    max_range_miles: float = Field(default=0.5, ge=0)
+    relays_audio: bool = True
+    relays_visual: bool = True
+    combat_capable: bool = False
+    noisy: bool = True
+
+
+class PilotDisguiseEffect(FrozenModel):
+    """Holographic disguise and voice modulation."""
+
+    holographic_projection: bool = True
+    voice_modulation: bool = True
+    fools_electronics: bool = True
+    fails_close_inspection: bool = True
+
+
+class PilotShelterEffect(FrozenModel):
+    """Portable shelter that trades mobility for protection."""
+
+    enter_action: ActionType = "full"
+    exit_action: ActionType = "full"
+    immunities: list[str] = Field(default_factory=list)
+    environmental_seal: list[PilotEnvironmentalHazard] = Field(default_factory=list)
+    air_supply_hours: int | None = Field(default=None, ge=0)
+    evasion_override: int | None = Field(default=None, ge=0)
+    slowed: bool = True
+    restrict_actions_except_exit: bool = True
+
+
+class PilotExtraArmEffect(FrozenModel):
+    """Powered auxiliary arm for tools or weapons."""
+
+    powered: bool = True
+    mount_options: list[Literal["manipulator", "weapon", "tool"]] = Field(default_factory=list)
+
+
+class PilotGearItemDefinition(FrozenModel):
     """Definition for a pilot gear item."""
 
     id: str = Field(..., description="Unique gear identifier")
@@ -111,17 +171,33 @@ class PilotGearItemDefinition(BaseModel):
     category: PilotGearCategory
     limited_uses: int | None = Field(default=None, ge=0)
     tags: list[PilotGearTag] = Field(default_factory=list)
+    weapon_profile: PilotWeaponProfile | None = None
     grenades: list[PilotGrenadePayload] = Field(default_factory=list)
     charges: list[PilotChargePayload] = Field(default_factory=list)
     flight: PilotFlightEffect | None = None
     medical: PilotMedicalEffect | None = None
     stim: PilotStimEffect | None = None
+    stealth: PilotStealthEffect | None = None
+    environmental_seal: PilotEnvironmentalSeal | None = None
+    zero_g: PilotZeroGEffect | None = None
+    surface_marking: PilotSurfaceMarkEffect | None = None
+    sustenance: PilotSustenanceEffect | None = None
+    hack_interface: PilotHackInterfaceEffect | None = None
+    drone: PilotDroneEffect | None = None
+    disguise: PilotDisguiseEffect | None = None
+    shelter: PilotShelterEffect | None = None
+    extra_arm: PilotExtraArmEffect | None = None
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
 
-    model_config = {"frozen": True}
+    @model_validator(mode="after")
+    def _validate_weapon_profile(self) -> "PilotGearItemDefinition":
+        if self.category == "weapon" and self.weapon_profile is None:
+            raise ValueError("Weapon gear items must define a weapon_profile.")
+        return self
 
 
-class PilotGearRules(BaseModel):
+
+class PilotGearRules(FrozenModel):
     """Loadout limits for pilot gear."""
 
     clothing_required: bool = True
@@ -129,13 +205,12 @@ class PilotGearRules(BaseModel):
     max_weapons: int = 2
     max_gear: int = 3
 
-    model_config = {"frozen": True}
 
 
 DEFAULT_PILOT_GEAR_RULES = PilotGearRules()
 
 
-class PilotLoadout(BaseModel):
+class PilotLoadout(FrozenModel):
     """Pilot gear selection for a mission."""
 
     clothing: str | None = Field(default=None, description="Clothing item ID")
@@ -143,7 +218,6 @@ class PilotLoadout(BaseModel):
     weapons: list[str] = Field(default_factory=list, max_length=2, description="Weapon item IDs")
     gear: list[str] = Field(default_factory=list, max_length=3, description="Other gear item IDs")
 
-    model_config = {"frozen": True}
 
     def total_items(self) -> int:
         """Total number of selected items."""
@@ -212,12 +286,12 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         id="stealth_hardsuit",
         name="Stealth Hardsuit",
         category="armor",
+        stealth=PilotStealthEffect(),
         effects=MechanicalEffect(
             stat_mods=[
                 StatModifier(stat="evasion", value=-2),
                 StatModifier(stat="e_defense", value=-2),
             ],
-            special="quick_action_invisible_breaks_on_damage",
         ),
     ),
     PilotGearItemDefinition(
@@ -225,24 +299,30 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         name="Archaic Melee Weapon",
         category="weapon",
         tags=[PilotGearTag(tag="archaic")],
-        effects=MechanicalEffect(
-            special="pilot_melee_threat1_damage1_kinetic",
+        weapon_profile=PilotWeaponProfile(
+            range_type="threat",
+            range=1,
+            damage=PilotDamageSpec(flat=1, damage_type="kinetic"),
         ),
     ),
     PilotGearItemDefinition(
         id="alloy_composite_light",
         name="Alloy/Composite Weapon (Light)",
         category="weapon",
-        effects=MechanicalEffect(
-            special="pilot_melee_threat1_damage1_kinetic",
+        weapon_profile=PilotWeaponProfile(
+            range_type="threat",
+            range=1,
+            damage=PilotDamageSpec(flat=1, damage_type="kinetic"),
         ),
     ),
     PilotGearItemDefinition(
         id="alloy_composite_combat",
         name="Alloy/Composite Weapon (Combat)",
         category="weapon",
-        effects=MechanicalEffect(
-            special="pilot_melee_threat1_damage2_kinetic",
+        weapon_profile=PilotWeaponProfile(
+            range_type="threat",
+            range=1,
+            damage=PilotDamageSpec(flat=2, damage_type="kinetic"),
         ),
     ),
     PilotGearItemDefinition(
@@ -250,8 +330,10 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         name="Alloy/Composite Weapon (Heavy)",
         category="weapon",
         tags=[PilotGearTag(tag="inaccurate")],
-        effects=MechanicalEffect(
-            special="pilot_melee_threat1_damage3_kinetic",
+        weapon_profile=PilotWeaponProfile(
+            range_type="threat",
+            range=1,
+            damage=PilotDamageSpec(flat=3, damage_type="kinetic"),
         ),
     ),
     PilotGearItemDefinition(
@@ -259,8 +341,10 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         name="Archaic Ranged Weapon",
         category="weapon",
         tags=[PilotGearTag(tag="archaic")],
-        effects=MechanicalEffect(
-            special="pilot_ranged_range5_damage1_kinetic",
+        weapon_profile=PilotWeaponProfile(
+            range_type="range",
+            range=5,
+            damage=PilotDamageSpec(flat=1, damage_type="kinetic"),
         ),
     ),
     PilotGearItemDefinition(
@@ -268,16 +352,28 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         name="Signature Weapon (Sidearm)",
         category="weapon",
         tags=[PilotGearTag(tag="sidearm")],
-        effects=MechanicalEffect(
-            special="pilot_ranged_range3_damage1_choose_type",
+        weapon_profile=PilotWeaponProfile(
+            range_type="range",
+            range=3,
+            damage=PilotDamageSpec(
+                flat=1,
+                damage_type="kinetic",
+                damage_type_options=["kinetic", "energy", "explosive"],
+            ),
         ),
     ),
     PilotGearItemDefinition(
         id="signature_weapon_combat",
         name="Signature Weapon (Combat)",
         category="weapon",
-        effects=MechanicalEffect(
-            special="pilot_ranged_range5_damage2_choose_type",
+        weapon_profile=PilotWeaponProfile(
+            range_type="range",
+            range=5,
+            damage=PilotDamageSpec(
+                flat=2,
+                damage_type="kinetic",
+                damage_type_options=["kinetic", "energy", "explosive"],
+            ),
         ),
     ),
     PilotGearItemDefinition(
@@ -285,8 +381,14 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         name="Signature Weapon (Heavy)",
         category="weapon",
         tags=[PilotGearTag(tag="loading"), PilotGearTag(tag="ordnance")],
-        effects=MechanicalEffect(
-            special="pilot_ranged_range10_damage4_choose_type",
+        weapon_profile=PilotWeaponProfile(
+            range_type="range",
+            range=10,
+            damage=PilotDamageSpec(
+                flat=4,
+                damage_type="kinetic",
+                damage_type_options=["kinetic", "energy", "explosive"],
+            ),
         ),
     ),
     PilotGearItemDefinition(
@@ -328,8 +430,10 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         id="nanite_spray",
         name="Nanite Spray",
         category="gear",
-        effects=MechanicalEffect(
-            special="mark_surface_transmit_simple_data_unlimited",
+        surface_marking=PilotSurfaceMarkEffect(
+            visibility="invisible",
+            data_capacity="limited",
+            requires_scan=True,
         ),
     ),
     PilotGearItemDefinition(
@@ -425,8 +529,12 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         id="flexsuit",
         name="Flexsuit",
         category="gear",
-        effects=MechanicalEffect(
-            special="no_food_or_water_week_after_use",
+        sustenance=PilotSustenanceEffect(
+            duration_days=7,
+            recharge_days_min=1,
+            recharge_days_max=2,
+            provides_temperature_control=True,
+            prevents_hunger=False,
         ),
     ),
     PilotGearItemDefinition(
@@ -438,8 +546,10 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         id="horus_subjectivity_suite",
         name="HORUS Subjectivity Enhancement Suite",
         category="gear",
-        effects=MechanicalEffect(
-            special="hack_without_external_gear",
+        hack_interface=PilotHackInterfaceEffect(
+            requires_external_gear=False,
+            requires_rig=False,
+            provides_omninet_access=True,
         ),
     ),
     PilotGearItemDefinition(
@@ -451,9 +561,7 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         id="mag_clamps",
         name="Mag-Clamps",
         category="gear",
-        effects=MechanicalEffect(
-            special="zero_g_maneuvering_bonus",
-        ),
+        zero_g=PilotZeroGEffect(),
     ),
     PilotGearItemDefinition(
         id="omnihook",
@@ -464,16 +572,23 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         id="personal_drone",
         name="Personal Drone",
         category="gear",
-        effects=MechanicalEffect(
-            special="non_combat_drone_relay_audio_visual",
+        drone=PilotDroneEffect(
+            max_range_miles=0.5,
+            relays_audio=True,
+            relays_visual=True,
+            combat_capable=False,
+            noisy=True,
         ),
     ),
     PilotGearItemDefinition(
         id="prosocollar",
         name="Prosocollar",
         category="gear",
-        effects=MechanicalEffect(
-            special="holographic_face_projection_voice_masking",
+        disguise=PilotDisguiseEffect(
+            holographic_projection=True,
+            voice_modulation=True,
+            fools_electronics=True,
+            fails_close_inspection=True,
         ),
     ),
     PilotGearItemDefinition(
@@ -485,16 +600,24 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         id="sleeping_bag",
         name="Sleeping Bag",
         category="gear",
-        effects=MechanicalEffect(
-            special="full_action_enter_immunity_burn_vacuum_air1hr_evasion5_slowed_no_actions_except_exit",
+        shelter=PilotShelterEffect(
+            enter_action="full",
+            exit_action="full",
+            immunities=["burn"],
+            environmental_seal=["vacuum"],
+            air_supply_hours=1,
+            evasion_override=5,
+            slowed=True,
+            restrict_actions_except_exit=True,
         ),
     ),
     PilotGearItemDefinition(
         id="ssc_sylph",
         name="SSC Sylph",
         category="gear",
-        effects=MechanicalEffect(
-            special="undersuit_environmental_seal_breathe_water_limited_time",
+        environmental_seal=PilotEnvironmentalSeal(
+            protects_from=["vacuum", "radiation"],
+            water_breathing_duration="limited",
         ),
     ),
     PilotGearItemDefinition(
@@ -506,8 +629,9 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
         id="tertiary_arm",
         name="Tertiary Arm",
         category="gear",
-        effects=MechanicalEffect(
-            special="powered_third_arm_tool_or_weapon_mount",
+        extra_arm=PilotExtraArmEffect(
+            powered=True,
+            mount_options=["manipulator", "weapon", "tool"],
         ),
     ),
     PilotGearItemDefinition(
@@ -531,23 +655,21 @@ def get_pilot_gear_definition(gear_id: str) -> PilotGearItemDefinition | None:
 PILOT_GEAR_DEFINITIONS_BY_ID = {item.id: item for item in PILOT_GEAR_DEFINITIONS}
 
 
-class PilotGearIssue(BaseModel):
+class PilotGearIssue(FrozenModel):
     """A pilot gear validation issue."""
 
     code: str
     message: str
     severity: Literal["error", "warning"] = "error"
 
-    model_config = {"frozen": True}
 
 
-class PilotGearValidation(BaseModel):
+class PilotGearValidation(FrozenModel):
     """Validation result for pilot gear loadouts."""
 
     valid: bool
     issues: list[PilotGearIssue] = Field(default_factory=list)
 
-    model_config = {"frozen": True}
 
 
 def _iter_loadout_ids(loadout: PilotLoadout) -> list[str]:

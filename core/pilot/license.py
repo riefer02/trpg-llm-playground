@@ -7,7 +7,8 @@ Note: This module contains only mechanical definitions (allowed under
 the Lancer Third Party License). No copyrighted flavor text.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.enums import ManufacturerType as Manufacturer
 
@@ -21,7 +22,7 @@ MANUFACTURER_NAMES: dict[Manufacturer, str] = {
 }
 
 
-class LicenseDefinition(BaseModel):
+class LicenseDefinition(FrozenModel):
     """
     A license definition - the template for a manufacturer license.
     
@@ -39,10 +40,9 @@ class LicenseDefinition(BaseModel):
     manufacturer: Manufacturer
     frame_id: str = Field(..., description="ID of the frame this license provides")
     
-    model_config = {"frozen": True}
 
 
-class License(BaseModel):
+class License(FrozenModel):
     """
     A license that a pilot has ranks in.
     
@@ -53,7 +53,6 @@ class License(BaseModel):
     license_id: str = Field(..., description="ID of the license definition")
     rank: int = Field(default=1, ge=1, le=3, description="Current rank (1-3)")
     
-    model_config = {"frozen": True}
     
     def is_maxed(self) -> bool:
         """Check if this license is at maximum rank."""

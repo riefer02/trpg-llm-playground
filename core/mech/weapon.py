@@ -1,7 +1,8 @@
 """Mech weapon types for Lancer TTRPG."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.shared.enums import DamageType
 from core.shared.dice import DiceExpression
@@ -37,35 +38,32 @@ WeaponTagType = Literal[
 ]
 
 
-class WeaponRange(BaseModel):
+class WeaponRange(FrozenModel):
     """Range profile for a weapon (including threat, blast, etc)."""
 
     range_type: RangeType
     value: int = Field(..., ge=0)
 
-    model_config = {"frozen": True}
 
 
-class WeaponDamage(BaseModel):
+class WeaponDamage(FrozenModel):
     """Damage component for a weapon."""
 
     damage_type: WeaponDamageType
     dice: DiceExpression | None = None
     flat: int = 0
 
-    model_config = {"frozen": True}
 
 
-class WeaponTag(BaseModel):
+class WeaponTag(FrozenModel):
     """A weapon tag with an optional numeric value."""
 
     tag: WeaponTagType
     value: int | None = None
 
-    model_config = {"frozen": True}
 
 
-class MechWeaponDefinition(BaseModel):
+class MechWeaponDefinition(FrozenModel):
     """Definition for a mech weapon."""
 
     id: str = Field(..., description="Unique weapon identifier")
@@ -98,4 +96,3 @@ class MechWeaponDefinition(BaseModel):
     limited_uses: int | None = Field(default=None, ge=0)
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
 
-    model_config = {"frozen": True}

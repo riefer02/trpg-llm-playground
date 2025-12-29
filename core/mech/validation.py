@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Literal
 from collections import Counter
-from pydantic import BaseModel, Field
+from pydantic import Field
+from core.shared.models import FrozenModel
 
 from core.mech.build import (
     MechBuild,
@@ -21,24 +22,22 @@ from core.pilot.skill import SkillSet
 from core.pilot.license import License
 
 
-class MechBuildIssue(BaseModel):
+class MechBuildIssue(FrozenModel):
     """A mech build validation issue."""
 
     code: str
     message: str
     severity: Literal["error", "warning"] = "error"
 
-    model_config = {"frozen": True}
 
 
-class MechBuildValidation(BaseModel):
+class MechBuildValidation(FrozenModel):
     """Validation result for a mech build."""
 
     valid: bool
     issues: list[MechBuildIssue] = Field(default_factory=list)
     limited_uses: LimitedUseSummary = Field(default_factory=LimitedUseSummary)
 
-    model_config = {"frozen": True}
 
 
 def _validate_mount_allocation(
