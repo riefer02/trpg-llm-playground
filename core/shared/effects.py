@@ -279,6 +279,8 @@ ConditionType = Literal[
     "teleport_on_hit",
     "gravity_well_pull",
     "plasma_gauntlet_active",
+    # Phase/shift conditions
+    "out_of_phase",
 ]
 
 # Structured condition primitives
@@ -456,6 +458,7 @@ TriggerType = Literal[
     "on_stabilize",
     "on_skirmish",
     "on_enter",
+    "on_inflict",
     # Triggers from compendium migration
     "on_brace",
     "on_move_or_boost",
@@ -2935,6 +2938,154 @@ class CorePowerEffect(FrozenModel):
     effects: MechanicalEffect = Field(default_factory=lambda: MechanicalEffect())
 
 
+ProgressionResetTrigger = Literal["scene_end", "rest", "full_repair", "never"]
+
+
+class ProgressionState(FrozenModel):
+    """
+    Tracks sequential progression through numbered states (gates).
+
+    Used for effects like OSIRIS NHP gates where effects unlock sequentially.
+
+    Examples:
+        ProgressionState(current_gate=1, max_gate=4, reset_on="rest", per_target=True)
+    """
+
+    current_gate: int = Field(default=1, ge=1, le=4)
+    max_gate: int = Field(default=4, ge=1)
+    reset_on: ProgressionResetTrigger = "scene_end"
+    per_target: bool = True
+    target_id: str | None = None
+
+
+class GateProgressionEffect(FrozenModel):
+    """
+    Effect that unlocks based on previous gate completion.
+
+    Used for sequential effects like OSIRIS NHP where each gate unlocks the next.
+
+    Examples:
+        GateProgressionEffect(
+            gate_number=2,
+            prerequisite_gate=1,
+            effect=MechanicalEffect(status_grants=[...])
+        )
+    """
+
+    gate_number: int = Field(..., ge=1, le=4)
+    prerequisite_gate: int | None = Field(default=None, ge=1, le=4)
+    effect: "MechanicalEffect"
+    condition: EffectCondition | None = None
+
+
+class ProgressionEffect(FrozenModel):
+    """
+    Tracks sequential gate progression and applies effects at each gate.
+
+    Examples:
+        ProgressionEffect(
+            progression_name="OSIRIS_Gates",
+            reset_on="rest",
+            max_gate=4,
+            gates=[
+                GateProgressionEffect(gate_number=1, effect=MechanicalEffect(...)),
+                GateProgressionEffect(gate_number=2, prerequisite_gate=1, effect=MechanicalEffect(...)),
+            ]
+        )
+    """
+
+    progression_name: str
+    reset_on: ProgressionResetTrigger = "scene_end"
+    max_gate: int = Field(default=4, ge=1)
+    per_target: bool = True
+    gates: list[GateProgressionEffect] = Field(default_factory=list)
+    condition: EffectCondition | None = None
+
+
+class PerTargetCounter(FrozenModel):
+    """
+    Tracks effect usage per specific target.
+
+    Used for effects like Basilisk stun or H0r_OS invasions where each target
+    can only be affected a limited number of times per combat/scene.
+
+    Examples:
+        PerTargetCounter(effect_id="basilisk_stun", max_count=1, reset_on="scene_end")
+    """
+
+    effect_id: str
+    current_count: int = 0
+    max_count: int = Field(default=1, ge=1)
+    reset_on: ProgressionResetTrigger = "scene_end"
+    target_id: str | None = None
+
+
+class PerTargetCounterEffect(FrozenModel):
+    """
+    Applies an effect with per-target limits.
+
+    Used for effects that limit how many times a specific target can be affected.
+
+    Examples:
+        PerTargetCounterEffect(
+            effect_id="basilisk_stun",
+            max_count=1,
+            reset_on="scene_end",
+            effect=MechanicalEffect(status_grants=[...])
+        )
+    """
+
+    effect_id: str
+    max_count: int = Field(default=1, ge=1)
+    reset_on: ProgressionResetTrigger = "scene_end"
+    effect: "MechanicalEffect"
+    condition: EffectCondition | None = None
+
+
+CooldownResetTrigger = Literal[
+    "scene_end", "rest", "full_repair", "turn_start", "turn_end", "round_end", "never"
+]
+
+
+class CooldownState(FrozenModel):
+    """
+    Tracks cooldowns preventing repeated effects.
+
+    Used for effects that require a cooldown period between uses.
+
+    Examples:
+        CooldownState(effect_id="ability_id", duration=1, trigger_on="on_hit")
+    """
+
+    effect_id: str
+    turns_remaining: int = 0
+    duration: int = Field(default=1, ge=1)
+    trigger_on: TriggerType | None = None
+    reset_on: CooldownResetTrigger = "scene_end"
+    per_target: bool = False
+    target_id: str | None = None
+
+
+class CooldownEffect(FrozenModel):
+    """
+    Applies an effect with a cooldown preventing immediate re-use.
+
+    Examples:
+        CooldownEffect(
+            effect_id="ability_id",
+            duration=1,
+            effect=MechanicalEffect(damage_mods=[...])
+        )
+    """
+
+    effect_id: str
+    duration: int = Field(default=1, ge=1)
+    trigger_on: TriggerType | None = None
+    reset_on: CooldownResetTrigger = "scene_end"
+    effect: "MechanicalEffect"
+    condition: EffectCondition | None = None
+
+
 class MechanicalEffect(FrozenModel):
     """
     Composable mechanical effect for talents, core bonuses, systems, etc.
@@ -3079,6 +3230,11 @@ class MechanicalEffect(FrozenModel):
     holographic_duplicates: list[HolographicDuplicateEffect] = Field(
         default_factory=list
     )
+    progression_effects: list[ProgressionEffect] = Field(default_factory=list)
+    per_target_counter_effects: list[PerTargetCounterEffect] = Field(
+        default_factory=list
+    )
+    cooldown_effects: list[CooldownEffect] = Field(default_factory=list)
 
     def is_empty(self) -> bool:
         """Check if this effect has no components."""
@@ -3196,6 +3352,9 @@ class MechanicalEffect(FrozenModel):
             and not self.movement_trails
             and not self.hologram_trails
             and not self.holographic_duplicates
+            and not self.progression_effects
+            and not self.per_target_counter_effects
+            and not self.cooldown_effects
         )
 
 

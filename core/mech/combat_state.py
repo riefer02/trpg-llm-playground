@@ -5,7 +5,14 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 
 from core.shared.enums import StatusType, SizeClass, ActionType, AttackType
-from core.shared.effects import ModeEffect, ReactionTriggerEffect, ReactionTriggerEvent
+from core.shared.effects import (
+    ModeEffect,
+    ReactionTriggerEffect,
+    ReactionTriggerEvent,
+    ProgressionState,
+    PerTargetCounter,
+    CooldownState,
+)
 from core.shared.rolls import ContestedCheck
 from core.mech.grid import HexPosition, HexCoord
 from core.mech.terrain import TerrainMap
@@ -96,6 +103,9 @@ class CombatantState(FrozenModel):
     ai_controlled: bool = False
     active_mode_effects: list[ModeEffect] = Field(default_factory=list)
     reaction_triggers: list[ReactionTriggerEffect] = Field(default_factory=list)
+    progression_states: dict[str, ProgressionState] = Field(default_factory=dict)
+    per_target_counters: dict[str, PerTargetCounter] = Field(default_factory=dict)
+    cooldown_states: dict[str, CooldownState] = Field(default_factory=dict)
 
 
 class GrappleLink(FrozenModel):

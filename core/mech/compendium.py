@@ -134,6 +134,9 @@ from core.shared.effects import (
     SpatialCondition,
     ZoneEffect,
     ZoneEndCondition,
+    ProgressionEffect,
+    GateProgressionEffect,
+    PerTargetCounterEffect,
 )
 
 
@@ -304,7 +307,9 @@ GMS_WEAPONS: list[MechWeaponDefinition] = [
         weapon_type="cannon",
         damage_type="kinetic",
         ranges=[WeaponRange(range_type="range", value=8)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("2d6+4"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("2d6+4"))
+        ],
         tags=[WeaponTag(tag="inaccurate")],
     ),
     MechWeaponDefinition(
@@ -314,7 +319,9 @@ GMS_WEAPONS: list[MechWeaponDefinition] = [
         weapon_type="melee",
         damage_type="kinetic",
         ranges=[WeaponRange(range_type="threat", value=1)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("2d6+1"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("2d6+1"))
+        ],
     ),
     MechWeaponDefinition(
         id="heavy_charged_blade",
@@ -336,7 +343,9 @@ GMS_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=20),
             WeaponRange(range_type="blast", value=2),
         ],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("2d6"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("2d6"))
+        ],
         tags=[
             WeaponTag(tag="arcing"),
             WeaponTag(tag="inaccurate"),
@@ -354,7 +363,9 @@ GMS_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=10),
             WeaponRange(range_type="blast", value=1),
         ],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d3+1"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d3+1"))
+        ],
         tags=[WeaponTag(tag="loading")],
     ),
     MechWeaponDefinition(
@@ -367,7 +378,9 @@ GMS_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=15),
             WeaponRange(range_type="blast", value=1),
         ],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6+1"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6+1"))
+        ],
         tags=[WeaponTag(tag="arcing"), WeaponTag(tag="inaccurate")],
     ),
     MechWeaponDefinition(
@@ -399,7 +412,9 @@ GMS_WEAPONS: list[MechWeaponDefinition] = [
         weapon_type="rifle",
         damage_type="kinetic",
         ranges=[WeaponRange(range_type="range", value=15)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("3d6+3"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("3d6+3"))
+        ],
         tags=[
             WeaponTag(tag="reliable", value=5),
             WeaponTag(tag="accurate"),
@@ -416,7 +431,9 @@ GMS_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=10),
             WeaponRange(range_type="blast", value=2),
         ],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6+1"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6+1"))
+        ],
         tags=[WeaponTag(tag="loading"), WeaponTag(tag="ordnance")],
     ),
     MechWeaponDefinition(
@@ -438,7 +455,9 @@ GMS_WEAPONS: list[MechWeaponDefinition] = [
         weapon_type="melee",
         damage_type="kinetic",
         ranges=[WeaponRange(range_type="threat", value=1)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+2"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+2"))
+        ],
     ),
     MechWeaponDefinition(
         id="tactical_knife",
@@ -450,7 +469,9 @@ GMS_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="threat", value=1),
             WeaponRange(range_type="thrown", value=3),
         ],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d3+1"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d3+1"))
+        ],
     ),
     MechWeaponDefinition(
         id="thermal_pistol",
@@ -562,7 +583,9 @@ GMS_SYSTEMS: list[MechSystemDefinition] = [
         tags=[SystemTag(tag="mod")],
         effects=MechanicalEffect(
             accuracy_mods=[
-                AccuracyModifier(value=1, applies_to="all", condition="save_vs_knockback_or_prone")
+                AccuracyModifier(
+                    value=1, applies_to="all", condition="save_vs_knockback_or_prone"
+                )
             ],
         ),
     ),
@@ -739,7 +762,11 @@ GMS_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         limited_uses=3,
         system_type="drone",
-        tags=[SystemTag(tag="drone"), SystemTag(tag="reaction"), SystemTag(tag="quick_action")],
+        tags=[
+            SystemTag(tag="drone"),
+            SystemTag(tag="reaction"),
+            SystemTag(tag="quick_action"),
+        ],
         drone=DronePayload(
             name="Turret Drone",
             size="size_half",
@@ -869,7 +896,9 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                                             bonus_effect=MechanicalEffect(
                                                 weapon_mods=[
                                                     WeaponModEffect(
-                                                        add_tags=[WeaponTagGrant(tag="ap")]
+                                                        add_tags=[
+                                                            WeaponTagGrant(tag="ap")
+                                                        ]
                                                     )
                                                 ],
                                                 status_grants=[
@@ -1716,7 +1745,9 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         license_id="raleigh",
         license_rank=3,
         ranges=[WeaponRange(range_type="threat", value=1)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("2d6+2"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("2d6+2"))
+        ],
         tags=[WeaponTag(tag="reliable", value=4)],
     ),
     MechWeaponDefinition(
@@ -1820,7 +1851,9 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         license_id="blackbeard",
         license_rank=2,
         ranges=[WeaponRange(range_type="threat", value=2)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+4"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+4"))
+        ],
         tags=[WeaponTag(tag="reliable", value=3)],
     ),
     MechWeaponDefinition(
@@ -1832,7 +1865,9 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         license_id="drake",
         license_rank=1,
         ranges=[WeaponRange(range_type="range", value=8)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+2"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+2"))
+        ],
         tags=[WeaponTag(tag="heat_self", value=1), WeaponTag(tag="overkill")],
         effects=MechanicalEffect(
             weapon_spin_ups=[
@@ -1867,7 +1902,9 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         license_id="drake",
         license_rank=2,
         ranges=[WeaponRange(range_type="range", value=5)],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d3"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d3"))
+        ],
         tags=[WeaponTag(tag="knockback", value=2)],
         effects=MechanicalEffect(
             save_checks=[
@@ -2035,7 +2072,9 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         license_id="nelson",
         license_rank=3,
         ranges=[WeaponRange(range_type="threat", value=1)],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d3+1"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d3+1"))
+        ],
         effects=MechanicalEffect(
             save_checks=[
                 SaveCheck(
@@ -2101,7 +2140,9 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
         license_id="tortuga",
         license_rank=2,
         ranges=[WeaponRange(range_type="threat", value=1)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d3+5"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d3+5"))
+        ],
         tags=[WeaponTag(tag="loading")],
         effects=MechanicalEffect(
             save_checks=[
@@ -2153,7 +2194,9 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=5),
             WeaponRange(range_type="threat", value=3),
         ],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+1"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+1"))
+        ],
         tags=[WeaponTag(tag="heat_self", value=1)],
         effects=MechanicalEffect(
             save_checks=[
@@ -2194,9 +2237,7 @@ IPSN_WEAPONS: list[MechWeaponDefinition] = [
                     trigger="on_overkill",
                     condition="target_prone_or_immobilized_or_stunned",
                     effect=MechanicalEffect(
-                        damage_mods=[
-                            DamageModifier(dice=DiceExpression.parse("1d6"))
-                        ],
+                        damage_mods=[DamageModifier(dice=DiceExpression.parse("1d6"))],
                     ),
                 )
             ],
@@ -2482,7 +2523,11 @@ IPSN_SYSTEMS: list[MechSystemDefinition] = [
         unique=True,
         limited_uses=1,
         system_type="shield",
-        tags=[SystemTag(tag="shield"), SystemTag(tag="deployable"), SystemTag(tag="quick_action")],
+        tags=[
+            SystemTag(tag="shield"),
+            SystemTag(tag="deployable"),
+            SystemTag(tag="quick_action"),
+        ],
         deployable=DeployableEffect(
             obj=DeployableObject(
                 size=1,
@@ -4175,7 +4220,9 @@ SSC_WEAPONS: list[MechWeaponDefinition] = [
         license_id="deaths_head",
         license_rank=2,
         ranges=[WeaponRange(range_type="range", value=15)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+1"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+1"))
+        ],
         tags=[
             WeaponTag(tag="heat_self", value=1),
             WeaponTag(tag="overkill"),
@@ -4191,7 +4238,9 @@ SSC_WEAPONS: list[MechWeaponDefinition] = [
         license_id="deaths_head",
         license_rank=3,
         ranges=[WeaponRange(range_type="line", value=20)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+4"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+4"))
+        ],
         tags=[
             WeaponTag(tag="heat_self", value=2),
             WeaponTag(tag="ap"),
@@ -4263,7 +4312,9 @@ SSC_WEAPONS: list[MechWeaponDefinition] = [
         license_id="metalmark",
         license_rank=2,
         ranges=[WeaponRange(range_type="line", value=10)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+1"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+1"))
+        ],
         tags=[WeaponTag(tag="heat_self", value=1)],
     ),
     MechWeaponDefinition(
@@ -4333,7 +4384,9 @@ SSC_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=20),
             WeaponRange(range_type="blast", value=1),
         ],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("2d6"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("2d6"))
+        ],
         tags=[
             WeaponTag(tag="arcing"),
             WeaponTag(tag="heat_self", value=2),
@@ -4368,7 +4421,9 @@ SSC_WEAPONS: list[MechWeaponDefinition] = [
         license_id="mourning_cloak",
         license_rank=1,
         ranges=[WeaponRange(range_type="range", value=5)],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d3"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d3"))
+        ],
         tags=[WeaponTag(tag="accurate")],
     ),
     MechWeaponDefinition(
@@ -6064,7 +6119,7 @@ MANTICORE_CHARGED_DISCHARGE_EFFECT = MechanicalEffect(
     ],
 )
 
- 
+
 HORUS_FRAMES: list[MechFrameDefinition] = [
     MechFrameDefinition(
         id="horus_balor",
@@ -7736,7 +7791,7 @@ HORUS_SYSTEMS: list[MechSystemDefinition] = [
                                                         amount=2,
                                                         direction="gain",
                                                         target="ally",
-                                                    )
+                                                    ),
                                                 ]
                                             ),
                                             end_conditions=[
@@ -7840,62 +7895,73 @@ HORUS_SYSTEMS: list[MechSystemDefinition] = [
                                 target="enemy",
                             )
                         ],
-                        choices=[
-                            EffectChoice(
-                                name="First Gate",
-                                effect=MechanicalEffect(
-                                    movement_grants=[
-                                        MovementGrant(
-                                            spaces="speed",
-                                            movement_type="walk",
-                                            target="enemy",
-                                            trigger="on_turn_start",
-                                            distance_is_maximum=True,
-                                            provokes_reactions=True,
-                                        )
-                                    ]
-                                ),
-                            ),
-                            EffectChoice(
-                                name="Second Gate",
-                                effect=MechanicalEffect(
-                                    status_grants=[
-                                        StatusGrant(
-                                            status="slowed",
-                                            target="enemy",
-                                            duration="end_of_next_turn",
+                        progression_effects=[
+                            ProgressionEffect(
+                                progression_name="OSIRIS_Gates",
+                                reset_on="rest",
+                                max_gate=4,
+                                per_target=True,
+                                gates=[
+                                    GateProgressionEffect(
+                                        gate_number=1,
+                                        effect=MechanicalEffect(
+                                            movement_grants=[
+                                                MovementGrant(
+                                                    spaces="speed",
+                                                    movement_type="walk",
+                                                    target="enemy",
+                                                    trigger="on_turn_start",
+                                                    distance_is_maximum=True,
+                                                    provokes_reactions=True,
+                                                )
+                                            ]
                                         ),
-                                        StatusGrant(
-                                            status="impaired",
-                                            target="enemy",
-                                            duration="end_of_next_turn",
+                                    ),
+                                    GateProgressionEffect(
+                                        gate_number=2,
+                                        prerequisite_gate=1,
+                                        effect=MechanicalEffect(
+                                            status_grants=[
+                                                StatusGrant(
+                                                    status="slowed",
+                                                    target="enemy",
+                                                    duration="end_of_next_turn",
+                                                ),
+                                                StatusGrant(
+                                                    status="impaired",
+                                                    target="enemy",
+                                                    duration="end_of_next_turn",
+                                                ),
+                                            ]
                                         ),
-                                    ]
-                                ),
-                            ),
-                            EffectChoice(
-                                name="Third Gate",
-                                effect=MechanicalEffect(
-                                    status_grants=[
-                                        StatusGrant(
-                                            status="stunned",
-                                            target="enemy",
-                                            duration="end_of_next_turn",
-                                        )
-                                    ]
-                                ),
-                            ),
-                            EffectChoice(
-                                name="Fourth Gate",
-                                effect=MechanicalEffect(
-                                    allegiance_shifts=[
-                                        AllegianceShiftEffect(
-                                            duration="end_of_next_turn",
-                                            ends_on_hostile_action=True,
-                                            target="enemy",
-                                        )
-                                    ]
-                                ),
+                                    ),
+                                    GateProgressionEffect(
+                                        gate_number=3,
+                                        prerequisite_gate=2,
+                                        effect=MechanicalEffect(
+                                            status_grants=[
+                                                StatusGrant(
+                                                    status="stunned",
+                                                    target="enemy",
+                                                    duration="end_of_next_turn",
+                                                )
+                                            ]
+                                        ),
+                                    ),
+                                    GateProgressionEffect(
+                                        gate_number=4,
+                                        prerequisite_gate=3,
+                                        effect=MechanicalEffect(
+                                            allegiance_shifts=[
+                                                AllegianceShiftEffect(
+                                                    duration="end_of_next_turn",
+                                                    ends_on_hostile_action=True,
+                                                    target="enemy",
+                                                )
+                                            ]
+                                        ),
+                                    ),
+                                ],
                             ),
                         ],
                     ),
@@ -9476,7 +9542,9 @@ HA_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=10),
             WeaponRange(range_type="burst", value=1),
         ],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6"))
+        ],
         tags=[WeaponTag(tag="arcing")],
     ),
     MechWeaponDefinition(
@@ -9491,7 +9559,9 @@ HA_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=5),
             WeaponRange(range_type="cone", value=5),
         ],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+2"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+2"))
+        ],
         tags=[WeaponTag(tag="loading")],
     ),
     MechWeaponDefinition(
@@ -9569,7 +9639,9 @@ HA_WEAPONS: list[MechWeaponDefinition] = [
         license_id="napoleon",
         license_rank=1,
         ranges=[WeaponRange(range_type="threat", value=1)],
-        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d3+1"))],
+        damage=[
+            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d3+1"))
+        ],
     ),
     MechWeaponDefinition(
         id="ha_capacitor_trident",
@@ -9637,7 +9709,9 @@ HA_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=15),
             WeaponRange(range_type="blast", value=1),
         ],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6"))
+        ],
         tags=[WeaponTag(tag="arcing"), WeaponTag(tag="loading")],
     ),
     MechWeaponDefinition(
@@ -9758,7 +9832,9 @@ HA_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=15),
             WeaponRange(range_type="blast", value=1),
         ],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6+2"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6+2"))
+        ],
         tags=[WeaponTag(tag="loading")],
     ),
     MechWeaponDefinition(
@@ -9786,7 +9862,9 @@ HA_WEAPONS: list[MechWeaponDefinition] = [
             WeaponRange(range_type="range", value=15),
             WeaponRange(range_type="blast", value=2),
         ],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("2d6"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("2d6"))
+        ],
         tags=[
             WeaponTag(tag="loading"),
             WeaponTag(tag="ordnance"),
@@ -9802,7 +9880,9 @@ HA_WEAPONS: list[MechWeaponDefinition] = [
         license_id="barbarossa",
         license_rank=2,
         ranges=[WeaponRange(range_type="range", value=10)],
-        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("3d6"))],
+        damage=[
+            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("3d6"))
+        ],
         tags=[
             WeaponTag(tag="loading"),
             WeaponTag(tag="ordnance"),
@@ -10638,9 +10718,15 @@ HA_SYSTEMS: list[MechSystemDefinition] = [
 ]
 
 
-ALL_FRAMES: list[MechFrameDefinition] = GMS_FRAMES + IPSN_FRAMES + SSC_FRAMES + HORUS_FRAMES + HA_FRAMES
-ALL_WEAPONS: list[MechWeaponDefinition] = GMS_WEAPONS + IPSN_WEAPONS + SSC_WEAPONS + HORUS_WEAPONS + HA_WEAPONS
-ALL_SYSTEMS: list[MechSystemDefinition] = GMS_SYSTEMS + IPSN_SYSTEMS + SSC_SYSTEMS + HORUS_SYSTEMS + HA_SYSTEMS
+ALL_FRAMES: list[MechFrameDefinition] = (
+    GMS_FRAMES + IPSN_FRAMES + SSC_FRAMES + HORUS_FRAMES + HA_FRAMES
+)
+ALL_WEAPONS: list[MechWeaponDefinition] = (
+    GMS_WEAPONS + IPSN_WEAPONS + SSC_WEAPONS + HORUS_WEAPONS + HA_WEAPONS
+)
+ALL_SYSTEMS: list[MechSystemDefinition] = (
+    GMS_SYSTEMS + IPSN_SYSTEMS + SSC_SYSTEMS + HORUS_SYSTEMS + HA_SYSTEMS
+)
 
 FRAME_DEFINITIONS_BY_ID = {frame.id: frame for frame in ALL_FRAMES}
 WEAPON_DEFINITIONS_BY_ID = {weapon.id: weapon for weapon in ALL_WEAPONS}
