@@ -69,6 +69,10 @@ _AXIAL_DIRECTIONS: tuple[tuple[int, int], ...] = (
     (0, 1),
 )
 
+HEX_DIRECTIONS: tuple[HexCoord, ...] = tuple(
+    HexCoord(q=q, r=r) for q, r in _AXIAL_DIRECTIONS
+)
+
 
 def hex_line(start: HexCoord, end: HexCoord) -> list[HexCoord]:
     """Draw a straight line between two axial coordinates."""
@@ -100,6 +104,129 @@ def iter_neighbors(coord: HexCoord) -> Iterable[HexCoord]:
     """Iterate over axial neighbors."""
     for dq, dr in _AXIAL_DIRECTIONS:
         yield HexCoord(q=coord.q + dq, r=coord.r + dr)
+
+
+def normalize_hex_direction(direction: HexCoord) -> HexCoord | None:
+    """Normalize a direction to a unit axial direction if possible."""
+    if direction.q == 0 and direction.r == 0:
+        return None
+    for unit in HEX_DIRECTIONS:
+        if unit.q == 0:
+            if direction.q != 0:
+                continue
+            if direction.r % unit.r == 0 and direction.r // unit.r > 0:
+                return unit
+        elif unit.r == 0:
+            if direction.r != 0:
+                continue
+            if direction.q % unit.q == 0 and direction.q // unit.q > 0:
+                return unit
+        else:
+            if direction.q % unit.q != 0 or direction.r % unit.r != 0:
+                continue
+            scale_q = direction.q // unit.q
+            scale_r = direction.r // unit.r
+            if scale_q == scale_r and scale_q > 0:
+                return unit
+    return None
+
+
+def hex_add(a: HexCoord, b: HexCoord) -> HexCoord:
+    """Add two axial coordinates."""
+    return HexCoord(q=a.q + b.q, r=a.r + b.r)
+
+
+def hex_scale(coord: HexCoord, scale: int) -> HexCoord:
+    """Scale an axial coordinate by an integer."""
+    return HexCoord(q=coord.q * scale, r=coord.r * scale)
+
+
+def hexes_in_radius(center: HexCoord, radius: int) -> list[HexCoord]:
+    """Return axial coordinates within a hex radius (including center)."""
+    results: list[HexCoord] = []
+    for dq in range(-radius, radius + 1):
+        for dr in range(-radius, radius + 1):
+            coord = HexCoord(q=center.q + dq, r=center.r + dr)
+            if center.distance_to(coord) <= radius:
+                results.append(coord)
+    return results
+
+
+def hex_line_from_direction(
+    origin: HexCoord,
+    direction: HexCoord,
+    length: int,
+) -> list[HexCoord]:
+    """Return axial coordinates along a line from origin in a direction."""
+    step = normalize_hex_direction(direction)
+    if not step or length <= 0:
+        return []
+    return [
+        HexCoord(q=origin.q + step.q * distance, r=origin.r + step.r * distance)
+        for distance in range(1, length + 1)
+    ]
+
+
+def hex_cone(
+    origin: HexCoord,
+    direction: HexCoord,
+    length: int,
+) -> list[HexCoord]:
+    """Return axial coordinates for a cone of given length."""
+    step = normalize_hex_direction(direction)
+    if not step or length <= 0:
+        return []
+    direction_index = HEX_DIRECTIONS.index(step)
+    left = HEX_DIRECTIONS[(direction_index - 1) % len(HEX_DIRECTIONS)]
+    results: list[HexCoord] = []
+    for distance in range(1, length + 1):
+        for offset in range(distance):
+            results.append(
+                hex_add(
+                    origin,
+                    hex_add(
+                        hex_scale(step, distance),
+                        hex_scale(left, offset),
+                    ),
+                )
+            )
+    return results
+
+
+def hex_cone_centered(
+    origin: HexCoord,
+    direction: HexCoord,
+    length: int,
+) -> list[HexCoord]:
+    """Return axial coordinates for a cone centered on the axis direction."""
+    step = normalize_hex_direction(direction)
+    if not step or length <= 0:
+        return []
+    step_cube = _axial_to_cube(step)
+    axes = [int(step_cube[0]), int(step_cube[1]), int(step_cube[2])]
+    forward_idx = axes.index(1)
+    lateral_idx = axes.index(0)
+    backward_idx = axes.index(-1)
+    origin_cube = _axial_to_cube(origin)
+    results: list[HexCoord] = []
+
+    for distance in range(1, length + 1):
+        for offset in range(-(distance - 1), distance):
+            cube = [0, 0, 0]
+            cube[forward_idx] = distance
+            cube[lateral_idx] = offset
+            cube[backward_idx] = -distance - offset
+            results.append(
+                _cube_to_axial(
+                    (
+                        origin_cube[0] + cube[0],
+                        origin_cube[1] + cube[1],
+                        origin_cube[2] + cube[2],
+                    )
+                )
+            )
+
+    return results
 
 
 def _axial_to_cube(coord: HexCoord) -> tuple[float, float, float]:

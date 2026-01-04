@@ -1515,7 +1515,9 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                         MovementGrant(
                             spaces=1,
                             movement_type="walk",
-                            trigger="after_attack_ignore_reactions_ignore_engagement_not_immobilized_or_slowed",
+                            trigger="on_attack_roll",
+                            ignores_engagement=True,
+                            provokes_reactions=False,
                         )
                     ],
                 ),
@@ -1585,7 +1587,7 @@ IPSN_FRAMES: list[MechFrameDefinition] = [
                                 ActionGrant(
                                     action_type="reaction",
                                     name="overwatch",
-                                    trigger="extra_overwatch_per_round",
+                                    trigger="on_extra_overwatch",
                                     uses_per="round",
                                 )
                             ],
@@ -3970,7 +3972,7 @@ SSC_FRAMES: list[MechFrameDefinition] = [
                     MovementGrant(
                         spaces=DiceExpression.parse("3d6"),
                         movement_type="teleport",
-                        trigger="slipstream_jump",
+                        trigger="on_slipstream_jump",
                         target="self",
                         distance_is_maximum=True,
                         requires_line_of_sight=False,
@@ -5250,7 +5252,7 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
                             MovementGrant(
                                 spaces="speed",
                                 movement_type="walk",
-                                trigger="brace",
+                                trigger="on_brace",
                                 target="self",
                             )
                         ],

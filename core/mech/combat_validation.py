@@ -9,7 +9,15 @@ from core.shared.models import FrozenModel
 from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES, LineOfSightRules
 from core.mech.combat_state import MechCombatScenario, CombatTurn, CombatantState, ActionUse
 from core.mech.combat_actions import ACTION_RULES_BY_ID, ActionRule
-from core.mech.grid import HexCoord, hexes_between
+from core.mech.grid import (
+    HexCoord,
+    hexes_between,
+    hex_cone,
+    hex_cone_centered,
+    hex_line_from_direction,
+    hexes_in_radius,
+    normalize_hex_direction,
+)
 from core.mech.grid import HexPosition
 from core.mech.terrain import terrain_index, TerrainHex
 from core.mech.statuses import STATUS_DEFINITIONS_BY_ID
@@ -21,6 +29,7 @@ from core.shared.effects import (
     EffectCondition,
     SizeCondition,
     SpatialCondition,
+    PerTargetCounter,
 )
 
 
@@ -38,6 +47,33 @@ class CombatValidation(FrozenModel):
 
     valid: bool
     issues: list[CombatValidationIssue] = Field(default_factory=list)
+
+
+STRICT_AOE_WARNING_CODES = {
+    "area_origin_missing",
+    "area_origin_line_of_sight_blocked",
+    "area_origin_path_blocked",
+    "area_line_of_sight_blocked",
+    "area_path_blocked",
+}
+
+
+def _promote_strict_warnings(
+    issues: list[CombatValidationIssue],
+) -> list[CombatValidationIssue]:
+    promoted: list[CombatValidationIssue] = []
+    for issue in issues:
+        if issue.severity == "warning" and issue.code in STRICT_AOE_WARNING_CODES:
+            promoted.append(
+                CombatValidationIssue(
+                    code=issue.code,
+                    message=issue.message,
+                    severity="error",
+                )
+            )
+        else:
+            promoted.append(issue)
+    return promoted
 
 
 def _condition_matches_statuses(
@@ -203,6 +239,59 @@ def _path_clear(
     return True
 
 
+def _terrain_elevation(
+    tiles: dict[tuple[int, int], TerrainHex],
+    coord: HexCoord,
+) -> int:
+    tile = tiles.get((coord.q, coord.r))
+    return tile.elevation if tile else 0
+
+
+def _blocked_area_coords_by_los(
+    tiles: dict[tuple[int, int], TerrainHex],
+    origin: HexPosition,
+    coords: list[HexCoord],
+    line_of_sight_rules: LineOfSightRules,
+) -> set[tuple[int, int]]:
+    blocked: set[tuple[int, int]] = set()
+    start_coord = (origin.coord.q, origin.coord.r)
+    for coord in coords:
+        end_coord = (coord.q, coord.r)
+        end_elevation = _terrain_elevation(tiles, coord)
+        if not _line_of_sight_clear(
+            tiles,
+            start_coord,
+            end_coord,
+            origin.elevation,
+            end_elevation,
+            line_of_sight_rules,
+            coord,
+        ):
+            blocked.add(end_coord)
+    return blocked
+
+
+def _blocked_area_coords_by_path(
+    tiles: dict[tuple[int, int], TerrainHex],
+    origin: HexPosition,
+    coords: list[HexCoord],
+    line_of_sight_rules: LineOfSightRules,
+) -> set[tuple[int, int]]:
+    blocked: set[tuple[int, int]] = set()
+    start_coord = (origin.coord.q, origin.coord.r)
+    for coord in coords:
+        end_coord = (coord.q, coord.r)
+        if not _path_clear(
+            tiles,
+            start_coord,
+            end_coord,
+            line_of_sight_rules,
+            coord,
+        ):
+            blocked.add(end_coord)
+    return blocked
+
+
 def _adjacency_distance(attacker: CombatantState, target: CombatantState) -> int:
     size_to_radius = {
         "size_half": 1,
@@ -334,10 +423,87 @@ def _action_targets(
     return targets
 
 
+def _index_per_target_counters(
+    combatant: CombatantState,
+) -> tuple[dict[tuple[str, str], PerTargetCounter], dict[str, PerTargetCounter]]:
+    counters_by_target: dict[tuple[str, str], PerTargetCounter] = {}
+    templates_by_effect: dict[str, PerTargetCounter] = {}
+    for counter in combatant.per_target_counters.values():
+        if counter.target_id:
+            counters_by_target[(counter.effect_id, counter.target_id)] = counter
+        else:
+            templates_by_effect[counter.effect_id] = counter
+    return counters_by_target, templates_by_effect
+
+
+def _apply_per_target_effects(
+    action: ActionUse,
+    actor_id: str,
+    combatants_by_id: dict[str, CombatantState],
+    counters_by_target: dict[tuple[str, str], PerTargetCounter],
+    templates_by_effect: dict[str, PerTargetCounter],
+    issues: list[CombatValidationIssue],
+) -> None:
+    for applied in action.applied_per_target_effects:
+        if applied.target_id not in combatants_by_id:
+            issues.append(
+                CombatValidationIssue(
+                    code="per_target_unknown_target",
+                    message=(
+                        f"Action {action.action_id} applies {applied.effect_id} "
+                        f"to unknown target {applied.target_id}."
+                    ),
+                )
+            )
+            continue
+
+        key = (applied.effect_id, applied.target_id)
+        counter = counters_by_target.get(key)
+        if counter is None:
+            template = templates_by_effect.get(applied.effect_id)
+            if template:
+                counter = template.model_copy(
+                    update={"target_id": applied.target_id, "current_count": template.current_count}
+                )
+            else:
+                if applied.max_count is None:
+                    issues.append(
+                        CombatValidationIssue(
+                            code="per_target_limit_unknown",
+                            message=(
+                                f"Action {action.action_id} applies {applied.effect_id} "
+                                f"to {applied.target_id} without a max_count."
+                            ),
+                            severity="warning",
+                        )
+                    )
+                    continue
+                counter = PerTargetCounter(
+                    effect_id=applied.effect_id,
+                    max_count=applied.max_count,
+                    reset_on=applied.reset_on or "scene_end",
+                    target_id=applied.target_id,
+                )
+
+        new_count = counter.current_count + applied.count
+        if new_count > counter.max_count:
+            issues.append(
+                CombatValidationIssue(
+                    code="per_target_limit_exceeded",
+                    message=(
+                        f"{actor_id} applies {applied.effect_id} to {applied.target_id} "
+                        f"{new_count} times (max {counter.max_count})."
+                    ),
+                )
+            )
+
+        counters_by_target[key] = counter.model_copy(update={"current_count": new_count})
+
+
 def _validate_area_geometry(
     action: ActionUse,
-    actor_position: HexPosition | None,
-    target_position: HexPosition | None,
+    origin: HexPosition | None,
+    area_coords: set[tuple[int, int]] | None,
     issues: list[CombatValidationIssue],
 ) -> None:
     if not action.area_pattern:
@@ -355,7 +521,6 @@ def _validate_area_geometry(
         )
 
     if action.area_affected:
-        origin = _resolve_area_origin(action, actor_position, target_position)
         if not origin:
             issues.append(
                 CombatValidationIssue(
@@ -365,12 +530,13 @@ def _validate_area_geometry(
                 )
             )
             return
+        if area_coords is None:
+            return
         for coord in action.area_affected:
-            distance = origin.coord.distance_to(coord)
-            if distance > size:
+            if (coord.q, coord.r) not in area_coords:
                 issues.append(
                     CombatValidationIssue(
-                        code="area_affected_out_of_bounds",
+                        code="area_affected_not_in_shape",
                         message=(
                             f"Action {action.action_id} includes hex {coord.q},{coord.r} "
                             f"outside {pattern} size {size}."
@@ -380,12 +546,56 @@ def _validate_area_geometry(
                 )
 
 
+def _area_coords_for_action(
+    action: ActionUse,
+    origin: HexPosition,
+    issues: list[CombatValidationIssue],
+) -> set[tuple[int, int]] | None:
+    if not action.area_pattern:
+        return None
+    pattern = action.area_pattern.pattern
+    size = action.area_pattern.size
+
+    if pattern in ("line", "cone"):
+        if not action.area_direction:
+            return None
+        step = normalize_hex_direction(action.area_direction)
+        if not step:
+            issues.append(
+                CombatValidationIssue(
+                    code="area_direction_invalid",
+                    message=(
+                        f"Action {action.action_id} uses {pattern} with a non-axial direction."
+                    ),
+                    severity="warning",
+                )
+            )
+            return None
+        if pattern == "line":
+            coords = hex_line_from_direction(origin.coord, step, size)
+        else:
+            if action.area_pattern.cone_mode == "axis":
+                coords = hex_cone_centered(origin.coord, step, size)
+            else:
+                coords = hex_cone(origin.coord, step, size)
+        return {(coord.q, coord.r) for coord in coords}
+
+    if pattern in ("blast", "burst"):
+        coords = hexes_in_radius(origin.coord, size)
+        return {(coord.q, coord.r) for coord in coords}
+
+    return None
+
+
 def _validate_turn(
     turn: CombatTurn,
     issues: list[CombatValidationIssue],
     combatants_by_id: dict[str, CombatantState],
     terrain_tiles: dict[tuple[int, int], TerrainHex],
     environment: str,
+    per_target_state_by_actor: dict[
+        str, tuple[dict[tuple[str, str], PerTargetCounter], dict[str, PerTargetCounter]]
+    ],
 ) -> None:
     economy = DEFAULT_MECH_COMBAT_RULES.turn_actions.action_economy
     max_quick = economy.quick_actions_per_turn
@@ -402,6 +612,9 @@ def _validate_turn(
     reaction_count = 0
     non_free_counts: dict[str, int] = {}
     actor = combatants_by_id.get(turn.actor_id)
+    per_target_state = per_target_state_by_actor.get(turn.actor_id)
+    per_target_counters = per_target_state[0] if per_target_state else {}
+    per_target_templates = per_target_state[1] if per_target_state else {}
 
     if not actor:
         issues.append(
@@ -878,6 +1091,7 @@ def _validate_turn(
             )
 
         targets = _action_targets(action, combatants_by_id)
+        range_targets_present = any(position for _, position in targets)
         if action.target_id and not combatants_by_id.get(action.target_id):
             issues.append(
                 CombatValidationIssue(
@@ -894,11 +1108,24 @@ def _validate_turn(
                     )
                 )
 
+        if actor and action.applied_per_target_effects:
+            _apply_per_target_effects(
+                action,
+                turn.actor_id,
+                combatants_by_id,
+                per_target_counters,
+                per_target_templates,
+                issues,
+            )
+
         actor_position = actor.position if actor else None
         primary_target = combatants_by_id.get(action.target_id) if action.target_id else None
         target_position = action.target_position or (primary_target.position if primary_target else None)
         area_origin = _resolve_area_origin(action, actor_position, target_position)
-        _validate_area_geometry(action, actor_position, target_position, issues)
+        area_coords = None
+        if action.area_pattern and area_origin:
+            area_coords = _area_coords_for_action(action, area_origin, issues)
+        _validate_area_geometry(action, area_origin, area_coords, issues)
 
         if action.consumes_lock_on:
             if not primary_target:
@@ -1254,10 +1481,39 @@ def _validate_turn(
                                 ),
                             )
                         )
+                if (
+                    action.area_pattern
+                    and action.area_pattern.pattern in ("line", "cone", "blast")
+                    and not range_targets_present
+                ):
+                    if area_origin is None:
+                        issues.append(
+                            CombatValidationIssue(
+                                code="area_origin_missing",
+                                message=(
+                                    f"Action {action.action_id} uses {action.area_pattern.pattern} "
+                                    "but has no origin specified."
+                                ),
+                                severity="warning",
+                            )
+                        )
+                    else:
+                        distance = actor_position.distance_3d(area_origin)
+                        if distance > action.range_spaces:
+                            issues.append(
+                                CombatValidationIssue(
+                                    code="area_origin_range_exceeded",
+                                    message=(
+                                        f"Action {action.action_id} places origin at {distance} "
+                                        f"beyond range {action.range_spaces}."
+                                    ),
+                                )
+                            )
 
+        line_of_sight_rules = DEFAULT_MECH_COMBAT_RULES.line_of_sight_rules
         if rule.requires_line_of_sight and not _effective_ignores_los(
             action,
-            DEFAULT_MECH_COMBAT_RULES.line_of_sight_rules,
+            line_of_sight_rules,
         ):
             if not actor_position:
                 issues.append(
@@ -1289,7 +1545,7 @@ def _validate_turn(
                             end_coord,
                             origin_position.elevation,
                             position.elevation,
-                            DEFAULT_MECH_COMBAT_RULES.line_of_sight_rules,
+                            line_of_sight_rules,
                             position.coord,
                         ):
                             issues.append(
@@ -1300,7 +1556,35 @@ def _validate_turn(
                                 )
                             )
 
-        line_of_sight_rules = DEFAULT_MECH_COMBAT_RULES.line_of_sight_rules
+        if (
+            action.area_pattern
+            and action.area_pattern.pattern in ("line", "cone", "blast")
+            and actor_position
+            and area_origin
+            and rule.requires_line_of_sight
+            and not _effective_ignores_los(action, line_of_sight_rules)
+        ):
+            start_coord = (actor_position.coord.q, actor_position.coord.r)
+            end_coord = (area_origin.coord.q, area_origin.coord.r)
+            if not _line_of_sight_clear(
+                terrain_tiles,
+                start_coord,
+                end_coord,
+                actor_position.elevation,
+                area_origin.elevation,
+                line_of_sight_rules,
+                area_origin.coord,
+            ):
+                issues.append(
+                    CombatValidationIssue(
+                        code="area_origin_line_of_sight_blocked",
+                        message=(
+                            f"Action {action.action_id} places origin without line of sight."
+                        ),
+                        severity="warning",
+                    )
+                )
+
         tags = set(action.weapon_tags)
         requires_path_check = (
             ("arcing" in tags and line_of_sight_rules.arcing_requires_path_clear)
@@ -1330,6 +1614,78 @@ def _validate_turn(
                                 severity="warning",
                             )
                         )
+                if action.area_pattern and area_origin:
+                    if action.area_pattern.pattern in ("line", "cone", "blast"):
+                        start_coord = (actor_position.coord.q, actor_position.coord.r)
+                        end_coord = (area_origin.coord.q, area_origin.coord.r)
+                        if not _path_clear(
+                            terrain_tiles,
+                            start_coord,
+                            end_coord,
+                            line_of_sight_rules,
+                            area_origin.coord,
+                        ):
+                            issues.append(
+                                CombatValidationIssue(
+                                    code="area_origin_path_blocked",
+                                    message=(
+                                        f"Action {action.action_id} uses arcing/seeking "
+                                    "but the area origin path is blocked."
+                                ),
+                                severity="warning",
+                            )
+                        )
+
+        if action.area_pattern and area_origin and action.area_pattern.pattern in ("line", "cone"):
+            area_check_coords: list[HexCoord]
+            if action.area_affected:
+                area_check_coords = action.area_affected
+            elif area_coords is not None:
+                area_check_coords = [HexCoord(q=q, r=r) for q, r in area_coords]
+            else:
+                area_check_coords = []
+
+            if (
+                area_check_coords
+                and rule.requires_line_of_sight
+                and not _effective_ignores_los(action, line_of_sight_rules)
+            ):
+                blocked = _blocked_area_coords_by_los(
+                    terrain_tiles,
+                    area_origin,
+                    area_check_coords,
+                    line_of_sight_rules,
+                )
+                if blocked:
+                    issues.append(
+                        CombatValidationIssue(
+                            code="area_line_of_sight_blocked",
+                            message=(
+                                f"Action {action.action_id} affects {len(blocked)} hexes "
+                                "without line of sight."
+                            ),
+                            severity="warning",
+                        )
+                    )
+
+            if area_check_coords and requires_path_check:
+                blocked = _blocked_area_coords_by_path(
+                    terrain_tiles,
+                    area_origin,
+                    area_check_coords,
+                    line_of_sight_rules,
+                )
+                if blocked:
+                    issues.append(
+                        CombatValidationIssue(
+                            code="area_path_blocked",
+                            message=(
+                                f"Action {action.action_id} affects {len(blocked)} hexes "
+                                "with blocked arcing/seeking paths."
+                            ),
+                            severity="warning",
+                        )
+                    )
 
         if rule.attack and actor_position:
             origin_position = area_origin or actor_position
@@ -1384,18 +1740,19 @@ def _validate_turn(
                     )
                 )
             else:
-                distance = origin_position.distance_3d(target_position)
-                if distance > action.area_pattern.size:
-                    issues.append(
-                        CombatValidationIssue(
-                            code="area_out_of_bounds",
-                            message=(
-                                f"Action {action.action_id} targets at distance {distance} "
-                                f"outside {action.area_pattern.pattern} size {action.area_pattern.size}."
-                            ),
-                            severity="warning",
+                if area_coords is not None:
+                    coord = target_position.coord
+                    if (coord.q, coord.r) not in area_coords:
+                        issues.append(
+                            CombatValidationIssue(
+                                code="area_out_of_bounds",
+                                message=(
+                                    f"Action {action.action_id} targets {coord.q},{coord.r} "
+                                    f"outside {action.area_pattern.pattern} size {action.area_pattern.size}."
+                                ),
+                                severity="warning",
+                            )
                         )
-                    )
 
         if rule.attack and rule.attack.uses_weapon:
             if action.weapon_count is not None:
@@ -1588,14 +1945,31 @@ def _validate_turn(
         )
 
 
-def validate_combat_scenario(scenario: MechCombatScenario) -> CombatValidation:
+def validate_combat_scenario(
+    scenario: MechCombatScenario,
+    strict: bool = False,
+) -> CombatValidation:
     """Validate a combat scenario against action economy and targeting rules."""
     issues: list[CombatValidationIssue] = []
     combatants_by_id = {combatant.id: combatant for combatant in scenario.combatants}
     terrain_tiles = terrain_index(scenario.terrain)
+    per_target_state_by_actor = {
+        combatant.id: _index_per_target_counters(combatant)
+        for combatant in scenario.combatants
+    }
 
     for round_ in scenario.rounds:
         for turn in round_.turns:
-            _validate_turn(turn, issues, combatants_by_id, terrain_tiles, scenario.environment)
+            _validate_turn(
+                turn,
+                issues,
+                combatants_by_id,
+                terrain_tiles,
+                scenario.environment,
+                per_target_state_by_actor,
+            )
+
+    if strict:
+        issues = _promote_strict_warnings(issues)
 
     return CombatValidation(valid=not any(i.severity == "error" for i in issues), issues=issues)

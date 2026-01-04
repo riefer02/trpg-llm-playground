@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Literal
 
 from core.shared.enums import ActionType, AttackType, RangeType
 from core.shared.effects import ReactionTriggerEvent
@@ -28,12 +28,13 @@ def build_action_use_from_weapon(
     area_origin: HexPosition | None = None,
     area_direction: HexCoord | None = None,
     area_affected: list[HexCoord] | None = None,
+    cone_mode: Literal["wedge", "axis"] | None = None,
     reaction_trigger: ReactionTriggerEvent | None = None,
     heat_generated: int | None = None,
 ) -> ActionUse:
     """Create an ActionUse enriched with weapon tags and patterns."""
     weapon_tags = [tag.tag for tag in weapon.tags]
-    pattern = _pattern_from_tags(weapon.tags)
+    pattern = _pattern_from_tags(weapon.tags, cone_mode=cone_mode)
     attack_type = attack_type_override
     if attack_type is None and weapon.weapon_type == "melee":
         attack_type = "melee"
@@ -75,6 +76,7 @@ def build_action_use_from_weapon_id(
     action_type: ActionType,
     weapon_id: str,
     weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
+    cone_mode: Literal["wedge", "axis"] | None = None,
     **kwargs,
 ) -> ActionUse:
     """Create an ActionUse from a weapon ID and definition map."""
@@ -91,13 +93,23 @@ def build_action_use_from_weapon_id(
         action_id=action_id,
         action_type=action_type,
         weapon=weapon,
+        cone_mode=cone_mode,
         **kwargs,
     )
 
 
-def _pattern_from_tags(tags: Iterable[WeaponTag]) -> AttackPatternDefinition | None:
+def _pattern_from_tags(
+    tags: Iterable[WeaponTag],
+    cone_mode: Literal["wedge", "axis"] | None = None,
+) -> AttackPatternDefinition | None:
     for tag in tags:
         if tag.tag in {"line", "cone", "blast", "burst"} and tag.value is not None:
+            if tag.tag == "cone" and cone_mode is not None:
+                return AttackPatternDefinition(
+                    pattern=tag.tag,
+                    size=tag.value,
+                    cone_mode=cone_mode,
+                )
             return AttackPatternDefinition(pattern=tag.tag, size=tag.value)
     return None
 

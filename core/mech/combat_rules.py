@@ -124,6 +124,7 @@ class AttackPatternDefinition(FrozenModel):
 
     pattern: Literal["line", "cone", "blast", "burst"]
     size: int = Field(..., ge=0)
+    cone_mode: Literal["wedge", "axis"] = "wedge"
     separate_attack_per_target: bool = True
     single_damage_roll: bool = True
 

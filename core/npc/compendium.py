@@ -434,6 +434,496 @@ HA_BOSS_T3 = NPCTemplate(
     ],
 )
 
+PR2_ACE_T1 = NPCTemplate(
+    id="pr2_ace_t1",
+    name="Ace",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=10,
+            evasion_base=12,
+            e_defense_base=8,
+            armor_base=0,
+            speed_base=5,
+            sensor_range=10,
+            save_bonus=10,
+            tech_attack=1,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(system_id="npc_ss_corpro_flight_system"),
+        NPCGear(weapon_id="npc_missile_launcher"),
+        NPCGear(system_id="npc_evasive_maneuvers"),
+    ],
+)
+
+PR2_ASSAULT_T1 = NPCTemplate(
+    id="pr2_assault_t1",
+    name="Assault",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=15,
+            evasion_base=8,
+            e_defense_base=8,
+            armor_base=1,
+            speed_base=4,
+            sensor_range=8,
+            save_bonus=10,
+            tech_attack=1,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_heavy_assault_rifle"),
+        NPCGear(weapon_id="npc_combat_knife"),
+    ],
+)
+
+PR2_ARCHER_T1 = NPCTemplate(
+    id="pr2_archer_t1",
+    name="Archer",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=16,
+            evasion_base=8,
+            e_defense_base=8,
+            armor_base=0,
+            speed_base=5,
+            sensor_range=15,
+            save_bonus=11,
+            tech_attack=2,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_lmg"),
+        NPCGear(system_id="npc_suppress"),
+    ],
+)
+
+PR2_ASSASSIN_T1 = NPCTemplate(
+    id="pr2_assassin_t1",
+    name="Assassin",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_half",
+            hp_base=15,
+            evasion_base=12,
+            e_defense_base=8,
+            armor_base=0,
+            speed_base=6,
+            sensor_range=10,
+            save_bonus=10,
+            tech_attack=1,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(system_id="npc_kai_bioplating"),
+        NPCGear(weapon_id="npc_heated_blade"),
+        NPCGear(system_id="npc_assassins_mark"),
+    ],
+)
+
+PR2_BASTION_T1 = NPCTemplate(
+    id="pr2_bastion_t1",
+    name="Bastion",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_2",
+            hp_base=10,
+            evasion_base=8,
+            e_defense_base=8,
+            armor_base=3,
+            speed_base=4,
+            sensor_range=5,
+            save_bonus=8,
+            tech_attack=0,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_rotary_grenade_launcher"),
+        NPCGear(weapon_id="npc_heavy_assault_shield"),
+        NPCGear(system_id="npc_shieldwall"),
+        NPCGear(system_id="npc_guardian"),
+    ],
+)
+
+PR2_BERSERKER_T1 = NPCTemplate(
+    id="pr2_berserker_t1",
+    name="Berserker",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=12,
+            evasion_base=8,
+            e_defense_base=6,
+            armor_base=1,
+            speed_base=5,
+            sensor_range=5,
+            save_bonus=10,
+            tech_attack=0,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_chain_axe"),
+        NPCGear(system_id="npc_active_defense"),
+        NPCGear(system_id="npc_aggression"),
+    ],
+)
+
+PR2_BREACHER_T1 = NPCTemplate(
+    id="pr2_breacher_t1",
+    name="Breacher",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=18,
+            evasion_base=9,
+            e_defense_base=7,
+            armor_base=1,
+            speed_base=3,
+            sensor_range=5,
+            save_bonus=10,
+            tech_attack=0,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_dual_shotguns"),
+        NPCGear(system_id="npc_breach_ram"),
+    ],
+)
+
+PR2_CATAPHRACT_T1 = NPCTemplate(
+    id="pr2_cataphract_t1",
+    name="Cataphract",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=15,
+            evasion_base=10,
+            e_defense_base=8,
+            armor_base=0,
+            speed_base=8,
+            sensor_range=5,
+            save_bonus=12,
+            tech_attack=0,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_ram_cannon"),
+        NPCGear(system_id="npc_trample"),
+    ],
+)
+
+PR2_DEMOLISHER_T1 = NPCTemplate(
+    id="pr2_demolisher_t1",
+    name="Demolisher",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_2",
+            hp_base=15,
+            evasion_base=6,
+            e_defense_base=7,
+            armor_base=2,
+            speed_base=2,
+            sensor_range=10,
+            save_bonus=10,
+            tech_attack=0,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_demolisher_hammer"),
+        NPCGear(system_id="npc_entrench"),
+        NPCGear(system_id="npc_shock_armor"),
+    ],
+)
+
+PR2_ENGINEER_T1 = NPCTemplate(
+    id="pr2_engineer_t1",
+    name="Engineer",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=20,
+            evasion_base=7,
+            e_defense_base=10,
+            armor_base=0,
+            speed_base=3,
+            sensor_range=15,
+            save_bonus=10,
+            tech_attack=1,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_flak_cannon"),
+        NPCGear(system_id="npc_deployable_turret"),
+    ],
+)
+
+PR2_PRIEST_T1 = NPCTemplate(
+    id="pr2_priest_t1",
+    name="Priest",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_half",
+            hp_base=10,
+            evasion_base=10,
+            e_defense_base=12,
+            armor_base=0,
+            speed_base=5,
+            sensor_range=10,
+            save_bonus=11,
+            tech_attack=2,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(system_id="npc_abjure"),
+        NPCGear(system_id="npc_dispersal_shield"),
+        NPCGear(system_id="npc_hardened_target"),
+        NPCGear(system_id="npc_investiture"),
+    ],
+)
+
+PR2_RAINMAKER_T1 = NPCTemplate(
+    id="pr2_rainmaker_t1",
+    name="Rainmaker",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=10,
+            evasion_base=8,
+            e_defense_base=8,
+            armor_base=1,
+            speed_base=3,
+            sensor_range=15,
+            save_bonus=10,
+            tech_attack=2,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_missile_pods"),
+        NPCGear(system_id="npc_javelin_rockets"),
+    ],
+)
+
+PR2_RONIN_T1 = NPCTemplate(
+    id="pr2_ronin_t1",
+    name="Ronin",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=18,
+            evasion_base=10,
+            e_defense_base=7,
+            armor_base=0,
+            speed_base=5,
+            sensor_range=10,
+            save_bonus=10,
+            tech_attack=0,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_carbon_fiber_sword"),
+        NPCGear(system_id="npc_perfect_parry"),
+    ],
+)
+
+PR2_SCOURER_T1 = NPCTemplate(
+    id="pr2_scourer_t1",
+    name="Scourer",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=10,
+            evasion_base=8,
+            e_defense_base=8,
+            armor_base=2,
+            speed_base=4,
+            sensor_range=10,
+            save_bonus=10,
+            tech_attack=0,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_thermal_lance"),
+        NPCGear(system_id="npc_focus_down"),
+        NPCGear(system_id="npc_cooling_module"),
+    ],
+)
+
+PR2_SNIPER_T1 = NPCTemplate(
+    id="pr2_sniper_t1",
+    name="Sniper",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=10,
+            evasion_base=10,
+            e_defense_base=8,
+            armor_base=0,
+            speed_base=4,
+            sensor_range=15,
+            save_bonus=11,
+            tech_attack=1,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_anti_material_rifle"),
+        NPCGear(system_id="npc_snipers_mark"),
+    ],
+)
+
+PR2_SPECTRE_T1 = NPCTemplate(
+    id="pr2_spectre_t1",
+    name="Spectre",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_1",
+            hp_base=10,
+            evasion_base=10,
+            e_defense_base=8,
+            armor_base=0,
+            speed_base=4,
+            sensor_range=5,
+            save_bonus=10,
+            tech_attack=1,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(weapon_id="npc_monowire_sword"),
+        NPCGear(system_id="npc_prowl"),
+        NPCGear(system_id="npc_tactical_cloak"),
+    ],
+)
+
+PR2_WITCH_T1 = NPCTemplate(
+    id="pr2_witch_t1",
+    name="Witch",
+    description="",
+    npc_class="specialist",
+    tier="tier_1",
+    stats=NPCStats(
+        base=NPCStatsBase(
+            size="size_half",
+            hp_base=12,
+            evasion_base=10,
+            e_defense_base=13,
+            armor_base=0,
+            speed_base=6,
+            sensor_range=15,
+            save_bonus=12,
+            tech_attack=3,
+        ),
+        scaling=_make_specialist_scaling(),
+    ),
+    abilities=[],
+    gear=[
+        NPCGear(system_id="npc_tear_down"),
+        NPCGear(system_id="npc_blind"),
+        NPCGear(system_id="npc_predatory_logic"),
+    ],
+)
+
+PR2_NPC_TEMPLATES: list[NPCTemplate] = [
+    PR2_ACE_T1,
+    PR2_ASSAULT_T1,
+    PR2_ARCHER_T1,
+    PR2_ASSASSIN_T1,
+    PR2_BASTION_T1,
+    PR2_BERSERKER_T1,
+    PR2_BREACHER_T1,
+    PR2_CATAPHRACT_T1,
+    PR2_DEMOLISHER_T1,
+    PR2_ENGINEER_T1,
+    PR2_PRIEST_T1,
+    PR2_RAINMAKER_T1,
+    PR2_RONIN_T1,
+    PR2_SCOURER_T1,
+    PR2_SNIPER_T1,
+    PR2_SPECTRE_T1,
+    PR2_WITCH_T1,
+]
+
 
 NPC_TEMPLATES: list[NPCTemplate] = [
     GMS_GRUNT_T1,
@@ -444,6 +934,7 @@ NPC_TEMPLATES: list[NPCTemplate] = [
     SSC_SPECIALIST_T2,
     HORUS_ELITE_T3,
     HA_BOSS_T3,
+    *PR2_NPC_TEMPLATES,
 ]
 
 

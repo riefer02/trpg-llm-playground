@@ -14,8 +14,7 @@ from core.pilot.background import (
     Background,
     BackgroundInvokeRule,
     BACKGROUND_INVOKE_RULE,
-    EXAMPLE_BACKGROUNDS,
-    STANDARD_BACKGROUNDS,
+    PILOT_BACKGROUNDS,
     get_background,
 )
 from core.pilot.talent import (
@@ -134,8 +133,7 @@ __all__ = [
     "Background",
     "BackgroundInvokeRule",
     "BACKGROUND_INVOKE_RULE",
-    "EXAMPLE_BACKGROUNDS",
-    "STANDARD_BACKGROUNDS",
+    "PILOT_BACKGROUNDS",
     "get_background",
     # Talents
     "Talent",

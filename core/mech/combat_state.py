@@ -12,6 +12,7 @@ from core.shared.effects import (
     ProgressionState,
     PerTargetCounter,
     CooldownState,
+    ProgressionResetTrigger,
 )
 from core.shared.rolls import ContestedCheck
 from core.mech.grid import HexPosition, HexCoord
@@ -117,6 +118,20 @@ class GrappleLink(FrozenModel):
     target_total_size: int = Field(default=1, ge=0)
 
 
+PerTargetEffectSource = Literal["save_check", "triggered_effect", "direct"]
+
+
+class AppliedPerTargetEffect(FrozenModel):
+    """Applied per-target effect metadata for action resolution."""
+
+    effect_id: str
+    target_id: str
+    count: int = Field(default=1, ge=1)
+    max_count: int | None = Field(default=None, ge=1)
+    reset_on: ProgressionResetTrigger | None = None
+    source: PerTargetEffectSource = "direct"
+
+
 class ActionUse(FrozenModel):
     """An action taken during a combat turn."""
 
@@ -149,6 +164,7 @@ class ActionUse(FrozenModel):
     reaction_trigger: ReactionTriggerEvent | None = None
     contested_check: ContestedCheck | None = None
     consumes_lock_on: bool = False
+    applied_per_target_effects: list[AppliedPerTargetEffect] = Field(default_factory=list)
 
 
 class CombatTurn(FrozenModel):
