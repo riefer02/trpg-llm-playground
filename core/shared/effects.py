@@ -188,6 +188,7 @@ ConditionType = Literal[
     "fuel_rod_gun_attack",
     "melee_attack_no_other_adjacent",
     "melee_crit",
+    "attack_roll_1_or_2",
     # Save conditions
     "save_vs_knockback_or_prone",
     # Spatial/targeting conditions (from compendium migration)
@@ -200,6 +201,8 @@ ConditionType = Literal[
     "target_empty_space",
     "target_destroyed",
     "target_is_object",
+    "target_is_drone",
+    "target_is_deployable",
     "target_prone_or_immobilized_or_stunned",
     # Attack context conditions (from compendium migration)
     "after_boost_melee_attack",
@@ -428,6 +431,7 @@ TriggerType = Literal[
     "on_overcharge",
     "on_core_power_spent",
     "on_structure_loss",
+    "on_heat_gain",
     "on_target_failed_save",
     "on_tech_attack_hit",
     "on_ally_turn_start",
@@ -440,6 +444,7 @@ TriggerType = Literal[
     "on_slipstream_jump",
     "on_extra_overwatch",
     "on_ally_hit_target_within_range",
+    "on_lock_on_consumed",
 ]
 ReactionTriggerEvent = Literal[
     "enemy_starts_movement_in_threat",
@@ -514,7 +519,7 @@ OutOfPlayDuration = Literal[
 ]
 
 ResourceType = Literal["hp", "heat", "repairs", "structure", "stress", "core_power"]
-ResourceAmount = int | DiceExpression | Literal["half_max", "full"]
+ResourceAmount = int | DiceExpression | Literal["quarter_max", "half_max", "full"]
 ResourceDirection = Literal["gain", "lose", "set"]
 TechRangeType = Literal["sensors", "range"]
 DeploymentActivationCondition = Literal[
@@ -549,6 +554,23 @@ class StatModifier(FrozenModel):
 
     stat: StatType
     value: int
+
+
+class CompanionStatModifierEffect(FrozenModel):
+    """
+    Stat modifiers that apply to deployables, drones, or other companion entities.
+
+    Examples:
+        CompanionStatModifierEffect(stat="hp", value=5, applies_to=["drone", "deployable"])
+    """
+
+    stat: StatType
+    value: int
+    applies_to: list[Literal["drone", "deployable", "object"]] = Field(
+        default_factory=list
+    )
+    duration: EffectDuration | None = None
+    condition: EffectCondition | None = None
 
 
 class StatOverrideEffect(FrozenModel):
@@ -712,6 +734,20 @@ class ActionGrant(FrozenModel):
         default=None, description="When this action can be used"
     )
     uses_per: UsesPer = "unlimited"
+
+
+class ReactionLimitEffect(FrozenModel):
+    """
+    Adjusts the maximum number of reactions per turn.
+
+    Examples:
+        ReactionLimitEffect(max_reactions_per_turn=2)
+    """
+
+    max_reactions_per_turn: int | None = Field(default=None, ge=1)
+    bonus_reactions_per_turn: int | None = Field(default=None, ge=1)
+    target: EffectTargetNoAll = "self"
+    condition: EffectCondition | None = None
 
 
 class ReactionTriggerEffect(FrozenModel):
@@ -1459,6 +1495,20 @@ class StatusRestriction(FrozenModel):
     condition: EffectCondition | None = None
 
 
+class AllegianceShiftEffect(FrozenModel):
+    """
+    Temporarily flips a target's allegiance.
+
+    Examples:
+        AllegianceShiftEffect(duration="end_of_next_turn", ends_on_hostile_action=True)
+    """
+
+    target: EffectTarget = "enemy"
+    duration: EffectDuration = "end_of_next_turn"
+    ends_on_hostile_action: bool = True
+    condition: EffectCondition | None = None
+
+
 class CoverRestriction(FrozenModel):
     """
     Restricts cover benefits for targets.
@@ -1951,6 +2001,20 @@ class CriticalDamageOverrideEffect(FrozenModel):
     condition: EffectCondition | None = None
 
 
+class DamageRollOverrideEffect(FrozenModel):
+    """
+    Overrides how damage rolls are resolved.
+
+    Examples:
+        DamageRollOverrideEffect(mode="average", optional=True)
+    """
+
+    mode: Literal["average"] = "average"
+    optional: bool = True
+    target: EffectTargetNoAll = "self"
+    condition: EffectCondition | None = None
+
+
 class AccuracyTradeEffect(FrozenModel):
     """
     Trade accuracy dice for bonus effects.
@@ -2207,6 +2271,51 @@ class AttachmentEffect(FrozenModel):
     requires_line_of_sight: bool = True
     max_instances_per_target: int | None = Field(default=None, ge=1)
     duration: EffectDuration | None = None
+    condition: EffectCondition | None = None
+
+
+class SystemLinkEffect(FrozenModel):
+    """
+    Persistent link between two characters for shared systems/conditions.
+
+    Examples:
+        SystemLinkEffect(
+            action_type="quick",
+            range=10,
+            range_type="sensors",
+            target="ally",
+            duration="scene",
+            tech_action_uses_target_sensors=True,
+            tech_action_uses_target_los=True,
+            check_stat_proxy_to_target=["systems"],
+            check_kinds=["check", "save"],
+            share_conditions=True,
+            share_heat_from_tech=True,
+        )
+    """
+
+    action_type: ActionType
+    range: int | None = Field(default=None, ge=0)
+    range_type: TechRangeType = "sensors"
+    target: EffectTargetNoAll = "ally"
+    requires_line_of_sight: bool = True
+    duration: EffectDuration | None = None
+    max_links_per_source: int | None = Field(default=None, ge=1)
+    breaks_on_out_of_range: bool = False
+    break_if_statuses: list[StatusType] = Field(default_factory=list)
+    shares_space: bool = False
+    moves_with_target: bool = False
+    cover_from_target: CoverType | None = None
+    share_conditions: bool = False
+    share_heat_from_tech: bool = False
+    share_heat_all: bool = False
+    tech_action_uses_target_sensors: bool = False
+    tech_action_uses_target_los: bool = False
+    stat_proxy_to_target: list[StatType] = Field(default_factory=list)
+    stat_proxy_to_source: list[StatType] = Field(default_factory=list)
+    check_stat_proxy_to_target: list[SaveType] = Field(default_factory=list)
+    check_stat_proxy_to_source: list[SaveType] = Field(default_factory=list)
+    check_kinds: list[CheckKind] = Field(default_factory=list)
     condition: EffectCondition | None = None
 
 
@@ -2824,6 +2933,9 @@ class MechanicalEffect(FrozenModel):
 
     # Stat modifications
     stat_mods: list[StatModifier] = Field(default_factory=list)
+    companion_stat_mods: list[CompanionStatModifierEffect] = Field(
+        default_factory=list
+    )
     stat_overrides: list[StatOverrideEffect] = Field(default_factory=list)
     mount_slot_grants: list[MountSlotGrant] = Field(default_factory=list)
     mount_slot_replacements: list[MountSlotReplacement] = Field(default_factory=list)
@@ -2844,6 +2956,7 @@ class MechanicalEffect(FrozenModel):
 
     # Grants and immunities
     action_grants: list[ActionGrant] = Field(default_factory=list)
+    reaction_limits: list[ReactionLimitEffect] = Field(default_factory=list)
     reaction_triggers: list[ReactionTriggerEffect] = Field(default_factory=list)
     bondmates: list[BondmateEffect] = Field(default_factory=list)
     target_marks: list[TargetMarkEffect] = Field(default_factory=list)
@@ -2872,6 +2985,7 @@ class MechanicalEffect(FrozenModel):
         default_factory=list
     )
     status_restrictions: list[StatusRestriction] = Field(default_factory=list)
+    allegiance_shifts: list[AllegianceShiftEffect] = Field(default_factory=list)
     cover_restrictions: list[CoverRestriction] = Field(default_factory=list)
     cover_grants: list[CoverGrant] = Field(default_factory=list)
     intel_effects: list[IntelEffect] = Field(default_factory=list)
@@ -2912,6 +3026,7 @@ class MechanicalEffect(FrozenModel):
     critical_damage_overrides: list[CriticalDamageOverrideEffect] = Field(
         default_factory=list
     )
+    damage_roll_overrides: list[DamageRollOverrideEffect] = Field(default_factory=list)
     accuracy_trade_effects: list[AccuracyTradeEffect] = Field(default_factory=list)
     delayed_impacts: list[DelayedImpactEffect] = Field(default_factory=list)
     weapon_grants: list[WeaponGrantEffect] = Field(default_factory=list)
@@ -2922,6 +3037,7 @@ class MechanicalEffect(FrozenModel):
     ai_control_transfers: list[AIControlTransferEffect] = Field(default_factory=list)
     deployments: list[DeploymentEffect] = Field(default_factory=list)
     attachments: list[AttachmentEffect] = Field(default_factory=list)
+    system_links: list[SystemLinkEffect] = Field(default_factory=list)
     zones: list[ZoneEffect] = Field(default_factory=list)
     reloads: list[ReloadEffect] = Field(default_factory=list)
     reload_restrictions: list[ReloadRestrictionEffect] = Field(default_factory=list)
@@ -2952,6 +3068,7 @@ class MechanicalEffect(FrozenModel):
         """Check if this effect has no components."""
         return (
             not self.stat_mods
+            and not self.companion_stat_mods
             and not self.stat_overrides
             and not self.mount_slot_grants
             and not self.mount_slot_replacements
@@ -2970,6 +3087,7 @@ class MechanicalEffect(FrozenModel):
             and not self.limited_use_recharges
             and not self.non_combat_capabilities
             and not self.action_grants
+            and not self.reaction_limits
             and not self.reaction_triggers
             and not self.bondmates
             and not self.target_marks
@@ -2994,6 +3112,7 @@ class MechanicalEffect(FrozenModel):
             and not self.status_action_overrides
             and not self.line_of_sight_restrictions
             and not self.status_restrictions
+            and not self.allegiance_shifts
             and not self.cover_restrictions
             and not self.cover_grants
             and not self.intel_effects
@@ -3026,6 +3145,7 @@ class MechanicalEffect(FrozenModel):
             and not self.attack_rerolls
             and not self.attack_outcomes
             and not self.critical_damage_overrides
+            and not self.damage_roll_overrides
             and not self.accuracy_trade_effects
             and not self.delayed_impacts
             and not self.weapon_grants
@@ -3036,6 +3156,7 @@ class MechanicalEffect(FrozenModel):
             and not self.ai_control_transfers
             and not self.deployments
             and not self.attachments
+            and not self.system_links
             and not self.zones
             and not self.reloads
             and not self.reload_restrictions

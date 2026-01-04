@@ -31,6 +31,7 @@ from core.shared.effects import (
     AccuracyModifier,
     ActionGrant,
     ActionRestriction,
+    AllegianceShiftEffect,
     AttackContextCondition,
     AreaSelectionEffect,
     AreaAttackPattern,
@@ -39,13 +40,17 @@ from core.shared.effects import (
     AttackCaptureEffect,
     CheckContextCondition,
     ConditionGroup,
+    CompanionStatModifierEffect,
     CoverRestriction,
     CoverGrant,
     DelayedImpactEffect,
     DamageModifier,
     DamageMultiplierEffect,
+    DamageRollOverrideEffect,
     DamageReduction,
     DamageShareEffect,
+    CountdownDieEffect,
+    CountdownDieTrigger,
     DicePoolEffect,
     DicePoolGain,
     DicePoolSpendOption,
@@ -55,12 +60,14 @@ from core.shared.effects import (
     EffectChoice,
     ForcedMovement,
     HologramTrailEffect,
+    HolographicDuplicateEffect,
     IntelEffect,
     LineAttackEffect,
     Immunity,
     Resistance,
     HeatResistanceEffect,
     RangeModifier,
+    ReactionLimitEffect,
     MechanicalEffect,
     LineOfSightRestriction,
     MovementGrant,
@@ -83,6 +90,7 @@ from core.shared.effects import (
     AttackSequenceModifierEffect,
     DeploymentEffect,
     AttachmentEffect,
+    SystemLinkEffect,
     ReloadEffect,
     DamageAbsorption,
     AttackRollOverrideEffect,
@@ -5818,10 +5826,2213 @@ SSC_SYSTEMS: list[MechSystemDefinition] = [
     ),
 ]
 
+OROCHI_GUARDIAN_DRONE_ZONE = ZoneEffect(
+    shape="burst",
+    size=1,
+    placement="deployable",
+    duration="scene",
+    applies_to="ally",
+    continuous_effects=MechanicalEffect(
+        accuracy_mods=[
+            AccuracyModifier(
+                value=-1,
+                applies_to="ranged",
+                condition=AttackContextCondition(
+                    attack_types=["ranged"],
+                    applies_to="incoming",
+                ),
+            )
+        ],
+    ),
+    max_instances_per_source=1,
+)
+OROCHI_SNARE_FAILURE_EFFECT = MechanicalEffect(
+    status_grants=[
+        StatusGrant(
+            status="immobilized",
+            target="all",
+            duration="scene",
+        )
+    ],
+    status_breaks=[
+        StatusBreakCondition(
+            status="immobilized",
+            target="all",
+            break_triggers=["manual_deactivate", "move", "source_destroyed"],
+        )
+    ],
+)
+OROCHI_SNARE_DRONE_ZONE = ZoneEffect(
+    shape="burst",
+    size=1,
+    placement="deployable",
+    duration="scene",
+    applies_to="all",
+    effects_on_start_turn=MechanicalEffect(
+        save_checks=[
+            SaveCheck(
+                trigger="on_turn_start",
+                save="agility",
+                target="all",
+                on_failure=OROCHI_SNARE_FAILURE_EFFECT,
+            )
+        ]
+    ),
+    effects_on_enter=MechanicalEffect(
+        save_checks=[
+            SaveCheck(
+                trigger="on_enter",
+                save="agility",
+                target="all",
+                on_failure=OROCHI_SNARE_FAILURE_EFFECT,
+            )
+        ]
+    ),
+    max_instances_per_source=1,
+)
+OROCHI_SHREDDER_FAILURE_EFFECT = MechanicalEffect(
+    direct_damages=[
+        DirectDamage(
+            damage_type="kinetic",
+            dice=DiceExpression.parse("1d3"),
+            target="all",
+        )
+    ],
+    status_grants=[
+        StatusGrant(
+            status="shredded",
+            target="all",
+            duration="end_of_next_turn",
+        )
+    ],
+)
+OROCHI_SHREDDER_DRONE_ZONE = ZoneEffect(
+    shape="burst",
+    size=1,
+    placement="deployable",
+    duration="scene",
+    applies_to="all",
+    effects_on_start_turn=MechanicalEffect(
+        save_checks=[
+            SaveCheck(
+                trigger="on_turn_start",
+                save="hull",
+                target="all",
+                on_failure=OROCHI_SHREDDER_FAILURE_EFFECT,
+            )
+        ]
+    ),
+    effects_on_enter=MechanicalEffect(
+        save_checks=[
+            SaveCheck(
+                trigger="on_enter",
+                save="hull",
+                target="all",
+                on_failure=OROCHI_SHREDDER_FAILURE_EFFECT,
+            )
+        ]
+    ),
+    max_instances_per_source=1,
+)
+OROCHI_HUNTER_DRONE_ZONE = ZoneEffect(
+    shape="burst",
+    size=1,
+    placement="deployable",
+    duration="scene",
+    applies_to="all",
+    continuous_effects=MechanicalEffect(
+        status_restrictions=[
+            StatusRestriction(
+                statuses=["invisible"],
+                restriction="cannot_benefit",
+                target="all",
+                duration="scene",
+            )
+        ]
+    ),
+    max_instances_per_source=1,
+)
+MANTICORE_MELTDOWN_EFFECT = MechanicalEffect(
+    area_selections=[
+        AreaSelectionEffect(
+            scope_options=["area"],
+            shape="burst",
+            size=2,
+            origin="self",
+        )
+    ],
+    save_checks=[
+        SaveCheck(
+            trigger="on_turn_end",
+            save="agility",
+            target="all",
+            on_failure=MechanicalEffect(
+                direct_damages=[
+                    DirectDamage(
+                        damage_type="explosive",
+                        dice=DiceExpression.parse("4d6"),
+                        target="all",
+                    )
+                ]
+            ),
+            on_success=MechanicalEffect(
+                direct_damages=[
+                    DirectDamage(
+                        damage_type="explosive",
+                        dice=DiceExpression.parse("2d6"),
+                        target="all",
+                    )
+                ]
+            ),
+        )
+    ],
+)
+MANTICORE_CASTIGATE_MELTDOWN_EFFECT = MechanicalEffect(
+    area_selections=[
+        AreaSelectionEffect(
+            scope_options=["area"],
+            shape="burst",
+            size=2,
+            origin="self",
+        )
+    ],
+    save_checks=[
+        SaveCheck(
+            trigger="on_turn_end",
+            save="agility",
+            target="all",
+            on_failure=MechanicalEffect(
+                direct_damages=[
+                    DirectDamage(
+                        damage_type="explosive",
+                        dice=DiceExpression.parse("8d6"),
+                        target="all",
+                    )
+                ]
+            ),
+            on_success=MechanicalEffect(
+                direct_damages=[
+                    DirectDamage(
+                        damage_type="explosive",
+                        dice=DiceExpression.parse("4d6"),
+                        target="all",
+                    )
+                ]
+            ),
+        )
+    ],
+)
+MANTICORE_CHARGED_DISCHARGE_EFFECT = MechanicalEffect(
+    area_selections=[
+        AreaSelectionEffect(
+            scope_options=["area"],
+            shape="burst",
+            size=2,
+            origin="self",
+        )
+    ],
+    save_checks=[
+        SaveCheck(
+            trigger="on_activation",
+            save="engineering",
+            target="all",
+            on_failure=MechanicalEffect(
+                direct_damages=[
+                    DirectDamage(
+                        damage_type="energy",
+                        dice=DiceExpression.parse("6d6"),
+                        target="all",
+                    )
+                ]
+            ),
+            on_success=MechanicalEffect(
+                direct_damages=[
+                    DirectDamage(
+                        damage_type="energy",
+                        dice=DiceExpression.parse("3d6"),
+                        target="all",
+                    )
+                ]
+            ),
+        )
+    ],
+)
 
-ALL_FRAMES: list[MechFrameDefinition] = GMS_FRAMES + IPSN_FRAMES + SSC_FRAMES
-ALL_WEAPONS: list[MechWeaponDefinition] = GMS_WEAPONS + IPSN_WEAPONS + SSC_WEAPONS
-ALL_SYSTEMS: list[MechSystemDefinition] = GMS_SYSTEMS + IPSN_SYSTEMS + SSC_SYSTEMS
+ 
+HORUS_FRAMES: list[MechFrameDefinition] = [
+    MechFrameDefinition(
+        id="horus_balor",
+        name="HORUS Balor",
+        manufacturer="HORUS",
+        license_id="balor",
+        license_rank=2,
+        base_stats=MechFrameBaseStats(
+            size="size_2",
+            armor=0,
+            hp=12,
+            evasion=6,
+            e_defense=10,
+            speed=3,
+            sensor_range=5,
+            tech_attack=1,
+            heat_cap=4,
+            repair_cap=4,
+            save_target=10,
+        ),
+        mounts=[
+            MountSlot(slot_type="main"),
+            MountSlot(slot_type="heavy"),
+        ],
+        system_points=6,
+        core_system=CoreSystemDefinition(
+            id="horus_hellswarm",
+            name="HELLSWARM",
+            effects=MechanicalEffect(
+                core_powers=[
+                    CorePowerEffect(
+                        name="Hive Frenzy",
+                        action_type="protocol",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            cover_grants=[
+                                CoverGrant(
+                                    cover="soft",
+                                    target="self",
+                                    duration="scene",
+                                ),
+                                CoverGrant(
+                                    cover="soft",
+                                    target="ally",
+                                    duration="scene",
+                                    condition=SpatialCondition(
+                                        relation="adjacent",
+                                        target="ally",
+                                    ),
+                                ),
+                            ],
+                            triggered_effects=[
+                                TriggeredEffect(
+                                    trigger="on_turn_end",
+                                    condition=ConditionGroup(
+                                        none_of=["overheated", "structure_damage"]
+                                    ),
+                                    effect=MechanicalEffect(
+                                        resource_changes=[
+                                            ResourceChange(
+                                                resource="hp",
+                                                amount="half_max",
+                                                target="self",
+                                            )
+                                        ]
+                                    ),
+                                )
+                            ],
+                            status_grants=[
+                                StatusGrant(
+                                    status="shredded",
+                                    target="self",
+                                    duration="scene",
+                                )
+                            ],
+                            structure_damage_avoidances=[
+                                StructureDamageAvoidanceEffect(
+                                    trigger="on_structure_loss",
+                                    roll=DiceExpression.parse("1d6"),
+                                    success_threshold=6,
+                                    heal_hp_to=1,
+                                )
+                            ],
+                        ),
+                    )
+                ]
+            ),
+        ),
+        traits=[
+            FrameTrait(
+                name="Scouring Swarm",
+                effects=MechanicalEffect(
+                    zones=[
+                        ZoneEffect(
+                            shape="burst",
+                            size=1,
+                            placement="self",
+                            duration="scene",
+                            effects_on_start_turn=MechanicalEffect(
+                                direct_damages=[
+                                    DirectDamage(
+                                        damage_type="kinetic",
+                                        flat=2,
+                                        target="all",
+                                        condition=ConditionGroup(
+                                            none_of=["core_power_active"]
+                                        ),
+                                    ),
+                                    DirectDamage(
+                                        damage_type="kinetic",
+                                        flat=4,
+                                        target="all",
+                                        condition="core_power_active",
+                                    ),
+                                ]
+                            ),
+                        )
+                    ]
+                ),
+            ),
+            FrameTrait(
+                name="Regeneration",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_turn_end",
+                            condition=ConditionGroup(
+                                none_of=[
+                                    "overheated",
+                                    "structure_damage",
+                                    "core_power_active",
+                                ]
+                            ),
+                            effect=MechanicalEffect(
+                                resource_changes=[
+                                    ResourceChange(
+                                        resource="hp",
+                                        amount="quarter_max",
+                                        target="self",
+                                    )
+                                ]
+                            ),
+                        )
+                    ]
+                ),
+            ),
+            FrameTrait(
+                name="Self-Perpetuating",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_activation",
+                            condition="during_rest",
+                            effect=MechanicalEffect(
+                                resource_changes=[
+                                    ResourceChange(
+                                        resource="hp",
+                                        amount="full",
+                                        target="self",
+                                    )
+                                ]
+                            ),
+                        )
+                    ]
+                ),
+            ),
+        ],
+    ),
+    MechFrameDefinition(
+        id="horus_goblin",
+        name="HORUS Goblin",
+        manufacturer="HORUS",
+        license_id="goblin",
+        license_rank=2,
+        base_stats=MechFrameBaseStats(
+            size="size_half",
+            armor=0,
+            hp=6,
+            evasion=11,
+            e_defense=12,
+            speed=5,
+            sensor_range=20,
+            tech_attack=2,
+            heat_cap=4,
+            repair_cap=2,
+            save_target=12,
+        ),
+        mounts=[
+            MountSlot(slot_type="flexible"),
+        ],
+        system_points=8,
+        core_system=CoreSystemDefinition(
+            id="horus_symbiosis",
+            name="Symbiosis",
+            effects=MechanicalEffect(
+                core_powers=[
+                    CorePowerEffect(
+                        name="Symbiosis",
+                        action_type="quick",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            system_links=[
+                                SystemLinkEffect(
+                                    action_type="quick",
+                                    range=1,
+                                    range_type="range",
+                                    target="ally",
+                                    duration="scene",
+                                    max_links_per_source=1,
+                                    shares_space=True,
+                                    moves_with_target=True,
+                                    cover_from_target="hard",
+                                    share_conditions=True,
+                                    share_heat_all=True,
+                                    stat_proxy_to_target=["e_defense", "tech_attack"],
+                                    check_stat_proxy_to_target=["systems"],
+                                    check_kinds=["check", "save"],
+                                    break_if_statuses=["stunned"],
+                                    condition=ConditionGroup(
+                                        all_of=[
+                                            SpatialCondition(
+                                                relation="adjacent",
+                                                target="ally",
+                                            ),
+                                            SizeCondition(
+                                                subject="target",
+                                                comparator="gt",
+                                                size="size_half",
+                                            ),
+                                        ]
+                                    ),
+                                )
+                            ],
+                        ),
+                    )
+                ]
+            ),
+        ),
+        traits=[
+            FrameTrait(
+                name="Liturgicode",
+                effects=MechanicalEffect(
+                    tech_attack_mods=[
+                        TechAttackModifier(
+                            value=1,
+                            target="self",
+                        )
+                    ],
+                ),
+            ),
+            FrameTrait(
+                name="Reactive Code",
+                effects=MechanicalEffect(
+                    action_grants=[
+                        ActionGrant(
+                            action_type="reaction",
+                            name="reactive_quick_tech",
+                            trigger="on_tech_attack_hit",
+                            uses_per="round",
+                        )
+                    ],
+                ),
+            ),
+            FrameTrait(
+                name="Fragile",
+                effects=MechanicalEffect(
+                    check_mods=[
+                        CheckModifierEffect(
+                            value=-1,
+                            check_types=["hull"],
+                            check_kinds=["check", "save"],
+                            target="self",
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    MechFrameDefinition(
+        id="horus_gorgon",
+        name="HORUS Gorgon",
+        manufacturer="HORUS",
+        license_id="gorgon",
+        license_rank=2,
+        base_stats=MechFrameBaseStats(
+            size="size_2",
+            armor=0,
+            hp=12,
+            evasion=8,
+            e_defense=12,
+            speed=4,
+            sensor_range=8,
+            tech_attack=1,
+            heat_cap=5,
+            repair_cap=3,
+            save_target=12,
+        ),
+        mounts=[
+            MountSlot(slot_type="flexible"),
+            MountSlot(slot_type="main"),
+            MountSlot(slot_type="main"),
+        ],
+        system_points=6,
+        core_system=CoreSystemDefinition(
+            id="horus_harnessed_basilisk",
+            name="Harnessed Basilisk",
+            effects=MechanicalEffect(
+                core_powers=[
+                    CorePowerEffect(
+                        name="Extrude Basilisk",
+                        action_type="quick",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            save_checks=[
+                                SaveCheck(
+                                    trigger="on_attack_roll",
+                                    save="systems",
+                                    target="enemy",
+                                    condition=ConditionGroup(
+                                        all_of=[
+                                            AttackContextCondition(
+                                                applies_to="incoming",
+                                                target="ally",
+                                            ),
+                                            SpatialCondition(
+                                                relation="within_range",
+                                                target="ally",
+                                                range=3,
+                                                range_type="range",
+                                            ),
+                                        ]
+                                    ),
+                                    on_failure=MechanicalEffect(
+                                        status_grants=[
+                                            StatusGrant(
+                                                status="stunned",
+                                                target="enemy",
+                                                duration="end_of_next_turn",
+                                            )
+                                        ]
+                                    ),
+                                )
+                            ]
+                        ),
+                    )
+                ]
+            ),
+        ),
+        traits=[
+            FrameTrait(
+                name="Meta-state Paralysis",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_attack_roll",
+                            condition=ConditionGroup(
+                                all_of=[
+                                    "attack_roll_1_or_2",
+                                    AttackContextCondition(
+                                        applies_to="incoming",
+                                        target="self",
+                                    ),
+                                ]
+                            ),
+                            effect=MechanicalEffect(
+                                status_grants=[
+                                    StatusGrant(
+                                        status="stunned",
+                                        target="enemy",
+                                        duration="end_of_next_turn",
+                                    )
+                                ],
+                                attack_outcomes=[
+                                    AttackOutcomeEffect(
+                                        trigger="on_attack_roll",
+                                        force_miss=True,
+                                        target="self",
+                                        attacker="enemy",
+                                    )
+                                ],
+                            ),
+                        )
+                    ],
+                ),
+            ),
+            FrameTrait(
+                name="GAZE",
+                effects=MechanicalEffect(
+                    reaction_limits=[
+                        ReactionLimitEffect(
+                            max_reactions_per_turn=2,
+                            target="self",
+                        )
+                    ]
+                ),
+            ),
+            FrameTrait(
+                name="Guardian",
+                effects=MechanicalEffect(
+                    cover_grants=[
+                        CoverGrant(
+                            cover="hard",
+                            target="ally",
+                            duration="scene",
+                            condition="adjacent_to_self",
+                        )
+                    ]
+                ),
+            ),
+        ],
+    ),
+    MechFrameDefinition(
+        id="horus_hydra",
+        name="HORUS Hydra",
+        manufacturer="HORUS",
+        license_id="hydra",
+        license_rank=2,
+        base_stats=MechFrameBaseStats(
+            size="size_1",
+            armor=1,
+            hp=8,
+            evasion=7,
+            e_defense=10,
+            speed=5,
+            sensor_range=10,
+            tech_attack=1,
+            heat_cap=5,
+            repair_cap=4,
+            save_target=10,
+        ),
+        mounts=[
+            MountSlot(slot_type="main"),
+            MountSlot(slot_type="heavy"),
+        ],
+        system_points=8,
+        core_system=CoreSystemDefinition(
+            id="horus_orochi_disarticulation",
+            name="OROCHI Disarticulation",
+            effects=MechanicalEffect(
+                action_grants=[
+                    ActionGrant(action_type="quick", name="orochi_recall_drones"),
+                    ActionGrant(action_type="quick", name="orochi_redeploy_drones"),
+                ],
+                choices=[
+                    EffectChoice(
+                        name="Guardian Drone",
+                        effect=MechanicalEffect(
+                            zones=[OROCHI_GUARDIAN_DRONE_ZONE],
+                        ),
+                    ),
+                    EffectChoice(
+                        name="Snare Drone",
+                        effect=MechanicalEffect(
+                            zones=[OROCHI_SNARE_DRONE_ZONE],
+                        ),
+                    ),
+                    EffectChoice(
+                        name="Shredder Drone",
+                        effect=MechanicalEffect(
+                            zones=[OROCHI_SHREDDER_DRONE_ZONE],
+                        ),
+                    ),
+                    EffectChoice(
+                        name="Hunter Drone",
+                        effect=MechanicalEffect(
+                            zones=[OROCHI_HUNTER_DRONE_ZONE],
+                            tech_actions=[
+                                TechAction(
+                                    name="Hunter Drone Lock On",
+                                    action_type="quick",
+                                    target="enemy",
+                                    range=TechRange(range_type="range", value=1),
+                                    effect=MechanicalEffect(
+                                        status_grants=[
+                                            StatusGrant(
+                                                status="lock_on",
+                                                target="enemy",
+                                                duration="until_cleared",
+                                            )
+                                        ]
+                                    ),
+                                )
+                            ],
+                        ),
+                    ),
+                ],
+                core_powers=[
+                    CorePowerEffect(
+                        name="Full Deployment",
+                        action_type="quick",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            zones=[
+                                OROCHI_GUARDIAN_DRONE_ZONE,
+                                OROCHI_SNARE_DRONE_ZONE,
+                                OROCHI_SHREDDER_DRONE_ZONE,
+                                OROCHI_HUNTER_DRONE_ZONE,
+                            ],
+                        ),
+                    )
+                ],
+            ),
+        ),
+        traits=[
+            FrameTrait(
+                name="System Link",
+                effects=MechanicalEffect(
+                    companion_stat_mods=[
+                        CompanionStatModifierEffect(
+                            stat="hp",
+                            value=5,
+                            applies_to=["drone", "deployable"],
+                        )
+                    ]
+                ),
+            ),
+            FrameTrait(
+                name="Shepherd Field",
+                effects=MechanicalEffect(
+                    zones=[
+                        ZoneEffect(
+                            shape="burst",
+                            size=1,
+                            placement="self",
+                            duration="scene",
+                            continuous_effects=MechanicalEffect(
+                                resistances=[
+                                    Resistance(
+                                        damage_type="all",
+                                        condition=ConditionGroup(
+                                            any_of=[
+                                                "target_is_drone",
+                                                "target_is_deployable",
+                                                "target_is_object",
+                                            ]
+                                        ),
+                                    )
+                                ],
+                            ),
+                        )
+                    ]
+                ),
+            ),
+        ],
+    ),
+    MechFrameDefinition(
+        id="horus_manticore",
+        name="HORUS Manticore",
+        manufacturer="HORUS",
+        license_id="manticore",
+        license_rank=2,
+        base_stats=MechFrameBaseStats(
+            size="size_1",
+            armor=2,
+            hp=8,
+            evasion=6,
+            e_defense=10,
+            speed=3,
+            sensor_range=10,
+            tech_attack=1,
+            heat_cap=7,
+            repair_cap=3,
+            save_target=10,
+        ),
+        mounts=[
+            MountSlot(slot_type="flexible"),
+            MountSlot(slot_type="heavy"),
+        ],
+        system_points=6,
+        core_system=CoreSystemDefinition(
+            id="horus_charged_exoskeleton",
+            name="Charged Exoskeleton",
+            effects=MechanicalEffect(
+                triggered_effects=[
+                    TriggeredEffect(
+                        trigger="on_heat_gain",
+                        uses_per="round",
+                        effect=MechanicalEffect(
+                            direct_damages=[
+                                DirectDamage(
+                                    damage_type="energy",
+                                    flat=2,
+                                    ap=True,
+                                    target="enemy",
+                                    condition=SpatialCondition(
+                                        relation="within_range",
+                                        range=3,
+                                        range_type="range",
+                                    ),
+                                )
+                            ]
+                        ),
+                    )
+                ],
+                core_powers=[
+                    CorePowerEffect(
+                        name="Destruction of the Temple of the Enemies of RA",
+                        action_type="protocol",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            heat_resistances=[
+                                HeatResistanceEffect(
+                                    multiplier=0.5,
+                                    target="self",
+                                )
+                            ],
+                            countdown_dice=[
+                                CountdownDieEffect(
+                                    die_name="charged_exoskeleton",
+                                    die_size=6,
+                                    starting_value=6,
+                                    decrement_triggers=[
+                                        CountdownDieTrigger(trigger="on_heat_gain"),
+                                        CountdownDieTrigger(trigger="on_take_damage"),
+                                    ],
+                                    spend_requires_value=1,
+                                    expires_on_scene_end=True,
+                                )
+                            ],
+                            choices=[
+                                EffectChoice(
+                                    name="Charged Discharge",
+                                    effect=MANTICORE_CHARGED_DISCHARGE_EFFECT,
+                                )
+                            ],
+                        ),
+                    )
+                ],
+            ),
+        ),
+        traits=[
+            FrameTrait(
+                name="Slag Carapace",
+                effects=MechanicalEffect(
+                    resistances=[
+                        Resistance(damage_type="energy"),
+                        Resistance(damage_type="burn"),
+                    ],
+                ),
+            ),
+            FrameTrait(
+                name="Unstable System",
+                effects=MechanicalEffect(
+                    triggered_effects=[
+                        TriggeredEffect(
+                            trigger="on_turn_end",
+                            condition="zero_hp",
+                            effect=MANTICORE_MELTDOWN_EFFECT,
+                        )
+                    ]
+                ),
+            ),
+            FrameTrait(
+                name="Castigate the Enemies of the Godhead",
+                effects=MechanicalEffect(
+                    mode_effects=[
+                        ModeEffect(
+                            name="Castigate Instability",
+                            activation_action_id="castigate_instability",
+                            activation_action_type="protocol",
+                            deactivation_action_id="castigate_instability_end",
+                            deactivation_action_type="protocol",
+                            condition="during_rest",
+                            effects=MechanicalEffect(
+                                triggered_effects=[
+                                    TriggeredEffect(
+                                        trigger="on_turn_end",
+                                        condition="zero_hp",
+                                        effect=MANTICORE_CASTIGATE_MELTDOWN_EFFECT,
+                                    )
+                                ]
+                            ),
+                        )
+                    ]
+                ),
+            ),
+        ],
+    ),
+    MechFrameDefinition(
+        id="horus_minotaur",
+        name="HORUS Minotaur",
+        manufacturer="HORUS",
+        license_id="minotaur",
+        license_rank=2,
+        base_stats=MechFrameBaseStats(
+            size="size_1",
+            armor=0,
+            hp=12,
+            evasion=8,
+            e_defense=10,
+            speed=4,
+            sensor_range=8,
+            tech_attack=2,
+            heat_cap=5,
+            repair_cap=4,
+            save_target=10,
+        ),
+        mounts=[
+            MountSlot(slot_type="main_aux"),
+        ],
+        system_points=8,
+        core_system=CoreSystemDefinition(
+            id="horus_metafold_maze",
+            name="Metafold Maze",
+            effects=MechanicalEffect(
+                action_grants=[
+                    ActionGrant(
+                        action_type="quick",
+                        name="metafold_maze_followup",
+                        trigger="on_tech_attack_hit",
+                        uses_per="round",
+                    )
+                ],
+                triggered_effects=[
+                    TriggeredEffect(
+                        trigger="on_tech_attack_hit",
+                        effect=MechanicalEffect(
+                            choices=[
+                                EffectChoice(
+                                    name="Maze Slow",
+                                    effect=MechanicalEffect(
+                                        status_grants=[
+                                            StatusGrant(
+                                                status="slowed",
+                                                target="enemy",
+                                                duration="end_of_next_turn",
+                                            )
+                                        ]
+                                    ),
+                                ),
+                                EffectChoice(
+                                    name="Maze Immobilize",
+                                    effect=MechanicalEffect(
+                                        status_grants=[
+                                            StatusGrant(
+                                                status="immobilized",
+                                                target="enemy",
+                                                duration="end_of_next_turn",
+                                                condition="target_slowed",
+                                            )
+                                        ]
+                                    ),
+                                ),
+                                EffectChoice(
+                                    name="Maze Stun",
+                                    effect=MechanicalEffect(
+                                        status_grants=[
+                                            StatusGrant(
+                                                status="stunned",
+                                                target="enemy",
+                                                duration="end_of_next_turn",
+                                                condition="target_immobilized",
+                                            )
+                                        ]
+                                    ),
+                                ),
+                            ]
+                        ),
+                    )
+                ],
+                core_powers=[
+                    CorePowerEffect(
+                        name="Maze",
+                        action_type="full",
+                        effects=MechanicalEffect(
+                            tech_actions=[
+                                TechAction(
+                                    name="Maze",
+                                    action_type="full",
+                                    target="enemy",
+                                    range=TechRange(range_type="sensors"),
+                                    effect=MechanicalEffect(
+                                        status_grants=[
+                                            StatusGrant(
+                                                status="stunned",
+                                                target="enemy",
+                                                duration="until_cleared",
+                                            )
+                                        ],
+                                        triggered_effects=[
+                                            TriggeredEffect(
+                                                trigger="on_turn_end",
+                                                effect=MechanicalEffect(
+                                                    save_checks=[
+                                                        SaveCheck(
+                                                            trigger="on_turn_end",
+                                                            save="systems",
+                                                            target="enemy",
+                                                            on_success=MechanicalEffect(
+                                                                status_clears=[
+                                                                    StatusClear(
+                                                                        status="stunned",
+                                                                        target="enemy",
+                                                                    )
+                                                                ]
+                                                            ),
+                                                        )
+                                                    ]
+                                                ),
+                                            )
+                                        ],
+                                    ),
+                                )
+                            ]
+                        ),
+                    )
+                ],
+            ),
+        ),
+        traits=[
+            FrameTrait(
+                name="Invert Cockpit",
+                effects=MechanicalEffect(
+                    action_grants=[
+                        ActionGrant(
+                            action_type="free",
+                            name="mount",
+                            uses_per="round",
+                        ),
+                        ActionGrant(
+                            action_type="free",
+                            name="dismount",
+                            uses_per="round",
+                        ),
+                    ]
+                ),
+            ),
+            FrameTrait(
+                name="Internal Metafold",
+                effects=MechanicalEffect(
+                    immunities=[
+                        Immunity(target="pilot_death_on_mech_destruction"),
+                    ]
+                ),
+            ),
+            FrameTrait(
+                name="Localized Maze",
+                effects=MechanicalEffect(
+                    zones=[
+                        ZoneEffect(
+                            shape="burst",
+                            size=0,
+                            placement="self",
+                            duration="scene",
+                            blocks_movement=True,
+                            applies_to="enemy",
+                        )
+                    ],
+                    movement_restrictions=[
+                        MovementRestrictionEffect(
+                            target="enemy",
+                            max_voluntary_speed=0,
+                            duration="end_of_turn",
+                            condition=SpatialCondition(
+                                relation="adjacent",
+                                target="enemy",
+                            ),
+                        )
+                    ],
+                ),
+            ),
+        ],
+    ),
+    MechFrameDefinition(
+        id="horus_pegasus",
+        name="HORUS Pegasus",
+        manufacturer="HORUS",
+        license_id="pegasus",
+        license_rank=2,
+        base_stats=MechFrameBaseStats(
+            size="size_1",
+            armor=0,
+            hp=8,
+            evasion=8,
+            e_defense=10,
+            speed=4,
+            sensor_range=10,
+            tech_attack=1,
+            heat_cap=6,
+            repair_cap=3,
+            save_target=10,
+        ),
+        mounts=[
+            MountSlot(slot_type="flexible"),
+            MountSlot(slot_type="flexible"),
+            MountSlot(slot_type="heavy"),
+        ],
+        system_points=7,
+        core_system=CoreSystemDefinition(
+            id="horus_ushabti_omnigun",
+            name="Ushabti Omnigun",
+            effects=MechanicalEffect(
+                tech_actions=[
+                    TechAction(
+                        name="Ushabti Omnigun",
+                        action_type="free",
+                        target="enemy",
+                        range=TechRange(range_type="range", value=15),
+                        effect=MechanicalEffect(
+                            direct_damages=[
+                                DirectDamage(
+                                    damage_type="kinetic",
+                                    flat=1,
+                                    ap=True,
+                                    target="enemy",
+                                )
+                            ]
+                        ),
+                        uses_per="round",
+                    )
+                ],
+                core_powers=[
+                    CorePowerEffect(
+                        name="Unshackle Ushabti",
+                        action_type="protocol",
+                        duration="scene",
+                        effects=MechanicalEffect(
+                            tech_actions=[
+                                TechAction(
+                                    name="Ushabti Omnigun",
+                                    action_type="free",
+                                    target="enemy",
+                                    range=TechRange(range_type="range", value=15),
+                                    effect=MechanicalEffect(
+                                        direct_damages=[
+                                            DirectDamage(
+                                                damage_type="kinetic",
+                                                flat=1,
+                                                ap=True,
+                                                target="enemy",
+                                            )
+                                        ]
+                                    ),
+                                    uses_per="round",
+                                ),
+                                TechAction(
+                                    name="Ushabti Omnigun (Bonus)",
+                                    action_type="free",
+                                    target="enemy",
+                                    range=TechRange(range_type="range", value=15),
+                                    effect=MechanicalEffect(
+                                        direct_damages=[
+                                            DirectDamage(
+                                                damage_type="kinetic",
+                                                flat=1,
+                                                ap=True,
+                                                target="enemy",
+                                            )
+                                        ]
+                                    ),
+                                    uses_per="round",
+                                ),
+                                TechAction(
+                                    name="Ushabti Omnigun (Bonus)",
+                                    action_type="free",
+                                    target="enemy",
+                                    range=TechRange(range_type="range", value=15),
+                                    effect=MechanicalEffect(
+                                        direct_damages=[
+                                            DirectDamage(
+                                                damage_type="kinetic",
+                                                flat=1,
+                                                ap=True,
+                                                target="enemy",
+                                            )
+                                        ]
+                                    ),
+                                    uses_per="round",
+                                ),
+                            ]
+                        ),
+                    )
+                ],
+            ),
+        ),
+        traits=[
+            FrameTrait(
+                name="Extrude Gun",
+            ),
+            FrameTrait(
+                name="By the Way, I Know Everything",
+                effects=MechanicalEffect(
+                    damage_roll_overrides=[
+                        DamageRollOverrideEffect(
+                            mode="average",
+                            optional=True,
+                            target="self",
+                        )
+                    ]
+                ),
+            ),
+        ],
+    ),
+]
+
+
+HORUS_WEAPONS: list[MechWeaponDefinition] = [
+    MechWeaponDefinition(
+        id="horus_nanobot_whip",
+        name="Nanobot Whip",
+        size="heavy",
+        weapon_type="melee",
+        damage_type="kinetic",
+        license_id="balor",
+        license_rank=3,
+        ranges=[WeaponRange(range_type="threat", value=3)],
+        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("2d6"))],
+        tags=[WeaponTag(tag="smart")],
+        effects=MechanicalEffect(
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_crit",
+                    effect=MechanicalEffect(
+                        forced_movements=[
+                            ForcedMovement(
+                                direction="pull",
+                                distance="as_far_as_possible",
+                                target="enemy",
+                                toward="source",
+                                ignores_engagement=True,
+                                provokes_reactions=False,
+                                condition="toward_self_stop_adjacent_if_possible",
+                            )
+                        ]
+                    ),
+                )
+            ],
+        ),
+    ),
+    MechWeaponDefinition(
+        id="horus_seeker_swarm_nexus",
+        name="Seeker Swarm Nexus",
+        size="main",
+        weapon_type="nexus",
+        damage_type="kinetic",
+        license_id="balor",
+        license_rank=3,
+        ranges=[WeaponRange(range_type="range", value=5)],
+        damage=[WeaponDamage(damage_type="kinetic", flat=2)],
+        tags=[
+            WeaponTag(tag="smart"),
+            WeaponTag(tag="seeking"),
+            WeaponTag(tag="burn", value=2),
+        ],
+    ),
+    MechWeaponDefinition(
+        id="horus_autopod",
+        name="Autopod",
+        size="main",
+        weapon_type="launcher",
+        damage_type="kinetic",
+        license_id="goblin",
+        license_rank=1,
+        unique=True,
+        ranges=[WeaponRange(range_type="range", value=15)],
+        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6"))],
+        tags=[WeaponTag(tag="seeking")],
+        effects=MechanicalEffect(
+            triggered_effects=[
+                TriggeredEffect(
+                    trigger="on_lock_on_consumed",
+                    uses_per="round",
+                    condition=SpatialCondition(
+                        relation="within_range",
+                        range=15,
+                        range_type="range",
+                    ),
+                    effect=MechanicalEffect(
+                        direct_damages=[
+                            DirectDamage(
+                                damage_type="kinetic",
+                                dice=DiceExpression.parse("1d6"),
+                                target="enemy",
+                            )
+                        ]
+                    ),
+                )
+            ]
+        ),
+    ),
+    MechWeaponDefinition(
+        id="horus_vorpal_gun",
+        name="Vorpal Gun",
+        size="main",
+        weapon_type="cannon",
+        damage_type="kinetic",
+        license_id="gorgon",
+        license_rank=3,
+        ranges=[WeaponRange(range_type="range", value=5)],
+        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("2d6"))],
+    ),
+    MechWeaponDefinition(
+        id="horus_ghoul_nexus",
+        name="Ghoul Nexus",
+        size="main",
+        weapon_type="nexus",
+        damage_type="kinetic",
+        license_id="hydra",
+        license_rank=1,
+        ranges=[WeaponRange(range_type="range", value=10)],
+        damage=[WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d3+2"))],
+        tags=[WeaponTag(tag="smart")],
+    ),
+    MechWeaponDefinition(
+        id="horus_ghast_nexus",
+        name="Ghast Nexus",
+        size="heavy",
+        weapon_type="nexus",
+        damage_type="explosive",
+        license_id="hydra",
+        license_rank=2,
+        ranges=[WeaponRange(range_type="range", value=10)],
+        damage=[WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6+3"))],
+        tags=[WeaponTag(tag="smart")],
+    ),
+    MechWeaponDefinition(
+        id="horus_annihilation_nexus",
+        name="Annihilation Nexus",
+        size="superheavy",
+        weapon_type="nexus",
+        damage_type="energy",
+        license_id="hydra",
+        license_rank=3,
+        ranges=[WeaponRange(range_type="burst", value=2)],
+        damage=[WeaponDamage(damage_type="energy", dice=DiceExpression.parse("1d6+3"))],
+        tags=[WeaponTag(tag="ap"), WeaponTag(tag="smart")],
+    ),
+    MechWeaponDefinition(
+        id="horus_catalyst_pistol",
+        name="Catalyst Pistol",
+        size="aux",
+        weapon_type="cqb",
+        damage_type="energy",
+        license_id="manticore",
+        license_rank=1,
+        ranges=[
+            WeaponRange(range_type="cone", value=3),
+            WeaponRange(range_type="threat", value=3),
+        ],
+        damage=[WeaponDamage(damage_type="energy", dice=DiceExpression.parse("1d3"))],
+        tags=[WeaponTag(tag="heat_self", value=2)],
+    ),
+    MechWeaponDefinition(
+        id="horus_arc_projector",
+        name="Arc Projector",
+        size="heavy",
+        weapon_type="cqb",
+        damage_type="energy",
+        license_id="manticore",
+        license_rank=2,
+        ranges=[WeaponRange(range_type="range", value=5)],
+        damage=[WeaponDamage(damage_type="energy", dice=DiceExpression.parse("1d6+1"))],
+        tags=[WeaponTag(tag="heat_self", value=1)],
+    ),
+    MechWeaponDefinition(
+        id="horus_smart_gun",
+        name="Smart Gun",
+        size="main",
+        weapon_type="rifle",
+        damage_type="kinetic",
+        license_id="pegasus",
+        license_rank=1,
+        ranges=[WeaponRange(range_type="range", value=15)],
+        damage=[WeaponDamage(damage_type="kinetic", flat=4)],
+        tags=[
+            WeaponTag(tag="smart"),
+            WeaponTag(tag="seeking"),
+            WeaponTag(tag="accurate"),
+        ],
+    ),
+    MechWeaponDefinition(
+        id="horus_mimic_gun",
+        name="Mimic Gun",
+        size="heavy",
+        weapon_type="cannon",
+        damage_type="kinetic",
+        license_id="pegasus",
+        license_rank=2,
+        ranges=[],
+        damage=[],
+    ),
+    MechWeaponDefinition(
+        id="horus_autogun",
+        name="Autogun",
+        size="main",
+        weapon_type="cannon",
+        damage_type="kinetic",
+        license_id="pegasus",
+        license_rank=3,
+        ranges=[WeaponRange(range_type="range", value=15)],
+        damage=[WeaponDamage(damage_type="kinetic", flat=3)],
+    ),
+]
+
+
+HORUS_SYSTEMS: list[MechSystemDefinition] = [
+    MechSystemDefinition(
+        id="horus_scanner_swarm",
+        name="Scanner Swarm",
+        sp_cost=1,
+        license_id="balor",
+        license_rank=1,
+        unique=True,
+        effects=MechanicalEffect(
+            tech_attack_mods=[
+                TechAttackModifier(
+                    value=1,
+                    condition=SpatialCondition(
+                        relation="adjacent",
+                        target="enemy",
+                    ),
+                )
+            ],
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_hive_drone",
+        name="Hive Drone",
+        sp_cost=2,
+        license_id="balor",
+        license_rank=1,
+        system_type="drone",
+        tags=[SystemTag(tag="drone"), SystemTag(tag="quick_action")],
+        drone=DronePayload(
+            name="Hive Drone",
+            size="size_half",
+            hp=10,
+            evasion=10,
+            e_defense=10,
+        ),
+        effects=MechanicalEffect(
+            zones=[
+                ZoneEffect(
+                    shape="burst",
+                    size=2,
+                    placement="deployable",
+                    duration="scene",
+                    cover="soft",
+                    applies_to="ally",
+                    effects_on_start_turn=MechanicalEffect(
+                        direct_damages=[
+                            DirectDamage(
+                                damage_type="kinetic",
+                                flat=1,
+                                ap=True,
+                                target="enemy",
+                            )
+                        ]
+                    ),
+                    effects_on_enter=MechanicalEffect(
+                        direct_damages=[
+                            DirectDamage(
+                                damage_type="kinetic",
+                                flat=1,
+                                ap=True,
+                                target="enemy",
+                            )
+                        ]
+                    ),
+                )
+            ],
+            action_grants=[
+                ActionGrant(action_type="quick", name="move_drone"),
+            ],
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_swarm_body",
+        name="Swarm Body",
+        sp_cost=2,
+        license_id="balor",
+        license_rank=2,
+        unique=True,
+        tags=[SystemTag(tag="quick_action")],
+        effects=MechanicalEffect(
+            zones=[
+                ZoneEffect(
+                    shape="burst",
+                    size=1,
+                    placement="self",
+                    duration="scene",
+                    condition="no_move",
+                    effects_on_start_turn=MechanicalEffect(
+                        save_checks=[
+                            SaveCheck(
+                                trigger="on_turn_start",
+                                save="systems",
+                                target="all",
+                                on_failure=MechanicalEffect(
+                                    direct_damages=[
+                                        DirectDamage(
+                                            damage_type="kinetic",
+                                            flat=3,
+                                            target="all",
+                                        )
+                                    ]
+                                ),
+                            )
+                        ]
+                    ),
+                    effects_on_enter=MechanicalEffect(
+                        save_checks=[
+                            SaveCheck(
+                                trigger="on_enter",
+                                save="systems",
+                                target="all",
+                                on_failure=MechanicalEffect(
+                                    direct_damages=[
+                                        DirectDamage(
+                                            damage_type="kinetic",
+                                            flat=3,
+                                            target="all",
+                                        )
+                                    ]
+                                ),
+                            )
+                        ]
+                    ),
+                )
+            ],
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_nanocomposites",
+        name="Nanocomposites",
+        sp_cost=2,
+        license_id="balor",
+        license_rank=2,
+        tags=[SystemTag(tag="mod")],
+        effects=MechanicalEffect(
+            weapon_mods=[
+                WeaponModEffect(
+                    allowed_weapon_types=[
+                        "cqb",
+                        "rifle",
+                        "launcher",
+                        "cannon",
+                        "melee",
+                        "nexus",
+                    ],
+                    add_tags=[
+                        WeaponTagGrant(tag="smart"),
+                        WeaponTagGrant(tag="seeking"),
+                    ],
+                )
+            ]
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_h0ros_upgrade_i",
+        name="H0r_OS System Upgrade I",
+        sp_cost=2,
+        license_id="goblin",
+        license_rank=1,
+        unique=True,
+        system_type="tech",
+        tags=[SystemTag(tag="quick_action")],
+        effects=MechanicalEffect(
+            tech_actions=[
+                TechAction(
+                    name="H0r_OS I Invasion",
+                    action_type="quick",
+                    is_attack=True,
+                    range=TechRange(range_type="sensors"),
+                    on_hit=MechanicalEffect(
+                        resource_changes=[
+                            ResourceChange(
+                                resource="heat",
+                                amount=2,
+                                direction="gain",
+                                target="enemy",
+                            )
+                        ],
+                        choices=[
+                            EffectChoice(
+                                name="Puppet System",
+                                effect=MechanicalEffect(
+                                    movement_grants=[
+                                        MovementGrant(
+                                            spaces="speed",
+                                            movement_type="walk",
+                                            target="enemy",
+                                            distance_is_maximum=True,
+                                            provokes_reactions=True,
+                                        )
+                                    ]
+                                ),
+                            ),
+                            EffectChoice(
+                                name="Eject Power Cores",
+                                effect=MechanicalEffect(
+                                    status_grants=[
+                                        StatusGrant(
+                                            status="jammed",
+                                            target="enemy",
+                                            duration="end_of_next_turn",
+                                        )
+                                    ],
+                                    direct_damages=[
+                                        DirectDamage(
+                                            damage_type="energy",
+                                            flat=2,
+                                            target="adjacent",
+                                        )
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                )
+            ]
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_meta_hook",
+        name="HORUS Meta-hook",
+        sp_cost=2,
+        license_id="goblin",
+        license_rank=2,
+        unique=True,
+        system_type="tech",
+        tags=[SystemTag(tag="quick_action")],
+        effects=MechanicalEffect(
+            tech_actions=[
+                TechAction(
+                    name="Investiture",
+                    action_type="quick",
+                    target="ally",
+                    range=TechRange(range_type="sensors"),
+                    effect=MechanicalEffect(
+                        system_links=[
+                            SystemLinkEffect(
+                                action_type="quick",
+                                range_type="sensors",
+                                target="ally",
+                                duration="scene",
+                                max_links_per_source=1,
+                                breaks_on_out_of_range=True,
+                                share_conditions=True,
+                                share_heat_from_tech=True,
+                                tech_action_uses_target_sensors=True,
+                                tech_action_uses_target_los=True,
+                                check_stat_proxy_to_target=["systems"],
+                                check_kinds=["check", "save"],
+                            )
+                        ]
+                    ),
+                )
+            ]
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_h0ros_upgrade_ii",
+        name="H0r_OS System Upgrade II",
+        sp_cost=2,
+        license_id="goblin",
+        license_rank=2,
+        unique=True,
+        system_type="tech",
+        tags=[SystemTag(tag="quick_action")],
+        effects=MechanicalEffect(
+            tech_actions=[
+                TechAction(
+                    name="Construct Eidolon",
+                    action_type="quick",
+                    target="object",
+                    range=TechRange(range_type="sensors"),
+                    effect=MechanicalEffect(
+                        zones=[
+                            ZoneEffect(
+                                shape="square",
+                                width=3,
+                                height=3,
+                                placement="target_area",
+                                placement_requires_line_of_sight=True,
+                                placement_requires_free_space=True,
+                                duration="scene",
+                                cover="hard",
+                                cover_all_directions=True,
+                                applies_to="ally",
+                                blocks_movement=True,
+                                counts_as_obstruction=True,
+                                max_instances_per_source=1,
+                            )
+                        ],
+                        effect_removals=[
+                            EffectRemoval(
+                                action_type="full",
+                                check_type="systems",
+                                check_kind="check",
+                                target="adjacent",
+                            )
+                        ],
+                    ),
+                ),
+                TechAction(
+                    name="Construct False Idol",
+                    action_type="quick",
+                    target="ally",
+                    range=TechRange(range_type="sensors"),
+                    effect=MechanicalEffect(
+                        holographic_duplicates=[
+                            HolographicDuplicateEffect(
+                                duration="scene",
+                                breaks_on_hit=True,
+                                target="ally",
+                            )
+                        ]
+                    ),
+                ),
+            ]
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_h0ros_upgrade_iii",
+        name="H0r_OS System Upgrade III",
+        sp_cost=2,
+        license_id="goblin",
+        license_rank=3,
+        unique=True,
+        system_type="tech",
+        tags=[SystemTag(tag="quick_action")],
+        effects=MechanicalEffect(
+            tech_actions=[
+                TechAction(
+                    name="H0r_OS III Invasion",
+                    action_type="quick",
+                    is_attack=True,
+                    range=TechRange(range_type="sensors"),
+                    on_hit=MechanicalEffect(
+                        resource_changes=[
+                            ResourceChange(
+                                resource="heat",
+                                amount=2,
+                                direction="gain",
+                                target="enemy",
+                            )
+                        ],
+                        choices=[
+                            EffectChoice(
+                                name="Dimensional Emblems",
+                                effect=MechanicalEffect(
+                                    zones=[
+                                        ZoneEffect(
+                                            shape="burst",
+                                            size=1,
+                                            placement="target_area",
+                                            placement_range=1,
+                                            placement_requires_line_of_sight=True,
+                                            placement_requires_free_space=True,
+                                            duration="scene",
+                                            effects_on_enter=MechanicalEffect(
+                                                resource_changes=[
+                                                    ResourceChange(
+                                                        resource="heat",
+                                                        amount=2,
+                                                        direction="gain",
+                                                        target="enemy",
+                                                    ),
+                                                    ResourceChange(
+                                                        resource="heat",
+                                                        amount=2,
+                                                        direction="gain",
+                                                        target="ally",
+                                                    )
+                                                ]
+                                            ),
+                                            end_conditions=[
+                                                ZoneEndCondition(
+                                                    trigger="enter",
+                                                    end_scope="triggered_space",
+                                                )
+                                            ],
+                                            max_instances_per_source=3,
+                                        )
+                                    ]
+                                ),
+                            ),
+                            EffectChoice(
+                                name="Celestial Paradigm Shift",
+                                effect=MechanicalEffect(
+                                    zones=[
+                                        ZoneEffect(
+                                            shape="square",
+                                            width=4,
+                                            height=4,
+                                            placement="target_area",
+                                            placement_requires_line_of_sight=True,
+                                            duration="scene",
+                                            effects_on_end_turn=MechanicalEffect(
+                                                resource_changes=[
+                                                    ResourceChange(
+                                                        resource="heat",
+                                                        amount=2,
+                                                        direction="gain",
+                                                        target="enemy",
+                                                        condition=SpatialCondition(
+                                                            relation="outside_range",
+                                                            range=4,
+                                                            range_type="range",
+                                                            target="enemy",
+                                                        ),
+                                                    )
+                                                ],
+                                                movement_grants=[
+                                                    MovementGrant(
+                                                        spaces=4,
+                                                        movement_type="teleport",
+                                                        target="enemy",
+                                                        requires_free_space=True,
+                                                        condition=SpatialCondition(
+                                                            relation="outside_range",
+                                                            range=4,
+                                                            range_type="range",
+                                                            target="enemy",
+                                                        ),
+                                                    )
+                                                ],
+                                            ),
+                                            end_conditions=[
+                                                ZoneEndCondition(
+                                                    trigger="turn_end",
+                                                    end_scope="zone",
+                                                    condition=SpatialCondition(
+                                                        relation="outside_range",
+                                                        range=4,
+                                                        range_type="range",
+                                                        target="enemy",
+                                                    ),
+                                                )
+                                            ],
+                                            max_instances_per_source=1,
+                                        )
+                                    ]
+                                ),
+                            ),
+                        ],
+                    ),
+                )
+            ]
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_osiris_nhp",
+        name="OSIRIS-Class NHP",
+        sp_cost=3,
+        license_id="goblin",
+        license_rank=3,
+        unique=True,
+        system_type="ai",
+        tags=[SystemTag(tag="ai"), SystemTag(tag="quick_action")],
+        effects=MechanicalEffect(
+            tech_actions=[
+                TechAction(
+                    name="Hurl into the Duat",
+                    action_type="quick",
+                    is_attack=True,
+                    range=TechRange(range_type="sensors"),
+                    uses_per="round",
+                    on_hit=MechanicalEffect(
+                        resource_changes=[
+                            ResourceChange(
+                                resource="heat",
+                                amount=2,
+                                direction="gain",
+                                target="enemy",
+                            )
+                        ],
+                        choices=[
+                            EffectChoice(
+                                name="First Gate",
+                                effect=MechanicalEffect(
+                                    movement_grants=[
+                                        MovementGrant(
+                                            spaces="speed",
+                                            movement_type="walk",
+                                            target="enemy",
+                                            trigger="on_turn_start",
+                                            distance_is_maximum=True,
+                                            provokes_reactions=True,
+                                        )
+                                    ]
+                                ),
+                            ),
+                            EffectChoice(
+                                name="Second Gate",
+                                effect=MechanicalEffect(
+                                    status_grants=[
+                                        StatusGrant(
+                                            status="slowed",
+                                            target="enemy",
+                                            duration="end_of_next_turn",
+                                        ),
+                                        StatusGrant(
+                                            status="impaired",
+                                            target="enemy",
+                                            duration="end_of_next_turn",
+                                        ),
+                                    ]
+                                ),
+                            ),
+                            EffectChoice(
+                                name="Third Gate",
+                                effect=MechanicalEffect(
+                                    status_grants=[
+                                        StatusGrant(
+                                            status="stunned",
+                                            target="enemy",
+                                            duration="end_of_next_turn",
+                                        )
+                                    ]
+                                ),
+                            ),
+                            EffectChoice(
+                                name="Fourth Gate",
+                                effect=MechanicalEffect(
+                                    allegiance_shifts=[
+                                        AllegianceShiftEffect(
+                                            duration="end_of_next_turn",
+                                            ends_on_hostile_action=True,
+                                            target="enemy",
+                                        )
+                                    ]
+                                ),
+                            ),
+                        ],
+                    ),
+                )
+            ]
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_sentinel_drone",
+        name="Sentinel Drone",
+        sp_cost=2,
+        license_id="gorgon",
+        license_rank=1,
+        system_type="drone",
+        tags=[SystemTag(tag="drone"), SystemTag(tag="quick_action")],
+        drone=DronePayload(
+            name="Sentinel Drone",
+            size="size_half",
+            hp=10,
+            evasion=10,
+            e_defense=10,
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_mimic_mesh",
+        name="Mimic Mesh",
+        sp_cost=2,
+        license_id="gorgon",
+        license_rank=1,
+        tags=[SystemTag(tag="quick_action"), SystemTag(tag="reaction")],
+    ),
+    MechSystemDefinition(
+        id="horus_monitor_module",
+        name="MONITOR Module",
+        sp_cost=2,
+        license_id="gorgon",
+        license_rank=2,
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_scorpion_v701",
+        name="SCORPION v70.1",
+        sp_cost=2,
+        license_id="gorgon",
+        license_rank=2,
+        unique=True,
+    ),
+    MechSystemDefinition(
+        id="horus_scylla_nhp",
+        name="SCYLLA-Class NHP",
+        sp_cost=3,
+        license_id="gorgon",
+        license_rank=3,
+        unique=True,
+        system_type="ai",
+        tags=[SystemTag(tag="ai"), SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_puppetmaster",
+        name="Puppetmaster",
+        sp_cost=2,
+        license_id="hydra",
+        license_rank=1,
+        unique=True,
+        system_type="tech",
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_tempest_drone",
+        name="Tempest Drone",
+        sp_cost=2,
+        license_id="hydra",
+        license_rank=2,
+        system_type="drone",
+        tags=[SystemTag(tag="drone"), SystemTag(tag="quick_action")],
+        drone=DronePayload(
+            name="Tempest Drone",
+            size="size_half",
+            hp=10,
+            evasion=10,
+            e_defense=10,
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_assassin_drone",
+        name="Assassin Drone",
+        sp_cost=2,
+        license_id="hydra",
+        license_rank=3,
+        system_type="drone",
+        tags=[SystemTag(tag="drone"), SystemTag(tag="quick_action")],
+        drone=DronePayload(
+            name="Assassin Drone",
+            size="size_half",
+            hp=10,
+            evasion=10,
+            e_defense=10,
+        ),
+    ),
+    MechSystemDefinition(
+        id="horus_beckoner",
+        name="Beckoner",
+        sp_cost=2,
+        license_id="manticore",
+        license_rank=1,
+        unique=True,
+        system_type="tech",
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_smite",
+        name="SMITE",
+        sp_cost=3,
+        license_id="manticore",
+        license_rank=2,
+        unique=True,
+        system_type="tech",
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_emp_pulse",
+        name="EMP Pulse",
+        sp_cost=2,
+        license_id="manticore",
+        license_rank=3,
+        unique=True,
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_lightning_generator",
+        name="Lightning Generator",
+        sp_cost=3,
+        license_id="manticore",
+        license_rank=3,
+        unique=True,
+    ),
+    MechSystemDefinition(
+        id="horus_viral_logic",
+        name="Viral Logic",
+        sp_cost=2,
+        license_id="minotaur",
+        license_rank=1,
+        unique=True,
+        system_type="tech",
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_mesmer_charge",
+        name="Mesmer Charge",
+        sp_cost=2,
+        license_id="minotaur",
+        license_rank=1,
+        unique=True,
+        limited_uses=2,
+        tags=[SystemTag(tag="grenade"), SystemTag(tag="mine")],
+        grenades=[
+            GrenadePayload(
+                name="Mesmer Beacon",
+                range=5,
+                area=AreaEffect(
+                    pattern="blast",
+                    size=0,
+                    save="systems",
+                    half_on_success=False,
+                ),
+            ),
+        ],
+        mines=[
+            MinePayload(
+                name="Mesmer Mine",
+                area=AreaEffect(
+                    pattern="burst",
+                    size=2,
+                    save="systems",
+                    half_on_success=False,
+                    duration="end_of_next_turn",
+                ),
+            ),
+        ],
+    ),
+    MechSystemDefinition(
+        id="horus_metafold_carver",
+        name="Metafold Carver",
+        sp_cost=2,
+        license_id="minotaur",
+        license_rank=2,
+        system_type="tech",
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_aggressive_system_sync",
+        name="Aggressive System Sync",
+        sp_cost=2,
+        license_id="minotaur",
+        license_rank=2,
+        system_type="tech",
+        tags=[SystemTag(tag="full_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_interdiction_field",
+        name="Interdiction Field",
+        sp_cost=3,
+        license_id="minotaur",
+        license_rank=3,
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_law_of_blades",
+        name="LAW OF BLADES",
+        sp_cost=2,
+        license_id="minotaur",
+        license_rank=3,
+        unique=True,
+        system_type="tech",
+        tags=[SystemTag(tag="full_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_hunter_lock",
+        name="Hunter Lock",
+        sp_cost=2,
+        license_id="pegasus",
+        license_rank=1,
+        unique=True,
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_eye_of_horus",
+        name="Eye of HORUS",
+        sp_cost=3,
+        license_id="pegasus",
+        license_rank=2,
+        unique=True,
+        tags=[SystemTag(tag="quick_action")],
+    ),
+    MechSystemDefinition(
+        id="horus_sisyphus_nhp",
+        name="SISYPHUS-Class NHP",
+        sp_cost=2,
+        license_id="pegasus",
+        license_rank=3,
+        unique=True,
+        system_type="ai",
+        tags=[SystemTag(tag="ai"), SystemTag(tag="full_action")],
+    ),
+]
+
+
+ALL_FRAMES: list[MechFrameDefinition] = GMS_FRAMES + IPSN_FRAMES + SSC_FRAMES + HORUS_FRAMES
+ALL_WEAPONS: list[MechWeaponDefinition] = GMS_WEAPONS + IPSN_WEAPONS + SSC_WEAPONS + HORUS_WEAPONS
+ALL_SYSTEMS: list[MechSystemDefinition] = GMS_SYSTEMS + IPSN_SYSTEMS + SSC_SYSTEMS + HORUS_SYSTEMS
 
 FRAME_DEFINITIONS_BY_ID = {frame.id: frame for frame in ALL_FRAMES}
 WEAPON_DEFINITIONS_BY_ID = {weapon.id: weapon for weapon in ALL_WEAPONS}
