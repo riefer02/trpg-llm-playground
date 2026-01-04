@@ -32,7 +32,6 @@ class TurnOrderRules(FrozenModel):
     next_round_start_other_side: bool = True
 
 
-
 class TurnActionRules(FrozenModel):
     """Per-turn action economy rules."""
 
@@ -42,13 +41,11 @@ class TurnActionRules(FrozenModel):
     overcharge_limit_per_turn: int = Field(default=1, ge=0)
 
 
-
 class EngagementRules(FrozenModel):
     """Engagement rules and penalties."""
 
     ranged_attack_difficulty: int = Field(default=1, ge=0)
     stop_on_engage_same_size_or_larger: bool = True
-
 
 
 class ObstructionRules(FrozenModel):
@@ -61,7 +58,6 @@ class ObstructionRules(FrozenModel):
     can_end_in_smaller_space: bool = False
 
 
-
 class TerrainRules(FrozenModel):
     """Terrain interaction rules."""
 
@@ -70,7 +66,6 @@ class TerrainRules(FrozenModel):
     dangerous_terrain_damage: int = Field(default=5, ge=0)
     dangerous_terrain_check_once_per_round: bool = True
     climb_cost: int = Field(default=2, ge=1)
-
 
 
 class FallingRules(FrozenModel):
@@ -84,14 +79,12 @@ class FallingRules(FrozenModel):
     resolves_end_of_turn: bool = True
 
 
-
 class ZeroGRules(FrozenModel):
     """Zero-g or underwater movement rules."""
 
     slowed_without_propulsion: bool = True
     can_fly_while_moving: bool = True
     no_falling: bool = True
-
 
 
 class TeleportRules(FrozenModel):
@@ -105,7 +98,6 @@ class TeleportRules(FrozenModel):
     ignores_obstructions: bool = True
     ignores_line_of_sight: bool = True
     fails_if_destination_occupied: bool = True
-
 
 
 class FlightRules(FrozenModel):
@@ -127,7 +119,6 @@ class FlightRules(FrozenModel):
     carry_limit_ignored_in_zero_g: bool = True
 
 
-
 class AttackPatternDefinition(FrozenModel):
     """Definition for area attack patterns."""
 
@@ -135,7 +126,6 @@ class AttackPatternDefinition(FrozenModel):
     size: int = Field(..., ge=0)
     separate_attack_per_target: bool = True
     single_damage_roll: bool = True
-
 
 
 class LineOfSightRules(FrozenModel):
@@ -150,7 +140,6 @@ class LineOfSightRules(FrozenModel):
     adjacent_cover_does_not_block_los: bool = True
 
 
-
 class ValidTargetRules(FrozenModel):
     """Target eligibility rules."""
 
@@ -158,7 +147,6 @@ class ValidTargetRules(FrozenModel):
     allow_objects: bool = True
     allow_points: bool = True
     allow_self: bool = False
-
 
 
 class DamageResolutionRules(FrozenModel):
@@ -173,13 +161,11 @@ class DamageResolutionRules(FrozenModel):
     apply_multipliers_before_reduction: bool = True
 
 
-
 class D6Range(FrozenModel):
     """Inclusive d6 roll range."""
 
     roll_min: int = Field(..., ge=1, le=6)
     roll_max: int = Field(..., ge=1, le=6)
-
 
 
 class SystemTraumaRules(FrozenModel):
@@ -194,7 +180,6 @@ class SystemTraumaRules(FrozenModel):
     fallback_to_direct_hit_if_none: bool = True
 
 
-
 class StructureOutcomeType(FrozenModel):
     """Outcome detail for structure damage."""
 
@@ -207,14 +192,12 @@ class StructureOutcomeType(FrozenModel):
     destroyed: bool = False
 
 
-
 class StructureTableEntry(FrozenModel):
     """Table entry for structure damage results."""
 
     roll_min: int = Field(..., ge=1, le=6)
     roll_max: int = Field(..., ge=1, le=6)
     outcome: StructureOutcomeType
-
 
 
 class DirectHitOutcome(FrozenModel):
@@ -225,12 +208,26 @@ class DirectHitOutcome(FrozenModel):
     outcome: StructureOutcomeType
 
 
-
 class StructureDamageRules(FrozenModel):
-    """Structure damage and check rules."""
+    """Structure damage and check rules.
+
+    NPC structure is determined by tier:
+    - Tier 1: 1 structure
+    - Tier 2: 2 structures
+    - Tier 3: 3 structures
+
+    The npc_tier_structure_map field allows customization of these defaults.
+    """
 
     pc_structure: int = Field(default=4, ge=0)
     npc_structure: int = Field(default=1, ge=0)
+    npc_tier_structure_map: dict[str, int] = Field(
+        default_factory=lambda: {
+            "tier_1": 1,
+            "tier_2": 2,
+            "tier_3": 3,
+        }
+    )
     check_on_zero_hp: bool = True
     reset_hp_on_structure: bool = True
     spillover_damage_applies: bool = True
@@ -239,23 +236,39 @@ class StructureDamageRules(FrozenModel):
     multiple_ones_crushing: bool = True
     system_trauma_rules: SystemTraumaRules = Field(default_factory=SystemTraumaRules)
     crushing_hit_outcome: StructureOutcomeType = Field(
-        default_factory=lambda: StructureOutcomeType(name="crushing_hit", destroyed=True)
+        default_factory=lambda: StructureOutcomeType(
+            name="crushing_hit", destroyed=True
+        )
     )
     table: list[StructureTableEntry] = Field(default_factory=list)
     direct_hit_outcomes: list[DirectHitOutcome] = Field(default_factory=list)
 
+    def get_npc_structure(self, tier: str) -> int:
+        """Get structure points for an NPC of the given tier.
+
+        Args:
+            tier: The NPC tier ("tier_1", "tier_2", "tier_3")
+
+        Returns:
+            Structure points for this tier
+        """
+        return self.npc_tier_structure_map.get(tier, self.npc_structure)
 
 
 class OverheatOutcomeType(FrozenModel):
     """Outcome detail for overheat checks."""
 
-    name: Literal["emergency_shunt", "power_plant_destabilize", "meltdown", "irreversible_meltdown"]
+    name: Literal[
+        "emergency_shunt",
+        "power_plant_destabilize",
+        "meltdown",
+        "irreversible_meltdown",
+    ]
     impaired_until_end_next_turn: bool = False
     exposed_until_cleared: bool = False
     meltdown_immediate: bool = False
     meltdown_countdown: bool = False
     engineering_check_to_delay: bool = False
-
 
 
 class OverheatTableEntry(FrozenModel):
@@ -266,14 +279,12 @@ class OverheatTableEntry(FrozenModel):
     outcome: OverheatOutcomeType
 
 
-
 class MeltdownOutcome(FrozenModel):
     """Meltdown outcome by remaining stress."""
 
     remaining_stress_min: int = Field(..., ge=0)
     remaining_stress_max: int | None = Field(default=None, ge=0)
     outcome: OverheatOutcomeType
-
 
 
 class OverheatRules(FrozenModel):
@@ -290,9 +301,10 @@ class OverheatRules(FrozenModel):
     meltdown_outcomes: list[MeltdownOutcome] = Field(default_factory=list)
     irreversible_meltdown_on_multiple_ones: bool = True
     irreversible_meltdown_outcome: OverheatOutcomeType = Field(
-        default_factory=lambda: OverheatOutcomeType(name="irreversible_meltdown", meltdown_countdown=True)
+        default_factory=lambda: OverheatOutcomeType(
+            name="irreversible_meltdown", meltdown_countdown=True
+        )
     )
-
 
 
 class ReactorMeltdownRules(FrozenModel):
@@ -304,7 +316,6 @@ class ReactorMeltdownRules(FrozenModel):
     save_skill: Literal["agility"] = "agility"
     save_halves_damage: bool = True
     pilot_survival: bool = False
-
 
 
 class RepairSpendOption(FrozenModel):
@@ -320,7 +331,6 @@ class RepairSpendOption(FrozenModel):
     ]
 
 
-
 class RestRepairRules(FrozenModel):
     """Rest and repair rules."""
 
@@ -333,18 +343,21 @@ class RestRepairRules(FrozenModel):
     destroyed_mech_difficult_terrain: bool = True
 
 
-
 DEFAULT_STRUCTURE_DAMAGE_RULES = StructureDamageRules(
     table=[
         StructureTableEntry(
             roll_min=5,
             roll_max=6,
-            outcome=StructureOutcomeType(name="glancing_blow", impaired_until_end_next_turn=True),
+            outcome=StructureOutcomeType(
+                name="glancing_blow", impaired_until_end_next_turn=True
+            ),
         ),
         StructureTableEntry(
             roll_min=2,
             roll_max=4,
-            outcome=StructureOutcomeType(name="system_trauma", destroy_mount=True, destroy_system=True),
+            outcome=StructureOutcomeType(
+                name="system_trauma", destroy_mount=True, destroy_system=True
+            ),
         ),
         StructureTableEntry(
             roll_min=1,
@@ -356,13 +369,17 @@ DEFAULT_STRUCTURE_DAMAGE_RULES = StructureDamageRules(
         DirectHitOutcome(
             remaining_structure_min=3,
             remaining_structure_max=None,
-            outcome=StructureOutcomeType(name="direct_hit", stunned_until_end_next_turn=True),
+            outcome=StructureOutcomeType(
+                name="direct_hit", stunned_until_end_next_turn=True
+            ),
         ),
         DirectHitOutcome(
             remaining_structure_min=2,
             remaining_structure_max=2,
             outcome=StructureOutcomeType(
-                name="direct_hit", hull_check_required=True, stunned_until_end_next_turn=True
+                name="direct_hit",
+                hull_check_required=True,
+                stunned_until_end_next_turn=True,
             ),
         ),
         DirectHitOutcome(
@@ -379,12 +396,16 @@ DEFAULT_OVERHEAT_RULES = OverheatRules(
         OverheatTableEntry(
             roll_min=5,
             roll_max=6,
-            outcome=OverheatOutcomeType(name="emergency_shunt", impaired_until_end_next_turn=True),
+            outcome=OverheatOutcomeType(
+                name="emergency_shunt", impaired_until_end_next_turn=True
+            ),
         ),
         OverheatTableEntry(
             roll_min=2,
             roll_max=4,
-            outcome=OverheatOutcomeType(name="power_plant_destabilize", exposed_until_cleared=True),
+            outcome=OverheatOutcomeType(
+                name="power_plant_destabilize", exposed_until_cleared=True
+            ),
         ),
         OverheatTableEntry(
             roll_min=1,
@@ -402,7 +423,9 @@ DEFAULT_OVERHEAT_RULES = OverheatRules(
             remaining_stress_min=2,
             remaining_stress_max=2,
             outcome=OverheatOutcomeType(
-                name="meltdown", meltdown_countdown=True, engineering_check_to_delay=True
+                name="meltdown",
+                meltdown_countdown=True,
+                engineering_check_to_delay=True,
             ),
         ),
         MeltdownOutcome(
@@ -446,18 +469,25 @@ class MechCombatRules(FrozenModel):
     valid_target_rules: ValidTargetRules = Field(default_factory=ValidTargetRules)
     critical_hit_rules: CriticalHitRules = Field(default_factory=CriticalHitRules)
     bonus_damage_rules: BonusDamageRules = Field(default_factory=BonusDamageRules)
-    damage_resolution: DamageResolutionRules = Field(default_factory=DamageResolutionRules)
+    damage_resolution: DamageResolutionRules = Field(
+        default_factory=DamageResolutionRules
+    )
     heat_rules: HeatRules = Field(default_factory=HeatRules)
     burn_rules: BurnRules = Field(default_factory=BurnRules)
     overcharge_rules: OverchargeRules = Field(default_factory=OverchargeRules)
-    overheat_rules: OverheatRules = Field(default_factory=lambda: DEFAULT_OVERHEAT_RULES)
-    structure_rules: StructureDamageRules = Field(default_factory=lambda: DEFAULT_STRUCTURE_DAMAGE_RULES)
+    overheat_rules: OverheatRules = Field(
+        default_factory=lambda: DEFAULT_OVERHEAT_RULES
+    )
+    structure_rules: StructureDamageRules = Field(
+        default_factory=lambda: DEFAULT_STRUCTURE_DAMAGE_RULES
+    )
     invisibility_rules: InvisibilityRules = Field(default_factory=InvisibilityRules)
     object_rules: ObjectRules = Field(default_factory=ObjectRules)
     reaction_rules: ReactionRules = Field(default_factory=ReactionRules)
     reactor_meltdown: ReactorMeltdownRules = Field(default_factory=ReactorMeltdownRules)
-    rest_repair_rules: RestRepairRules = Field(default_factory=lambda: DEFAULT_REST_REPAIR_RULES)
-
+    rest_repair_rules: RestRepairRules = Field(
+        default_factory=lambda: DEFAULT_REST_REPAIR_RULES
+    )
 
 
 DEFAULT_MECH_COMBAT_RULES = MechCombatRules()

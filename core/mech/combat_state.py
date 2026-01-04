@@ -32,7 +32,6 @@ class CombatStats(FrozenModel):
     tech_attack: int = Field(default=0)
 
 
-
 class CombatResources(FrozenModel):
     """Resource tracks for a combatant."""
 
@@ -44,7 +43,6 @@ class CombatResources(FrozenModel):
     repairs_remaining: int = Field(default=0, ge=0)
 
 
-
 class WeaponState(FrozenModel):
     """Weapon state for a mounted weapon."""
 
@@ -52,7 +50,6 @@ class WeaponState(FrozenModel):
     tags: list[WeaponTagType] = Field(default_factory=list)
     destroyed: bool = False
     limited_charges_remaining: int | None = Field(default=None, ge=0)
-
 
 
 class WeaponMountState(FrozenModel):
@@ -64,14 +61,12 @@ class WeaponMountState(FrozenModel):
     destroyed: bool = False
 
 
-
 class MechSystemState(FrozenModel):
     """System state for a mech."""
 
     system_id: str
     destroyed: bool = False
     limited_charges_remaining: int | None = Field(default=None, ge=0)
-
 
 
 class MechInventory(FrozenModel):
@@ -81,9 +76,12 @@ class MechInventory(FrozenModel):
     systems: list[MechSystemState] = Field(default_factory=list)
 
 
-
 class CombatantState(FrozenModel):
-    """State for a combatant in mech combat."""
+    """State for a combatant in mech combat.
+
+    For NPCs, use the companion `core.npc` module to create NPCState
+    and convert to CombatantState using the helper functions.
+    """
 
     id: str
     name: str
@@ -100,7 +98,6 @@ class CombatantState(FrozenModel):
     reaction_triggers: list[ReactionTriggerEffect] = Field(default_factory=list)
 
 
-
 class GrappleLink(FrozenModel):
     """Link between grappling combatants."""
 
@@ -108,7 +105,6 @@ class GrappleLink(FrozenModel):
     target_id: str
     grappler_total_size: int = Field(default=1, ge=0)
     target_total_size: int = Field(default=1, ge=0)
-
 
 
 class ActionUse(FrozenModel):
@@ -131,7 +127,9 @@ class ActionUse(FrozenModel):
     uses_superheavy: bool | None = None
     uses_aux_bonus_attack: bool | None = None
     stabilize_primary: Literal["cool_heat", "spend_repair_full_hp"] | None = None
-    stabilize_secondary: Literal["reload_loading", "clear_burn", "clear_condition"] | None = None
+    stabilize_secondary: (
+        Literal["reload_loading", "clear_burn", "clear_condition"] | None
+    ) = None
     ignores_line_of_sight: bool = False
     ignores_cover: bool = False
     used_as_free_action: bool = False
@@ -141,7 +139,6 @@ class ActionUse(FrozenModel):
     reaction_trigger: ReactionTriggerEvent | None = None
     contested_check: ContestedCheck | None = None
     consumes_lock_on: bool = False
-
 
 
 class CombatTurn(FrozenModel):
@@ -154,13 +151,11 @@ class CombatTurn(FrozenModel):
     actions: list[ActionUse] = Field(default_factory=list)
 
 
-
 class CombatRound(FrozenModel):
     """A combat round."""
 
     round_index: int = Field(..., ge=1)
     turns: list[CombatTurn] = Field(default_factory=list)
-
 
 
 class MechCombatScenario(FrozenModel):
@@ -171,3 +166,64 @@ class MechCombatScenario(FrozenModel):
     rounds: list[CombatRound] = Field(default_factory=list)
     terrain: TerrainMap | None = None
     environment: CombatEnvironment = "standard"
+
+
+def create_npc_combatant(
+    npc_id: str,
+    npc_name: str,
+    npc_side: CombatSide,
+    npc_size: str,
+    npc_hp: int,
+    npc_evasion: int,
+    npc_e_defense: int,
+    npc_armor: int,
+    npc_speed: int,
+    npc_sensor_range: int,
+    npc_structure: int,
+    npc_tech_attack: int = 0,
+) -> CombatantState:
+    """Create a CombatantState for an NPC.
+
+    This is a simple helper for creating NPC combatants without
+    using the full NPC template system. For more complex NPCs,
+    use the core.npc module.
+
+    Args:
+        npc_id: Unique identifier for this NPC
+        npc_name: Display name for this NPC
+        npc_side: Which side the NPC is on ("players", "hostiles", "neutral")
+        npc_size: Size class ("size_1", "size_2", etc.)
+        npc_hp: Maximum HP
+        npc_evasion: Evasion value
+        npc_e_defense: E-Defense value
+        npc_armor: Armor value
+        npc_speed: Speed value
+        npc_sensor_range: Sensor range
+        npc_structure: Structure points (1 for T1, 2 for T2, 3 for T3)
+        npc_tech_attack: Tech attack bonus (default 0)
+
+    Returns:
+        A new CombatantState suitable for use in combat
+    """
+    from core.shared.enums import SizeClass
+
+    return CombatantState(
+        id=npc_id,
+        name=npc_name,
+        side=npc_side,
+        kind="npc",
+        stats=CombatStats(
+            size=SizeClass(npc_size),
+            hp_max=npc_hp,
+            evasion=npc_evasion,
+            e_defense=npc_e_defense,
+            armor=npc_armor,
+            speed=npc_speed,
+            sensor_range=npc_sensor_range,
+            tech_attack=npc_tech_attack,
+        ),
+        resources=CombatResources(
+            hp_current=npc_hp,
+            structure_current=npc_structure,
+        ),
+    )
