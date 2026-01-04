@@ -55,6 +55,7 @@ ConditionType = Literal[
     "target_prone",
     "target_immobilized",
     "target_below_half_hp",
+    "target_below_max_hp",
     "target_has_lock_on",
     "target_larger",
     "target_smaller",
@@ -261,6 +262,23 @@ ConditionType = Literal[
     "benefiting_from_trail_cover",
     "source_is_chosen_target",
     "ally_other_than_self_hits_markerlight_target",
+    # HORUS Gorgon conditions
+    "mimic_mesh_copy_active",
+    "monitor_charge_accumulated",
+    "cascade_status_spread",
+    # HORUS weapon conditions
+    "damage_type_selectable",
+    "weapon_profile_copied",
+    "chain_to_secondary_target",
+    # HA frame conditions
+    "overwatch_reaction",
+    "overwatch_attack",
+    "limit_break_active",
+    "apocalypse_rail_attack",
+    "warp_shield_redirect",
+    "teleport_on_hit",
+    "gravity_well_pull",
+    "plasma_gauntlet_active",
 ]
 
 # Structured condition primitives
@@ -2933,9 +2951,7 @@ class MechanicalEffect(FrozenModel):
 
     # Stat modifications
     stat_mods: list[StatModifier] = Field(default_factory=list)
-    companion_stat_mods: list[CompanionStatModifierEffect] = Field(
-        default_factory=list
-    )
+    companion_stat_mods: list[CompanionStatModifierEffect] = Field(default_factory=list)
     stat_overrides: list[StatOverrideEffect] = Field(default_factory=list)
     mount_slot_grants: list[MountSlotGrant] = Field(default_factory=list)
     mount_slot_replacements: list[MountSlotReplacement] = Field(default_factory=list)
