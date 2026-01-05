@@ -324,7 +324,6 @@ class TestIsCondition:
         """Test that non-condition statuses are not identified as conditions."""
         assert is_condition("braced") is False
         assert is_condition("engaged") is False
-        assert is_condition("hidden") is False
         assert is_condition("prone") is False
 
 
@@ -342,5 +341,6 @@ class TestConditionsSet:
             "immobilized",
             "slowed",
             "stunned",
+            "hidden",
         }
         assert CONDITIONS == expected

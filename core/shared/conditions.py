@@ -40,6 +40,7 @@ CONDITIONS: frozenset[StatusType] = frozenset(
         "immobilized",
         "slowed",
         "stunned",
+        "hidden",
     ]
 )
 

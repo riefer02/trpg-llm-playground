@@ -50,6 +50,14 @@ from core.shared.rolls import (
     SaveRoll,
     ContestedCheck,
 )
+from core.shared.saves import (
+    SaveRequest,
+    SaveResult,
+    SaveDifficultyModifier,
+    resolve_save,
+    compute_save_target,
+    resolve_save_against_damage,
+)
 from core.shared.narrative import (
     NarrativeCheckTier,
     NarrativeCheckTierRule,
@@ -323,6 +331,13 @@ __all__ = [
     "AttackRoll",
     "SaveRoll",
     "ContestedCheck",
+    # Save resolution
+    "SaveRequest",
+    "SaveResult",
+    "SaveDifficultyModifier",
+    "resolve_save",
+    "compute_save_target",
+    "resolve_save_against_damage",
     # Narrative checks
     "NarrativeCheckTier",
     "NarrativeCheckTierRule",

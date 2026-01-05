@@ -164,6 +164,7 @@ def get_cover_difficulty(
     - Soft Cover: +1 Difficulty
     - Hard Cover: +2 Difficulty (requires adjacency)
     - Cover types do not stack
+    - Flanking negates hard cover
 
     Args:
         terrain: The terrain map
@@ -190,7 +191,14 @@ def get_cover_difficulty(
         hard_cover_size=hard_cover_size,
     )
 
-    if hard_cover.available:
+    is_flanked = False
+    if hard_cover.available and hard_cover_flanking_negates:
+        from core.shared.flanking import check_flanking
+
+        flanking_result = check_flanking(terrain, attacker_coord, target_coord)
+        is_flanked = flanking_result.is_flanked
+
+    if hard_cover.available and not is_flanked:
         return CoverDifficultyResult(
             cover_type="hard",
             difficulty_modifier=hard_cover_difficulty,
@@ -200,10 +208,23 @@ def get_cover_difficulty(
     soft_cover = check_soft_cover(terrain, attacker_coord, target_coord)
 
     if soft_cover:
+        if is_flanked and hard_cover.available:
+            return CoverDifficultyResult(
+                cover_type="soft",
+                difficulty_modifier=soft_cover_difficulty,
+                reason="Hard cover negated by flanking, target has soft cover",
+            )
         return CoverDifficultyResult(
             cover_type="soft",
             difficulty_modifier=soft_cover_difficulty,
             reason="Target has soft cover (line of sight obscured)",
+        )
+
+    if is_flanked and hard_cover.available:
+        return CoverDifficultyResult(
+            cover_type="none",
+            difficulty_modifier=0,
+            reason="Hard cover negated by flanking, no soft cover",
         )
 
     return CoverDifficultyResult(

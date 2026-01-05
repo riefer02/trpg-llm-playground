@@ -453,6 +453,81 @@ DEFAULT_REST_REPAIR_RULES = RestRepairRules(
 )
 
 
+class GrappleRules(FrozenModel):
+    """Grapple-specific rules per PR2 ~4157-4177.
+
+    - Grapple is a quick action melee attack
+    - On hit: both parties become engaged
+    - Smaller party is immobilized, moves when larger moves
+    - Same size = contested HULL check at start of turn
+    - Grapple breaks if adjacency breaks (e.g., knockback)
+    - Attacker ends free action, defender ends via quick action contested check
+    """
+
+    immobilized_for_smaller: bool = True
+    contested_hull_check_for_same_size: bool = True
+    attacker_ends_free: bool = True
+    defender_ends_quick_action: bool = True
+    break_on_knockback: bool = True
+    break_on_loss_of_adjacency: bool = True
+    group_grapple_size_calculation: bool = True
+    mount_required_for_grapple: bool = True
+    disarm_on_grapple: bool = True
+
+
+class RamRules(FrozenModel):
+    """Ram-specific rules per PR2 ~4152-4155.
+
+    - Ram is a quick action melee attack against adjacent target
+    - On hit: target becomes prone, may knock back up to 1 space directly away
+    """
+
+    knockback_spaces_max: int = Field(default=1, ge=0)
+    prone_on_hit: bool = True
+    requires_adjacency: bool = True
+    mount_required_for_ram: bool = True
+    knockback_from_talents_stack: bool = True
+
+
+class InvoluntaryMovementRules(FrozenModel):
+    """Involuntary movement rules per PR2 ~3846-3849.
+
+    - Push, pull, or shove forces movement in a direct line
+    - Does NOT provoke reactions
+    - Ignores engagement during movement
+    - Must still obey obstructions
+    """
+
+    straight_line_movement: bool = True
+    ignores_reactions: bool = True
+    ignores_engagement: bool = True
+    obeys_obstructions: bool = True
+    drag_max_size_multiplier: int = Field(default=2, ge=1)
+    lift_max_size_same: bool = True
+    cannot_react_while_dragging: bool = True
+    cannot_react_while_lifting: bool = True
+    knockback_stops_at_obstruction: bool = True
+    no_vertical_movement: bool = True
+
+
+class LiftDragRules(FrozenModel):
+    """Lifting and dragging rules per PR2 ~3862-3865.
+
+    - Drag: up to 2x size, becomes slowed
+    - Lift: up to own size, becomes immobilized
+    - Cannot take reactions while dragging/lifting
+    - Pilots: cannot drag/lift > size 1/2
+    """
+
+    drag_size_multiplier: int = Field(default=2, ge=1)
+    lift_size_limit_same: bool = True
+    pilot_drag_lift_max_size: Literal["size_half"] = "size_half"
+    cannot_react_while_dragging: bool = True
+    cannot_react_while_lifting: bool = True
+    slowed_while_dragging: bool = True
+    immobilized_while_lifting: bool = True
+
+
 class MechCombatRules(FrozenModel):
     """Top-level combat rules bundle."""
 
@@ -490,6 +565,12 @@ class MechCombatRules(FrozenModel):
     rest_repair_rules: RestRepairRules = Field(
         default_factory=lambda: DEFAULT_REST_REPAIR_RULES
     )
+    grapple_rules: GrappleRules = Field(default_factory=GrappleRules)
+    ram_rules: RamRules = Field(default_factory=RamRules)
+    involuntary_movement_rules: InvoluntaryMovementRules = Field(
+        default_factory=InvoluntaryMovementRules
+    )
+    lift_drag_rules: LiftDragRules = Field(default_factory=LiftDragRules)
 
 
 DEFAULT_MECH_COMBAT_RULES = MechCombatRules()
