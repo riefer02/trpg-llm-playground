@@ -1,7 +1,7 @@
 """Narrative check tier rules and helpers for Lancer TTRPG."""
 
 from typing import Literal
-from pydantic import Field
+from pydantic import Field, model_validator
 from core.shared.models import FrozenModel
 
 from core.shared.rolls import RollType
@@ -157,6 +157,10 @@ class NarrativeCombatConstraints(FrozenModel):
 class NarrativeGoalOutcome(FrozenModel):
     """Outcome resolution for a pilot's goal in narrative combat."""
 
+    goal_id: str | None = Field(
+        default=None,
+        description="Goal identifier if tracked",
+    )
     goal_description: str = Field(
         ..., description="What the pilot was trying to accomplish"
     )
@@ -177,6 +181,470 @@ class NarrativeGoalOutcome(FrozenModel):
         default=None,
         description="If harm or other complication occurred",
     )
+
+
+PilotSkillType = Literal["hull", "agility", "systems", "engineering"]
+
+
+NarrativeComplicationType = Literal[
+    "harm",
+    "time",
+    "resources",
+    "collateral",
+    "position",
+    "effect",
+]
+
+
+NarrativeComplicationSeverity = Literal["minor", "major", "lethal"]
+
+
+NarrativeComplicationTrigger = Literal[
+    "failure",
+    "risky_success",
+    "heroic_success",
+    "other",
+]
+
+
+NarrativeResolutionRequirementType = Literal[
+    "skill_check",
+    "time_passed",
+    "resource_spend",
+    "position_change",
+    "goal_completion",
+    "effect_reversal",
+    "other",
+]
+
+
+class NarrativeResolutionRequirement(FrozenModel):
+    """Requirements for resolving a narrative complication."""
+
+    requirement_type: NarrativeResolutionRequirementType
+    description: str = Field(..., description="What clears this complication")
+    required_tier: NarrativeCheckTier | None = Field(
+        default=None,
+        description="Narrative tier required (if resolution needs a check)",
+    )
+    required_skill: PilotSkillType | None = Field(
+        default=None,
+        description="Pilot skill used to resolve (if check-based)",
+    )
+    required_amount: int | None = Field(
+        default=None,
+        ge=0,
+        description="Quantity of time/resources/etc required",
+    )
+
+
+class NarrativeComplication(FrozenModel):
+    """Complication that persists in narrative combat until resolved."""
+
+    id: str = Field(..., description="Unique complication identifier")
+    complication_type: NarrativeComplicationType
+    description: str = Field(..., description="What is going wrong")
+    severity: NarrativeComplicationSeverity = Field(
+        default="minor",
+        description="Severity of the complication",
+    )
+    established_before_roll: bool = Field(
+        default=True,
+        description="Whether the complication was established before the roll",
+    )
+    trigger: NarrativeComplicationTrigger | None = Field(
+        default=None,
+        description="What triggered the complication",
+    )
+    target_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of pilots or targets affected",
+    )
+    resolution_requirements: list[NarrativeResolutionRequirement] = Field(
+        default_factory=list,
+        description="Requirements to resolve the complication",
+    )
+    harm_damage: int | None = Field(
+        default=None,
+        ge=0,
+        description="Damage amount if this is a harm complication",
+    )
+
+    @model_validator(mode="after")
+    def validate_harm_details(self) -> "NarrativeComplication":
+        if self.harm_damage is not None and self.complication_type != "harm":
+            raise ValueError(
+                "harm_damage is only valid for complications of type 'harm'."
+            )
+        return self
+
+
+NarrativeComplicationStatus = Literal["active", "resolved", "escalated"]
+
+
+class NarrativeComplicationState(FrozenModel):
+    """State wrapper for a complication in narrative combat."""
+
+    complication: NarrativeComplication
+    status: NarrativeComplicationStatus = "active"
+    resolved_by: str | None = Field(
+        default=None,
+        description="Who resolved the complication",
+    )
+    resolution_notes: str | None = Field(
+        default=None,
+        description="How the complication was resolved",
+    )
+
+
+NarrativeGoalConditionType = Literal[
+    "skill_check",
+    "position_reached",
+    "target_removed",
+    "resource_spend",
+    "time_elapsed",
+    "complication_resolved",
+    "other",
+]
+
+
+class NarrativeGoalCondition(FrozenModel):
+    """Condition that must be met to complete a narrative goal."""
+
+    id: str = Field(..., description="Unique condition identifier")
+    condition_type: NarrativeGoalConditionType
+    description: str = Field(..., description="What must be true for this condition")
+    required_tier: NarrativeCheckTier | None = Field(
+        default=None,
+        description="Tier needed if condition is check-based",
+    )
+    required_skill: PilotSkillType | None = Field(
+        default=None,
+        description="Skill used if condition is check-based",
+    )
+    required_amount: int | None = Field(
+        default=None,
+        ge=0,
+        description="Quantity needed (time/resources/etc)",
+    )
+    target_id: str | None = Field(
+        default=None,
+        description="Target or object tied to this condition",
+    )
+
+
+NarrativeGoalStatus = Literal["active", "completed", "failed", "blocked"]
+
+
+class NarrativeGoal(FrozenModel):
+    """Goal definition for narrative combat."""
+
+    id: str = Field(..., description="Unique goal identifier")
+    description: str = Field(..., description="Pilot's stated goal")
+    success_conditions: list[NarrativeGoalCondition] = Field(
+        default_factory=list,
+        description="Conditions that represent success",
+    )
+    successes_required: int | None = Field(
+        default=None,
+        ge=1,
+        description="Successful checks required to complete the goal",
+    )
+    failure_limit: int | None = Field(
+        default=None,
+        ge=0,
+        description="Failures allowed before the goal fails",
+    )
+    harm_involved: bool = Field(
+        default=False,
+        description="Whether the goal involves physical harm",
+    )
+    repeat_requires_change: bool = Field(
+        default=True,
+        description="Checks cannot repeat until circumstances change",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_successes_required(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+
+        success_conditions = data.get("success_conditions") or []
+        successes_required = data.get("successes_required")
+
+        if successes_required is None:
+            data["successes_required"] = (
+                len(success_conditions) if success_conditions else 1
+            )
+        elif success_conditions and successes_required > len(success_conditions):
+            raise ValueError(
+                "successes_required cannot exceed number of success_conditions."
+            )
+
+        return data
+
+
+class NarrativeGoalAttempt(FrozenModel):
+    """Resolution details for a single narrative goal attempt."""
+
+    roll_result: int = Field(..., ge=1, le=20)
+    target: int = Field(default=10, ge=0)
+    modifiers: int = Field(default=0)
+    difficulty_modifier: int = Field(default=0, ge=0)
+    tier: NarrativeCheckTier = "standard"
+    total_result: int = Field(..., description="Final total after modifiers")
+    success: bool = Field(..., description="Whether the goal check succeeded")
+    consequence_suffered: bool = Field(
+        default=False,
+        description="Whether consequences apply (risky/heroic)",
+    )
+    complication_type: NarrativeComplicationType | None = Field(
+        default=None,
+        description="Type of complication suffered, if any",
+    )
+    complication_description: str | None = Field(
+        default=None,
+        description="Complication details if any",
+    )
+    pilot_id: str | None = Field(
+        default=None,
+        description="Pilot taking the action",
+    )
+    skill_used: PilotSkillType | None = Field(
+        default=None,
+        description="Pilot skill used for the check",
+    )
+    action_id: str | None = Field(
+        default=None,
+        description="Action identifier tied to the attempt",
+    )
+    action_description: str | None = Field(
+        default=None,
+        description="Narrative description of the action",
+    )
+
+
+class NarrativeGoalState(FrozenModel):
+    """State wrapper for a narrative goal."""
+
+    goal: NarrativeGoal
+    status: NarrativeGoalStatus = "active"
+    successes: int = Field(default=0, ge=0)
+    failures: int = Field(default=0, ge=0)
+    attempts: int = Field(default=0, ge=0)
+    last_outcome: NarrativeGoalOutcome | None = Field(
+        default=None,
+        description="Most recent goal outcome",
+    )
+    last_attempt: NarrativeGoalAttempt | None = Field(
+        default=None,
+        description="Most recent goal attempt details",
+    )
+    attempt_history: list[NarrativeGoalAttempt] = Field(default_factory=list)
+
+
+class NarrativeGoalTracker(FrozenModel):
+    """Tracker for active narrative goals."""
+
+    goals: list[NarrativeGoalState] = Field(default_factory=list)
+
+
+class NarrativeCombatState(FrozenModel):
+    """Narrative combat state tracking complications and goals."""
+
+    scene_id: str | None = Field(
+        default=None,
+        description="Optional scene identifier",
+    )
+    complications: list[NarrativeComplicationState] = Field(default_factory=list)
+    goal_tracker: NarrativeGoalTracker = Field(
+        default_factory=NarrativeGoalTracker
+    )
+
+
+def add_narrative_complication(
+    state: NarrativeCombatState,
+    complication: NarrativeComplication,
+    status: NarrativeComplicationStatus = "active",
+) -> NarrativeCombatState:
+    """Append a complication to narrative combat state."""
+    entry = NarrativeComplicationState(
+        complication=complication,
+        status=status,
+    )
+    return state.model_copy(
+        update={"complications": [*state.complications, entry]}
+    )
+
+
+def resolve_narrative_complication(
+    state: NarrativeCombatState,
+    complication_id: str,
+    resolution_notes: str | None = None,
+    resolved_by: str | None = None,
+) -> NarrativeCombatState:
+    """Resolve a narrative complication by ID."""
+    updated: list[NarrativeComplicationState] = []
+    found = False
+    for entry in state.complications:
+        if entry.complication.id == complication_id:
+            found = True
+            updated.append(
+                entry.model_copy(
+                    update={
+                        "status": "resolved",
+                        "resolution_notes": resolution_notes,
+                        "resolved_by": resolved_by,
+                    }
+                )
+            )
+        else:
+            updated.append(entry)
+
+    if not found:
+        raise ValueError(f"Unknown complication '{complication_id}'.")
+
+    return state.model_copy(update={"complications": updated})
+
+
+def add_narrative_goal(
+    tracker: NarrativeGoalTracker,
+    goal: NarrativeGoal,
+    status: NarrativeGoalStatus = "active",
+) -> NarrativeGoalTracker:
+    """Append a narrative goal to the tracker."""
+    entry = NarrativeGoalState(goal=goal, status=status)
+    return tracker.model_copy(update={"goals": [*tracker.goals, entry]})
+
+
+def resolve_narrative_goal_check(
+    tracker: NarrativeGoalTracker,
+    goal_id: str,
+    roll_result: int,
+    target: int = 10,
+    modifiers: int = 0,
+    difficulty_modifier: int = 0,
+    tier: NarrativeCheckTier = "standard",
+    skill_used: PilotSkillType | None = None,
+    action_id: str | None = None,
+    action_description: str | None = None,
+    pilot_id: str | None = None,
+    complication_type: NarrativeComplicationType | None = None,
+    complication_description: str | None = None,
+    constraints: NarrativeCombatConstraints | None = None,
+    circumstances_changed: bool = True,
+    tier_rules: list[NarrativeCheckTierRule] | None = None,
+) -> tuple[NarrativeGoalTracker, NarrativeGoalOutcome]:
+    """Resolve a narrative goal check and update the tracker."""
+    updated: list[NarrativeGoalState] = []
+    found = False
+    outcome: NarrativeGoalOutcome | None = None
+
+    for entry in tracker.goals:
+        if entry.goal.id != goal_id:
+            updated.append(entry)
+            continue
+
+        found = True
+        goal = entry.goal
+        if entry.status in {"completed", "failed"}:
+            raise ValueError(f"Goal '{goal_id}' is already {entry.status}.")
+
+        if (
+            goal.repeat_requires_change
+            and not circumstances_changed
+            and entry.last_outcome
+            and not entry.last_outcome.success
+        ):
+            raise ValueError(
+                "Goal check cannot be repeated until circumstances change."
+            )
+
+        success, consequence_suffered, total_result = compute_check_success(
+            roll_result=roll_result,
+            target=target,
+            modifiers=modifiers,
+            difficulty_modifier=difficulty_modifier,
+            tier=tier,
+            tier_rules=tier_rules,
+        )
+
+        effective_complication_type = (
+            complication_type if consequence_suffered else None
+        )
+        effective_complication_description = (
+            complication_description if consequence_suffered else None
+        )
+
+        harm_suffered = False
+        if effective_complication_type == "harm":
+            allow_harm = True
+            if constraints and constraints.harm_only_on_risky_complication:
+                allow_harm = tier != "standard" or (
+                    constraints.allow_granted_harm_on_standard
+                )
+            harm_suffered = allow_harm
+
+        outcome = NarrativeGoalOutcome(
+            goal_id=goal.id,
+            goal_description=goal.description,
+            success=success,
+            tier_attained=tier,
+            harm_involved=goal.harm_involved,
+            harm_suffered=harm_suffered,
+            complication_description=effective_complication_description,
+        )
+
+        attempt = NarrativeGoalAttempt(
+            roll_result=roll_result,
+            target=target,
+            modifiers=modifiers,
+            difficulty_modifier=difficulty_modifier,
+            tier=tier,
+            total_result=total_result,
+            success=success,
+            consequence_suffered=consequence_suffered,
+            complication_type=effective_complication_type,
+            complication_description=effective_complication_description,
+            pilot_id=pilot_id,
+            skill_used=skill_used,
+            action_id=action_id,
+            action_description=action_description,
+        )
+
+        successes = entry.successes + (1 if success else 0)
+        failures = entry.failures + (0 if success else 1)
+        attempts = entry.attempts + 1
+
+        status = entry.status
+        required_successes = goal.successes_required or 1
+        if success and successes >= required_successes:
+            status = "completed"
+        elif goal.failure_limit is not None and failures >= goal.failure_limit:
+            status = "failed"
+
+        updated.append(
+            entry.model_copy(
+                update={
+                    "status": status,
+                    "successes": successes,
+                    "failures": failures,
+                    "attempts": attempts,
+                    "last_outcome": outcome,
+                    "last_attempt": attempt,
+                    "attempt_history": [*entry.attempt_history, attempt],
+                }
+            )
+        )
+
+    if not found:
+        raise ValueError(f"Unknown goal '{goal_id}'.")
+
+    if outcome is None:
+        raise ValueError(f"Unable to resolve goal '{goal_id}'.")
+
+    return tracker.model_copy(update={"goals": updated}), outcome
 
 
 class NarrativeScenarioSettings(FrozenModel):
@@ -238,10 +706,6 @@ class PrecedenceRule(FrozenModel):
         ...,
         description="When this precedence rule applies",
     )
-
-
-PilotSkillType = Literal["hull", "agility", "systems", "engineering"]
-
 
 class SkillChallengeType(FrozenModel):
     """Type/purpose of a skill challenge."""

@@ -9,7 +9,13 @@ from core.shared import (
     NarrativeCheckTier,
     NarrativeCombatConstraints,
     NarrativeGoalOutcome,
+    NarrativeGoalCondition,
+    NarrativeGoal,
+    NarrativeGoalTracker,
     NarrativeScenarioSettings,
+    NarrativeComplication,
+    NarrativeCombatState,
+    NarrativeResolutionRequirement,
     DEFAULT_NARRATIVE_SCENARIO_SETTINGS,
     PrecedenceRule,
     SkillChallengeType,
@@ -22,6 +28,10 @@ from core.shared import (
     SkillChallengeUse,
     resolve_skill_challenge,
     compute_check_success,
+    add_narrative_complication,
+    resolve_narrative_complication,
+    add_narrative_goal,
+    resolve_narrative_goal_check,
     NARRATIVE_TIER_RULES,
 )
 
@@ -631,6 +641,153 @@ class TestNarrativeGoalOutcome:
             harm_involved=False,
         )
         assert outcome.success is False
+
+
+class TestNarrativeGoalTracker:
+    """Tests for narrative goal tracking helpers."""
+
+    def test_goal_defaults_successes_required(self):
+        """Goal defaults successes_required to condition count."""
+        goal = NarrativeGoal(
+            id="goal_break_in",
+            description="Break into the vault",
+            success_conditions=[
+                NarrativeGoalCondition(
+                    id="goal_check",
+                    condition_type="skill_check",
+                    description="Pass the lockpick check",
+                    required_skill="systems",
+                ),
+                NarrativeGoalCondition(
+                    id="goal_escape",
+                    condition_type="position_reached",
+                    description="Reach the inner door",
+                ),
+            ],
+        )
+        assert goal.successes_required == 2
+        assert goal.repeat_requires_change is True
+
+    def test_goal_tracker_success(self):
+        """Successful check completes the goal."""
+        goal = NarrativeGoal(
+            id="goal_disarm",
+            description="Disarm the bomb",
+            harm_involved=False,
+        )
+        tracker = add_narrative_goal(NarrativeGoalTracker(), goal)
+        tracker, outcome = resolve_narrative_goal_check(
+            tracker,
+            goal_id="goal_disarm",
+            roll_result=15,
+            tier="standard",
+            action_description="Cut the correct wire",
+        )
+        assert outcome.success is True
+        assert tracker.goals[0].status == "completed"
+        assert tracker.goals[0].attempts == 1
+
+    def test_goal_tracker_repeat_requires_change(self):
+        """Failed checks require circumstances to change."""
+        goal = NarrativeGoal(
+            id="goal_escape",
+            description="Escape the patrol",
+        )
+        tracker = add_narrative_goal(NarrativeGoalTracker(), goal)
+        tracker, outcome = resolve_narrative_goal_check(
+            tracker,
+            goal_id="goal_escape",
+            roll_result=4,
+            tier="standard",
+        )
+        assert outcome.success is False
+        with pytest.raises(ValueError):
+            resolve_narrative_goal_check(
+                tracker,
+                goal_id="goal_escape",
+                roll_result=12,
+                tier="standard",
+                circumstances_changed=False,
+            )
+
+    def test_goal_tracker_failure_limit(self):
+        """Failure limit marks the goal as failed."""
+        goal = NarrativeGoal(
+            id="goal_hold",
+            description="Hold the line",
+            failure_limit=1,
+        )
+        tracker = add_narrative_goal(NarrativeGoalTracker(), goal)
+        tracker, outcome = resolve_narrative_goal_check(
+            tracker,
+            goal_id="goal_hold",
+            roll_result=2,
+            tier="standard",
+        )
+        assert outcome.success is False
+        assert tracker.goals[0].status == "failed"
+
+
+class TestNarrativeCombatState:
+    """Tests for narrative complication state tracking."""
+
+    def test_complication_defaults_and_requirements(self):
+        """Complications track requirements and default flags."""
+        complication = NarrativeComplication(
+            id="complication_1",
+            complication_type="harm",
+            description="Stray shot grazes the pilot",
+            harm_damage=2,
+            resolution_requirements=[
+                NarrativeResolutionRequirement(
+                    requirement_type="skill_check",
+                    description="Find cover and stabilize",
+                    required_tier="risky",
+                    required_skill="hull",
+                )
+            ],
+        )
+        assert complication.severity == "minor"
+        assert complication.established_before_roll is True
+        assert complication.harm_damage == 2
+        assert complication.resolution_requirements[0].required_skill == "hull"
+
+    def test_harm_damage_requires_harm_type(self):
+        """Non-harm complications cannot set harm damage."""
+        with pytest.raises(ValueError):
+            NarrativeComplication(
+                id="complication_2",
+                complication_type="time",
+                description="Delayed extraction",
+                harm_damage=1,
+            )
+
+    def test_add_and_resolve_complication(self):
+        """Complications can be added and resolved by ID."""
+        complication = NarrativeComplication(
+            id="complication_3",
+            complication_type="position",
+            description="Pinned behind the barricade",
+        )
+        state = NarrativeCombatState(scene_id="scene_1")
+        state = add_narrative_complication(state, complication)
+        assert len(state.complications) == 1
+        assert state.complications[0].status == "active"
+
+        state = resolve_narrative_complication(
+            state,
+            complication_id="complication_3",
+            resolution_notes="Flanked the opponent",
+            resolved_by="pilot_1",
+        )
+        assert state.complications[0].status == "resolved"
+        assert state.complications[0].resolved_by == "pilot_1"
+
+    def test_resolve_unknown_complication_raises(self):
+        """Resolving a missing complication raises."""
+        state = NarrativeCombatState()
+        with pytest.raises(ValueError):
+            resolve_narrative_complication(state, complication_id="missing")
 
 
 if __name__ == "__main__":

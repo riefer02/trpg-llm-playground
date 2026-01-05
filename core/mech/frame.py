@@ -6,6 +6,7 @@ from core.shared.models import FrozenModel
 from core.shared.enums import ManufacturerType, SizeClass
 from core.shared.effects import MechanicalEffect
 from core.mech.mounts import MountSlot
+from core.mech.weapon import MountlessWeaponDefinition
 
 
 class CoreSystemDefinition(FrozenModel):
@@ -14,6 +15,7 @@ class CoreSystemDefinition(FrozenModel):
     id: str = Field(..., description="Unique core system identifier")
     name: str = Field(..., description="Display name")
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
+    mountless_weapons: list[MountlessWeaponDefinition] = Field(default_factory=list)
     uses_per_mission: int = Field(default=1, ge=1)
 
 
@@ -65,4 +67,3 @@ class MechFrameDefinition(FrozenModel):
     system_points: int = Field(default=0, ge=0)
     core_system: CoreSystemDefinition | None = None
     traits: list[FrameTrait] = Field(default_factory=list)
-

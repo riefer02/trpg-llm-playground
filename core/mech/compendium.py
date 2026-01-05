@@ -21,8 +21,13 @@ from core.mech.system import (
     SystemTag,
 )
 from core.mech.weapon import (
+    DynamicWeaponDefinition,
     MechWeaponDefinition,
+    MimicGunProfileRule,
+    MountlessWeaponDefinition,
     WeaponDamage,
+    WeaponProfile,
+    WeaponProfileChoice,
     WeaponRange,
     WeaponTag,
 )
@@ -7096,6 +7101,31 @@ HORUS_FRAMES: list[MechFrameDefinition] = [
                     )
                 ],
             ),
+            mountless_weapons=[
+                MountlessWeaponDefinition(
+                    id="horus_ushabti_omnigun",
+                    name="Ushabti Omnigun",
+                    profile=WeaponProfile(
+                        profile_id="horus_ushabti_omnigun",
+                        name="Ushabti Omnigun",
+                        damage_type="kinetic",
+                        ranges=[WeaponRange(range_type="range", value=15)],
+                        damage=[WeaponDamage(damage_type="kinetic", flat=1)],
+                        tags=[WeaponTag(tag="ap")],
+                    ),
+                    action_type="free",
+                    target="enemy",
+                    uses_per="round",
+                    requires_line_of_sight=True,
+                    counts_as_attack=False,
+                    auto_hit=True,
+                    ignores_cover=True,
+                    damage_unreducible=True,
+                    counts_as_weapon=False,
+                    modifiable=False,
+                    benefits_from_talents=False,
+                )
+            ],
         ),
         traits=[
             FrameTrait(
@@ -7251,16 +7281,54 @@ HORUS_WEAPONS: list[MechWeaponDefinition] = [
         ranges=[WeaponRange(range_type="range", value=10)],
         damage=[
             WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d3+2")),
-            WeaponDamage(damage_type="energy", dice=DiceExpression.parse("1d3+2")),
-            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d3+2")),
         ],
         tags=[WeaponTag(tag="smart")],
-        effects=MechanicalEffect(
-            choices=[
-                EffectChoice(name="Kinetic", effect=MechanicalEffect()),
-                EffectChoice(name="Energy", effect=MechanicalEffect()),
-                EffectChoice(name="Explosive", effect=MechanicalEffect()),
-            ],
+        dynamic=DynamicWeaponDefinition(
+            profile_choice=WeaponProfileChoice(
+                selection="attack",
+                default_profile_id="kinetic",
+                profiles=[
+                    WeaponProfile(
+                        profile_id="kinetic",
+                        name="Kinetic",
+                        damage_type="kinetic",
+                        ranges=[WeaponRange(range_type="range", value=10)],
+                        damage=[
+                            WeaponDamage(
+                                damage_type="kinetic",
+                                dice=DiceExpression.parse("1d3+2"),
+                            )
+                        ],
+                        tags=[WeaponTag(tag="smart")],
+                    ),
+                    WeaponProfile(
+                        profile_id="energy",
+                        name="Energy",
+                        damage_type="energy",
+                        ranges=[WeaponRange(range_type="range", value=10)],
+                        damage=[
+                            WeaponDamage(
+                                damage_type="energy",
+                                dice=DiceExpression.parse("1d3+2"),
+                            )
+                        ],
+                        tags=[WeaponTag(tag="smart")],
+                    ),
+                    WeaponProfile(
+                        profile_id="explosive",
+                        name="Explosive",
+                        damage_type="explosive",
+                        ranges=[WeaponRange(range_type="range", value=10)],
+                        damage=[
+                            WeaponDamage(
+                                damage_type="explosive",
+                                dice=DiceExpression.parse("1d3+2"),
+                            )
+                        ],
+                        tags=[WeaponTag(tag="smart")],
+                    ),
+                ],
+            ),
         ),
     ),
     MechWeaponDefinition(
@@ -7273,18 +7341,9 @@ HORUS_WEAPONS: list[MechWeaponDefinition] = [
         license_rank=2,
         ranges=[WeaponRange(range_type="range", value=10)],
         damage=[
-            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+3")),
-            WeaponDamage(damage_type="energy", dice=DiceExpression.parse("1d6+3")),
             WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6+3")),
         ],
         tags=[WeaponTag(tag="smart")],
-        effects=MechanicalEffect(
-            choices=[
-                EffectChoice(name="Kinetic", effect=MechanicalEffect()),
-                EffectChoice(name="Energy", effect=MechanicalEffect()),
-                EffectChoice(name="Explosive", effect=MechanicalEffect()),
-            ],
-        ),
     ),
     MechWeaponDefinition(
         id="horus_annihilation_nexus",
@@ -7296,18 +7355,9 @@ HORUS_WEAPONS: list[MechWeaponDefinition] = [
         license_rank=3,
         ranges=[WeaponRange(range_type="burst", value=2)],
         damage=[
-            WeaponDamage(damage_type="kinetic", dice=DiceExpression.parse("1d6+3")),
             WeaponDamage(damage_type="energy", dice=DiceExpression.parse("1d6+3")),
-            WeaponDamage(damage_type="explosive", dice=DiceExpression.parse("1d6+3")),
         ],
         tags=[WeaponTag(tag="ap"), WeaponTag(tag="smart")],
-        effects=MechanicalEffect(
-            choices=[
-                EffectChoice(name="Kinetic", effect=MechanicalEffect()),
-                EffectChoice(name="Energy", effect=MechanicalEffect()),
-                EffectChoice(name="Explosive", effect=MechanicalEffect()),
-            ],
-        ),
     ),
     MechWeaponDefinition(
         id="horus_catalyst_pistol",
@@ -7391,6 +7441,9 @@ HORUS_WEAPONS: list[MechWeaponDefinition] = [
                     effect=MechanicalEffect(),
                 )
             ],
+        ),
+        dynamic=DynamicWeaponDefinition(
+            mimic_gun=MimicGunProfileRule(),
         ),
     ),
     MechWeaponDefinition(

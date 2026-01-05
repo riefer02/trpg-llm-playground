@@ -9,7 +9,12 @@ from core.shared.effects import ReactionTriggerEvent
 from core.mech.combat_rules import AttackPatternDefinition
 from core.mech.combat_state import ActionUse
 from core.mech.grid import HexCoord, HexPosition
-from core.mech.weapon import MechWeaponDefinition, WeaponTag
+from core.mech.weapon import (
+    MechWeaponDefinition,
+    WeaponRange,
+    WeaponTag,
+    resolve_weapon_profile,
+)
 
 
 def build_action_use_from_weapon(
@@ -17,6 +22,7 @@ def build_action_use_from_weapon(
     action_id: str,
     action_type: ActionType,
     weapon: MechWeaponDefinition,
+    weapon_profile_id: str | None = None,
     target_id: str | None = None,
     target_position: HexPosition | None = None,
     target_ids: list[str] | None = None,
@@ -33,8 +39,9 @@ def build_action_use_from_weapon(
     heat_generated: int | None = None,
 ) -> ActionUse:
     """Create an ActionUse enriched with weapon tags and patterns."""
-    weapon_tags = [tag.tag for tag in weapon.tags]
-    pattern = _pattern_from_tags(weapon.tags, cone_mode=cone_mode)
+    profile = resolve_weapon_profile(weapon, profile_id=weapon_profile_id)
+    weapon_tags = [tag.tag for tag in profile.tags]
+    pattern = _pattern_from_tags(profile.tags, cone_mode=cone_mode)
     attack_type = attack_type_override
     if attack_type is None and weapon.weapon_type == "melee":
         attack_type = "melee"
@@ -43,7 +50,8 @@ def build_action_use_from_weapon(
     if preferred_range is None and action_id == "overwatch":
         preferred_range = "threat"
     range_spaces = _resolve_weapon_range(
-        weapon,
+        profile.ranges,
+        profile.tags,
         preferred=preferred_range,
         area_pattern=pattern,
     )
@@ -77,6 +85,7 @@ def build_action_use_from_weapon_id(
     weapon_id: str,
     weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
     cone_mode: Literal["wedge", "axis"] | None = None,
+    weapon_profile_id: str | None = None,
     **kwargs,
 ) -> ActionUse:
     """Create an ActionUse from a weapon ID and definition map."""
@@ -94,6 +103,7 @@ def build_action_use_from_weapon_id(
         action_type=action_type,
         weapon=weapon,
         cone_mode=cone_mode,
+        weapon_profile_id=weapon_profile_id,
         **kwargs,
     )
 
@@ -115,14 +125,15 @@ def _pattern_from_tags(
 
 
 def _resolve_weapon_range(
-    weapon: MechWeaponDefinition,
+    ranges: Iterable[WeaponRange],
+    tags: Iterable[WeaponTag],
     preferred: RangeType | None,
     area_pattern: AttackPatternDefinition | None,
 ) -> int | None:
     if area_pattern and area_pattern.pattern == "burst":
         return None
 
-    range_by_type = {entry.range_type: entry.value for entry in weapon.ranges}
+    range_by_type = {entry.range_type: entry.value for entry in ranges}
     if preferred and preferred in range_by_type:
         return range_by_type[preferred]
 
@@ -131,7 +142,7 @@ def _resolve_weapon_range(
     if "threat" in range_by_type:
         return range_by_type["threat"]
 
-    threat_tag = next((tag for tag in weapon.tags if tag.tag == "threat"), None)
+    threat_tag = next((tag for tag in tags if tag.tag == "threat"), None)
     if threat_tag and threat_tag.value is not None:
         return threat_tag.value
 

@@ -8,7 +8,13 @@ from core.mech.weapon import (
     WeaponDamage,
     WeaponTag,
     WeaponTagType,
+    WeaponProfile,
+    WeaponProfileChoice,
+    MimicGunProfileRule,
+    DynamicWeaponDefinition,
+    MountlessWeaponDefinition,
     MechWeaponDefinition,
+    resolve_weapon_profile,
 )
 from core.mech.mounts import MountSlotType, MountSlot, allowed_weapon_sizes
 from core.mech.frame import (
@@ -275,7 +281,13 @@ __all__ = [
     "WeaponDamage",
     "WeaponTag",
     "WeaponTagType",
+    "WeaponProfile",
+    "WeaponProfileChoice",
+    "MimicGunProfileRule",
+    "DynamicWeaponDefinition",
+    "MountlessWeaponDefinition",
     "MechWeaponDefinition",
+    "resolve_weapon_profile",
     "MountSlotType",
     "MountSlot",
     "allowed_weapon_sizes",
