@@ -7,7 +7,12 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 
 from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES, LineOfSightRules
-from core.mech.combat_state import MechCombatScenario, CombatTurn, CombatantState, ActionUse
+from core.mech.combat_state import (
+    MechCombatScenario,
+    CombatTurn,
+    CombatantState,
+    ActionUse,
+)
 from core.mech.combat_actions import ACTION_RULES_BY_ID, ActionRule
 from core.mech.grid import (
     HexCoord,
@@ -30,6 +35,15 @@ from core.shared.effects import (
     SizeCondition,
     SpatialCondition,
     PerTargetCounter,
+    CooldownState,
+)
+from core.mech.timing import (
+    TurnPhase,
+    PreparedActionState,
+    ActionTimingValidationSettings,
+    validate_protocol_timing,
+    validate_action_while_prepared,
+    validate_per_round_reaction,
 )
 
 
@@ -39,7 +53,6 @@ class CombatValidationIssue(FrozenModel):
     code: str
     message: str
     severity: Literal["error", "warning"] = "error"
-
 
 
 class CombatValidation(FrozenModel):
@@ -100,11 +113,15 @@ def _condition_matches_statuses(
         return True
     if isinstance(
         condition,
-        (SpatialCondition, AttackContextCondition, CheckContextCondition, SizeCondition),
+        (
+            SpatialCondition,
+            AttackContextCondition,
+            CheckContextCondition,
+            SizeCondition,
+        ),
     ):
         return False
     return False
-
 
 
 def _adjacent_hard_cover_coords(
@@ -115,7 +132,11 @@ def _adjacent_hard_cover_coords(
     adjacent: set[tuple[int, int]] = set()
     for neighbor in target_coord.neighbors():
         tile = tiles.get((neighbor.q, neighbor.r))
-        if tile and tile.provides_hard_cover and _cover_size_allows_target(tile.hard_cover_size, target_size):
+        if (
+            tile
+            and tile.provides_hard_cover
+            and _cover_size_allows_target(tile.hard_cover_size, target_size)
+        ):
             adjacent.add((neighbor.q, neighbor.r))
     return adjacent
 
@@ -156,7 +177,9 @@ def _cover_between(
     hard_between_size_ok = any(
         tiles.get((coord.q, coord.r))
         and tiles[(coord.q, coord.r)].provides_hard_cover
-        and _cover_size_allows_target(tiles[(coord.q, coord.r)].hard_cover_size, target_size)
+        and _cover_size_allows_target(
+            tiles[(coord.q, coord.r)].hard_cover_size, target_size
+        )
         for coord in line
     )
     soft_between = any(
@@ -316,7 +339,9 @@ def _size_value(size: str) -> float:
     return size_values.get(size, 1.0)
 
 
-def _hostiles_for(actor: CombatantState, combatants: dict[str, CombatantState]) -> list[CombatantState]:
+def _hostiles_for(
+    actor: CombatantState, combatants: dict[str, CombatantState]
+) -> list[CombatantState]:
     if actor.side == "players":
         return [c for c in combatants.values() if c.side == "hostiles"]
     if actor.side == "hostiles":
@@ -364,7 +389,9 @@ def _is_engaged(actor: CombatantState, hostiles: list[CombatantState]) -> bool:
     return False
 
 
-def _effective_ignores_los(action: ActionUse, line_of_sight_rules: LineOfSightRules) -> bool:
+def _effective_ignores_los(
+    action: ActionUse, line_of_sight_rules: LineOfSightRules
+) -> bool:
     tags = set(action.weapon_tags)
     if action.ignores_line_of_sight:
         return True
@@ -419,7 +446,9 @@ def _action_targets(
     targets.extend((None, pos) for pos in action.target_positions)
     if action.target_id or action.target_position:
         target = combatants_by_id.get(action.target_id) if action.target_id else None
-        targets.append((target, action.target_position or (target.position if target else None)))
+        targets.append(
+            (target, action.target_position or (target.position if target else None))
+        )
     return targets
 
 
@@ -434,6 +463,142 @@ def _index_per_target_counters(
         else:
             templates_by_effect[counter.effect_id] = counter
     return counters_by_target, templates_by_effect
+
+
+def _index_cooldown_states(
+    combatant: CombatantState,
+) -> tuple[dict[str, CooldownState], dict[str, CooldownState]]:
+    global_cooldowns: dict[str, CooldownState] = {}
+    per_target_cooldowns: dict[str, CooldownState] = {}
+    for cooldown in combatant.cooldown_states.values():
+        if cooldown.per_target and cooldown.target_id:
+            key = f"{cooldown.effect_id}:{cooldown.target_id}"
+            per_target_cooldowns[key] = cooldown
+        else:
+            global_cooldowns[cooldown.effect_id] = cooldown
+    return global_cooldowns, per_target_cooldowns
+
+
+def _check_action_on_cooldown(
+    action: ActionUse,
+    actor_cooldowns: tuple[dict[str, CooldownState], dict[str, CooldownState]],
+    issues: list[CombatValidationIssue],
+) -> bool:
+    global_cooldowns, per_target_cooldowns = actor_cooldowns
+    is_blocked = False
+    if action.applied_per_target_effects:
+        for applied in action.applied_per_target_effects:
+            key = (
+                f"{applied.effect_id}:{applied.target_id}"
+                if applied.target_id
+                else applied.effect_id
+            )
+            cooldown = per_target_cooldowns.get(key) or global_cooldowns.get(
+                applied.effect_id
+            )
+            if cooldown and cooldown.turns_remaining > 0:
+                issues.append(
+                    CombatValidationIssue(
+                        code="action_on_cooldown",
+                        message=(
+                            f"Action {action.action_id} uses {applied.effect_id} "
+                            f"which is on cooldown ({cooldown.turns_remaining} turns remaining)."
+                        ),
+                    )
+                )
+                is_blocked = True
+    return is_blocked
+
+
+def _validate_action_timing(
+    action: ActionUse,
+    actor: CombatantState | None,
+    current_phase: TurnPhase,
+    round_reaction_counts: dict[str, int],
+    issues: list[CombatValidationIssue],
+    timing_settings: ActionTimingValidationSettings | None = None,
+) -> bool:
+    """Validate timing constraints for an action.
+
+    Validates:
+    - Protocol timing (must be at start of turn)
+    - Prepared action lockout (cannot act/react/move while prepared)
+    - Per-round reaction limits (brace/overwatch once per round)
+
+    Args:
+        action: The action being validated
+        actor: The combatant taking the action
+        current_phase: Current turn phase
+        round_reaction_counts: Per-round reaction counts for this actor
+        issues: List to append validation issues to
+        timing_settings: Validation settings (uses defaults if None)
+
+    Returns:
+        True if all timing constraints are valid
+    """
+    if timing_settings is None:
+        timing_settings = ActionTimingValidationSettings(strict_mode=True)
+
+    is_valid = True
+
+    if actor:
+        protocol_timing_result = validate_protocol_timing(
+            action.action_id,
+            action.action_type == "protocol",
+            current_phase,
+            timing_settings,
+        )
+        if not protocol_timing_result.valid:
+            is_valid = False
+            for error in protocol_timing_result.errors:
+                issues.append(
+                    CombatValidationIssue(code="protocol_timing", message=error)
+                )
+        for warning in protocol_timing_result.warnings:
+            issues.append(
+                CombatValidationIssue(
+                    code="protocol_timing", message=warning, severity="warning"
+                )
+            )
+
+        prepared_result = validate_action_while_prepared(
+            action.action_id,
+            action.action_type,
+            actor.prepared_action,
+            timing_settings,
+        )
+        if not prepared_result.valid:
+            is_valid = False
+            for error in prepared_result.errors:
+                issues.append(
+                    CombatValidationIssue(code="prepared_action_lockout", message=error)
+                )
+        for warning in prepared_result.warnings:
+            issues.append(
+                CombatValidationIssue(
+                    code="prepared_action_lockout", message=warning, severity="warning"
+                )
+            )
+
+    if action.action_type == "reaction" or action.used_as_reaction:
+        max_per_round = DEFAULT_MECH_COMBAT_RULES.reaction_rules.max_reactions_per_turn
+        reaction_result = validate_per_round_reaction(
+            action.action_id,
+            0,
+            actor.id if actor else "",
+            {actor.id if actor else "": round_reaction_counts} if actor else {},
+            max_per_round,
+        )
+        if not reaction_result.valid:
+            is_valid = False
+            for error in reaction_result.errors:
+                issues.append(
+                    CombatValidationIssue(
+                        code="per_round_reaction_limit", message=error
+                    )
+                )
+
+    return is_valid
 
 
 def _apply_per_target_effects(
@@ -463,7 +628,10 @@ def _apply_per_target_effects(
             template = templates_by_effect.get(applied.effect_id)
             if template:
                 counter = template.model_copy(
-                    update={"target_id": applied.target_id, "current_count": template.current_count}
+                    update={
+                        "target_id": applied.target_id,
+                        "current_count": template.current_count,
+                    }
                 )
             else:
                 if applied.max_count is None:
@@ -497,7 +665,9 @@ def _apply_per_target_effects(
                 )
             )
 
-        counters_by_target[key] = counter.model_copy(update={"current_count": new_count})
+        counters_by_target[key] = counter.model_copy(
+            update={"current_count": new_count}
+        )
 
 
 def _validate_area_geometry(
@@ -596,13 +766,26 @@ def _validate_turn(
     per_target_state_by_actor: dict[
         str, tuple[dict[tuple[str, str], PerTargetCounter], dict[str, PerTargetCounter]]
     ],
+    cooldown_state_by_actor: dict[
+        str, tuple[dict[str, CooldownState], dict[str, CooldownState]]
+    ],
+    current_phase: TurnPhase = "normal",
+    round_reaction_counts: dict[str, int] | None = None,
+    timing_settings: ActionTimingValidationSettings | None = None,
 ) -> None:
     economy = DEFAULT_MECH_COMBAT_RULES.turn_actions.action_economy
     max_quick = economy.quick_actions_per_turn
     max_full = economy.full_actions_per_turn
     overcharge_used = any(action.action_id == "overcharge" for action in turn.actions)
-    overcharge_used = overcharge_used or any(action.granted_by_overcharge for action in turn.actions)
-    overcharge_count = sum(1 for action in turn.actions if action.action_id == "overcharge")
+    overcharge_used = overcharge_used or any(
+        action.granted_by_overcharge for action in turn.actions
+    )
+    overcharge_count = sum(
+        1 for action in turn.actions if action.action_id == "overcharge"
+    )
+
+    if round_reaction_counts is None:
+        round_reaction_counts = {}
 
     if overcharge_used:
         max_quick += 1
@@ -615,6 +798,8 @@ def _validate_turn(
     per_target_state = per_target_state_by_actor.get(turn.actor_id)
     per_target_counters = per_target_state[0] if per_target_state else {}
     per_target_templates = per_target_state[1] if per_target_state else {}
+    cooldown_state = cooldown_state_by_actor.get(turn.actor_id)
+    actor_cooldowns = cooldown_state if cooldown_state else ({}, {})
 
     if not actor:
         issues.append(
@@ -666,7 +851,10 @@ def _validate_turn(
     ]
 
     if actor_movement_restrictions:
-        if turn.move_used and any(restriction.max_voluntary_speed == 0 for restriction in actor_movement_restrictions):
+        if turn.move_used and any(
+            restriction.max_voluntary_speed == 0
+            for restriction in actor_movement_restrictions
+        ):
             issues.append(
                 CombatValidationIssue(
                     code="movement_disallowed",
@@ -675,7 +863,11 @@ def _validate_turn(
             )
 
     if actor_restrictions:
-        quick_caps = [r.max_quick_actions for r in actor_restrictions if r.max_quick_actions is not None]
+        quick_caps = [
+            r.max_quick_actions
+            for r in actor_restrictions
+            if r.max_quick_actions is not None
+        ]
         if quick_caps:
             max_quick = min(max_quick, *quick_caps)
         if any(r.disallow_full_actions for r in actor_restrictions):
@@ -737,7 +929,8 @@ def _validate_turn(
                     )
                 )
             if actor_movement_restrictions and any(
-                restriction.max_voluntary_speed == 0 for restriction in actor_movement_restrictions
+                restriction.max_voluntary_speed == 0
+                for restriction in actor_movement_restrictions
             ):
                 issues.append(
                     CombatValidationIssue(
@@ -867,7 +1060,10 @@ def _validate_turn(
                     severity="warning",
                 )
             )
-        elif rule.action_type != action.action_type and action.action_type not in rule.alternate_action_types:
+        elif (
+            rule.action_type != action.action_type
+            and action.action_type not in rule.alternate_action_types
+        ):
             issues.append(
                 CombatValidationIssue(
                     code="action_type_mismatch",
@@ -878,6 +1074,15 @@ def _validate_turn(
                     severity="warning",
                 )
             )
+
+        _validate_action_timing(
+            action,
+            actor,
+            current_phase,
+            round_reaction_counts,
+            issues,
+            timing_settings,
+        )
 
         if rule:
             if actor and actor.ai_controlled and rule.scope == "pilot":
@@ -927,7 +1132,9 @@ def _validate_turn(
                         )
                     )
 
-            if disallow_free and (action.used_as_free_action or action.action_type == "free"):
+            if disallow_free and (
+                action.used_as_free_action or action.action_type == "free"
+            ):
                 issues.append(
                     CombatValidationIssue(
                         code="free_action_disallowed",
@@ -949,7 +1156,9 @@ def _validate_turn(
                     )
                 )
 
-            if disallow_reactions and (action.used_as_reaction or action.action_type == "reaction"):
+            if disallow_reactions and (
+                action.used_as_reaction or action.action_type == "reaction"
+            ):
                 issues.append(
                     CombatValidationIssue(
                         code="reaction_disallowed",
@@ -971,7 +1180,9 @@ def _validate_turn(
                     )
                 )
 
-            if disallow_overcharge and (action.action_id == "overcharge" or action.granted_by_overcharge):
+            if disallow_overcharge and (
+                action.action_id == "overcharge" or action.granted_by_overcharge
+            ):
                 issues.append(
                     CombatValidationIssue(
                         code="overcharge_disallowed",
@@ -1004,7 +1215,10 @@ def _validate_turn(
 
         if mode_action_restrictions:
             for restriction in mode_action_restrictions:
-                if restriction.action_ids and action.action_id in restriction.action_ids:
+                if (
+                    restriction.action_ids
+                    and action.action_id in restriction.action_ids
+                ):
                     issues.append(
                         CombatValidationIssue(
                             code="mode_action_disallowed",
@@ -1014,7 +1228,11 @@ def _validate_turn(
                             ),
                         )
                     )
-                if rule and restriction.action_categories and rule.category in restriction.action_categories:
+                if (
+                    rule
+                    and restriction.action_categories
+                    and rule.category in restriction.action_categories
+                ):
                     issues.append(
                         CombatValidationIssue(
                             code="mode_action_category_disallowed",
@@ -1024,7 +1242,11 @@ def _validate_turn(
                             ),
                         )
                     )
-                if rule and restriction.disallow_attack_rolls and (rule.attack or (rule.tech and rule.tech.is_attack)):
+                if (
+                    rule
+                    and restriction.disallow_attack_rolls
+                    and (rule.attack or (rule.tech and rule.tech.is_attack))
+                ):
                     issues.append(
                         CombatValidationIssue(
                             code="mode_attack_roll_disallowed",
@@ -1048,7 +1270,10 @@ def _validate_turn(
                         )
 
         if mode_tech_restrictions and rule and rule.category == "tech":
-            if any(restriction.disallow_tech_actions for restriction in mode_tech_restrictions):
+            if any(
+                restriction.disallow_tech_actions
+                for restriction in mode_tech_restrictions
+            ):
                 issues.append(
                     CombatValidationIssue(
                         code="mode_tech_action_disallowed",
@@ -1060,7 +1285,10 @@ def _validate_turn(
                 )
 
         if actor_movement_restrictions and rule.movement:
-            if any(restriction.max_voluntary_speed == 0 for restriction in actor_movement_restrictions):
+            if any(
+                restriction.max_voluntary_speed == 0
+                for restriction in actor_movement_restrictions
+            ):
                 issues.append(
                     CombatValidationIssue(
                         code="movement_disallowed",
@@ -1071,7 +1299,8 @@ def _validate_turn(
                     )
                 )
             if rule.movement.counts_as_boost and any(
-                restriction.only_regular_move for restriction in actor_movement_restrictions
+                restriction.only_regular_move
+                for restriction in actor_movement_restrictions
             ):
                 issues.append(
                     CombatValidationIssue(
@@ -1118,9 +1347,16 @@ def _validate_turn(
                 issues,
             )
 
+        if actor and action.applied_per_target_effects:
+            _check_action_on_cooldown(action, actor_cooldowns, issues)
+
         actor_position = actor.position if actor else None
-        primary_target = combatants_by_id.get(action.target_id) if action.target_id else None
-        target_position = action.target_position or (primary_target.position if primary_target else None)
+        primary_target = (
+            combatants_by_id.get(action.target_id) if action.target_id else None
+        )
+        target_position = action.target_position or (
+            primary_target.position if primary_target else None
+        )
         area_origin = _resolve_area_origin(action, actor_position, target_position)
         area_coords = None
         if action.area_pattern and area_origin:
@@ -1136,7 +1372,9 @@ def _validate_turn(
                     )
                 )
             else:
-                target_statuses = list(primary_target.statuses) + list(primary_target.conditions)
+                target_statuses = list(primary_target.statuses) + list(
+                    primary_target.conditions
+                )
                 if "lock_on" not in target_statuses:
                     issues.append(
                         CombatValidationIssue(
@@ -1182,7 +1420,10 @@ def _validate_turn(
                     )
 
             if target:
-                if target.kind == "object" and not DEFAULT_MECH_COMBAT_RULES.valid_target_rules.allow_objects:
+                if (
+                    target.kind == "object"
+                    and not DEFAULT_MECH_COMBAT_RULES.valid_target_rules.allow_objects
+                ):
                     issues.append(
                         CombatValidationIssue(
                             code="object_target_not_allowed",
@@ -1191,7 +1432,10 @@ def _validate_turn(
                             ),
                         )
                     )
-                if target.kind != "object" and not DEFAULT_MECH_COMBAT_RULES.valid_target_rules.allow_characters:
+                if (
+                    target.kind != "object"
+                    and not DEFAULT_MECH_COMBAT_RULES.valid_target_rules.allow_characters
+                ):
                     issues.append(
                         CombatValidationIssue(
                             code="character_target_not_allowed",
@@ -1206,7 +1450,11 @@ def _validate_turn(
                     for mode in target_mode_effects
                     for grant in mode.effects.status_grants
                 ]
-                target_statuses = list(target.statuses) + list(target.conditions) + target_mode_statuses
+                target_statuses = (
+                    list(target.statuses)
+                    + list(target.conditions)
+                    + target_mode_statuses
+                )
                 target_mode_tech_restrictions = [
                     restriction
                     for mode in target_mode_effects
@@ -1252,7 +1500,8 @@ def _validate_turn(
                         for status in target_statuses
                     )
                     immune_to_tech = immune_to_tech or any(
-                        restriction.immune_to_tech for restriction in target_mode_tech_restrictions
+                        restriction.immune_to_tech
+                        for restriction in target_mode_tech_restrictions
                     )
                     if immune_to_tech:
                         issues.append(
@@ -1266,7 +1515,11 @@ def _validate_turn(
                             )
                         )
                 if action.weapon_tags and target_tag_immunities:
-                    immune_tags = {tag for immunity in target_tag_immunities for tag in immunity.tags}
+                    immune_tags = {
+                        tag
+                        for immunity in target_tag_immunities
+                        for tag in immunity.tags
+                    }
                     if immune_tags.intersection(action.weapon_tags):
                         issues.append(
                             CombatValidationIssue(
@@ -1279,7 +1532,10 @@ def _validate_turn(
                             )
                         )
 
-            if position and not DEFAULT_MECH_COMBAT_RULES.valid_target_rules.allow_points:
+            if (
+                position
+                and not DEFAULT_MECH_COMBAT_RULES.valid_target_rules.allow_points
+            ):
                 if not target:
                     issues.append(
                         CombatValidationIssue(
@@ -1316,7 +1572,9 @@ def _validate_turn(
 
         if rule.search and action.action_id == "search":
             if rule.search.requires_hidden_target and primary_target:
-                target_statuses = list(primary_target.statuses) + list(primary_target.conditions)
+                target_statuses = list(primary_target.statuses) + list(
+                    primary_target.conditions
+                )
                 if "hidden" not in target_statuses:
                     issues.append(
                         CombatValidationIssue(
@@ -1354,14 +1612,20 @@ def _validate_turn(
                 )
             else:
                 can_hide = False
-                if rule.hide.allow_without_cover_if_invisible and "invisible" in actor_statuses:
+                if (
+                    rule.hide.allow_without_cover_if_invisible
+                    and "invisible" in actor_statuses
+                ):
                     can_hide = True
                 else:
                     can_hide = True
                     for hostile in hostiles:
                         if not hostile.position:
                             continue
-                        start_coord = (hostile.position.coord.q, hostile.position.coord.r)
+                        start_coord = (
+                            hostile.position.coord.q,
+                            hostile.position.coord.r,
+                        )
                         end_coord = (actor_position.coord.q, actor_position.coord.r)
                         los_clear = _line_of_sight_clear(
                             terrain_tiles,
@@ -1456,7 +1720,11 @@ def _validate_turn(
                     if not position:
                         continue
                     range_anchor = position
-                    if action.area_pattern and action.area_pattern.pattern in ("line", "cone", "blast"):
+                    if action.area_pattern and action.area_pattern.pattern in (
+                        "line",
+                        "cone",
+                        "blast",
+                    ):
                         if area_origin is None:
                             issues.append(
                                 CombatValidationIssue(
@@ -1587,9 +1855,8 @@ def _validate_turn(
 
         tags = set(action.weapon_tags)
         requires_path_check = (
-            ("arcing" in tags and line_of_sight_rules.arcing_requires_path_clear)
-            or ("seeking" in tags and line_of_sight_rules.seeking_requires_path_clear)
-        )
+            "arcing" in tags and line_of_sight_rules.arcing_requires_path_clear
+        ) or ("seeking" in tags and line_of_sight_rules.seeking_requires_path_clear)
         if requires_path_check and actor_position:
             origin_position = area_origin or actor_position
             if origin_position:
@@ -1630,13 +1897,17 @@ def _validate_turn(
                                     code="area_origin_path_blocked",
                                     message=(
                                         f"Action {action.action_id} uses arcing/seeking "
-                                    "but the area origin path is blocked."
-                                ),
-                                severity="warning",
+                                        "but the area origin path is blocked."
+                                    ),
+                                    severity="warning",
+                                )
                             )
-                        )
 
-        if action.area_pattern and area_origin and action.area_pattern.pattern in ("line", "cone"):
+        if (
+            action.area_pattern
+            and area_origin
+            and action.area_pattern.pattern in ("line", "cone")
+        ):
             area_check_coords: list[HexCoord]
             if action.area_affected:
                 area_check_coords = action.area_affected
@@ -1816,8 +2087,8 @@ def _validate_turn(
                         CombatValidationIssue(
                             code="stabilize_secondary_invalid",
                             message=f"Invalid stabilize secondary option {action.stabilize_secondary}.",
+                        )
                     )
-                )
 
         if rule.attack and engaged:
             attack_type = action.attack_type_override or rule.attack.attack_type
@@ -1876,7 +2147,9 @@ def _validate_turn(
             continue
 
         if not is_free:
-            non_free_counts[action.action_id] = non_free_counts.get(action.action_id, 0) + 1
+            non_free_counts[action.action_id] = (
+                non_free_counts.get(action.action_id, 0) + 1
+            )
 
         if action.action_type == "quick":
             quick_count += 1
@@ -1924,7 +2197,10 @@ def _validate_turn(
                 )
             )
 
-    if any(action.granted_by_overcharge for action in turn.actions) and not overcharge_used:
+    if (
+        any(action.granted_by_overcharge for action in turn.actions)
+        and not overcharge_used
+    ):
         issues.append(
             CombatValidationIssue(
                 code="overcharge_missing",
@@ -1933,7 +2209,10 @@ def _validate_turn(
             )
         )
 
-    if overcharge_count > DEFAULT_MECH_COMBAT_RULES.turn_actions.overcharge_limit_per_turn:
+    if (
+        overcharge_count
+        > DEFAULT_MECH_COMBAT_RULES.turn_actions.overcharge_limit_per_turn
+    ):
         issues.append(
             CombatValidationIssue(
                 code="overcharge_limit",
@@ -1957,6 +2236,10 @@ def validate_combat_scenario(
         combatant.id: _index_per_target_counters(combatant)
         for combatant in scenario.combatants
     }
+    cooldown_state_by_actor = {
+        combatant.id: _index_cooldown_states(combatant)
+        for combatant in scenario.combatants
+    }
 
     for round_ in scenario.rounds:
         for turn in round_.turns:
@@ -1967,9 +2250,12 @@ def validate_combat_scenario(
                 terrain_tiles,
                 scenario.environment,
                 per_target_state_by_actor,
+                cooldown_state_by_actor,
             )
 
     if strict:
         issues = _promote_strict_warnings(issues)
 
-    return CombatValidation(valid=not any(i.severity == "error" for i in issues), issues=issues)
+    return CombatValidation(
+        valid=not any(i.severity == "error" for i in issues), issues=issues
+    )

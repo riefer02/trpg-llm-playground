@@ -20,6 +20,7 @@ from core.mech.terrain import TerrainMap
 from core.mech.weapon import WeaponTagType
 from core.mech.mounts import MountSlotType
 from core.mech.combat_rules import AttackPatternDefinition
+from core.mech.timing import PreparedActionState
 
 
 CombatSide = Literal["players", "hostiles", "neutral"]
@@ -107,6 +108,12 @@ class CombatantState(FrozenModel):
     progression_states: dict[str, ProgressionState] = Field(default_factory=dict)
     per_target_counters: dict[str, PerTargetCounter] = Field(default_factory=dict)
     cooldown_states: dict[str, CooldownState] = Field(default_factory=dict)
+    prepared_action: PreparedActionState | None = Field(
+        default=None, description="Held prepared action, if any"
+    )
+    per_round_reactions: dict[str, int] = Field(
+        default_factory=dict, description="Per-round reaction usage {action_id: count}"
+    )
 
 
 class GrappleLink(FrozenModel):
@@ -164,7 +171,9 @@ class ActionUse(FrozenModel):
     reaction_trigger: ReactionTriggerEvent | None = None
     contested_check: ContestedCheck | None = None
     consumes_lock_on: bool = False
-    applied_per_target_effects: list[AppliedPerTargetEffect] = Field(default_factory=list)
+    applied_per_target_effects: list[AppliedPerTargetEffect] = Field(
+        default_factory=list
+    )
 
 
 class CombatTurn(FrozenModel):
@@ -182,6 +191,10 @@ class CombatRound(FrozenModel):
 
     round_index: int = Field(..., ge=1)
     turns: list[CombatTurn] = Field(default_factory=list)
+    reaction_counts_by_actor: dict[str, dict[str, int]] = Field(
+        default_factory=dict,
+        description="Per-round reaction tracking {actor_id: {action_id: count}}",
+    )
 
 
 class MechCombatScenario(FrozenModel):
