@@ -6,12 +6,17 @@ from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 
-from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES, LineOfSightRules
+from core.mech.combat_rules import (
+    DEFAULT_MECH_COMBAT_RULES,
+    LineOfSightRules,
+    OverchargeRules,
+)
 from core.mech.combat_state import (
     MechCombatScenario,
     CombatTurn,
     CombatantState,
     ActionUse,
+    OverchargeState,
 )
 from core.mech.combat_actions import ACTION_RULES_BY_ID, ActionRule
 from core.mech.grid import (
@@ -508,6 +513,60 @@ def _check_action_on_cooldown(
                 )
                 is_blocked = True
     return is_blocked
+
+
+def _validate_overcharge_escalation(
+    action: ActionUse,
+    actor_overcharge_state: OverchargeState | None,
+    rules: OverchargeRules = DEFAULT_MECH_COMBAT_RULES.overcharge_rules,
+    strict_mode: bool = True,
+) -> list[CombatValidationIssue]:
+    """Validate that overcharge heat cost matches expected escalation level.
+
+    Args:
+        action: The action being validated
+        actor_overcharge_state: Current overcharge state for the actor
+        rules: Overcharge rules to use
+        strict_mode: If True, produce errors; otherwise produce warnings
+
+    Returns:
+        List of validation issues (empty if valid)
+    """
+    from core.mech.combat_resolution import compute_overcharge_escalation
+    from core.shared.dice import DiceExpression
+
+    issues: list[CombatValidationIssue] = []
+
+    if action.action_id != "overcharge":
+        return issues
+
+    escalation = compute_overcharge_escalation(actor_overcharge_state)
+    expected_cost = rules.costs[escalation.current_level]
+    declared_cost = action.heat_generated
+
+    if declared_cost is not None:
+        expected_value: int
+        if isinstance(expected_cost, DiceExpression):
+            expected_value = expected_cost.min_value()
+        else:
+            expected_value = expected_cost
+
+        if declared_cost != expected_value and not isinstance(
+            expected_cost, DiceExpression
+        ):
+            severity = "error" if strict_mode else "warning"
+            issues.append(
+                CombatValidationIssue(
+                    code="overcharge_cost_mismatch",
+                    message=(
+                        f"Overcharge at level {escalation.current_level} expects "
+                        f"heat cost {expected_cost}, but action declares {declared_cost}."
+                    ),
+                    severity=severity,
+                )
+            )
+
+    return issues
 
 
 def _validate_action_timing(
@@ -1191,6 +1250,16 @@ def _validate_turn(
                         ),
                     )
                 )
+
+            if action.action_id == "overcharge" or action.granted_by_overcharge:
+                strict_mode = timing_settings.strict_mode if timing_settings else True
+                escalation_issues = _validate_overcharge_escalation(
+                    action,
+                    actor.overcharge_state if actor else None,
+                    DEFAULT_MECH_COMBAT_RULES.overcharge_rules,
+                    strict_mode,
+                )
+                issues.extend(escalation_issues)
 
                 if disallow_boost and rule.movement and rule.movement.counts_as_boost:
                     issues.append(
@@ -2259,3 +2328,281 @@ def validate_combat_scenario(
     return CombatValidation(
         valid=not any(i.severity == "error" for i in issues), issues=issues
     )
+
+
+def validate_deployment(
+    scenario: MechCombatScenario,
+    deployer_id: str,
+    target_position: HexPosition,
+    kind: Literal["drone", "mine", "deployable", "other"],
+    deploy_range: int = 1,
+    requires_flat_surface: bool = True,
+    requires_line_of_sight: bool = True,
+) -> list[CombatValidationIssue]:
+    """Validate deployment position per PR2 rules.
+
+    Per PR2:
+    - Free space: Unoccupied by other characters or objects
+    - Valid space: Flat horizontal surface, in line of sight (unless specified)
+    - Mines cannot be placed adjacent to other mines
+
+    Args:
+        scenario: Current combat scenario
+        deployer_id: ID of combatant deploying
+        target_position: Target deployment position
+        kind: Type of deployable being placed
+        deploy_range: Maximum range for deployment (default 1 for adjacent)
+        requires_flat_surface: Whether deployment requires flat surface
+        requires_line_of_sight: Whether deployment requires LOS
+
+    Returns:
+        List of validation issues (empty if valid)
+    """
+    issues: list[CombatValidationIssue] = []
+    deployer = None
+    for c in scenario.combatants:
+        if c.id == deployer_id:
+            deployer = c
+            break
+
+    if deployer is None:
+        issues.append(
+            CombatValidationIssue(
+                code="deployer_not_found",
+                message=f"Deployer {deployer_id} not found in scenario.",
+            )
+        )
+        return issues
+
+    if deployer.position is None:
+        issues.append(
+            CombatValidationIssue(
+                code="deployer_no_position",
+                message=f"Deployer {deployer.name} has no position set.",
+            )
+        )
+        return issues
+
+    distance = deployer.position.distance_2d(target_position)
+    if distance > deploy_range:
+        issues.append(
+            CombatValidationIssue(
+                code="deployment_out_of_range",
+                message=f"Deployment position is {distance} spaces away but max range is {deploy_range}.",
+            )
+        )
+
+    for combatant in scenario.combatants:
+        if combatant.position is not None:
+            if combatant.position.coord == target_position.coord:
+                issues.append(
+                    CombatValidationIssue(
+                        code="deployment_space_occupied",
+                        message=f"Target space is occupied by {combatant.name}.",
+                    )
+                )
+
+    for deployable_id, deployable in scenario.deployables.items():
+        if deployable.position.coord == target_position.coord:
+            issues.append(
+                CombatValidationIssue(
+                    code="deployment_space_occupied",
+                    message=f"Target space is occupied by deployable {deployable.name}.",
+                )
+            )
+
+    if kind == "mine":
+        for mine_id, mine in scenario.deployables.items():
+            if mine.kind == "mine":
+                mine_coord = mine.position.coord
+                target_coord = target_position.coord
+                if mine_coord.is_adjacent(target_coord):
+                    issues.append(
+                        CombatValidationIssue(
+                            code="mine_too_close",
+                            message=f"Cannot place mine adjacent to existing mine {mine.name}.",
+                        )
+                    )
+
+    terrain_tiles = terrain_index(scenario.terrain)
+    target_tile = terrain_tiles.get((target_position.coord.q, target_position.coord.r))
+    if target_tile is not None and target_tile.elevation != 0:
+        if requires_flat_surface:
+            issues.append(
+                CombatValidationIssue(
+                    code="deployment_not_flat",
+                    message="Deployment requires flat horizontal surface.",
+                )
+            )
+
+    if requires_line_of_sight:
+        from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
+
+        los_rules = DEFAULT_MECH_COMBAT_RULES.line_of_sight_rules
+        if not _line_of_sight_clear(
+            terrain_tiles,
+            (deployer.position.coord.q, deployer.position.coord.r),
+            (target_position.coord.q, target_position.coord.r),
+            deployer.position.elevation,
+            target_position.elevation,
+            los_rules,
+            None,
+        ):
+            issues.append(
+                CombatValidationIssue(
+                    code="deployment_no_line_of_sight",
+                    message="Deployment position is not in line of sight.",
+                )
+            )
+
+    return issues
+
+
+def validate_mine_detection(
+    scenario: MechCombatScenario,
+    detector_id: str,
+    mine_id: str,
+) -> list[CombatValidationIssue]:
+    """Validate mine detection attempt per PR2 rules.
+
+    Per PR2: Mine can be detected with a quick action and successful systems check
+    if in sensor range.
+
+    Args:
+        scenario: Current combat scenario
+        detector_id: ID of combatant attempting detection
+        mine_id: ID of mine being detected
+
+    Returns:
+        List of validation issues (empty if valid)
+    """
+    issues: list[CombatValidationIssue] = []
+
+    detector = None
+    for c in scenario.combatants:
+        if c.id == detector_id:
+            detector = c
+            break
+
+    if detector is None:
+        issues.append(
+            CombatValidationIssue(
+                code="detector_not_found",
+                message=f"Detector {detector_id} not found in scenario.",
+            )
+        )
+        return issues
+
+    if mine_id not in scenario.deployables:
+        issues.append(
+            CombatValidationIssue(
+                code="mine_not_found",
+                message=f"Mine {mine_id} not found in scenario.",
+            )
+        )
+        return issues
+
+    mine = scenario.deployables[mine_id]
+    if mine.kind != "mine":
+        issues.append(
+            CombatValidationIssue(
+                code="not_a_mine",
+                message=f"Deployable {mine.name} is not a mine.",
+            )
+        )
+        return issues
+
+    if detector.position is None:
+        issues.append(
+            CombatValidationIssue(
+                code="detector_no_position",
+                message=f"Detector {detector.name} has no position.",
+            )
+        )
+        return issues
+
+    distance = detector.position.distance_2d(mine.position)
+    sensor_range = detector.stats.sensor_range
+    if distance > sensor_range:
+        issues.append(
+            CombatValidationIssue(
+                code="mine_out_of_sensor_range",
+                message=f"Mine is {distance} spaces away but sensor range is {sensor_range}.",
+            )
+        )
+
+    return issues
+
+
+def validate_mine_disarm(
+    scenario: MechCombatScenario,
+    disarmer_id: str,
+    mine_id: str,
+) -> list[CombatValidationIssue]:
+    """Validate mine disarm attempt per PR2 rules.
+
+    Per PR2: Mine can be disarmed by moving adjacent and making successful
+    systems check as quick action before mine activates.
+
+    Args:
+        scenario: Current combat scenario
+        disarmer_id: ID of combatant attempting disarm
+        mine_id: ID of mine being disarmed
+
+    Returns:
+        List of validation issues (empty if valid)
+    """
+    issues: list[CombatValidationIssue] = []
+
+    disarmer = None
+    for c in scenario.combatants:
+        if c.id == disarmer_id:
+            disarmer = c
+            break
+
+    if disarmer is None:
+        issues.append(
+            CombatValidationIssue(
+                code="disarmer_not_found",
+                message=f"Disarmer {disarmer_id} not found in scenario.",
+            )
+        )
+        return issues
+
+    if mine_id not in scenario.deployables:
+        issues.append(
+            CombatValidationIssue(
+                code="mine_not_found",
+                message=f"Mine {mine_id} not found in scenario.",
+            )
+        )
+        return issues
+
+    mine = scenario.deployables[mine_id]
+    if mine.kind != "mine":
+        issues.append(
+            CombatValidationIssue(
+                code="not_a_mine",
+                message=f"Deployable {mine.name} is not a mine.",
+            )
+        )
+        return issues
+
+    if disarmer.position is None:
+        issues.append(
+            CombatValidationIssue(
+                code="disarmer_no_position",
+                message=f"Disarmer {disarmer.name} has no position.",
+            )
+        )
+        return issues
+
+    if not disarmer.position.coord.is_adjacent(mine.position.coord):
+        issues.append(
+            CombatValidationIssue(
+                code="not_adjacent_to_mine",
+                message="Must be adjacent to mine to disarm it.",
+            )
+        )
+
+    return issues

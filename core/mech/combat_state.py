@@ -15,6 +15,7 @@ from core.shared.effects import (
     ProgressionResetTrigger,
 )
 from core.shared.rolls import ContestedCheck
+from core.shared.dice import DiceExpression
 from core.mech.grid import HexPosition, HexCoord
 from core.mech.terrain import TerrainMap
 from core.mech.weapon import WeaponTagType
@@ -26,6 +27,41 @@ from core.mech.timing import PreparedActionState
 CombatSide = Literal["players", "hostiles", "neutral"]
 CombatantKind = Literal["mech", "pilot", "npc", "object"]
 CombatEnvironment = Literal["standard", "zero_g", "underwater"]
+DeployableKind = Literal["drone", "mine", "deployable", "other"]
+
+
+class DeployableState(FrozenModel):
+    """Trackable deployable object in combat.
+
+    Models drones, mines, and other deployable objects per PR2 rules.
+    Drones: size ½, evasion 10, HP 10, armor 0, act on owner's turn
+    Mines: arm at start of next turn, trigger on adjacent entry
+    Deployables: 10 HP/size, evasion 5, default armor 0
+    """
+
+    id: str
+    name: str
+    kind: DeployableKind
+    owner_id: str | None = None
+    position: HexPosition
+    size: int = Field(..., ge=1)
+    hp: int = Field(..., ge=0)
+    max_hp: int = Field(..., ge=1)
+    armor: int = Field(default=0, ge=0)
+    evasion: int = Field(default=5, ge=0)
+    cover: Literal["soft", "hard"] | None = None
+    is_destroyed: bool = False
+    is_active: bool = True
+    can_act: bool = False
+    can_move: bool = False
+    acts_on_owner_turn: bool = True
+    is_armed: bool = False
+    arming_turn: int | None = None
+    trigger_on_adjacent_entry: bool = False
+    detection_dc: int | None = None
+    disarm_dc: int | None = None
+    e_defense: int = Field(default=10, ge=0)
+    reactions: list[str] = Field(default_factory=list)
 
 
 class CombatStats(FrozenModel):
@@ -85,6 +121,30 @@ class MechInventory(FrozenModel):
     systems: list[MechSystemState] = Field(default_factory=list)
 
 
+class OverchargeState(FrozenModel):
+    """Tracks overcharge escalation state for a combatant.
+
+    Overcharge costs escalate: 1 heat, then 1d3, 1d6, 1d6+4
+    Resets on full repair per PR2 rules.
+    """
+
+    current_level: int = Field(default=0, ge=0, le=3)
+    uses_this_turn: int = Field(default=0, ge=0)
+
+    @property
+    def can_overcharge(self) -> bool:
+        """Check if overcharge is available this turn (once per turn)."""
+        return self.uses_this_turn < 1
+
+    @property
+    def next_cost(self) -> int | DiceExpression:
+        """Get the heat cost for the next overcharge."""
+        from core.mech.rules import DEFAULT_OVERCHARGE_RULES
+
+        rules = DEFAULT_OVERCHARGE_RULES
+        return rules.costs[self.current_level]
+
+
 class CombatantState(FrozenModel):
     """State for a combatant in mech combat.
 
@@ -114,6 +174,34 @@ class CombatantState(FrozenModel):
     per_round_reactions: dict[str, int] = Field(
         default_factory=dict, description="Per-round reaction usage {action_id: count}"
     )
+    overcharge_state: OverchargeState | None = Field(
+        default=None, description="Overcharge escalation state"
+    )
+
+    def in_danger_zone(
+        self, danger_zone_fraction: float = 0.5, rounding: Literal["up", "down"] = "up"
+    ) -> bool:
+        """Check if mech is in danger zone based on current heat.
+
+        Per PR2: When a mech has 1/2 of its total heat capacity filled (rounded up),
+        it's in the danger zone.
+
+        Args:
+            danger_zone_fraction: Fraction of heat cap for danger zone (default 0.5)
+            rounding: How to round the threshold ("up" or "down")
+
+        Returns:
+            True if mech is in danger zone
+        """
+        if self.resources.heat_current is None or self.resources.heat_cap <= 0:
+            return False
+
+        if rounding == "up":
+            threshold = int((self.resources.heat_cap * danger_zone_fraction) + 0.999)
+        else:
+            threshold = int(self.resources.heat_cap * danger_zone_fraction)
+
+        return self.resources.heat_current >= threshold
 
 
 class GrappleLink(FrozenModel):
@@ -205,6 +293,9 @@ class MechCombatScenario(FrozenModel):
     rounds: list[CombatRound] = Field(default_factory=list)
     terrain: TerrainMap | None = None
     environment: CombatEnvironment = "standard"
+    deployables: dict[str, DeployableState] = Field(
+        default_factory=dict, description="Trackable deployables {deployable_id: state}"
+    )
 
 
 def create_npc_combatant(

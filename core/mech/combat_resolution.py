@@ -20,6 +20,9 @@ from core.mech.combat_state import (
     WeaponState,
     WeaponMountState,
     MechSystemState,
+    DeployableState,
+    MechCombatScenario,
+    HexPosition,
 )
 from core.shared.effects import (
     PerTargetCounter,
@@ -964,3 +967,1009 @@ def reset_round_reaction_counts(
         Updated CombatRound with cleared reaction counts
     """
     return round_.model_copy(update={"reaction_counts_by_actor": {}})
+
+
+class BalorScouringSwarmResult(FrozenModel):
+    """Result of Scouring Swarm zone damage application."""
+
+    damage_dealt: bool = Field(..., description="Whether damage was dealt")
+    damage_per_target: int = Field(..., description="Damage applied per target")
+    affected_targets: list[str] = Field(
+        default_factory=list, description="List of affected target IDs"
+    )
+    is_core_power_active: bool = Field(
+        ..., description="Whether core power is active (affects damage)"
+    )
+
+
+class BalorRegenerationResult(FrozenModel):
+    """Result of Regeneration healing application."""
+
+    healing_applied: bool = Field(..., description="Whether healing was applied")
+    healing_amount: int = Field(..., description="Amount of HP healed")
+    was_paused: bool = Field(..., description="Whether regeneration was paused")
+    pause_reason: str | None = Field(
+        default=None, description="Reason for pause if applicable"
+    )
+
+
+class BalorSelfPerpetuatingResult(FrozenModel):
+    """Result of Self-Perpetuating full restore on rest."""
+
+    hp_restored: bool = Field(..., description="Whether HP was restored")
+    previous_hp: int = Field(..., description="HP before restoration")
+    new_hp: int = Field(..., description="HP after restoration")
+
+
+class HellswarmProtocolResult(FrozenModel):
+    """Result of HELLSWARM protocol activation."""
+
+    cover_granted: bool = Field(..., description="Whether cover was granted")
+    soft_cover_targets: list[str] = Field(
+        default_factory=list, description="Targets that received soft cover"
+    )
+    shredded_applied: bool = Field(..., description="Whether shredded was applied")
+    structure_avoidance_triggered: bool = Field(
+        ..., description="Whether structure damage was avoided"
+    )
+    structure_roll: list[int] | None = Field(
+        default=None, description="Dice roll for structure avoidance"
+    )
+    avoided_structure_damage: bool = Field(
+        ..., description="Whether structure damage was avoided on this check"
+    )
+    healing_applied: bool = Field(..., description="Whether HP healing was applied")
+    healing_amount: int | None = Field(
+        default=None, description="Amount of HP healed (half max)"
+    )
+
+
+class HiveDroneResult(FrozenModel):
+    """Result of Hive Drone activation."""
+
+    drone_deployed: bool = Field(..., description="Whether drone was deployed")
+    drone_position: tuple[int, int] | None = Field(
+        default=None, description="Position of deployed drone (hex coordinates)"
+    )
+    damage_dealt: bool = Field(..., description="Whether drone damage was applied")
+    affected_targets: list[str] = Field(
+        default_factory=list, description="Targets affected by drone"
+    )
+
+
+class SwarmBodyResult(FrozenModel):
+    """Result of Swarm Body zone effect."""
+
+    zone_active: bool = Field(..., description="Whether zone is active")
+    condition_met: bool = Field(..., description="Whether condition for zone is met")
+    save_triggered: bool = Field(..., description="Whether save was triggered")
+    affected_targets: list[str] = Field(
+        default_factory=list, description="Targets affected by zone"
+    )
+    damage_per_target: int = Field(
+        ..., description="Damage applied per failed save target"
+    )
+    damage_applied_to: list[str] = Field(
+        default_factory=list, description="Targets that took damage"
+    )
+    condition_ended: bool = Field(
+        default=False, description="Whether condition ended (e.g., movement)"
+    )
+
+
+def resolve_scouring_swarm(
+    *,
+    combatant_id: str,
+    is_core_power_active: bool,
+    affected_target_ids: list[str],
+    zone_shape: str = "burst",
+    zone_size: int = 1,
+) -> BalorScouringSwarmResult:
+    """Resolve Scouring Swarm zone damage at start of turn.
+
+    The Balor's Scouring Swarm trait deals kinetic damage to all targets in
+    the zone at the start of the Balor's turn. Damage increases from 2 to 4
+    when the Hellswarm core power is active.
+
+    Args:
+        combatant_id: The Balor combatant ID (source of the swarm)
+        is_core_power_active: Whether Hellswarm core power is currently active
+        affected_target_ids: List of target IDs in the swarm zone
+        zone_shape: Shape of the zone (default: burst)
+        zone_size: Size of the zone (default: 1)
+
+    Returns:
+        BalorScouringSwarmResult with damage application details
+    """
+    damage_per_target = 4 if is_core_power_active else 2
+    damage_dealt = len(affected_target_ids) > 0
+
+    return BalorScouringSwarmResult(
+        damage_dealt=damage_dealt,
+        damage_per_target=damage_per_target,
+        affected_targets=affected_target_ids,
+        is_core_power_active=is_core_power_active,
+    )
+
+
+def resolve_balor_regeneration(
+    *,
+    combatant_id: str,
+    max_hp: int,
+    is_overheated: bool,
+    has_structure_damage: bool,
+    is_core_power_active: bool,
+    current_hp: int,
+) -> BalorRegenerationResult:
+    """Resolve Balor Regeneration trait at end of turn.
+
+    The Balor's Regeneration trait heals 1/4 max HP at end of turn,
+    but pauses if the Balor is overheated, has structure damage,
+    or has the core power active.
+
+    Args:
+        combatant_id: The Balor combatant ID
+        max_hp: Maximum HP for calculating healing amount
+        is_overheated: Whether the Balor is currently overheated
+        has_structure_damage: Whether the Balor has taken structure damage
+        is_core_power_active: Whether Hellswarm core power is active
+        current_hp: Current HP before regeneration
+
+    Returns:
+        BalorRegenerationResult with healing application details
+    """
+    pause_reasons: list[str] = []
+    if is_overheated:
+        pause_reasons.append("overheated")
+    if has_structure_damage:
+        pause_reasons.append("structure_damage")
+    if is_core_power_active:
+        pause_reasons.append("core_power_active")
+
+    was_paused = len(pause_reasons) > 0
+    pause_reason = ", ".join(pause_reasons) if was_paused else None
+
+    if was_paused:
+        return BalorRegenerationResult(
+            healing_applied=False,
+            healing_amount=0,
+            was_paused=True,
+            pause_reason=pause_reason,
+        )
+
+    healing_amount = max(1, max_hp // 4)
+    new_hp = min(current_hp + healing_amount, max_hp)
+    actual_healing = new_hp - current_hp
+
+    return BalorRegenerationResult(
+        healing_applied=actual_healing > 0,
+        healing_amount=actual_healing,
+        was_paused=False,
+        pause_reason=None,
+    )
+
+
+def resolve_self_perpetuating(
+    *,
+    combatant_id: str,
+    current_hp: int,
+    max_hp: int,
+    is_during_rest: bool,
+) -> BalorSelfPerpetuatingResult:
+    """Resolve Balor Self-Perpetuating trait on rest activation.
+
+    The Balor's Self-Perpetuating trait fully restores HP when
+    the Balor takes a rest action.
+
+    Args:
+        combatant_id: The Balor combatant ID
+        current_hp: Current HP before restoration
+        max_hp: Maximum HP
+        is_during_rest: Whether a rest action is being taken
+
+    Returns:
+        BalorSelfPerpetuatingResult with restoration details
+    """
+    if not is_during_rest:
+        return BalorSelfPerpetuatingResult(
+            hp_restored=False,
+            previous_hp=current_hp,
+            new_hp=current_hp,
+        )
+
+    return BalorSelfPerpetuatingResult(
+        hp_restored=True,
+        previous_hp=current_hp,
+        new_hp=max_hp,
+    )
+
+
+def activate_hellswarm_protocol(
+    *,
+    combatant_id: str,
+    adjacent_ally_ids: list[str],
+    structure_damage_marked: int,
+    current_hp: int,
+    max_hp: int,
+    settings: ResolutionSettings | None = None,
+) -> HellswarmProtocolResult:
+    """Activate HELLSWARM protocol (Hellswarm core power).
+
+    The Hellswarm protocol provides the following effects:
+    - Grants soft cover to self and adjacent allies
+    - Applies shredded status to self
+    - At end of turn (if not overheated/structure damage), heals half max HP
+    - Structure damage avoidance: on structure loss, roll 1d6; if 6+, heal to 1 HP
+
+    Args:
+        combatant_id: The Balor combatant ID
+        adjacent_ally_ids: IDs of allies adjacent to the Balor
+        structure_damage_marked: Amount of structure damage marked (triggers avoidance)
+        current_hp: Current HP before any healing
+        max_hp: Maximum HP for calculating healing amount
+        settings: Resolution settings for deterministic rolls
+
+    Returns:
+        HellswarmProtocolResult with protocol activation details
+    """
+    cover_granted = True
+    soft_cover_targets = [combatant_id] + adjacent_ally_ids
+    shredded_applied = True
+
+    structure_avoidance_triggered = structure_damage_marked > 0
+    avoided_structure_damage = False
+    structure_roll: list[int] | None = None
+
+    if structure_avoidance_triggered:
+        roll_result = _roll_dice(1, settings)
+        structure_roll = roll_result
+        if roll_result[0] >= 6:
+            avoided_structure_damage = True
+
+    healing_applied = False
+    healing_amount: int | None = None
+
+    if not structure_avoidance_triggered:
+        healing_amount = max(1, max_hp // 2)
+        new_hp = min(current_hp + healing_amount, max_hp)
+        actual_healing = new_hp - current_hp
+        healing_applied = actual_healing > 0
+        healing_amount = actual_healing if healing_applied else None
+
+    return HellswarmProtocolResult(
+        cover_granted=cover_granted,
+        soft_cover_targets=soft_cover_targets,
+        shredded_applied=shredded_applied,
+        structure_avoidance_triggered=structure_avoidance_triggered,
+        structure_roll=structure_roll,
+        avoided_structure_damage=avoided_structure_damage,
+        healing_applied=healing_applied,
+        healing_amount=healing_amount,
+    )
+
+
+def deploy_hive_drone(
+    *,
+    combatant_id: str,
+    deploy_position: tuple[int, int],
+    enemy_target_ids: list[str],
+) -> HiveDroneResult:
+    """Deploy a Hive Drone to a specific position.
+
+    The Hive Drone creates a burst 2 zone that applies AP kinetic damage
+    to enemies at start of turn and on zone entry.
+
+    Args:
+        combatant_id: The Balor combatant deploying the drone
+        deploy_position: Position to deploy the drone (hex coordinates)
+        enemy_target_ids: IDs of potential enemy targets in range
+
+    Returns:
+        HiveDroneResult with deployment details
+    """
+    return HiveDroneResult(
+        drone_deployed=True,
+        drone_position=deploy_position,
+        damage_dealt=False,
+        affected_targets=[],
+    )
+
+
+def resolve_hive_drone_turn_start(
+    *,
+    drone_position: tuple[int, int],
+    enemy_target_ids: list[str],
+    zone_size: int = 2,
+) -> HiveDroneResult:
+    """Resolve Hive Drone damage at start of turn.
+
+    The Hive Drone deals 1 AP kinetic damage to all enemies in its
+    burst 2 zone at the start of the drone's turn.
+
+    Args:
+        drone_position: Position of the Hive Drone
+        enemy_target_ids: IDs of enemies potentially in the zone
+        zone_size: Size of the drone's burst zone (default: 2)
+
+    Returns:
+        HiveDroneResult with damage application details
+    """
+    damage_dealt = len(enemy_target_ids) > 0
+
+    return HiveDroneResult(
+        drone_deployed=True,
+        drone_position=drone_position,
+        damage_dealt=damage_dealt,
+        affected_targets=enemy_target_ids,
+    )
+
+
+def resolve_hive_drone_zone_entry(
+    *,
+    entering_combatant_id: str,
+    drone_position: tuple[int, int],
+    zone_size: int = 2,
+) -> HiveDroneResult:
+    """Resolve Hive Drone damage on zone entry.
+
+    The Hive Drone deals 1 AP kinetic damage to any combatant
+    that enters its burst 2 zone.
+
+    Args:
+        entering_combatant_id: ID of the combatant entering the zone
+        drone_position: Position of the Hive Drone
+        zone_size: Size of the drone's burst zone (default: 2)
+
+    Returns:
+        HiveDroneResult with damage application details
+    """
+    return HiveDroneResult(
+        drone_deployed=True,
+        drone_position=drone_position,
+        damage_dealt=True,
+        affected_targets=[entering_combatant_id],
+    )
+
+
+def activate_swarm_body(
+    *,
+    combatant_id: str,
+    current_hp: int,
+    has_moved_this_turn: bool,
+    enemy_target_ids: list[str],
+) -> SwarmBodyResult:
+    """Activate Swarm Body zone effect.
+
+    The Swarm Body creates a burst 1 zone around the Balor while the
+    Balor has not moved this turn. Enemies in the zone must pass a
+    systems save or take 3 kinetic damage on turn start and zone entry.
+    The zone ends when the Balor moves.
+
+    Args:
+        combatant_id: The Balor combatant ID
+        current_hp: Current HP (not directly used, for context)
+        has_moved_this_turn: Whether the Balor has moved this turn
+        enemy_target_ids: IDs of enemies potentially in the zone
+
+    Returns:
+        SwarmBodyResult with zone effect details
+    """
+    condition_met = not has_moved_this_turn
+    zone_active = condition_met
+
+    return SwarmBodyResult(
+        zone_active=zone_active,
+        condition_met=condition_met,
+        save_triggered=False,
+        affected_targets=[],
+        damage_per_target=3,
+        damage_applied_to=[],
+        condition_ended=False,
+    )
+
+
+def resolve_swarm_body_turn_start(
+    *,
+    combatant_id: str,
+    has_moved_this_turn: bool,
+    enemy_target_ids: list[str],
+) -> SwarmBodyResult:
+    """Resolve Swarm Body save check at start of turn.
+
+    Enemies in the Swarm Body zone must make a systems save at the
+    start of their turn or take 3 kinetic damage.
+
+    Args:
+        combatant_id: The Balor combatant ID (zone source)
+        has_moved_this_turn: Whether the Balor has moved this turn
+        enemy_target_ids: IDs of enemies in the zone
+
+    Returns:
+        SwarmBodyResult with save and damage details
+    """
+    condition_met = not has_moved_this_turn
+
+    if not condition_met:
+        return SwarmBodyResult(
+            zone_active=False,
+            condition_met=False,
+            save_triggered=False,
+            affected_targets=[],
+            damage_per_target=3,
+            damage_applied_to=[],
+            condition_ended=True,
+        )
+
+    return SwarmBodyResult(
+        zone_active=True,
+        condition_met=True,
+        save_triggered=True,
+        affected_targets=enemy_target_ids,
+        damage_per_target=3,
+        damage_applied_to=enemy_target_ids,
+        condition_ended=False,
+    )
+
+
+def resolve_swarm_body_zone_entry(
+    *,
+    entering_combatant_id: str,
+    balor_has_moved: bool,
+) -> SwarmBodyResult:
+    """Resolve Swarm Body save check on zone entry.
+
+    A combatant entering the Swarm Body zone must make a systems save
+    or take 3 kinetic damage.
+
+    Args:
+        entering_combatant_id: ID of the combatant entering the zone
+        balor_has_moved: Whether the Balor has moved this turn (zone inactive if true)
+
+    Returns:
+        SwarmBodyResult with save and damage details
+    """
+    zone_active = not balor_has_moved
+
+    if not zone_active:
+        return SwarmBodyResult(
+            zone_active=False,
+            condition_met=False,
+            save_triggered=False,
+            affected_targets=[],
+            damage_per_target=3,
+            damage_applied_to=[],
+            condition_ended=False,
+        )
+
+    return SwarmBodyResult(
+        zone_active=True,
+        condition_met=True,
+        save_triggered=True,
+        affected_targets=[entering_combatant_id],
+        damage_per_target=3,
+        damage_applied_to=[entering_combatant_id],
+        condition_ended=False,
+    )
+
+
+def end_swarm_body_condition(
+    *,
+    combatant_id: str,
+) -> SwarmBodyResult:
+    """End Swarm Body zone effect due to movement.
+
+    The Swarm Body zone ends when the Balor moves.
+
+    Args:
+        combatant_id: The Balor combatant ID
+
+    Returns:
+        SwarmBodyResult indicating the condition has ended
+    """
+    return SwarmBodyResult(
+        zone_active=False,
+        condition_met=False,
+        save_triggered=False,
+        affected_targets=[],
+        damage_per_target=3,
+        damage_applied_to=[],
+        condition_ended=True,
+    )
+
+
+class OverchargeEscalationResult(FrozenModel):
+    """Result of computing overcharge escalation state."""
+
+    current_level: int = Field(..., description="Current escalation level (0-3)")
+    next_cost: "int | DiceExpression" = Field(
+        ..., description="Heat cost for next overcharge"
+    )
+    can_overcharge: bool = Field(
+        ..., description="Whether overcharge can be used this turn"
+    )
+    uses_this_turn: int = Field(..., description="Number of overcharge uses this turn")
+
+
+class OverchargeUsageResult(FrozenModel):
+    """Result of using overcharge."""
+
+    level_before: int = Field(..., description="Escalation level before use")
+    level_after: int = Field(..., description="Escalation level after use")
+    cost: "int | DiceExpression" = Field(..., description="Cost of this overcharge")
+    rolled_cost: int | None = Field(
+        default=None, description="Evaluated cost if dice were rolled"
+    )
+    uses_this_turn_before: int = Field(..., description="Uses before this action")
+    uses_this_turn_after: int = Field(..., description="Uses after this action")
+
+
+class OverchargeResetResult(FrozenModel):
+    """Result of resetting overcharge (on full repair)."""
+
+    level_before: int = Field(..., description="Level before reset")
+    level_after: int = Field(..., description="Level after reset (always 0)")
+    uses_cleared: bool = Field(..., description="Whether uses_this_turn was cleared")
+
+
+from core.mech.combat_state import OverchargeState
+
+
+def compute_overcharge_escalation(
+    overcharge_state: OverchargeState | None,
+) -> OverchargeEscalationResult:
+    """Compute the current overcharge escalation state for a combatant.
+
+    Args:
+        overcharge_state: Current overcharge state (None for initial)
+
+    Returns:
+        OverchargeEscalationResult with current escalation info
+    """
+    if overcharge_state is None:
+        overcharge_state = OverchargeState()
+
+    return OverchargeEscalationResult(
+        current_level=overcharge_state.current_level,
+        next_cost=overcharge_state.next_cost,
+        can_overcharge=overcharge_state.can_overcharge,
+        uses_this_turn=overcharge_state.uses_this_turn,
+    )
+
+
+def use_overcharge(
+    overcharge_state: OverchargeState | None,
+    force_roll: int | None = None,
+) -> tuple[OverchargeState, OverchargeUsageResult]:
+    """Use overcharge, escalating the cost level.
+
+    Args:
+        overcharge_state: Current overcharge state (None for initial)
+        force_roll: Optional forced roll value for deterministic testing
+
+    Returns:
+        Tuple of (updated OverchargeState, OverchargeUsageResult)
+    """
+    from core.mech.rules import DEFAULT_OVERCHARGE_RULES
+
+    rules = DEFAULT_OVERCHARGE_RULES
+
+    if overcharge_state is None:
+        overcharge_state = OverchargeState()
+
+    level_before = overcharge_state.current_level
+    uses_before = overcharge_state.uses_this_turn
+
+    cost = rules.costs[level_before]
+    rolled_cost: int | None = None
+
+    if isinstance(cost, DiceExpression):
+        if force_roll is not None:
+            rolled_cost = force_roll
+        else:
+            roll_result = cost.roll()
+            rolled_cost = sum(roll_result) if roll_result else 0
+    else:
+        rolled_cost = cost
+
+    new_level = min(level_before + 1, 3)
+    new_uses = uses_before + 1
+
+    new_state = OverchargeState(
+        current_level=new_level,
+        uses_this_turn=new_uses,
+    )
+
+    result = OverchargeUsageResult(
+        level_before=level_before,
+        level_after=new_level,
+        cost=cost,
+        rolled_cost=rolled_cost,
+        uses_this_turn_before=uses_before,
+        uses_this_turn_after=new_uses,
+    )
+
+    return new_state, result
+
+
+def reset_overcharge(
+    overcharge_state: OverchargeState | None,
+) -> tuple[OverchargeState, OverchargeResetResult]:
+    """Reset overcharge escalation (called on full repair).
+
+    Args:
+        overcharge_state: Current overcharge state (None for initial)
+
+    Returns:
+        Tuple of (reset OverchargeState, OverchargeResetResult)
+    """
+    if overcharge_state is None:
+        return OverchargeState(), OverchargeResetResult(
+            level_before=0, level_after=0, uses_cleared=True
+        )
+
+    result = OverchargeResetResult(
+        level_before=overcharge_state.current_level,
+        level_after=0,
+        uses_cleared=overcharge_state.uses_this_turn > 0,
+    )
+
+    return OverchargeState(), result
+
+
+def increment_overcharge_on_turn_start(
+    overcharge_state: OverchargeState | None,
+) -> OverchargeState:
+    """Reset overcharge uses at the start of a new turn.
+
+    Args:
+        overcharge_state: Current overcharge state (None for initial)
+
+    Returns:
+        Updated OverchargeState with uses_this_turn reset to 0
+    """
+    if overcharge_state is None:
+        return OverchargeState()
+
+    if overcharge_state.uses_this_turn == 0:
+        return overcharge_state
+
+    return OverchargeState(
+        current_level=overcharge_state.current_level,
+        uses_this_turn=0,
+    )
+
+
+class DeploymentResult(FrozenModel):
+    """Result of deploying an object."""
+
+    deployable_id: str
+    deployable_name: str
+    kind: Literal["drone", "mine", "deployable", "other"]
+    owner_id: str | None
+    position_q: int
+    position_r: int
+    size: int
+    hp: int
+    max_hp: int
+    evasion: int
+    is_armed: bool = False
+    arming_turn: int | None = None
+
+
+class DeployableDamageResult(FrozenModel):
+    """Result of damaging a deployable."""
+
+    deployable_id: str
+    damage_dealt: int
+    hp_before: int
+    hp_after: int
+    is_destroyed: bool
+    destroyed: bool = False
+
+
+class DroneActionResult(FrozenModel):
+    """Result of a drone taking action on owner's turn."""
+
+    deployable_id: str
+    drone_name: str
+    action_taken: str
+    can_act: bool
+    can_move: bool
+
+
+class MineTriggerResult(FrozenModel):
+    """Result of a mine being triggered."""
+
+    mine_id: str
+    mine_name: str
+    triggered_by_id: str
+    triggered_by_name: str
+    was_armed: bool
+    detonated: bool
+    position_q: int
+    position_r: int
+
+
+class DangerZoneStatus(FrozenModel):
+    """Danger zone status for a combatant."""
+
+    combatant_id: str
+    combatant_name: str
+    heat_current: int
+    heat_cap: int
+    danger_zone_threshold: int
+    in_danger_zone: bool
+
+
+def deploy_object(
+    *,
+    scenario: MechCombatScenario,
+    deployable_id: str,
+    name: str,
+    kind: Literal["drone", "mine", "deployable", "other"],
+    owner_id: str | None,
+    position: HexPosition,
+    size: int,
+    hp: int,
+    max_hp: int,
+    armor: int = 0,
+    evasion: int = 5,
+    cover: Literal["soft", "hard"] | None = None,
+    can_act: bool = False,
+    can_move: bool = False,
+    acts_on_owner_turn: bool = True,
+    is_armed: bool = False,
+    arming_turn: int | None = None,
+    trigger_on_adjacent_entry: bool = False,
+    detection_dc: int | None = None,
+    disarm_dc: int | None = None,
+    e_defense: int = 10,
+    reactions: list[str] | None = None,
+) -> tuple[MechCombatScenario, DeploymentResult]:
+    """Deploy an object (drone, mine, or deployable) to a position.
+
+    Per PR2 rules:
+    - Deployables: Quick action, free adjacent valid space, 10 HP/size, evasion 5
+    - Drones: Size ½, evasion 10, HP 10, armor 0, act on owner's turn
+    - Mines: Quick action, free adjacent space, arm at start of next turn
+
+    Args:
+        scenario: Current combat scenario
+        deployable_id: Unique ID for this deployable
+        name: Display name
+        kind: Type of deployable
+        owner_id: ID of who deployed it
+        position: Position to deploy at
+        size: Size category
+        hp: Current HP
+        max_hp: Maximum HP
+        armor: Armor value (default 0)
+        evasion: Evasion value (default 5 for deployables, 10 for drones)
+        cover: Cover type if any
+        can_act: Whether drone can take actions
+        can_move: Whether drone can move
+        acts_on_owner_turn: Whether drone acts on owner's turn
+        is_armed: Whether mine is already armed
+        arming_turn: Turn number when mine will arm
+        trigger_on_adjacent_entry: Whether mine triggers on adjacent entry
+        detection_dc: Systems check DC to detect
+        disarm_dc: Systems check DC to disarm
+        e_defense: E-Defense value
+        reactions: Available reactions
+
+    Returns:
+        Tuple of (updated MechCombatScenario, DeploymentResult)
+    """
+    from core.mech.combat_state import DeployableState
+
+    deployable = DeployableState(
+        id=deployable_id,
+        name=name,
+        kind=kind,
+        owner_id=owner_id,
+        position=position,
+        size=size,
+        hp=hp,
+        max_hp=max_hp,
+        armor=armor,
+        evasion=evasion,
+        cover=cover,
+        can_act=can_act,
+        can_move=can_move,
+        acts_on_owner_turn=acts_on_owner_turn,
+        is_armed=is_armed,
+        arming_turn=arming_turn,
+        trigger_on_adjacent_entry=trigger_on_adjacent_entry,
+        detection_dc=detection_dc,
+        disarm_dc=disarm_dc,
+        e_defense=e_defense,
+        reactions=reactions or [],
+    )
+
+    new_scenario = MechCombatScenario(
+        combatants=scenario.combatants,
+        grapples=scenario.grapples,
+        rounds=scenario.rounds,
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables={**scenario.deployables, deployable_id: deployable},
+    )
+
+    result = DeploymentResult(
+        deployable_id=deployable_id,
+        deployable_name=name,
+        kind=kind,
+        owner_id=owner_id,
+        position_q=position.coord.q,
+        position_r=position.coord.r,
+        size=size,
+        hp=hp,
+        max_hp=max_hp,
+        evasion=evasion,
+        is_armed=is_armed,
+        arming_turn=arming_turn,
+    )
+
+    return new_scenario, result
+
+
+def damage_deployable(
+    *,
+    scenario: MechCombatScenario,
+    deployable_id: str,
+    damage: int,
+    armor_piercing: int = 0,
+) -> tuple[MechCombatScenario, DeployableDamageResult]:
+    """Apply damage to a deployable.
+
+    Args:
+        scenario: Current combat scenario
+        deployable_id: ID of deployable to damage
+        damage: Amount of damage
+        armor_piercing: Armor piercing value
+
+    Returns:
+        Tuple of (updated MechCombatScenario, DeployableDamageResult)
+    """
+    if deployable_id not in scenario.deployables:
+        raise ValueError(f"Deployable {deployable_id} not found in scenario")
+
+    deployable = scenario.deployables[deployable_id]
+    hp_before = deployable.hp
+
+    effective_armor = max(0, deployable.armor - armor_piercing)
+    net_damage = max(0, damage - effective_armor)
+    new_hp = max(0, deployable.hp - net_damage)
+    is_destroyed = new_hp == 0
+
+    updated_deployable = DeployableState(
+        **{
+            k: v
+            for k, v in deployable.model_dump().items()
+            if k not in ("hp", "is_destroyed")
+        },
+        hp=new_hp,
+        is_destroyed=is_destroyed,
+    )
+
+    new_scenario = MechCombatScenario(
+        combatants=scenario.combatants,
+        grapples=scenario.grapples,
+        rounds=scenario.rounds,
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables={**scenario.deployables, deployable_id: updated_deployable},
+    )
+
+    result = DeployableDamageResult(
+        deployable_id=deployable_id,
+        damage_dealt=net_damage,
+        hp_before=hp_before,
+        hp_after=new_hp,
+        is_destroyed=is_destroyed,
+        destroyed=is_destroyed,
+    )
+
+    return new_scenario, result
+
+
+def check_mine_trigger(
+    scenario: MechCombatScenario,
+    moving_combatant_id: str,
+    new_position: HexPosition,
+) -> list[MineTriggerResult]:
+    """Check if any armed mines are triggered by moving to a position.
+
+    Per PR2: Mines trigger when any character enters an adjacent space.
+    Leaving a space does NOT trigger mines.
+
+    Args:
+        scenario: Current combat scenario
+        moving_combatant_id: ID of combatant moving
+        new_position: Position being moved to
+
+    Returns:
+        List of MineTriggerResult for each triggered mine
+    """
+    from core.mech.grid import HexCoord
+
+    moving_combatant = None
+    for c in scenario.combatants:
+        if c.id == moving_combatant_id:
+            moving_combatant = c
+            break
+
+    if moving_combatant is None:
+        return []
+
+    results = []
+
+    for mine_id, mine in scenario.deployables.items():
+        if mine.kind != "mine" or not mine.is_armed:
+            continue
+
+        mine_coord = HexCoord(q=mine.position.coord.q, r=mine.position.coord.r)
+        new_coord = HexCoord(q=new_position.coord.q, r=new_position.coord.r)
+
+        if mine_coord.is_adjacent(new_coord):
+            result = MineTriggerResult(
+                mine_id=mine_id,
+                mine_name=mine.name,
+                triggered_by_id=moving_combatant_id,
+                triggered_by_name=moving_combatant.name
+                if moving_combatant
+                else "Unknown",
+                was_armed=mine.is_armed,
+                detonated=True,
+                position_q=mine.position.coord.q,
+                position_r=mine.position.coord.r,
+            )
+            results.append(result)
+
+    return results
+
+
+def get_combatants_in_danger_zone(
+    scenario: MechCombatScenario,
+    danger_zone_fraction: float = 0.5,
+    rounding: Literal["up", "down"] = "up",
+) -> list[DangerZoneStatus]:
+    """Get all combatants currently in danger zone.
+
+    Per PR2: When a mech has 1/2 of its total heat capacity filled (rounded up),
+    it's in the danger zone.
+
+    Args:
+        scenario: Current combat scenario
+        danger_zone_fraction: Fraction of heat cap for danger zone
+        rounding: How to round the threshold
+
+    Returns:
+        List of DangerZoneStatus for each combatant
+    """
+    results = []
+
+    for combatant in scenario.combatants:
+        if combatant.resources.heat_cap <= 0:
+            continue
+
+        if rounding == "up":
+            threshold = int(
+                (combatant.resources.heat_cap * danger_zone_fraction) + 0.999
+            )
+        else:
+            threshold = int(combatant.resources.heat_cap * danger_zone_fraction)
+
+        in_danger = combatant.resources.heat_current >= threshold
+
+        status = DangerZoneStatus(
+            combatant_id=combatant.id,
+            combatant_name=combatant.name,
+            heat_current=combatant.resources.heat_current,
+            heat_cap=combatant.resources.heat_cap,
+            danger_zone_threshold=threshold,
+            in_danger_zone=in_danger,
+        )
+        results.append(status)
+
+    return results

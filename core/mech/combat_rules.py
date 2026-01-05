@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 
-from core.shared.enums import DamageType
+from core.shared.enums import DamageType, SizeClass
 from core.shared.dice import DiceExpression
 from core.mech.rules import (
     ActionEconomyRules,
@@ -64,6 +64,7 @@ class TerrainRules(FrozenModel):
     difficult_terrain_cost: int = Field(default=2, ge=1)
     dangerous_terrain_check_skill: Literal["engineering"] = "engineering"
     dangerous_terrain_damage: int = Field(default=5, ge=0)
+    dangerous_terrain_damage_type: DamageType = "kinetic"
     dangerous_terrain_check_once_per_round: bool = True
     climb_cost: int = Field(default=2, ge=1)
 
@@ -492,3 +493,32 @@ class MechCombatRules(FrozenModel):
 
 
 DEFAULT_MECH_COMBAT_RULES = MechCombatRules()
+
+
+class TagDefaultRules(FrozenModel):
+    """Default rules for tag behaviors per PR2.
+
+    - Deployable: 10 HP/size, evasion 5, default armor 0
+    - Drone: size ½, evasion 10, HP 10, armor 0, acts on owner's turn
+    - Mine: arms at start of next turn (1 turn delay), triggers on adjacent entry
+    - Danger Zone: 1/2 heat cap (rounded up by default)
+    """
+
+    deployable_default_hp_per_size: int = Field(default=10, ge=1)
+    deployable_default_evasion: int = Field(default=5, ge=0)
+    deployable_default_armor: int = Field(default=0, ge=0)
+
+    drone_default_size: SizeClass = "size_half"
+    drone_default_hp: int = Field(default=10, ge=1)
+    drone_default_evasion: int = Field(default=10, ge=0)
+    drone_default_armor: int = Field(default=0, ge=0)
+    drone_default_e_defense: int = Field(default=10, ge=0)
+    drone_acts_on_owner_turn: bool = True
+
+    mine_arming_delay_turns: int = Field(default=1, ge=0)
+    mine_default_trigger_adjacent: bool = True
+    mine_default_detection_dc: int | None = Field(default=None, ge=0)
+    mine_default_disarm_dc: int | None = Field(default=None, ge=0)
+
+    danger_zone_fraction: float = Field(default=0.5, ge=0.0, le=1.0)
+    danger_zone_rounding: Literal["up", "down"] = "up"

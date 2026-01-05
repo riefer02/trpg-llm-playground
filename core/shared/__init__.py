@@ -20,6 +20,7 @@ from core.shared.dice import (
     roll_dice,
     roll_accuracy_difficulty,
     roll_with_advantage,
+    round_up,
 )
 from core.shared.payloads import (
     AttackVs,
@@ -295,6 +296,7 @@ __all__ = [
     "roll_dice",
     "roll_accuracy_difficulty",
     "roll_with_advantage",
+    "round_up",
     # Payloads
     "AttackVs",
     "DamageSpecBase",
