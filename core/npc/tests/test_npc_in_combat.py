@@ -129,6 +129,7 @@ class TestNPCTierScalingInCombat:
             name="Test T1",
             npc_class="grunt",
             tier="tier_1",
+            role="striker",
             stats=NPCStats(
                 base=NPCStatsBase(
                     hp_base=10,
@@ -149,6 +150,7 @@ class TestNPCTierScalingInCombat:
             name="Test T2",
             npc_class="grunt",
             tier="tier_2",
+            role="striker",
             stats=NPCStats(
                 base=NPCStatsBase(
                     hp_base=10,
@@ -173,6 +175,7 @@ class TestNPCTierScalingInCombat:
             name="Test T3",
             npc_class="boss",
             tier="tier_3",
+            role="defender",
             stats=NPCStats(
                 base=NPCStatsBase(
                     hp_base=10,

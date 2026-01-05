@@ -78,7 +78,7 @@ class NPCAbility(FrozenModel):
     name: str
     trigger: NPCAbilityTriggerType
     effect: MechanicalEffect = Field(default_factory=MechanicalEffect)
-    uses_per_combat: int | None = None  # None = unlimited
+    uses_per_combat: int | None = None
 
 
 class NPCGear(FrozenModel):
@@ -93,6 +93,9 @@ class NPCGear(FrozenModel):
     effect: MechanicalEffect = Field(default_factory=MechanicalEffect)
 
 
+NPCRole = Literal["striker", "defender", "controller", "supporter"]
+
+
 class NPCTemplate(FrozenModel):
     """Template for creating NPCs with class, tier, and abilities.
 
@@ -105,6 +108,7 @@ class NPCTemplate(FrozenModel):
     description: str = ""
     npc_class: NPCClass
     tier: NPCTier = "tier_1"
+    role: NPCRole
     stats: NPCStats
     abilities: list[NPCAbility] = Field(default_factory=list)
     gear: list[NPCGear] = Field(default_factory=list)

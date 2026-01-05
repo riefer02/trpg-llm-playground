@@ -57,6 +57,8 @@ class PilotAreaEffect(AreaEffectBase):
     """Area effect payload for pilot gear."""
 
     damage: PilotDamageSpec | None = None
+    object_damage: PilotDamageSpec | None = None
+    objects_auto_hit: bool = False
 
 
 PilotWeaponRangeType = Literal["range", "threat"]
@@ -68,6 +70,7 @@ class PilotWeaponProfile(FrozenModel):
     range_type: PilotWeaponRangeType
     range: int = Field(..., ge=0)
     damage: PilotDamageSpec
+    loaded: bool = True
 
 
 class GrenadePayloadBase(FrozenModel):

@@ -154,7 +154,11 @@ from core.mech.combat_state import (
     CombatRound,
     MechCombatScenario,
 )
-from core.mech.combat_validation import CombatValidationIssue, CombatValidation, validate_combat_scenario
+from core.mech.combat_validation import (
+    CombatValidationIssue,
+    CombatValidation,
+    validate_combat_scenario,
+)
 from core.mech.combat_resolution import (
     DiceRollResult,
     StructureResolution,
@@ -163,6 +167,16 @@ from core.mech.combat_resolution import (
     SystemTraumaSelection,
     resolve_structure_damage,
     resolve_overheat,
+)
+from core.mech.tech_actions import (
+    resolve_scan,
+    resolve_bolster,
+    resolve_lock_on,
+    resolve_invade,
+    ScanResult,
+    BolsterResult,
+    LockOnResult,
+    InvadeResult,
 )
 from core.mech.system import (
     AreaEffect,
@@ -195,7 +209,11 @@ from core.mech.build import (
     build_installed_system,
     build_mech_from_compendium,
 )
-from core.mech.validation import MechBuildIssue, MechBuildValidation, validate_mech_build
+from core.mech.validation import (
+    MechBuildIssue,
+    MechBuildValidation,
+    validate_mech_build,
+)
 from core.mech.examples import (
     build_example_everest_frame,
     build_example_raleigh_frame,
@@ -401,6 +419,14 @@ __all__ = [
     "SystemTraumaSelection",
     "resolve_structure_damage",
     "resolve_overheat",
+    "resolve_scan",
+    "resolve_bolster",
+    "resolve_lock_on",
+    "resolve_invade",
+    "ScanResult",
+    "BolsterResult",
+    "LockOnResult",
+    "InvadeResult",
     "MechSystemDefinition",
     "DamageSpec",
     "AreaEffect",

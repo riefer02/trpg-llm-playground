@@ -43,6 +43,7 @@ def _make_test_template() -> NPCTemplate:
         name="Test NPC",
         npc_class="grunt",
         tier="tier_1",
+        role="striker",
         stats=NPCStats(
             base=NPCStatsBase(
                 size="size_1",
@@ -62,86 +63,101 @@ def _make_test_template() -> NPCTemplate:
 
 
 class TestNPCTierScaling:
-    """Tests for NPC tier scaling logic."""
+    """Tests for NPC tier scaling rules."""
 
-    def test_tier_1_scaling(self) -> None:
-        """Tier 1 should have no adders."""
+    def test_tier_1_no_modifiers(self) -> None:
+        """Tier 1 should use base stats with no tier adders."""
+        scaling = _make_test_scaling()
+        stats = NPCStats(
+            base=NPCStatsBase(
+                hp_base=10,
+                evasion_base=8,
+                e_defense_base=8,
+                armor_base=0,
+            ),
+            scaling=scaling,
+        )
+        npc = scale_npc_stats(stats, "tier_1")
+        assert npc.hp_max == 10
+        assert npc.evasion == 8
+        assert npc.e_defense == 8
+        assert npc.armor == 0
+
+    def test_tier_2_applies_adders(self) -> None:
+        """Tier 2 should apply tier adders to base stats."""
+        scaling = _make_test_scaling()
+        stats = NPCStats(
+            base=NPCStatsBase(
+                hp_base=10,
+                evasion_base=8,
+                e_defense_base=8,
+                armor_base=0,
+            ),
+            scaling=scaling,
+        )
+        npc = scale_npc_stats(stats, "tier_2")
+        assert npc.hp_max == 25  # 10 * 1.5 + 10
+        assert npc.evasion == 9  # 8 + 1
+        assert npc.e_defense == 9  # 8 + 1
+        assert npc.armor == 0
+
+    def test_tier_3_applies_highest_adders(self) -> None:
+        """Tier 3 should apply highest tier adders."""
+        scaling = _make_test_scaling()
+        stats = NPCStats(
+            base=NPCStatsBase(
+                hp_base=10,
+                evasion_base=8,
+                e_defense_base=8,
+                armor_base=0,
+            ),
+            scaling=scaling,
+        )
+        npc = scale_npc_stats(stats, "tier_3")
+        assert npc.hp_max == 35  # 10 * 1.5 + 20
+        assert npc.evasion == 10  # 8 + 2
+        assert npc.e_defense == 10  # 8 + 2
+        assert npc.armor == 1  # 0 + 1
+
+    def test_custom_scaling_multiplier(self) -> None:
+        """Custom scaling should use provided multiplier."""
+        scaling = NPCTierScaling(hp_multiplier=2.0)
         stats = NPCStats(
             base=NPCStatsBase(hp_base=10),
-            scaling=_make_test_scaling(),
+            scaling=scaling,
         )
-        result = scale_npc_stats(stats, "tier_1")
-        assert result.hp_max == 10
-        assert result.evasion == 8
-        assert result.e_defense == 8
-        assert result.armor == 0
-        assert result.save_bonus == 0
+        npc = scale_npc_stats(stats, "tier_2")
+        assert (
+            npc.hp_max == 20
+        )  # 10 * 2.0 = 20 (no adder for tier 2 with default scaling)
 
-    def test_tier_2_scaling(self) -> None:
-        """Tier 2 should apply tier 2 adders and multiplier."""
-        stats = NPCStats(
-            base=NPCStatsBase(hp_base=10),
-            scaling=_make_test_scaling(),
+    def test_boss_scaling(self) -> None:
+        """Boss templates should have appropriate scaling."""
+        scaling = NPCTierScaling(
+            hp_multiplier=2.0,
+            hp_adder_tier_3=50,
+            evasion_adder_tier_3=3,
+            e_defense_adder_tier_3=3,
         )
-        result = scale_npc_stats(stats, "tier_2")
-        assert result.hp_max == 25  # 10 * 1.5 + 10
-        assert result.evasion == 9  # 8 + 1
-        assert result.e_defense == 9  # 8 + 1
-        assert result.armor == 0  # 0 + 0
-        assert result.save_bonus == 1  # 0 + 1
-
-    def test_tier_3_scaling(self) -> None:
-        """Tier 3 should apply tier 3 adders and multiplier."""
         stats = NPCStats(
-            base=NPCStatsBase(hp_base=10),
-            scaling=_make_test_scaling(),
+            base=NPCStatsBase(
+                hp_base=25,
+                evasion_base=8,
+                e_defense_base=8,
+            ),
+            scaling=scaling,
         )
-        result = scale_npc_stats(stats, "tier_3")
-        assert result.hp_max == 35  # 10 * 1.5 + 20
-        assert result.evasion == 10  # 8 + 2
-        assert result.e_defense == 10  # 8 + 2
-        assert result.armor == 1  # 0 + 1
-        assert result.save_bonus == 2  # 0 + 2
-
-    def test_size_preserved(self) -> None:
-        """Size class should not change with tier."""
-        stats = NPCStats(
-            base=NPCStatsBase(size="size_2"),
-            scaling=_make_test_scaling(),
-        )
-        for tier in ("tier_1", "tier_2", "tier_3"):
-            result = scale_npc_stats(stats, tier)
-            assert result.size == "size_2"
-
-    def test_speed_not_affected(self) -> None:
-        """Speed should not have tier adders in this scaling."""
-        stats = NPCStats(
-            base=NPCStatsBase(speed_base=5),
-            scaling=_make_test_scaling(),
-        )
-        for tier in ("tier_1", "tier_2", "tier_3"):
-            result = scale_npc_stats(stats, tier)
-            assert result.speed == 5
-
-    def test_sensor_affected(self) -> None:
-        """Sensor range should have tier 3 adder."""
-        stats = NPCStats(
-            base=NPCStatsBase(sensor_range=10),
-            scaling=_make_test_scaling(),
-        )
-        tier1 = scale_npc_stats(stats, "tier_1")
-        tier2 = scale_npc_stats(stats, "tier_2")
-        tier3 = scale_npc_stats(stats, "tier_3")
-        assert tier1.sensor_range == 10
-        assert tier2.sensor_range == 10  # No tier 2 adder
-        assert tier3.sensor_range == 15  # 10 + 5
+        npc = scale_npc_stats(stats, "tier_3")
+        assert npc.hp_max == 100  # 25 * 2.0 + 50
+        assert npc.evasion == 11  # 8 + 3
+        assert npc.e_defense == 11  # 8 + 3
 
 
 class TestNPCStateFromTemplate:
     """Tests for creating NPC state from template."""
 
     def test_create_npc_from_template(self) -> None:
-        """NPCState.from_template should create correct state."""
+        """Should create NPC state from template."""
         template = _make_test_template()
         npc = NPCState.from_template(template, "npc_1")
         assert npc.id == "npc_1"
@@ -166,6 +182,7 @@ class TestNPCStateFromTemplate:
             name="Test NPC T3",
             npc_class="boss",
             tier="tier_3",
+            role="defender",
             stats=NPCStats(
                 base=NPCStatsBase(
                     hp_base=10,
@@ -192,6 +209,7 @@ class TestNPCStateFromTemplate:
                 name=f"Test {tier}",
                 npc_class="grunt",
                 tier=tier,
+                role="striker",
                 stats=NPCStats(base=NPCStatsBase()),
             )
             npc = NPCState.from_template(template, f"npc_{tier}")

@@ -2,31 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Literal, TYPE_CHECKING
-from pydantic import Field
-from core.shared.models import FrozenModel
+from typing import TYPE_CHECKING
+from core.shared.validation import ValidationIssue, ValidationResult
 
 from core.pilot.progression import get_level_progression
 
 if TYPE_CHECKING:
     from core.pilot.pilot import Pilot
 
-
-class ProgressionIssue(FrozenModel):
-    """A progression validation issue."""
-
-    code: str
-    message: str
-    severity: Literal["error", "warning"] = "error"
+ProgressionIssue = ValidationIssue
 
 
-
-class ProgressionValidation(FrozenModel):
+class ProgressionValidation(ValidationResult):
     """Validation result for pilot progression."""
-
-    valid: bool
-    issues: list[ProgressionIssue] = Field(default_factory=list)
-
 
 
 def validate_pilot_progression(pilot: Pilot) -> ProgressionValidation:
@@ -122,7 +110,10 @@ def validate_pilot_progression(pilot: Pilot) -> ProgressionValidation:
                     message="LL0 pilots must have exactly three rank I talents.",
                 )
             )
-        if pilot.total_trigger_points() != progression.pilot_trigger_points or len(pilot.triggers) != 4:
+        if (
+            pilot.total_trigger_points() != progression.pilot_trigger_points
+            or len(pilot.triggers) != 4
+        ):
             issues.append(
                 ProgressionIssue(
                     code="ll0_trigger_points_invalid",
@@ -178,4 +169,6 @@ def validate_pilot_progression(pilot: Pilot) -> ProgressionValidation:
             )
         )
 
-    return ProgressionValidation(valid=not any(i.severity == "error" for i in issues), issues=issues)
+    return ProgressionValidation(
+        valid=not any(i.severity == "error" for i in issues), issues=issues
+    )

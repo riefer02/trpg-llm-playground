@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Literal
 from collections import Counter
+from typing import TYPE_CHECKING
 from pydantic import Field
-from core.shared.models import FrozenModel
+from core.shared.validation import ValidationIssue, ValidationResult
+from core.shared.effects import MechanicalEffect, OverchargeCostCapEffect, ModeEffect
+from core.shared.effects_validation import validate_mechanical_effects
 
 from core.mech.build import (
     MechBuild,
@@ -21,29 +23,20 @@ from core.mech.weapon import MechWeaponDefinition, WeaponSize
 from core.mech.system import MechSystemDefinition
 from core.pilot.skill import SkillSet
 from core.pilot.license import License
-from core.shared.effects import MechanicalEffect, OverchargeCostCapEffect, ModeEffect
-from core.shared.effects_validation import validate_mechanical_effects
+
+if TYPE_CHECKING:
+    from typing import Literal
+
+MechBuildIssue = ValidationIssue
 
 
-class MechBuildIssue(FrozenModel):
-    """A mech build validation issue."""
-
-    code: str
-    message: str
-    severity: Literal["error", "warning"] = "error"
-
-
-
-class MechBuildValidation(FrozenModel):
+class MechBuildValidation(ValidationResult):
     """Validation result for a mech build."""
 
-    valid: bool
-    issues: list[MechBuildIssue] = Field(default_factory=list)
     limited_uses: LimitedUseSummary = Field(default_factory=LimitedUseSummary)
     overcharge_cost_caps: list[OverchargeCostCapEffect] = Field(default_factory=list)
     ai_system_limit: int | None = None
     mode_effects: list[ModeEffect] = Field(default_factory=list)
-
 
 
 def _validate_mount_allocation(
@@ -106,9 +99,7 @@ def _validate_mount_allocation(
                 issues.append(
                     MechBuildIssue(
                         code="weapon_size_not_allowed",
-                        message=(
-                            f"Mount {index} does not allow weapon size '{size}'."
-                        ),
+                        message=(f"Mount {index} does not allow weapon size '{size}'."),
                     )
                 )
 
@@ -204,7 +195,10 @@ def _validate_integrated_weapon_restrictions(
         definition = weapon_definitions.get(mounted.weapon_id)
         if not definition or not definition.integrated_only:
             continue
-        if definition.integrated_frame_id and frame.id != definition.integrated_frame_id:
+        if (
+            definition.integrated_frame_id
+            and frame.id != definition.integrated_frame_id
+        ):
             issues.append(
                 MechBuildIssue(
                     code="integrated_weapon_frame_mismatch",
@@ -290,10 +284,14 @@ def _validate_superheavy(
     issues: list[MechBuildIssue] = []
     mount_slots = mounts or frame.mounts
     available_mounts = [
-        index for index, slot in enumerate(mount_slots) if slot.slot_type != "integrated"
+        index
+        for index, slot in enumerate(mount_slots)
+        if slot.slot_type != "integrated"
     ]
     superheavy_mounts = [
-        mounted.mount_index for mounted in build.weapons if mounted.weapon_size == "superheavy"
+        mounted.mount_index
+        for mounted in build.weapons
+        if mounted.weapon_size == "superheavy"
     ]
     if not superheavy_mounts:
         return issues
@@ -433,7 +431,10 @@ def validate_mech_build(
     issues: list[MechBuildIssue] = []
 
     if weapon_definitions is None or system_definitions is None:
-        from core.mech.compendium import WEAPON_DEFINITIONS_BY_ID, SYSTEM_DEFINITIONS_BY_ID
+        from core.mech.compendium import (
+            WEAPON_DEFINITIONS_BY_ID,
+            SYSTEM_DEFINITIONS_BY_ID,
+        )
 
         weapon_definitions = weapon_definitions or WEAPON_DEFINITIONS_BY_ID
         system_definitions = system_definitions or SYSTEM_DEFINITIONS_BY_ID
@@ -459,7 +460,9 @@ def validate_mech_build(
 
     issues.extend(_validate_mount_allocation(frame, build, mounts=effective_mounts))
     issues.extend(_validate_superheavy(frame, build, mounts=effective_mounts))
-    issues.extend(_validate_system_points(frame, build, skills, grit, system_definitions))
+    issues.extend(
+        _validate_system_points(frame, build, skills, grit, system_definitions)
+    )
     issues.extend(_validate_unique_tags(build, weapon_definitions, system_definitions))
     issues.extend(
         _validate_integrated_weapon_restrictions(
@@ -530,7 +533,9 @@ def validate_mech_build(
 
     stats = compute_mech_stats(frame, skills, grit, bonus_effects=bonus_effects)
     ai_system_limit = stats.ai_system_limit
-    issues.extend(_validate_ai_system_limits(build, system_definitions, ai_system_limit))
+    issues.extend(
+        _validate_ai_system_limits(build, system_definitions, ai_system_limit)
+    )
     limited_uses = compute_limited_uses(
         build,
         stats,

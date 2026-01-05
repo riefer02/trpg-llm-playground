@@ -51,12 +51,26 @@ class RollModifiers(FrozenModel):
     flat_bonus: FlatBonus | None = None
 
 
+class DifficultyModifier(FrozenModel):
+    """Difficulty modifier for a roll (typically +1, extendable for special cases)."""
+
+    value: int = Field(
+        default=1,
+        ge=1,
+        description="Difficulty value (+1 standard, higher for extreme cases)",
+    )
+    reason: str = Field(default="", description="Why the check is difficult")
+
+
 class SkillCheck(FrozenModel):
     """A narrative skill check (target 10 by default)."""
 
     roll_type: Literal["skill_check"] = "skill_check"
     target: int = Field(default=10, ge=0)
     modifiers: RollModifiers = Field(default_factory=RollModifiers)
+    is_difficult: bool = Field(
+        default=False, description="Adds +1 difficulty per PR2 rules"
+    )
 
 
 class AttackRoll(FrozenModel):

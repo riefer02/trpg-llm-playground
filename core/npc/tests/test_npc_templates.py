@@ -90,6 +90,7 @@ class TestNPCTemplateValidation:
             id="test_duplicate",
             name="Test NPC",
             npc_class="grunt",
+            role="striker",
             stats=NPCStats(base=NPCStatsBase()),
             abilities=[
                 NPCAbility(id="same_id", name="Ability 1", trigger="on_hit"),
@@ -110,6 +111,7 @@ class TestNPCTemplateValidation:
             id="test_invalid_uses",
             name="Test NPC",
             npc_class="grunt",
+            role="striker",
             stats=NPCStats(base=NPCStatsBase()),
             abilities=[
                 NPCAbility(
@@ -134,6 +136,7 @@ class TestNPCTemplateValidation:
             id="test_gear",
             name="Test NPC",
             npc_class="elite",
+            role="defender",
             stats=NPCStats(base=NPCStatsBase()),
             gear=[NPCGear(weapon_id=f"weapon_{i}") for i in range(7)],
         )
@@ -154,6 +157,7 @@ class TestNPCTemplateStructure:
         assert template.name
         assert template.npc_class in ("grunt", "elite", "boss", "specialist")
         assert template.tier in ("tier_1", "tier_2", "tier_3")
+        assert template.role in ("striker", "defender", "controller", "supporter")
         assert template.stats is not None
         assert template.stats.base is not None
 
@@ -175,3 +179,40 @@ class TestNPCTemplateStructure:
             assert has_gear or has_abilities, (
                 f"Template {template.id} has no gear or abilities"
             )
+
+
+class TestNPCTemplateRoles:
+    """Tests for NPC template role assignments."""
+
+    def test_striker_templates_exist(self) -> None:
+        """Should have striker templates."""
+        from core.npc.templates import get_striker_templates
+
+        strikers = get_striker_templates()
+        assert len(strikers) > 0
+
+    def test_defender_templates_exist(self) -> None:
+        """Should have defender templates."""
+        from core.npc.templates import get_defender_templates
+
+        defenders = get_defender_templates()
+        assert len(defenders) > 0
+
+    def test_controller_templates_exist(self) -> None:
+        """Should have controller templates."""
+        from core.npc.templates import get_controller_templates
+
+        controllers = get_controller_templates()
+        assert len(controllers) > 0
+
+    def test_supporter_templates_exist(self) -> None:
+        """Should have supporter templates."""
+        from core.npc.templates import get_supporter_templates
+
+        supporters = get_supporter_templates()
+        assert len(supporters) > 0
+
+    @pytest.mark.parametrize("template", NPC_TEMPLATES)
+    def test_all_templates_have_role(self, template) -> None:
+        """All templates should have a role assigned."""
+        assert template.role in ("striker", "defender", "controller", "supporter")

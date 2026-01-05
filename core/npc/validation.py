@@ -4,26 +4,23 @@ This module provides validation for NPC templates and NPC state
 in combat context.
 """
 
-from typing import Literal
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from pydantic import Field
-from core.shared.models import FrozenModel
+from core.shared.validation import ValidationIssue, ValidationResult
+
 from core.npc.models import NPCTemplate, NPCAbility, NPCGear
 from core.npc.state import NPCState
 
+if TYPE_CHECKING:
+    from typing import Literal
 
-class NPCValidationIssue(FrozenModel):
-    """A validation issue found in an NPC template or state."""
-
-    code: str
-    message: str
-    severity: Literal["error", "warning"] = "error"
+NPCValidationIssue = ValidationIssue
 
 
-class NPCValidation(FrozenModel):
+class NPCValidation(ValidationResult):
     """Validation result for NPC templates or state."""
-
-    valid: bool
-    issues: list[NPCValidationIssue] = Field(default_factory=list)
 
 
 def validate_npc_template(template: NPCTemplate) -> NPCValidation:

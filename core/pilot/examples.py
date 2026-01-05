@@ -143,7 +143,9 @@ def build_oda_ll3_pilot() -> Pilot:
     )
 
 
-def evaluate_oda_ll0_example() -> tuple[ProgressionValidation, MechBuildValidation, list[str]]:
+def evaluate_oda_ll0_example() -> tuple[
+    ProgressionValidation, MechBuildValidation, list[str]
+]:
     """Validate Oda's LL0 pilot and mech build, returning mismatches."""
     pilot = build_oda_ll0_pilot()
     pilot_validation = pilot.validate_progression()
@@ -176,7 +178,9 @@ def evaluate_oda_ll0_example() -> tuple[ProgressionValidation, MechBuildValidati
     return pilot_validation, mech_validation, mismatches
 
 
-def evaluate_oda_ll3_example() -> tuple[ProgressionValidation, MechBuildValidation, list[str]]:
+def evaluate_oda_ll3_example() -> tuple[
+    ProgressionValidation, MechBuildValidation, list[str]
+]:
     """Validate Oda's LL3 pilot and mech build, returning mismatches."""
     pilot = build_oda_ll3_pilot()
     pilot_validation = pilot.validate_progression()
@@ -215,21 +219,18 @@ def build_example_downtime_plan() -> DowntimePlan:
         pilot_id="example_pilot",
         actions=[
             DowntimeActionUse(
-                action_id="get_a_hold_of_something",
+                action_id="scrounge_and_barter",
                 outcome="reserve",
+                roll_result=15,
                 reserve=ReserveEntry(
                     id="reserve_cache",
                     name="Reserve Cache",
+                    reserve_type="narrative",
                     uses_remaining=1,
                     shared=True,
                     source="downtime_action",
                 ),
-            ),
-            DowntimeActionUse(
-                action_id="get_a_clue",
-                outcome="info",
-                reserve=None,
-            ),
+            ).with_roll_tier(),
         ],
     )
 
@@ -240,7 +241,9 @@ def evaluate_example_downtime_plan() -> bool:
     return validate_downtime_plan(plan).valid
 
 
-def _compare_mech_stats(actual: dict[str, object], expected: dict[str, object]) -> list[str]:
+def _compare_mech_stats(
+    actual: dict[str, object], expected: dict[str, object]
+) -> list[str]:
     mismatches: list[str] = []
     for key, value in expected.items():
         if actual.get(key) != value:

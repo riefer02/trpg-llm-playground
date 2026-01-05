@@ -17,6 +17,7 @@ def _make_test_npc() -> NPCState:
         name="Test NPC",
         npc_class="grunt",
         tier="tier_1",
+        role="striker",
         stats=NPCStats(
             base=NPCStatsBase(
                 hp_base=10,
@@ -107,6 +108,7 @@ class TestNPCInCombatValidation:
                 name="Test NPC",
                 npc_class="grunt",
                 tier="tier_1",
+                role="striker",
                 stats=NPCStats(
                     base=NPCStatsBase(
                         hp_base=0,
@@ -124,6 +126,7 @@ class TestNPCInCombatValidation:
                 name="Test NPC",
                 npc_class="grunt",
                 tier="tier_1",
+                role="striker",
                 stats=NPCStats(
                     base=NPCStatsBase(
                         hp_base=10,

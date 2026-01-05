@@ -5,7 +5,12 @@ from typing import Literal
 from pydantic import Field, model_validator
 from core.shared.models import FrozenModel
 
-from core.shared.effects import BreakTriggerType, EffectDuration, MechanicalEffect, StatModifier
+from core.shared.effects import (
+    BreakTriggerType,
+    EffectDuration,
+    MechanicalEffect,
+    StatModifier,
+)
 from core.shared.effects_validation import validate_mechanical_effects
 from core.shared.enums import ActionType, StatusType
 from core.shared.payloads import (
@@ -42,13 +47,11 @@ class PilotChargePayload(FrozenModel):
     area: PilotAreaEffect
 
 
-
 class PilotFlightEffect(FrozenModel):
     """Flight behavior granted by pilot gear."""
 
     mode: Literal["move", "boost", "move_or_boost"]
     must_end_on_surface: bool = False
-
 
 
 class PilotMedicalEffect(FrozenModel):
@@ -62,7 +65,6 @@ class PilotMedicalEffect(FrozenModel):
     restores_consciousness: bool = False
     applies_to_adjacent: bool = True
     affects_mechs: bool = False
-
 
 
 class PilotStimEffect(FrozenModel):
@@ -83,7 +85,9 @@ class PilotStealthEffect(FrozenModel):
     action_type: ActionType = "quick"
     status: StatusType = "invisible"
     duration: EffectDuration = "until_cleared"
-    break_triggers: list[BreakTriggerType] = Field(default_factory=lambda: ["take_damage"])
+    break_triggers: list[BreakTriggerType] = Field(
+        default_factory=lambda: ["take_damage"]
+    )
 
 
 class PilotEnvironmentalSeal(FrozenModel):
@@ -161,7 +165,9 @@ class PilotExtraArmEffect(FrozenModel):
     """Powered auxiliary arm for tools or weapons."""
 
     powered: bool = True
-    mount_options: list[Literal["manipulator", "weapon", "tool"]] = Field(default_factory=list)
+    mount_options: list[Literal["manipulator", "weapon", "tool"]] = Field(
+        default_factory=list
+    )
 
 
 class PilotGearItemDefinition(FrozenModel):
@@ -197,7 +203,6 @@ class PilotGearItemDefinition(FrozenModel):
         return self
 
 
-
 class PilotGearRules(FrozenModel):
     """Loadout limits for pilot gear."""
 
@@ -205,7 +210,6 @@ class PilotGearRules(FrozenModel):
     armor_optional: bool = True
     max_weapons: int = 2
     max_gear: int = 3
-
 
 
 DEFAULT_PILOT_GEAR_RULES = PilotGearRules()
@@ -216,9 +220,12 @@ class PilotLoadout(FrozenModel):
 
     clothing: str | None = Field(default=None, description="Clothing item ID")
     armor: str | None = Field(default=None, description="Armor item ID")
-    weapons: list[str] = Field(default_factory=list, max_length=2, description="Weapon item IDs")
-    gear: list[str] = Field(default_factory=list, max_length=3, description="Other gear item IDs")
-
+    weapons: list[str] = Field(
+        default_factory=list, max_length=2, description="Weapon item IDs"
+    )
+    gear: list[str] = Field(
+        default_factory=list, max_length=3, description="Other gear item IDs"
+    )
 
     def total_items(self) -> int:
         """Total number of selected items."""
@@ -390,6 +397,7 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
                 damage_type="kinetic",
                 damage_type_options=["kinetic", "energy", "explosive"],
             ),
+            loaded=False,
         ),
     ),
     PilotGearItemDefinition(
@@ -502,6 +510,12 @@ PILOT_GEAR_DEFINITIONS: list[PilotGearItemDefinition] = [
                         flat=3,
                         ap=True,
                     ),
+                    object_damage=PilotDamageSpec(
+                        damage_type="energy",
+                        flat=10,
+                        ap=True,
+                    ),
+                    objects_auto_hit=True,
                 ),
             ),
         ],
@@ -653,6 +667,85 @@ def get_pilot_gear_definition(gear_id: str) -> PilotGearItemDefinition | None:
     return PILOT_GEAR_DEFINITIONS_BY_ID.get(gear_id)
 
 
+def is_sidearm_weapon(tags: list[PilotGearTag]) -> bool:
+    """Check if weapon has the sidearm tag.
+
+    Sidearm weapons can be fired with a quick action instead of a full action.
+    """
+    return any(t.tag == "sidearm" for t in tags)
+
+
+def is_archaic_weapon(tags: list[PilotGearTag]) -> bool:
+    """Check if weapon has the archaic tag.
+
+    Archaic weapons are too old fashioned to harm mechs.
+    """
+    return any(t.tag == "archaic" for t in tags)
+
+
+def is_inaccurate_weapon(tags: list[PilotGearTag]) -> bool:
+    """Check if weapon has the inaccurate tag.
+
+    Inaccurate weapons attack with +1 Difficulty.
+    """
+    return any(t.tag == "inaccurate" for t in tags)
+
+
+def is_loading_weapon(tags: list[PilotGearTag]) -> bool:
+    """Check if weapon has the loading tag.
+
+    Loading weapons must be reloaded before being used again.
+    Reload via Stabilize action or some systems.
+    """
+    return any(t.tag == "loading" for t in tags)
+
+
+def is_ordnance_weapon(tags: list[PilotGearTag]) -> bool:
+    """Check if weapon has the ordnance tag.
+
+    Ordnance weapons typically have special loading requirements.
+    """
+    return any(t.tag == "ordnance" for t in tags)
+
+
+def get_pilot_weapon_action_type(tags: list[PilotGearTag]) -> Literal["full", "quick"]:
+    """Get the action type required to fire a pilot weapon.
+
+    Sidearm weapons can be fired as a quick action; others require a full action.
+    Returns 'quick' for sidearms, 'full' for all other pilot weapons.
+    """
+    return "quick" if is_sidearm_weapon(tags) else "full"
+
+
+def get_pilot_weapon_difficulty_modifier(tags: list[PilotGearTag]) -> int:
+    """Get the difficulty modifier for a pilot weapon attack.
+
+    Inaccurate weapons add +1 Difficulty to attack rolls.
+    Returns 1 for inaccurate weapons, 0 otherwise.
+    """
+    return 1 if is_inaccurate_weapon(tags) else 0
+
+
+def can_pilot_weapon_damage_target(
+    weapon: PilotGearItemDefinition,
+    target_is_mech: bool,
+) -> tuple[bool, str]:
+    """Check if a pilot weapon can damage a given target type.
+
+    Archaic weapons cannot harm mechs.
+
+    Args:
+        weapon: The pilot weapon definition
+        target_is_mech: Whether the target is a mech
+
+    Returns:
+        Tuple of (can_damage: bool, reason_if_not: str)
+    """
+    if target_is_mech and is_archaic_weapon(weapon.tags):
+        return False, "archaic weapons cannot harm mechs"
+    return True, ""
+
+
 PILOT_GEAR_DEFINITIONS_BY_ID = {item.id: item for item in PILOT_GEAR_DEFINITIONS}
 
 
@@ -664,13 +757,11 @@ class PilotGearIssue(FrozenModel):
     severity: Literal["error", "warning"] = "error"
 
 
-
 class PilotGearValidation(FrozenModel):
     """Validation result for pilot gear loadouts."""
 
     valid: bool
     issues: list[PilotGearIssue] = Field(default_factory=list)
-
 
 
 def _iter_loadout_ids(loadout: PilotLoadout) -> list[str]:
@@ -799,7 +890,9 @@ def validate_pilot_loadout(
             )
         )
 
-    return PilotGearValidation(valid=not any(i.severity == "error" for i in issues), issues=issues)
+    return PilotGearValidation(
+        valid=not any(i.severity == "error" for i in issues), issues=issues
+    )
 
 
 def get_pilot_gear_stat_mods(
