@@ -437,6 +437,8 @@ def can_ram(
 def attempt_ram(
     attempt: RamAttempt,
     terrain_occupancies: dict[HexCoord, bool] | None = None,
+    attacker_position: HexCoord | None = None,
+    target_position: HexCoord | None = None,
 ) -> RamResult:
     """Resolve a ram attempt.
 
@@ -445,9 +447,13 @@ def attempt_ram(
     knocking them down or back. If your attack is successful, your target is knocked
     Prone and you may also knock your target back up to 1 space directly away from you."
 
+    Knockback is blocked by terrain occupancies (obstructions, other mechs, etc.).
+
     Args:
         attempt: RamAttempt with all required parameters
         terrain_occupancies: Map of occupied hexes for knockback blocking
+        attacker_position: Attacker's current hex position (for direction calc)
+        target_position: Target's current hex position (for direction calc)
 
     Returns:
         RamResult with full resolution details
@@ -462,15 +468,33 @@ def attempt_ram(
     knockback_total = 1 + attempt.knockback_bonus
 
     blocked = False
-    if terrain_occupancies:
-        pass
+    blocked_at: HexCoord | None = None
+
+    if (
+        terrain_occupancies
+        and attacker_position
+        and target_position
+        and knockback_total > 0
+    ):
+        direction = get_knockback_direction(attacker_position, target_position)
+        for i in range(1, knockback_total + 1):
+            check_pos = HexCoord(
+                q=target_position.q + (direction.q * i),
+                r=target_position.r + (direction.r * i),
+            )
+            if terrain_occupancies.get(check_pos, False):
+                blocked = True
+                blocked_at = check_pos
+                break
+
+    effective_knockback = 0 if blocked else knockback_total
 
     return RamResult(
         hit=True,
         target_becomes_prone=True,
-        knockback_spaces=knockback_total,
+        knockback_spaces=effective_knockback,
         knockback_blocked=blocked,
-        reason=f"Ram successful: target becomes prone, knockback {knockback_total} spaces",
+        reason=f"Ram successful: target becomes prone, knockback {'blocked' if blocked else f'{effective_knockback} spaces'}",
     )
 
 

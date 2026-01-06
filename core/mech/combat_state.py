@@ -1,5 +1,8 @@
 """Combat state models for mech combat."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
@@ -22,6 +25,9 @@ from core.mech.weapon import WeaponTagType
 from core.mech.mounts import MountSlotType
 from core.mech.combat_rules import AttackPatternDefinition
 from core.mech.timing import PreparedActionState
+
+if TYPE_CHECKING:
+    from core.shared.heat import MeltdownState
 
 
 CombatSide = Literal["players", "hostiles", "neutral"]
@@ -176,6 +182,9 @@ class CombatantState(FrozenModel):
     )
     overcharge_state: OverchargeState | None = Field(
         default=None, description="Overcharge escalation state"
+    )
+    meltdown_state: "MeltdownState | None" = Field(
+        default=None, description="Active meltdown countdown state, if any"
     )
 
     def in_danger_zone(
@@ -343,7 +352,7 @@ def create_npc_combatant(
         side=npc_side,
         kind="npc",
         stats=CombatStats(
-            size=SizeClass(npc_size),
+            size=npc_size,  # type: ignore - SizeClass is a Literal type
             hp_max=npc_hp,
             evasion=npc_evasion,
             e_defense=npc_e_defense,

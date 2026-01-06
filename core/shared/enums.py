@@ -4,12 +4,12 @@ from typing import Literal
 
 # Action Types (what kind of action is this?)
 ActionType = Literal[
-    "free",       # No action cost
-    "quick",      # Quick action (2 per turn)
-    "full",       # Full action (1 per turn, ends quick actions)
-    "reaction",   # Triggered reaction
-    "protocol",   # Start-of-turn protocol
-    "move",       # Regular move action
+    "free",  # No action cost
+    "quick",  # Quick action (2 per turn)
+    "full",  # Full action (1 per turn, ends quick actions)
+    "reaction",  # Triggered reaction
+    "protocol",  # Start-of-turn protocol
+    "move",  # Regular move action
 ]
 
 # Attack Types
@@ -21,10 +21,10 @@ AttackType = Literal[
 
 # Damage Types
 DamageType = Literal[
-    "kinetic",     # Physical/ballistic damage
-    "explosive",   # Area/blast damage
-    "energy",      # Laser/beam damage
-    "burn",        # Heat-based, causes heat buildup
+    "kinetic",  # Physical/ballistic damage
+    "explosive",  # Area/blast damage
+    "energy",  # Laser/beam damage
+    "burn",  # Heat-based, causes heat buildup
 ]
 
 # Save Types (for mech saves)
@@ -37,40 +37,40 @@ SaveType = Literal[
 
 # Range Types
 RangeType = Literal[
-    "range",       # Standard ranged (in spaces)
-    "threat",      # Melee threat range
-    "thrown",      # Thrown range
-    "line",        # Line attack
-    "cone",        # Cone attack
-    "burst",       # Burst area
-    "blast",       # Blast area
-    "sensors",     # Sensor range
+    "range",  # Standard ranged (in spaces)
+    "threat",  # Melee threat range
+    "thrown",  # Thrown range
+    "line",  # Line attack
+    "cone",  # Cone attack
+    "burst",  # Burst area
+    "blast",  # Blast area
+    "sensors",  # Sensor range
 ]
 
 # Size Classes (for mechs)
 SizeClass = Literal[
-    "size_half",   # 1/2 size (small drones)
-    "size_1",      # Size 1 (standard)
-    "size_2",      # Size 2 (larger)
-    "size_3",      # Size 3 (very large)
-    "size_4",      # Size 4 (titanic)
-    "size_5",      # Size 5 (massive)
+    "size_half",  # 1/2 size (small drones)
+    "size_1",  # Size 1 (standard)
+    "size_2",  # Size 2 (larger)
+    "size_3",  # Size 3 (very large)
+    "size_4",  # Size 4 (titanic)
+    "size_5",  # Size 5 (massive)
 ]
 
 # Mech Manufacturers (for licenses and core bonuses)
 ManufacturerType = Literal[
-    "GMS",         # General Massive Systems (default/universal)
-    "IPS-N",       # Interplanetary Shipping-Northstar
-    "SSC",         # Smith-Shimano Corpro
-    "HORUS",       # HORUS (mysterious collective)
-    "HA",          # Harrison Armory
+    "GMS",  # General Massive Systems (default/universal)
+    "IPS-N",  # Interplanetary Shipping-Northstar
+    "SSC",  # Smith-Shimano Corpro
+    "HORUS",  # HORUS (mysterious collective)
+    "HA",  # Harrison Armory
 ]
 
 # Mount Types (for weapons)
 MountType = Literal[
-    "aux",         # Auxiliary mount
-    "main",        # Main mount  
-    "heavy",       # Heavy mount
+    "aux",  # Auxiliary mount
+    "main",  # Main mount
+    "heavy",  # Heavy mount
     "superheavy",  # Superheavy mount (takes 2 mounts)
 ]
 
@@ -86,12 +86,12 @@ MountSlotType = Literal[
 
 # System Types
 SystemType = Literal[
-    "system",      # Standard system
-    "tech",        # Tech action system
+    "system",  # Standard system
+    "tech",  # Tech action system
     "deployable",  # Creates deployable
-    "drone",       # Drone system
-    "shield",      # Shield system
-    "ai",          # AI system
+    "drone",  # Drone system
+    "shield",  # Shield system
+    "ai",  # AI system
 ]
 
 # Status/Condition Types
@@ -110,6 +110,7 @@ StatusType = Literal[
     "shutdown",
     "exposed",
     "engaged",
+    "burn",
 ]
 
 # Cover Types

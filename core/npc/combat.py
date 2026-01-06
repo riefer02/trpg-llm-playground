@@ -4,7 +4,7 @@ This module provides ability trigger resolution for NPCs during combat,
 integrating with the broader combat state system.
 """
 
-from typing import Literal, TYPE_CHECKING
+from typing import Literal, TYPE_CHECKING, Any
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.effects import MechanicalEffect
@@ -230,19 +230,70 @@ def check_trigger_condition(
 
 def apply_ability_effect(
     effect: MechanicalEffect,
-    combat_state: "CombatState",
+    combat_state: dict[str, Any],
     source_id: str,
     target_id: str | None = None,
-) -> None:
-    """Apply a MechanicalEffect to the combat state.
+) -> dict[str, Any]:
+    """Apply a MechanicalEffect from an NPC ability to the combat state.
 
-    This is a placeholder that integrates with the broader combat system.
-    The actual effect application depends on the effect type.
+    This function wires NPC abilities to the shared effects system.
+    It records effect applications in a format that integrates with
+    the broader combat state system.
 
     Args:
-        effect: The effect to apply
-        combat_state: The current combat state
+        effect: The MechanicalEffect to apply
+        combat_state: The current combat state (dict-based for flexibility)
         source_id: The NPC applying the effect
         target_id: Optional specific target
+
+    Returns:
+        Updated combat state with effect applications recorded
     """
-    pass
+    applied_effects: list[str] = []
+
+    if effect.status_grants:
+        for status in effect.status_grants:
+            applied_effects.append(f"status:{status.status}")
+
+    if effect.status_clears:
+        for clear in effect.status_clears:
+            applied_effects.append(f"clear:{clear.status}")
+
+    if effect.direct_damages:
+        for damage in effect.direct_damages:
+            if damage.dice:
+                dice_str = (
+                    f"{damage.dice.count}d{damage.dice.size:+{damage.dice.modifier}}"
+                    if damage.dice.modifier != 0
+                    else f"{damage.dice.count}d{damage.dice.size}"
+                )
+            else:
+                dice_str = f"{damage.flat}"
+            applied_effects.append(f"damage:{dice_str}")
+
+    if effect.stat_mods:
+        for mod in effect.stat_mods[:3]:
+            applied_effects.append(f"stat:{mod.stat}:{mod.value:+d}")
+
+    if effect.forced_movements:
+        for movement in effect.forced_movements:
+            applied_effects.append(
+                f"forced_move:{movement.direction}:{movement.distance}"
+            )
+
+    if effect.tech_actions:
+        for tech in effect.tech_actions:
+            applied_effects.append(f"tech:{tech.action_type}")
+
+    updated_state = dict(combat_state)
+    if "applied_effects" not in updated_state:
+        updated_state["applied_effects"] = []
+    updated_state["applied_effects"].append(
+        {
+            "source": source_id,
+            "target": target_id,
+            "effects": applied_effects,
+        }
+    )
+
+    return updated_state

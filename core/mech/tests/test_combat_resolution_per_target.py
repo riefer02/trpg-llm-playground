@@ -113,3 +113,55 @@ def test_resolve_per_target_counter_no_target_id() -> None:
     result = resolve_per_target_counter(counter=counter)
 
     assert result.target_id == ""
+
+
+def test_reset_per_round_reactions() -> None:
+    """Test that per-round reactions are properly reset."""
+    from core.mech.combat_state import CombatantState, CombatStats, CombatResources
+    from core.mech.combat_resolution import reset_per_round_reactions
+
+    combatant = CombatantState(
+        id="mech_1",
+        name="Test Mech",
+        side="players",
+        kind="mech",
+        stats=CombatStats(
+            size="size_1",
+            hp_max=10,
+            evasion=8,
+            e_defense=10,
+        ),
+        resources=CombatResources(hp_current=10),
+        per_round_reactions={"overwatch": 1, "brace": 1},
+    )
+
+    updated = reset_per_round_reactions(combatant)
+
+    assert updated.per_round_reactions == {}
+    assert updated.id == "mech_1"
+    assert updated.stats.hp_max == 10
+
+
+def test_reset_per_round_reactions_empty() -> None:
+    """Test that reset works on combatant with no reactions used."""
+    from core.mech.combat_state import CombatantState, CombatStats, CombatResources
+    from core.mech.combat_resolution import reset_per_round_reactions
+
+    combatant = CombatantState(
+        id="mech_2",
+        name="Fresh Mech",
+        side="players",
+        kind="mech",
+        stats=CombatStats(
+            size="size_1",
+            hp_max=10,
+            evasion=8,
+            e_defense=10,
+        ),
+        resources=CombatResources(hp_current=10),
+        per_round_reactions={},
+    )
+
+    updated = reset_per_round_reactions(combatant)
+
+    assert updated.per_round_reactions == {}

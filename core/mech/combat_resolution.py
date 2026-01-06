@@ -944,15 +944,18 @@ def consume_per_round_reaction(
 
 def reset_per_round_reactions(
     combatant: CombatantState,
-) -> None:
+) -> CombatantState:
     """Reset per-round reaction counts for a combatant.
 
-    Called at the start of a new round.
+    Called at the start of a new round per PR2 reaction rules.
 
     Args:
         combatant: The combatant to reset
+
+    Returns:
+        CombatantState with cleared per_round_reactions dict
     """
-    pass
+    return combatant.model_copy(update={"per_round_reactions": {}})
 
 
 def reset_round_reaction_counts(
@@ -1973,3 +1976,73 @@ def get_combatants_in_danger_zone(
         results.append(status)
 
     return results
+
+
+import warnings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.shared.structure import StructureInput, StructureResolutionResult
+    from core.shared.heat import OverheatInput, OverheatResolutionResult, MeltdownState
+
+
+def resolve_structure_damage_deprecated(
+    *,
+    remaining_structure: int,
+    incoming_damage: int,
+    hp_before: int,
+    structure_damage_marked: int = 1,
+    inventory: "MechInventory | None" = None,
+    rules: "StructureDamageRules" = DEFAULT_STRUCTURE_DAMAGE_RULES,
+    settings: "ResolutionSettings | None" = None,
+) -> StructureResolution:
+    """[DEPRECATED] Use core.shared.structure.resolve_structure_damage instead.
+
+    Resolve a structure check, including spillover and direct hit outcomes.
+
+    Args:
+        structure_damage_marked: Total structure damage marked (including the one just taken).
+        inventory: Inventory state used to resolve system trauma selections and fallbacks.
+    """
+    warnings.warn(
+        "resolve_structure_damage is deprecated. Use core.shared.structure.resolve_structure_damage instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return resolve_structure_damage(
+        remaining_structure=remaining_structure,
+        incoming_damage=incoming_damage,
+        hp_before=hp_before,
+        structure_damage_marked=structure_damage_marked,
+        inventory=inventory,
+        rules=rules,
+        settings=settings,
+    )
+
+
+def resolve_overheat_deprecated(
+    *,
+    stress_marked: int,
+    remaining_stress: int,
+    rules: "OverheatRules" = DEFAULT_OVERHEAT_RULES,
+    settings: "ResolutionSettings | None" = None,
+) -> OverheatResolution:
+    """[DEPRECATED] Use core.shared.heat.resolve_overheat instead.
+
+    Resolve an overheat check, including meltdown subtable outcomes.
+
+    Args:
+        stress_marked: Total stress boxes marked (including the one just taken).
+        remaining_stress: Stress boxes remaining after marking.
+    """
+    warnings.warn(
+        "resolve_overheat is deprecated. Use core.shared.heat.resolve_overheat instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return resolve_overheat(
+        stress_marked=stress_marked,
+        remaining_stress=remaining_stress,
+        rules=rules,
+        settings=settings,
+    )
