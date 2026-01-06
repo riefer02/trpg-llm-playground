@@ -20,6 +20,7 @@ from core.shared.models import FrozenModel
 
 if TYPE_CHECKING:
     from core.shared.narrative import NarrativeCombatState, NarrativeGoalTracker
+    from core.shared.turn_end import TurnEndTrigger, TurnEndEffectState, TurnEndResult
 
 
 ScenePhase = Literal["opening", "action", "complication", "resolution"]
@@ -636,3 +637,99 @@ def check_narrative_victory(
         return True, result
 
     return False, None
+
+
+def end_combatant_turn(
+    loop_state: "CombatLoopState",
+    actor_id: str,
+    round_number: int,
+    turn_number: int,
+    triggers: list["TurnEndTrigger"],
+    turn_end_effects: dict[str, "TurnEndEffectState"],
+    specified_order: list[str] | None = None,
+) -> tuple["CombatLoopState", "TurnEndResult", dict[str, "TurnEndEffectState"]]:
+    """End a combatant's turn and process all turn-end effects.
+
+    Per PR2 5099-5102, turn end processing includes:
+    - Resolving all end-of-turn triggers (actor chooses order)
+    - Expiring effects with "end_of_turn" duration
+    - Updating "end_of_next_turn" effect tracking
+
+    Note: Per-round reactions reset at ROUND start (see combat_resolution.py:945).
+    No conditions auto-clear at turn end - conditions require actions.
+
+    Args:
+        loop_state: Current combat loop state
+        actor_id: Combatant ending their turn
+        round_number: Current round number
+        turn_number: Current turn number
+        triggers: List of turn end triggers to resolve
+        turn_end_effects: Currently active turn-end effects
+        specified_order: Actor-specified trigger order (or None for default)
+
+    Returns:
+        Tuple of (updated_loop_state, turn_end_result, updated_effects)
+    """
+    from core.shared.turn_end import (
+        TurnEndInput,
+        TurnEndTrigger,
+        TurnEndEffectState,
+        resolve_turn_end,
+    )
+
+    input_data = TurnEndInput(
+        actor_id=actor_id,
+        round_number=round_number,
+        turn_number=turn_number,
+        triggers=triggers,
+        active_effects=turn_end_effects,
+        specified_order=specified_order,
+    )
+
+    result = resolve_turn_end(input_data)
+
+    updated_loop_state = loop_state
+
+    if actor_id not in updated_loop_state.turn_history:
+        updated_loop_state = updated_loop_state.model_copy(
+            update={"turn_history": [*updated_loop_state.turn_history, actor_id]}
+        )
+
+    return updated_loop_state, result, result.new_effects
+
+
+def advance_to_next_turn(
+    loop_state: "CombatLoopState",
+    current_actor_id: str,
+    next_actor_id: str,
+) -> "CombatLoopState":
+    """Advance from current turn to next actor's turn.
+
+    Handles turn transition including advancing round if needed.
+
+    Args:
+        loop_state: Current combat loop state
+        current_actor_id: Actor whose turn just ended
+        next_actor_id: Actor whose turn is next
+
+    Returns:
+        Updated combat loop state with new current actor
+    """
+    is_new_round = loop_state.initiative_holder != next_actor_id
+
+    if is_new_round:
+        updated = loop_state.model_copy(
+            update={
+                "round_number": loop_state.round_number + 1,
+                "initiative_holder": next_actor_id,
+            }
+        )
+    else:
+        updated = loop_state.model_copy(update={"initiative_holder": next_actor_id})
+
+    if next_actor_id not in updated.turn_history:
+        updated = updated.model_copy(
+            update={"turn_history": [*updated.turn_history, next_actor_id]}
+        )
+
+    return updated

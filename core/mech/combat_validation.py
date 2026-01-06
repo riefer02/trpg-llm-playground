@@ -1144,12 +1144,24 @@ def _validate_turn(
         )
 
         if rule:
-            if actor and actor.ai_controlled and rule.scope == "pilot":
+            ai_controlled = actor.ai_controlled if actor else False
+            ai_control_state = actor.ai_control_state if actor else "pilot"
+            pilot_blocked = ai_controlled or ai_control_state in [
+                "cede",
+                "cede_remote",
+                "unshackled",
+            ]
+            if actor and pilot_blocked and rule.scope == "pilot":
+                state_desc = (
+                    "unshackled"
+                    if ai_control_state == "unshackled"
+                    else "AI-controlled"
+                )
                 issues.append(
                     CombatValidationIssue(
                         code="ai_pilot_action_disallowed",
                         message=(
-                            f"{turn.actor_id} is AI-controlled and cannot take pilot action "
+                            f"{turn.actor_id} is {state_desc} and cannot take pilot action "
                             f"{action.action_id}."
                         ),
                     )

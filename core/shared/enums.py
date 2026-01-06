@@ -111,6 +111,7 @@ StatusType = Literal[
     "exposed",
     "engaged",
     "burn",
+    "unshackled",  # NHP has become unshackled per PR2 5081-5082
 ]
 
 # Cover Types

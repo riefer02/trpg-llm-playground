@@ -493,3 +493,64 @@ def _lookup_direct_hit_outcome(
                 return "direct_hit_destroyed"
             return "direct_hit"
     return "direct_hit"
+
+
+def check_unshackle_on_structure(
+    combatant: "CombatantState",
+    force_roll: int | None = None,
+) -> dict:
+    """Check for unshackle trigger after structure damage resolution.
+
+    Per PR2 5081-5082: Each time you roll a structure check, roll a d20.
+    On a roll of 1, your NHP's casket has suffered a traumatic impact and
+    your NHP becomes Unshackled.
+
+    Args:
+        combatant: Combatant that may have NHP
+        force_roll: Optional forced d20 roll for testing
+
+    Returns:
+        Dictionary with unshackle check results
+    """
+    from core.shared.ai import (
+        resolve_unshackle_check,
+        resolve_unshackled_behavior,
+        apply_unshackle,
+        UnshackleCheckInput,
+        UnshackledBehaviorInput,
+    )
+
+    result = {
+        "unshackle_check_performed": False,
+        "unshackle_occurred": False,
+        "nhp_behavior": None,
+        "pilot_ejected": False,
+        "combatant_updated": None,
+    }
+
+    if combatant.ai_type != "nhp":
+        return result
+
+    unshackle_input = UnshackleCheckInput(
+        actor_id=combatant.id,
+        check_type="structure",
+        force_roll=force_roll,
+    )
+
+    unshackle_result = resolve_unshackle_check(unshackle_input, has_nhp=True)
+
+    if not unshackle_result.unshackle_occurred:
+        return result
+
+    behavior_input = UnshackledBehaviorInput(actor_id=combatant.id)
+    behavior_result = resolve_unshackled_behavior(behavior_input)
+
+    apply_result = apply_unshackle(combatant, unshackle_result, behavior_result)
+
+    return {
+        "unshackle_check_performed": True,
+        "unshackle_occurred": True,
+        "nhp_behavior": apply_result.nhp_behavior,
+        "pilot_ejected": apply_result.pilot_ejected,
+        "combatant_updated": apply_result.updated_combatant,
+    }

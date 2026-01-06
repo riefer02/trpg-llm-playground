@@ -28,6 +28,8 @@ from core.mech.timing import PreparedActionState
 
 if TYPE_CHECKING:
     from core.shared.heat import MeltdownState
+    from core.shared.protocols import ProtocolState
+    from core.shared.turn_end import TurnEndEffectState
 
 
 CombatSide = Literal["players", "hostiles", "neutral"]
@@ -169,6 +171,21 @@ class CombatantState(FrozenModel):
     conditions: list[StatusType] = Field(default_factory=list)
     inventory: MechInventory | None = None
     ai_controlled: bool = False
+    ai_type: Literal["compcon", "nhp"] | None = Field(
+        default=None, description="Type of AI installed (compcon or nhp)"
+    )
+    ai_control_state: Literal["pilot", "cede", "cede_remote", "unshackled"] = Field(
+        default="pilot", description="Current control state of the mech"
+    )
+    nhp_behavior: (
+        Literal["ignore_pilot", "overrule_pilot", "illogical", "remove_pilot"] | None
+    ) = Field(default=None, description="NHP behavior when unshackled")
+    unshackle_count: int = Field(
+        default=0, ge=0, description="Number of times NHP has unshackled"
+    )
+    cede_turns_remaining: int = Field(
+        default=0, ge=0, description="Turns remaining in cede state"
+    )
     active_mode_effects: list[ModeEffect] = Field(default_factory=list)
     reaction_triggers: list[ReactionTriggerEffect] = Field(default_factory=list)
     progression_states: dict[str, ProgressionState] = Field(default_factory=dict)
@@ -185,6 +202,12 @@ class CombatantState(FrozenModel):
     )
     meltdown_state: "MeltdownState | None" = Field(
         default=None, description="Active meltdown countdown state, if any"
+    )
+    active_protocols: dict[str, "ProtocolState"] = Field(
+        default_factory=dict, description="Active protocols by protocol_id"
+    )
+    turn_end_effects: dict[str, "TurnEndEffectState"] = Field(
+        default_factory=dict, description="Effects expiring at turn boundaries"
     )
 
     def in_danger_zone(

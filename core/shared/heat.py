@@ -401,11 +401,80 @@ def _lookup_meltdown_outcome(
     return "meltdown"
 
 
-# Rebuild CombatantState to resolve MeltdownState forward reference
-# This must be done after CombatantState is defined and MeltdownState is available
+def check_unshackle_on_overheat(
+    combatant: "CombatantState",
+    force_roll: int | None = None,
+) -> dict:
+    """Check for unshackle trigger after overheat check resolution.
+
+    Per PR2 5081-5082: Each time you roll an overheating check, roll a d20.
+    On a roll of 1, your NHP's casket has suffered a traumatic code incursion
+    and your NHP becomes Unshackled.
+
+    Args:
+        combatant: Combatant that may have NHP
+        force_roll: Optional forced d20 roll for testing
+
+    Returns:
+        Dictionary with unshackle check results
+    """
+    from core.shared.ai import (
+        resolve_unshackle_check,
+        resolve_unshackled_behavior,
+        apply_unshackle,
+        UnshackleCheckInput,
+        UnshackledBehaviorInput,
+    )
+
+    result = {
+        "unshackle_check_performed": False,
+        "unshackle_occurred": False,
+        "nhp_behavior": None,
+        "pilot_ejected": False,
+        "combatant_updated": None,
+    }
+
+    if combatant.ai_type != "nhp":
+        return result
+
+    unshackle_input = UnshackleCheckInput(
+        actor_id=combatant.id,
+        check_type="overheat",
+        force_roll=force_roll,
+    )
+
+    unshackle_result = resolve_unshackle_check(unshackle_input, has_nhp=True)
+
+    if not unshackle_result.unshackle_occurred:
+        return result
+
+    behavior_input = UnshackledBehaviorInput(actor_id=combatant.id)
+    behavior_result = resolve_unshackled_behavior(behavior_input)
+
+    apply_result = apply_unshackle(combatant, unshackle_result, behavior_result)
+
+    return {
+        "unshackle_check_performed": True,
+        "unshackle_occurred": True,
+        "nhp_behavior": apply_result.nhp_behavior,
+        "pilot_ejected": apply_result.pilot_ejected,
+        "combatant_updated": apply_result.updated_combatant,
+    }
+
+
+# Rebuild CombatantState to resolve forward references
+# This must be done after CombatantState is defined and types are available
 try:
     from core.mech.combat_state import CombatantState
+    from core.shared.protocols import ProtocolState
+    from core.shared.turn_end import TurnEndEffectState
 
-    CombatantState.model_rebuild(_types_namespace={"MeltdownState": MeltdownState})
+    CombatantState.model_rebuild(
+        _types_namespace={
+            "MeltdownState": MeltdownState,
+            "ProtocolState": ProtocolState,
+            "TurnEndEffectState": TurnEndEffectState,
+        }
+    )
 except ImportError:
     pass  # CombatantState not yet available during initial import
