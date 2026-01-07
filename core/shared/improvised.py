@@ -18,6 +18,7 @@ from core.shared.models import FrozenModel
 from core.shared.enums import DamageType, AttackType
 from core.shared.dice import DiceExpression, round_up
 from core.mech.combat_state import CombatantState
+from core.shared.rolls import resolve_attack
 
 
 class ImprovisedRule(FrozenModel):
@@ -138,21 +139,18 @@ def resolve_improvised_attack(
             validation_errors=errors,
         )
 
-    accuracy_dice = DiceExpression.parse("1d6").roll()
-    if forced_roll is not None:
-        accuracy_dice = [forced_roll]
-
-    accuracy_roll = accuracy_dice[0]
-    total_accuracy = accuracy_roll + actor_accuracy_bonus
-
     if rules.attack_type == "melee":
         target_defense = target_evasion
     else:
         target_defense = target_e_defense
 
-    hit = total_accuracy > target_defense or (
-        total_accuracy == target_defense and accuracy_roll >= 10
+    attack_result = resolve_attack(
+        attack_bonus=actor_accuracy_bonus,
+        target_defense=target_defense,
+        forced_roll=forced_roll,
     )
+
+    hit = attack_result.hit
 
     damage_on_hit = None
     if hit:
@@ -164,9 +162,9 @@ def resolve_improvised_attack(
         target_id=input.target_id,
         is_unarmed=input.is_unarmed,
         attack_success=True,
-        accuracy_roll=accuracy_roll,
+        accuracy_roll=attack_result.roll,
         accuracy_bonus=actor_accuracy_bonus,
-        total_accuracy=total_accuracy,
+        total_accuracy=attack_result.total_accuracy,
         target_evasion=target_evasion,
         target_e_defense=target_e_defense,
         hit=hit,

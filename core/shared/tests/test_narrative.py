@@ -33,6 +33,30 @@ from core.shared import (
     add_narrative_goal,
     resolve_narrative_goal_check,
     NARRATIVE_TIER_RULES,
+    NarrativeCheckTierExtended,
+    DIFFICULT_TIER_RULE,
+    NARRATIVE_TIER_RULES_EXTENDED,
+    is_difficult,
+    get_narrative_tier_rule_extended,
+    ConsequenceSeverity,
+    Consequence,
+    ConsequenceAssignment,
+    generate_harm_consequence,
+    generate_time_consequence,
+    generate_resource_consequence,
+    generate_collateral_consequence,
+    generate_position_consequence,
+    generate_effect_consequence,
+    assign_consequence,
+    roll_1d3,
+    roll_harm,
+    roll_severity,
+    SkillChallengePhase,
+    ExtendedSkillChallengeUse,
+    ExtendedChallengeOutcome,
+    create_extended_challenge,
+    resolve_extended_challenge_phase,
+    finalize_extended_challenge,
 )
 
 
@@ -792,3 +816,598 @@ class TestNarrativeCombatState:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestNarrativeCheckTierExtended:
+    """Tests for extended narrative check tiers (difficult)."""
+
+    def test_difficult_tier_exists(self):
+        """Difficult tier is available in extended tiers."""
+        difficult_rule = get_narrative_tier_rule_extended("difficult")
+        assert difficult_rule is not None
+        assert difficult_rule.tier == "difficult"
+
+    def test_difficult_tier_properties(self):
+        """Difficult tier has correct properties."""
+        assert DIFFICULT_TIER_RULE.tier == "difficult"
+        assert DIFFICULT_TIER_RULE.success_threshold == 10
+        assert DIFFICULT_TIER_RULE.consequence_threshold is None
+        assert DIFFICULT_TIER_RULE.allows_push is True
+
+    def test_all_tiers_in_extended_rules(self):
+        """All tiers including difficult are in extended rules."""
+        tier_names = {rule.tier for rule in NARRATIVE_TIER_RULES_EXTENDED}
+        assert tier_names == {"standard", "difficult", "risky", "heroic"}
+
+    def test_is_difficult_helper(self):
+        """is_difficult helper works correctly."""
+        assert is_difficult("difficult") is True
+        assert is_difficult("standard") is False
+        assert is_difficult("risky") is False
+        assert is_difficult("heroic") is False
+
+    def test_get_tier_rule_extended_lookup(self):
+        """Extended tier rule lookup works for all tiers."""
+        for tier in ["standard", "difficult", "risky", "heroic"]:
+            rule = get_narrative_tier_rule_extended(tier)  # type: ignore
+            assert rule is not None
+            assert rule.tier == tier
+
+
+class TestConsequence:
+    """Tests for consequence system."""
+
+    def test_generate_minor_harm_consequence(self):
+        """Minor harm consequence generates correctly."""
+        consequence = generate_harm_consequence(
+            severity="minor",
+            context="while sneaking past guards",
+        )
+        assert consequence.consequence_type == "harm"
+        assert consequence.severity == "minor"
+        assert consequence.harm_damage in [1, 2]
+        assert "minor" in consequence.description.lower()
+
+    def test_generate_major_harm_consequence(self):
+        """Major harm consequence generates correctly."""
+        consequence = generate_harm_consequence(
+            severity="major",
+            context="during combat",
+        )
+        assert consequence.consequence_type == "harm"
+        assert consequence.severity == "major"
+        assert consequence.harm_damage in [3, 4]
+
+    def test_generate_lethal_harm_consequence(self):
+        """Lethal harm consequence generates correctly."""
+        consequence = generate_harm_consequence(
+            severity="lethal",
+            context="in the explosion",
+        )
+        assert consequence.consequence_type == "harm"
+        assert consequence.severity == "lethal"
+        assert consequence.harm_damage in [5, 6]
+
+    def test_generate_time_consequence(self):
+        """Time consequence generates correctly."""
+        consequence = generate_time_consequence(
+            time_cost=3,
+            time_unit="hours",
+            context="hacking the terminal",
+        )
+        assert consequence.consequence_type == "time"
+        assert consequence.time_cost == 3
+        assert "3" in consequence.description
+        assert "hours" in consequence.description
+
+    def test_generate_resource_consequence(self):
+        """Resource consequence generates correctly."""
+        consequence = generate_resource_consequence(
+            resource_type="ammo",
+            amount=2,
+            context="during firefight",
+        )
+        assert consequence.consequence_type == "resources"
+        assert consequence.resource_type == "ammo"
+        assert consequence.resource_amount == 2
+
+    def test_generate_collateral_consequence(self):
+        """Collateral consequence generates correctly."""
+        consequence = generate_collateral_consequence(
+            affected_target="civilian bystander",
+            harm_description="is caught in the crossfire",
+        )
+        assert consequence.consequence_type == "collateral"
+        assert consequence.affected_target == "civilian bystander"
+
+    def test_generate_position_consequence(self):
+        """Position consequence generates correctly."""
+        consequence = generate_position_consequence(
+            position_change="pinned down behind cover",
+            context="during the firefight",
+        )
+        assert consequence.consequence_type == "position"
+        assert "pinned down" in consequence.description
+
+    def test_generate_effect_consequence(self):
+        """Effect consequence generates correctly."""
+        consequence = generate_effect_consequence(
+            effect_reduction="door only opens partially",
+            context="trying to breach",
+        )
+        assert consequence.consequence_type == "effect"
+        assert "reduced" in consequence.description.lower()
+
+    def test_consequence_id_generation(self):
+        """Consequences generate unique IDs when context differs."""
+        c1 = generate_harm_consequence("minor", "context1", consequence_id="conseq_1")
+        c2 = generate_harm_consequence("minor", "context2", consequence_id="conseq_2")
+        assert c1.id == "conseq_1"
+        assert c2.id == "conseq_2"
+
+    def test_harm_consequence_requires_harm_type(self):
+        """Non-harm consequences cannot have harm_damage."""
+        with pytest.raises(ValueError):
+            Consequence(
+                id="test",
+                consequence_type="time",
+                description="test",
+                harm_damage=2,
+            )
+
+    def test_severity_only_for_harm(self):
+        """Severity is only valid for harm consequences."""
+        with pytest.raises(ValueError):
+            Consequence(
+                id="test",
+                consequence_type="time",
+                description="test",
+                severity="minor",
+            )
+
+
+class TestConsequenceAssignment:
+    """Tests for consequence assignment."""
+
+    def test_assign_harm_consequence(self):
+        """Can assign harm consequence to check result."""
+        result = IndividualCheckResult(
+            participant_id="pilot_1",
+            trigger_used="attack",
+            skill_context="hull",
+            roll_result=8,
+            total_result=7,
+            is_success=False,
+        )
+        assignment = assign_consequence(
+            result,
+            consequence_type="harm",
+            severity="minor",
+        )
+        assert assignment.consequence is not None
+        assert assignment.consequence.consequence_type == "harm"
+        assert assignment.consequence.severity == "minor"
+
+    def test_assign_time_consequence(self):
+        """Can assign time consequence to check result."""
+        result = IndividualCheckResult(
+            participant_id="pilot_1",
+            trigger_used="hack",
+            skill_context="systems",
+            roll_result=9,
+            total_result=9,
+            is_success=False,
+        )
+        assignment = assign_consequence(
+            result,
+            consequence_type="time",
+        )
+        assert assignment.consequence is not None
+        assert assignment.consequence.consequence_type == "time"
+
+    def test_assign_position_consequence(self):
+        """Can assign position consequence."""
+        result = IndividualCheckResult(
+            participant_id="pilot_1",
+            trigger_used="charm",
+            skill_context="hull",
+            roll_result=15,
+            total_result=15,
+            is_success=True,
+        )
+        assignment = assign_consequence(
+            result,
+            consequence_type="position",
+            description="pinned down behind cover",
+        )
+        assert assignment.consequence is not None
+        assert assignment.consequence.consequence_type == "position"
+
+    def test_assignment_tracks_roll_total(self):
+        """Assignment tracks the roll total when applied."""
+        result = IndividualCheckResult(
+            participant_id="pilot_1",
+            trigger_used="spot",
+            skill_context="agility",
+            roll_result=7,
+            total_result=7,
+            is_success=False,
+        )
+        assignment = assign_consequence(
+            result,
+            consequence_type="harm",
+            severity="minor",
+        )
+        assert assignment.applied_at_roll == 7
+
+
+class TestRoll1d3:
+    """Tests for 1d3 utility function."""
+
+    def test_roll_1d3_returns_1_to_3(self):
+        """1d3 always returns 1, 2, or 3."""
+        for _ in range(100):
+            result = roll_1d3()
+            assert 1 <= result <= 3
+
+    def test_roll_harm_with_specific_roll(self):
+        """roll_harm converts d6 roll correctly."""
+        assert roll_harm(1) == 1
+        assert roll_harm(2) == 1
+        assert roll_harm(3) == 2
+        assert roll_harm(4) == 2
+        assert roll_harm(5) == 3
+        assert roll_harm(6) == 3
+
+    def test_roll_severity_mapping(self):
+        """roll_severity maps d6 to severity correctly."""
+        assert roll_severity(1) == "minor"
+        assert roll_severity(2) == "minor"
+        assert roll_severity(3) == "major"
+        assert roll_severity(4) == "major"
+        assert roll_severity(5) == "lethal"
+        assert roll_severity(6) == "lethal"
+
+
+class TestExtendedSkillChallenge:
+    """Tests for extended skill challenges."""
+
+    def test_create_extended_challenge(self):
+        """Can create extended challenge with phases."""
+        definition = SkillChallengeDefinition(
+            id="test_extended",
+            name="Test Extended",
+            challenge_type="combat",
+            description="Test",
+        )
+        challenge = create_extended_challenge(
+            definition=definition,
+            phase_descriptions=[
+                "Phase 1: Breach the perimeter",
+                "Phase 2: Secure the objective",
+                "Phase 3: Extract safely",
+            ],
+            participant_ids=["pilot_1", "pilot_2", "pilot_3"],
+        )
+        assert len(challenge.phases) == 3
+        assert challenge.phases[0].phase_number == 1
+        assert challenge.phases[2].phase_number == 3
+
+    def test_extended_challenge_defaults(self):
+        """Extended challenge has correct defaults."""
+        definition = SkillChallengeDefinition(
+            id="test",
+            name="Test",
+            challenge_type="social",
+            description="Test",
+        )
+        challenge = create_extended_challenge(
+            definition=definition,
+            phase_descriptions=["Single phase"],
+            participant_ids=["pilot_1"],
+        )
+        assert challenge.current_phase_index == 0
+        assert challenge.phases[0].required_successes == 1
+
+    def test_resolve_extended_phase(self):
+        """Can resolve a single phase of extended challenge."""
+        definition = SkillChallengeDefinition(
+            id="test",
+            name="Test",
+            challenge_type="combat",
+            description="Test",
+        )
+        challenge = create_extended_challenge(
+            definition=definition,
+            phase_descriptions=["Phase 1"],
+            participant_ids=["pilot_1", "pilot_2"],
+        )
+
+        phase_checks = [
+            IndividualCheckResult(
+                participant_id="pilot_1",
+                trigger_used="attack",
+                skill_context="hull",
+                roll_result=15,
+                total_result=15,
+                is_success=True,
+            ),
+            IndividualCheckResult(
+                participant_id="pilot_2",
+                trigger_used="hide",
+                skill_context="agility",
+                roll_result=10,
+                total_result=10,
+                is_success=True,
+            ),
+        ]
+
+        updated_challenge, phase_result = resolve_extended_challenge_phase(
+            challenge, phase_checks
+        )
+        assert phase_result.is_success is True
+        assert phase_result.success_count == 2
+        assert phase_result.failure_count == 0
+
+    def test_finalize_extended_challenge_success(self):
+        """Can finalize extended challenge with all phases won."""
+        definition = SkillChallengeDefinition(
+            id="test",
+            name="Test",
+            challenge_type="combat",
+            description="Test",
+        )
+        challenge = create_extended_challenge(
+            definition=definition,
+            phase_descriptions=["Phase 1", "Phase 2", "Phase 3"],
+            participant_ids=["pilot_1"],
+        )
+
+        for i, phase in enumerate(challenge.phases):
+            check = IndividualCheckResult(
+                participant_id="pilot_1",
+                trigger_used="test",
+                skill_context="hull",
+                roll_result=15,
+                total_result=15,
+                is_success=True,
+            )
+            challenge, _ = resolve_extended_challenge_phase(challenge, [check], i)
+
+        finalized, outcome = finalize_extended_challenge(challenge)
+        assert outcome.is_success is True
+        assert outcome.phases_won == 3
+        assert outcome.phases_lost == 0
+
+    def test_finalize_extended_challenge_failure(self):
+        """Can finalize extended challenge with failure."""
+        definition = SkillChallengeDefinition(
+            id="test",
+            name="Test",
+            challenge_type="combat",
+            description="Test",
+        )
+        challenge = create_extended_challenge(
+            definition=definition,
+            phase_descriptions=["Phase 1", "Phase 2", "Phase 3"],
+            participant_ids=["pilot_1"],
+        )
+
+        for i, phase in enumerate(challenge.phases):
+            check = IndividualCheckResult(
+                participant_id="pilot_1",
+                trigger_used="test",
+                skill_context="hull",
+                roll_result=5,
+                total_result=5,
+                is_success=False,
+            )
+            challenge, _ = resolve_extended_challenge_phase(challenge, [check], i)
+
+        finalized, outcome = finalize_extended_challenge(challenge)
+        assert outcome.is_success is False
+        assert outcome.phases_won == 0
+        assert outcome.phases_lost == 3
+
+    def test_finalize_extended_challenge_tie(self):
+        """Tie in extended challenge resolved with 50% chance."""
+        definition = SkillChallengeDefinition(
+            id="test",
+            name="Test",
+            challenge_type="combat",
+            description="Test",
+        )
+        challenge = create_extended_challenge(
+            definition=definition,
+            phase_descriptions=["Phase 1", "Phase 2", "Phase 3", "Phase 4"],
+            participant_ids=["pilot_1"],
+        )
+
+        for i, phase in enumerate(challenge.phases):
+            is_success = i % 2 == 0  # Win, Loss, Win, Loss
+            check = IndividualCheckResult(
+                participant_id="pilot_1",
+                trigger_used="test",
+                skill_context="hull",
+                roll_result=15 if is_success else 5,
+                total_result=15 if is_success else 5,
+                is_success=is_success,
+            )
+            challenge, _ = resolve_extended_challenge_phase(challenge, [check], i)
+
+        finalized, outcome = finalize_extended_challenge(challenge)
+        assert outcome.was_tie is True
+        assert outcome.phases_won == 2
+        assert outcome.phases_lost == 2
+
+    def test_finalize_requires_all_phases_resolved(self):
+        """Finalize fails if phases are unresolved."""
+        definition = SkillChallengeDefinition(
+            id="test",
+            name="Test",
+            challenge_type="combat",
+            description="Test",
+        )
+        challenge = create_extended_challenge(
+            definition=definition,
+            phase_descriptions=["Phase 1", "Phase 2"],
+            participant_ids=["pilot_1"],
+        )
+
+        with pytest.raises(ValueError):
+            finalize_extended_challenge(challenge)
+
+    def test_extended_challenge_requires_phases(self):
+        """Cannot finalize challenge with no phases."""
+        definition = SkillChallengeDefinition(
+            id="test",
+            name="Test",
+            challenge_type="combat",
+            description="Test",
+        )
+        challenge = ExtendedSkillChallengeUse(
+            definition=definition,
+            phases=[],
+            participant_ids=["pilot_1"],
+        )
+
+        with pytest.raises(ValueError):
+            finalize_extended_challenge(challenge)
+
+
+class TestComputeCheckSuccessExtended:
+    """Tests for compute_check_success with extended tiers."""
+
+    def test_difficult_check_with_success(self):
+        """Difficult check that succeeds."""
+        success, consequence, total = compute_check_success(
+            roll_result=14,
+            target=10,
+            modifiers=0,
+            difficulty_modifier=1,
+            tier="difficult",
+        )
+        assert success is True
+        assert consequence is False
+        assert total == 13
+
+    def test_difficult_check_failure(self):
+        """Difficult check that fails due to difficulty."""
+        success, consequence, total = compute_check_success(
+            roll_result=10,
+            target=10,
+            modifiers=0,
+            difficulty_modifier=1,
+            tier="difficult",
+        )
+        assert success is False
+        assert total == 9
+
+    def test_difficult_no_automatic_consequence(self):
+        """Difficult checks don't have automatic consequences on success."""
+        success, consequence, total = compute_check_success(
+            roll_result=10,
+            target=10,
+            modifiers=0,
+            difficulty_modifier=1,
+            tier="difficult",
+        )
+        assert consequence is False
+
+
+class TestIntegrationExtended:
+    """Integration tests for extended features."""
+
+    def test_full_consequence_workflow(self):
+        """Test complete consequence generation and assignment."""
+        result = IndividualCheckResult(
+            participant_id="pilot_1",
+            trigger_used="attack",
+            skill_context="hull",
+            roll_result=7,
+            difficulty_modifier=1,
+            total_result=6,
+            is_success=False,
+            consequence_suffered=True,
+        )
+
+        harm_consequence = generate_harm_consequence(
+            severity="minor",
+            context="grazed by return fire",
+        )
+
+        assignment = ConsequenceAssignment(
+            check_result=result,
+            consequence=harm_consequence,
+            gm_notes="GM: Standard harm for failed attack under fire",
+            applied_at_roll=result.total_result,
+        )
+
+        assert assignment.consequence is not None
+        assert assignment.consequence.harm_damage in [1, 2]
+        assert "minor" in assignment.consequence.description.lower()
+
+    def test_extended_challenge_with_consequences(self):
+        """Test extended challenge where failures produce consequences."""
+        definition = SkillChallengeDefinition(
+            id="infiltration",
+            name="Stealth Infiltration",
+            challenge_type="infiltration",
+            description="Sneak into the facility",
+        )
+        challenge = create_extended_challenge(
+            definition=definition,
+            phase_descriptions=[
+                "Get past the outer guards",
+                "Bypass the security checkpoint",
+                "Reach the objective undetected",
+            ],
+            participant_ids=["pilot_1", "pilot_2"],
+        )
+
+        phase1_checks = [
+            IndividualCheckResult(
+                participant_id="pilot_1",
+                trigger_used="move_unseen",
+                skill_context="agility",
+                roll_result=14,
+                total_result=14,
+                is_success=True,
+            ),
+            IndividualCheckResult(
+                participant_id="pilot_2",
+                trigger_used="charm",
+                skill_context="hull",
+                roll_result=12,
+                total_result=12,
+                is_success=True,
+            ),
+        ]
+
+        updated_challenge, phase1_result = resolve_extended_challenge_phase(
+            challenge, phase1_checks, phase_index=0
+        )
+
+        assert phase1_result.is_success is True
+        assert phase1_result.success_count == 2
+        assert len(phase1_result.overall_consequences) == 0
+
+        for i in [1, 2]:
+            phase_checks = [
+                IndividualCheckResult(
+                    participant_id="pilot_1",
+                    trigger_used="test",
+                    skill_context="hull",
+                    roll_result=15,
+                    total_result=15,
+                    is_success=True,
+                ),
+            ]
+            updated_challenge, _ = resolve_extended_challenge_phase(
+                updated_challenge, phase_checks, phase_index=i
+            )
+
+        finalized, outcome = finalize_extended_challenge(updated_challenge)
+        assert outcome.total_phases == 3
+        assert outcome.phases_won == 3
+        assert outcome.phases_lost == 0

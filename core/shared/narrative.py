@@ -6,8 +6,10 @@ from core.shared.models import FrozenModel
 
 from core.shared.rolls import RollType
 
+import random
 
-NarrativeCheckTier = Literal["standard", "risky", "heroic"]
+
+NarrativeCheckTier = Literal["standard", "difficult", "risky", "heroic"]
 
 
 class NarrativeCheckTierRule(FrozenModel):
@@ -458,9 +460,7 @@ class NarrativeCombatState(FrozenModel):
         description="Optional scene identifier",
     )
     complications: list[NarrativeComplicationState] = Field(default_factory=list)
-    goal_tracker: NarrativeGoalTracker = Field(
-        default_factory=NarrativeGoalTracker
-    )
+    goal_tracker: NarrativeGoalTracker = Field(default_factory=NarrativeGoalTracker)
 
 
 def add_narrative_complication(
@@ -473,9 +473,7 @@ def add_narrative_complication(
         complication=complication,
         status=status,
     )
-    return state.model_copy(
-        update={"complications": [*state.complications, entry]}
-    )
+    return state.model_copy(update={"complications": [*state.complications, entry]})
 
 
 def resolve_narrative_complication(
@@ -706,6 +704,7 @@ class PrecedenceRule(FrozenModel):
         ...,
         description="When this precedence rule applies",
     )
+
 
 class SkillChallengeType(FrozenModel):
     """Type/purpose of a skill challenge."""
@@ -1004,3 +1003,658 @@ def compute_check_success(
             consequence_suffered = True
 
     return is_success, consequence_suffered, total_result
+
+
+NarrativeCheckTierExtended = Literal["standard", "difficult", "risky", "heroic"]
+
+
+DIFFICULT_TIER_RULE = NarrativeCheckTierRule(
+    tier="difficult",
+    success_threshold=10,
+    consequence_threshold=None,
+    allows_push=True,
+)
+
+
+NARRATIVE_TIER_RULES_EXTENDED: list[NarrativeCheckTierRule] = [
+    *NARRATIVE_TIER_RULES,
+    DIFFICULT_TIER_RULE,
+]
+
+
+NARRATIVE_TIER_RULES_BY_TIER_EXTENDED = {
+    rule.tier: rule for rule in NARRATIVE_TIER_RULES_EXTENDED
+}
+
+
+def is_difficult(tier: NarrativeCheckTierExtended) -> bool:
+    """Check if tier is difficult.
+
+    PR2 2963: "A difficult roll is harder than usual and made with +1 difficulty."
+    Difficult checks have a built-in +1 difficulty modifier but otherwise function
+    like standard checks (no automatic consequences).
+    """
+    return tier == "difficult"
+
+
+def get_narrative_tier_rule_extended(
+    tier: NarrativeCheckTierExtended,
+) -> NarrativeCheckTierRule | None:
+    """Look up a tier rule by name, including difficult."""
+    return NARRATIVE_TIER_RULES_BY_TIER_EXTENDED.get(tier)
+
+
+ConsequenceSeverity = Literal["minor", "major", "lethal"]
+
+
+class Consequence(FrozenModel):
+    """A structured consequence from a failed or risky check.
+
+    Per PR2 3007-3033, consequences can be:
+    - Harm: Damage, injury, or bodily harm (minor=1-2, major=3-4, lethal=5-6)
+    - Time: Activity takes more time than normal
+    - Resources: Something must be used up, lost, or expended
+    - Collateral: Someone or something else takes harm or is put in danger
+    - Position: Character is put in a worse position
+    - Effect: Action has less effect than intended
+    """
+
+    id: str = Field(..., description="Unique consequence identifier")
+    consequence_type: NarrativeComplicationType = Field(
+        ..., description="Type of consequence"
+    )
+    severity: ConsequenceSeverity | None = Field(
+        default=None,
+        description="Severity level for harm consequences",
+    )
+    description: str = Field(
+        ..., description="Narrative description of the consequence"
+    )
+    harm_damage: int | None = Field(
+        default=None,
+        ge=0,
+        le=6,
+        description="Damage amount if this is a harm consequence",
+    )
+    time_cost: int | None = Field(
+        default=None,
+        ge=0,
+        description="Time added (in units appropriate to context) for time consequences",
+    )
+    resource_type: str | None = Field(
+        default=None,
+        description="Resource consumed for resource consequences",
+    )
+    resource_amount: int | None = Field(
+        default=None,
+        ge=1,
+        description="Quantity of resource consumed",
+    )
+    affected_target: str | None = Field(
+        default=None,
+        description="ID of character, NPC, or object affected by collateral",
+    )
+    effect_reduction: str | None = Field(
+        default=None,
+        description="Description of how effect is reduced",
+    )
+
+    @model_validator(mode="after")
+    def validate_harm_details(self) -> "Consequence":
+        if self.harm_damage is not None and self.consequence_type != "harm":
+            raise ValueError(
+                "harm_damage is only valid for consequences of type 'harm'."
+            )
+        if self.severity is not None and self.consequence_type != "harm":
+            raise ValueError("severity is only valid for consequences of type 'harm'.")
+        if self.time_cost is not None and self.consequence_type != "time":
+            raise ValueError("time_cost is only valid for consequences of type 'time'.")
+        if self.resource_type is not None and self.consequence_type != "resources":
+            raise ValueError(
+                "resource_type is only valid for consequences of type 'resources'."
+            )
+        if self.resource_amount is not None and self.consequence_type != "resources":
+            raise ValueError(
+                "resource_amount is only valid for consequences of type 'resources'."
+            )
+        return self
+
+
+class ConsequenceAssignment(FrozenModel):
+    """Records consequence assignment for a check result."""
+
+    check_result: IndividualCheckResult = Field(
+        ..., description="The check result this consequence is assigned to"
+    )
+    consequence: Consequence | None = Field(
+        default=None,
+        description="The consequence assigned, if any",
+    )
+    gm_notes: str | None = Field(
+        default=None,
+        description="Additional GM notes about this consequence",
+    )
+    applied_at_roll: int = Field(
+        default=0,
+        ge=0,
+        description="Roll total when consequence was applied",
+    )
+
+
+HARM_VALUES: dict[ConsequenceSeverity, tuple[int, int]] = {
+    "minor": (1, 2),
+    "major": (3, 4),
+    "lethal": (5, 6),
+}
+
+
+def generate_harm_consequence(
+    severity: ConsequenceSeverity,
+    context: str = "",
+    consequence_id: str | None = None,
+) -> Consequence:
+    """Generate a harm consequence based on severity.
+
+    PR2 3007-3010:
+    - Minor harm: 1-2 damage
+    - Major harm: 3-4 damage
+    - Lethal harm: 5-6 damage
+    """
+    harm_range = HARM_VALUES[severity]
+    harm_damage = (harm_range[0] + harm_range[1]) // 2
+
+    desc_parts = []
+    if context:
+        desc_parts.append(context)
+    desc_parts.append(f"suffers {severity} harm ({harm_damage} damage)")
+
+    return Consequence(
+        id=consequence_id or f"harm_{severity}_{harm_damage}",
+        consequence_type="harm",
+        severity=severity,
+        description=". ".join(desc_parts),
+        harm_damage=harm_damage,
+    )
+
+
+def generate_time_consequence(
+    time_cost: int,
+    time_unit: str = "units",
+    context: str = "",
+    consequence_id: str | None = None,
+) -> Consequence:
+    """Generate a time consequence.
+
+    PR2 3011-3013: Time consequences indicate the activity takes more time
+    than normal.
+    """
+    desc = f"takes {time_cost} {time_unit}"
+    if context:
+        desc = f"{context}; {desc}"
+
+    return Consequence(
+        id=consequence_id or f"time_{time_cost}",
+        consequence_type="time",
+        description=desc,
+        time_cost=time_cost,
+    )
+
+
+def generate_resource_consequence(
+    resource_type: str,
+    amount: int = 1,
+    context: str = "",
+    consequence_id: str | None = None,
+) -> Consequence:
+    """Generate a resource consequence.
+
+    PR2 3014-3017: Resource consequences indicate something must be used up,
+    lost, or expended.
+    """
+    desc = f"loses {amount} {resource_type}"
+    if amount > 1:
+        desc = f"loses {amount} {resource_type}"
+    else:
+        desc = f"loses {resource_type}"
+    if context:
+        desc = f"{context}; {desc}"
+
+    return Consequence(
+        id=consequence_id or f"resource_{resource_type}",
+        consequence_type="resources",
+        description=desc,
+        resource_type=resource_type,
+        resource_amount=amount,
+    )
+
+
+def generate_collateral_consequence(
+    affected_target: str,
+    harm_description: str = "",
+    consequence_id: str | None = None,
+) -> Consequence:
+    """Generate a collateral consequence.
+
+    PR2 3026-3027: Collateral consequences mean someone or something else
+    takes harm or is put in danger.
+    """
+    desc = f"{affected_target}"
+    if harm_description:
+        desc = f"{affected_target} {harm_description}"
+    else:
+        desc = f"{affected_target} is put in danger"
+
+    return Consequence(
+        id=consequence_id or f"collateral_{affected_target}",
+        consequence_type="collateral",
+        description=desc,
+        affected_target=affected_target,
+    )
+
+
+def generate_position_consequence(
+    position_change: str,
+    context: str = "",
+    consequence_id: str | None = None,
+) -> Consequence:
+    """Generate a position consequence.
+
+    PR2 3028-3029: Position consequences put the character in a worse position.
+    """
+    desc = f"put in position: {position_change}"
+    if context:
+        desc = f"{context}; {desc}"
+
+    return Consequence(
+        id=consequence_id or f"position_{position_change[:20]}",
+        consequence_type="position",
+        description=desc,
+    )
+
+
+def generate_effect_consequence(
+    effect_reduction: str,
+    context: str = "",
+    consequence_id: str | None = None,
+) -> Consequence:
+    """Generate an effect consequence.
+
+    PR2 3030-3033: Effect consequences mean the action has less effect
+    than intended.
+    """
+    desc = f"effect reduced: {effect_reduction}"
+    if context:
+        desc = f"{context}; {desc}"
+
+    return Consequence(
+        id=consequence_id or f"effect_{effect_reduction[:20]}",
+        consequence_type="effect",
+        description=desc,
+        effect_reduction=effect_reduction,
+    )
+
+
+def assign_consequence(
+    result: IndividualCheckResult,
+    consequence_type: NarrativeComplicationType,
+    severity: ConsequenceSeverity | None = None,
+    description: str | None = None,
+    consequence_id: str | None = None,
+    gm_notes: str | None = None,
+) -> ConsequenceAssignment:
+    """Assign a consequence to a check result.
+
+    Args:
+        result: The check result to assign consequence to
+        consequence_type: Type of consequence
+        severity: Severity level for harm consequences
+        description: Custom description (generated if None)
+        consequence_id: Custom consequence ID
+        gm_notes: Additional GM notes
+
+    Returns:
+        ConsequenceAssignment with the assigned consequence
+    """
+    consequence: Consequence | None = None
+
+    if consequence_type == "harm" and severity:
+        consequence = generate_harm_consequence(
+            severity=severity,
+            context=description or "",
+            consequence_id=consequence_id,
+        )
+    elif consequence_type == "time":
+        consequence = generate_time_consequence(
+            time_cost=1,
+            context=description or "",
+            consequence_id=consequence_id,
+        )
+    elif consequence_type == "resources":
+        consequence = generate_resource_consequence(
+            resource_type=description or "resources",
+            consequence_id=consequence_id,
+        )
+    elif consequence_type == "collateral":
+        consequence = generate_collateral_consequence(
+            affected_target=description or "someone",
+            consequence_id=consequence_id,
+        )
+    elif consequence_type == "position":
+        consequence = generate_position_consequence(
+            position_change=description or "worse position",
+            consequence_id=consequence_id,
+        )
+    elif consequence_type == "effect":
+        consequence = generate_effect_consequence(
+            effect_reduction=description or "reduced effect",
+            consequence_id=consequence_id,
+        )
+
+    return ConsequenceAssignment(
+        check_result=result,
+        consequence=consequence,
+        gm_notes=gm_notes,
+        applied_at_roll=result.total_result,
+    )
+
+
+def roll_1d3() -> int:
+    """Roll 1d3 using 1d6 halved and rounded up.
+
+    PR2 1299-1300: "Sometimes the rules will call for you to roll a 1d3.
+    That is simply a 1d6 with the results halved and rounded up, so a result
+    of 1 or 2 would equal 1, 3 or 4 would equal 2, and 5 or 6 would equal 3."
+
+    Returns:
+        int: Result between 1 and 3
+    """
+    import random
+
+    d6 = random.randint(1, 6)
+    return (d6 + 1) // 2
+
+
+def roll_harm(d6_roll: int | None = None) -> int:
+    """Convert d6 roll to harm value based on PR2 severity.
+
+    When d6_roll is None, rolls 1d6 and converts to harm.
+
+    PR2 3007-3010:
+    - 1-2 on d6 = 1 (minor harm)
+    - 3-4 on d6 = 2 (minor harm)
+    - 5-6 on d6 = 3 (major harm)
+
+    Args:
+        d6_roll: Optional d6 result (1-6). If None, rolls randomly.
+
+    Returns:
+        int: Harm value (1-3)
+    """
+    if d6_roll is None:
+        d6_roll = random.randint(1, 6)
+    return (d6_roll + 1) // 2
+
+
+def roll_severity(d6_roll: int | None = None) -> ConsequenceSeverity:
+    """Roll for harm severity using 1d6.
+
+    PR2 3007-3010:
+    - Minor: 1-2 damage (roll 1-2 on d6)
+    - Major: 3-4 damage (roll 3-4 on d6)
+    - Lethal: 5-6 damage (roll 5-6 on d6)
+
+    Args:
+        d6_roll: Optional d6 result (1-6). If None, rolls randomly.
+
+    Returns:
+        ConsequenceSeverity: minor, major, or lethal
+    """
+    if d6_roll is None:
+        d6_roll = random.randint(1, 6)
+
+    if d6_roll <= 2:
+        return "minor"
+    elif d6_roll <= 4:
+        return "major"
+    else:
+        return "lethal"
+
+
+class SkillChallengePhase(FrozenModel):
+    """A single phase of an extended skill challenge.
+
+    PR2 3101-3104: "You can also have extended challenges that have 3 rounds
+    of rolling and calculate the outcome based on rounds 'won' by the players."
+    """
+
+    phase_number: int = Field(..., ge=1, description="Phase number (1-based)")
+    description: str = Field(..., description="Description of this phase")
+    required_successes: int = Field(
+        default=1,
+        ge=1,
+        description="Successes needed in this phase to win it",
+    )
+    individual_checks: list[IndividualCheckResult] = Field(
+        default_factory=list,
+        description="Individual check results for this phase",
+    )
+    phase_result: SkillChallengeResult | None = Field(
+        default=None,
+        description="Resolved outcome for this phase",
+    )
+
+
+class ExtendedSkillChallengeUse(FrozenModel):
+    """An extended skill challenge with multiple phases.
+
+    Extended challenges consist of multiple rounds where players must win
+    a majority (2/3) of phases to fully succeed.
+    """
+
+    definition: SkillChallengeDefinition = Field(
+        ..., description="The challenge definition being used"
+    )
+    phases: list[SkillChallengePhase] = Field(
+        default_factory=list,
+        description="Phases of this extended challenge",
+    )
+    current_phase_index: int = Field(
+        default=0,
+        ge=0,
+        description="Index of the current phase",
+    )
+    scenario_settings: NarrativeScenarioSettings = Field(
+        default_factory=NarrativeScenarioSettings,
+        description="Scenario settings that apply to this challenge",
+    )
+    participant_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of participating pilots",
+    )
+
+
+class ExtendedChallengeOutcome(FrozenModel):
+    """Outcome of an extended skill challenge.
+
+    PR2 3101-3104: "They are only truly successful if the majority (2/3)
+    of these tasks are accomplished."
+    """
+
+    total_phases: int = Field(..., ge=1, description="Total number of phases")
+    phases_won: int = Field(..., ge=0, description="Number of phases won by players")
+    phases_lost: int = Field(..., ge=0, description="Number of phases lost by players")
+    required_for_success: int = Field(
+        ..., ge=1, description="Phases needed to win (usually majority)"
+    )
+    is_success: bool = Field(..., description="Whether the challenge succeeded")
+    was_tie: bool = Field(default=False, description="Whether this was a tie")
+    tie_roll_result: int | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="50% roll result if tie (0=fail, 1=success)",
+    )
+    round_by_round_results: list[SkillChallengeResult] = Field(
+        default_factory=list,
+        description="Result for each phase",
+    )
+    overall_consequences: list[str] = Field(
+        default_factory=list,
+        description="Consequences from all phases",
+    )
+
+
+def create_extended_challenge(
+    definition: SkillChallengeDefinition,
+    phase_descriptions: list[str],
+    participant_ids: list[str],
+    successes_per_phase: int | None = None,
+    scenario_settings: NarrativeScenarioSettings | None = None,
+) -> ExtendedSkillChallengeUse:
+    """Create an extended skill challenge with phases.
+
+    Args:
+        definition: The skill challenge definition
+        phase_descriptions: List of descriptions, one per phase
+        participant_ids: IDs of participating pilots
+        successes_per_phase: Successes needed per phase (default: 1)
+        scenario_settings: Optional scenario settings
+
+    Returns:
+        ExtendedSkillChallengeUse ready for resolution
+    """
+    phases = [
+        SkillChallengePhase(
+            phase_number=i + 1,
+            description=desc,
+            required_successes=successes_per_phase or 1,
+        )
+        for i, desc in enumerate(phase_descriptions)
+    ]
+
+    return ExtendedSkillChallengeUse(
+        definition=definition,
+        phases=phases,
+        participant_ids=participant_ids,
+        scenario_settings=scenario_settings or NarrativeScenarioSettings(),
+    )
+
+
+def resolve_extended_challenge_phase(
+    challenge: ExtendedSkillChallengeUse,
+    phase_checks: list[IndividualCheckResult],
+    phase_index: int | None = None,
+    tier_rules: list[NarrativeCheckTierRule] | None = None,
+) -> tuple[ExtendedSkillChallengeUse, SkillChallengeResult]:
+    """Resolve one phase of an extended skill challenge.
+
+    Args:
+        challenge: The extended challenge
+        phase_checks: Individual check results for this phase
+        phase_index: Phase to resolve (default: current phase)
+        tier_rules: Optional custom tier rules
+
+    Returns:
+        Tuple of (updated challenge, phase result)
+    """
+    if tier_rules is None:
+        tier_rules = NARRATIVE_TIER_RULES
+
+    idx = phase_index if phase_index is not None else challenge.current_phase_index
+
+    if idx >= len(challenge.phases):
+        raise ValueError(f"Phase {idx + 1} does not exist in this challenge")
+
+    phase = challenge.phases[idx]
+
+    phase_result = resolve_skill_challenge(
+        SkillChallengeUse(
+            definition=challenge.definition,
+            scenario_settings=challenge.scenario_settings,
+            participant_ids=challenge.participant_ids,
+            individual_checks=phase_checks,
+        ),
+        tier_rules=tier_rules,
+    )
+
+    updated_phases = list(challenge.phases)
+    updated_phases[idx] = phase.model_copy(
+        update={
+            "individual_checks": phase_checks,
+            "phase_result": phase_result,
+        }
+    )
+
+    return (
+        challenge.model_copy(update={"phases": updated_phases}),
+        phase_result,
+    )
+
+
+def finalize_extended_challenge(
+    challenge: ExtendedSkillChallengeUse,
+) -> tuple[ExtendedSkillChallengeUse, ExtendedChallengeOutcome]:
+    """Finalize all phases and compute overall result.
+
+    PR2 3101-3104: Success requires majority (2/3) of phases won.
+    Tie = 50% chance (roll die or flip coin).
+
+    Args:
+        challenge: The extended challenge with all phases resolved
+
+    Returns:
+        Tuple of (updated challenge, overall outcome)
+    """
+    if not challenge.phases:
+        raise ValueError("Cannot finalize challenge with no phases")
+
+    total_phases = len(challenge.phases)
+    phases_won = 0
+    phases_lost = 0
+    round_results: list[SkillChallengeResult] = []
+    overall_consequences: list[str] = []
+
+    for phase in challenge.phases:
+        if phase.phase_result is None:
+            raise ValueError(f"Phase {phase.phase_number} has not been resolved yet")
+
+        round_results.append(phase.phase_result)
+
+        if phase.phase_result.is_success:
+            phases_won += 1
+        else:
+            phases_lost += 1
+
+        for consequence in phase.phase_result.overall_consequences:
+            overall_consequences.append(f"Phase {phase.phase_number}: {consequence}")
+
+    required_for_success = (total_phases // 2) + 1
+
+    if phases_won > phases_lost:
+        is_success = True
+        was_tie = False
+        tie_roll_result = None
+    elif phases_lost > phases_won:
+        is_success = False
+        was_tie = False
+        tie_roll_result = None
+    else:
+        was_tie = True
+        tie_roll_result = random.randint(0, 1)
+        is_success = tie_roll_result == 1
+
+    outcome = ExtendedChallengeOutcome(
+        total_phases=total_phases,
+        phases_won=phases_won,
+        phases_lost=phases_lost,
+        required_for_success=required_for_success,
+        is_success=is_success,
+        was_tie=was_tie,
+        tie_roll_result=tie_roll_result,
+        round_by_round_results=round_results,
+        overall_consequences=overall_consequences,
+    )
+
+    updated_challenge = challenge.model_copy(update={"phases": challenge.phases})
+
+    return updated_challenge, outcome

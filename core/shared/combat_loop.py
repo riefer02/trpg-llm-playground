@@ -21,6 +21,7 @@ from core.shared.models import FrozenModel
 if TYPE_CHECKING:
     from core.shared.narrative import NarrativeCombatState, NarrativeGoalTracker
     from core.shared.turn_end import TurnEndTrigger, TurnEndEffectState, TurnEndResult
+    from core.shared.scenario import MissionState
 
 
 ScenePhase = Literal["opening", "action", "complication", "resolution"]
@@ -53,6 +54,7 @@ class CombatLoopState(FrozenModel):
         active_goals: Goal IDs currently being pursued
         active_complications: Complication IDs currently active
         turn_history: Ordered list of actors who have taken turns
+        mission_state: Optional mission state for scenario tracking
     """
 
     scene_id: str | None = None
@@ -66,6 +68,7 @@ class CombatLoopState(FrozenModel):
     turn_history: list[str] = Field(default_factory=list)
     scenario_type: SceneScenarioType | None = None
     scenario_settings: dict[str, str] | None = None
+    mission_state: "MissionState | None" = Field(default=None)
 
     @model_validator(mode="before")
     @classmethod
@@ -604,6 +607,8 @@ def check_narrative_victory(
 ) -> tuple[bool, MissionCompletionResult | None]:
     """Check if narrative victory conditions are met.
 
+    Also checks mission objectives if mission_state is present.
+
     Args:
         loop_state: Current combat loop state
         combat_state: Goals and complications state
@@ -613,6 +618,8 @@ def check_narrative_victory(
     Returns:
         Tuple of (is_victory, completion_result)
     """
+    from core.shared.scenario import check_mission_completion, resolve_mission_outcome
+
     completed_goal_ids = [
         g.goal.id for g in combat_state.goal_tracker.goals if g.status == "completed"
     ]
@@ -635,6 +642,30 @@ def check_narrative_victory(
             ),
         )
         return True, result
+
+    if loop_state.mission_state is not None:
+        from core.shared.scenario import MissionState as ScenarioMissionState
+
+        mission_state = loop_state.mission_state
+        if isinstance(mission_state, ScenarioMissionState):
+            from core.shared.scenario import (
+                check_mission_completion as check_mission_done,
+            )
+
+            if check_mission_done(mission_state):
+                debrief = resolve_mission_outcome(mission_state)
+                result = MissionCompletionResult(
+                    victory=debrief.outcome in ("success", "partial"),
+                    completion_type=debrief.outcome,
+                    goals_achieved=len(debrief.objectives_completed),
+                    goals_total=len(mission_state.mission.objectives),
+                    complications_survived=0,
+                    complications_escalated=0,
+                    partial_success=debrief.outcome == "partial",
+                    sequel_flag=None,
+                    completion_turn=mission_state.current_turn,
+                )
+                return debrief.outcome in ("success", "partial"), result
 
     return False, None
 
@@ -733,3 +764,11 @@ def advance_to_next_turn(
         )
 
     return updated
+
+
+try:
+    from core.shared.scenario import MissionState
+
+    CombatLoopState.model_rebuild(_types_namespace={"MissionState": MissionState})
+except ImportError:
+    pass

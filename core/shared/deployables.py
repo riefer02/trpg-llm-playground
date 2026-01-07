@@ -36,6 +36,9 @@ from core.shared.damage import (
     DamageInput,
     DamageResolutionResult,
 )
+from core.shared.movement import (
+    resolve_drone_movement,
+)
 from core.mech.grid import HexCoord, HexPosition, hexes_in_radius
 from core.mech.combat_state import DeployableState, DeployableKind, MechCombatScenario
 
@@ -356,163 +359,6 @@ def resolve_drone_activation(input: DroneActivationInput) -> DroneActivationResu
     )
 
 
-class DroneMovementInput(FrozenModel):
-    """Input for drone movement following normal Lancer rules."""
-
-    drone_id: str = Field(..., description="ID of drone to move")
-    destination: HexPosition = Field(..., description="Target position")
-    current_scenario: MechCombatScenario = Field(
-        ..., description="Current combat scenario"
-    )
-    drone_speed: int = Field(default=4, description="Drone movement speed")
-    force_movement_cost: int | None = Field(
-        default=None, description="Forced total cost for testing"
-    )
-    force_path: list[HexCoord] | None = Field(
-        default=None, description="Forced path for testing"
-    )
-
-
-class DroneMovementResult(FrozenModel):
-    """Result of drone movement attempt."""
-
-    movement_successful: bool = Field(..., description="Whether movement completed")
-    path_clear: bool = Field(..., description="Whether path is clear")
-    spaces_moved: int = Field(..., description="Number of spaces moved")
-    total_movement_cost: int = Field(..., description="Total movement cost")
-    new_position: HexPosition | None = Field(default=None, description="Final position")
-    terrain_costs: list[int] = Field(
-        default_factory=list, description="Per-space terrain costs"
-    )
-    terrain_encountered: list[str] = Field(
-        default_factory=list, description="Terrain types encountered"
-    )
-    reason: str = Field(default="", description="Explanation of result")
-
-
-def resolve_drone_movement(input: DroneMovementInput) -> DroneMovementResult:
-    """Resolve drone movement following normal Lancer rules.
-
-    Per PR2:
-    - Movement costs 1 space per space moved
-    - Difficult terrain costs 2 spaces per space
-    - Movement doesn't provoke reactions
-    - Flying ignores obstructions at altitude 1+
-
-    Returns what SHOULD happen - caller applies state changes.
-    """
-    from core.mech.grid import HexCoord
-
-    start_pos = None
-    for c in input.current_scenario.combatants:
-        if c.id == input.drone_id:
-            start_pos = c.position
-            break
-
-    if start_pos is None:
-        return DroneMovementResult(
-            movement_successful=False,
-            path_clear=False,
-            spaces_moved=0,
-            total_movement_cost=0,
-            reason=f"Drone {input.drone_id} not found in scenario",
-        )
-
-    terrain = input.current_scenario.terrain
-    start_coord = start_pos.coord
-    dest_coord = input.destination.coord
-
-    distance = start_coord.distance_to(dest_coord)
-    path = hex_line_simple(start_coord, dest_coord)
-
-    terrain_costs: list[int] = []
-    terrain_encountered: list[str] = []
-    total_cost = 0
-    spaces_moved = 0
-
-    for i, coord in enumerate(path[1:], start=1):
-        if i > input.drone_speed:
-            break
-
-        cost = calculate_movement_cost(
-            spaces=1,
-            terrain=terrain,
-            coord=coord,
-        )
-        terrain_costs.append(cost)
-        total_cost += cost
-        spaces_moved += 1
-
-        hex_terrain = get_terrain_at(terrain, coord)
-        if hex_terrain:
-            if hex_terrain.difficult:
-                terrain_encountered.append("difficult")
-            if hex_terrain.dangerous:
-                terrain_encountered.append("dangerous")
-
-    if force_cost := input.force_movement_cost:
-        total_cost = force_cost
-
-    movement_successful = total_cost <= input.drone_speed
-    path_clear = movement_successful and len(path) - 1 <= input.drone_speed
-
-    if movement_successful:
-        new_pos = HexPosition(coord=dest_coord, elevation=input.destination.elevation)
-    else:
-        new_pos = None
-
-    return DroneMovementResult(
-        movement_successful=movement_successful,
-        path_clear=path_clear,
-        spaces_moved=spaces_moved,
-        total_movement_cost=total_cost,
-        new_position=new_pos,
-        terrain_costs=terrain_costs,
-        terrain_encountered=terrain_encountered,
-        reason=f"Moved {spaces_moved} spaces, cost {total_cost}/{input.drone_speed}",
-    )
-
-
-def hex_line_simple(start: HexCoord, end: HexCoord) -> list[HexCoord]:
-    """Simple hex line between two coordinates."""
-    distance = start.distance_to(end)
-    if distance == 0:
-        return [start]
-
-    results: list[HexCoord] = []
-    for step in range(distance + 1):
-        t = step / distance
-        cube = (
-            start.q * (1 - t) + end.q * t,
-            start.r * (1 - t) + end.r * t,
-            (-start.q - start.r) * (1 - t) + (-end.q - end.r) * t,
-        )
-        rounded = cube_round(cube)
-        results.append(HexCoord(q=round(rounded[0]), r=round(rounded[2])))
-    return results
-
-
-def cube_round(cube: tuple[float, float, float]) -> tuple[float, float, float]:
-    """Round fractional cube coordinates to nearest hex."""
-    rx, ry, rz = cube
-    x_round = round(rx)
-    y_round = round(ry)
-    z_round = round(rz)
-
-    x_diff = abs(x_round - rx)
-    y_diff = abs(y_round - ry)
-    z_diff = abs(z_round - rz)
-
-    if x_diff > y_diff and x_diff > z_diff:
-        x_round = -y_round - z_round
-    elif y_diff > z_diff:
-        y_round = -x_round - z_round
-    else:
-        z_round = -x_round - y_round
-
-    return (x_round, y_round, z_round)
-
-
 class MineDetonationInput(FrozenModel):
     """Input for mine detonation resolution per PR2 5085-5086."""
 
@@ -816,3 +662,20 @@ def is_adjacent_to_mine(
         return False
 
     return combatant_position.coord.is_adjacent(mine_position.coord)
+
+
+from core.shared.movement import (
+    DroneMovementInput,
+    DroneMovementResult,
+    resolve_drone_movement,
+    hex_line_simple,
+    cube_round,
+)
+
+__all__ = [
+    "DroneMovementInput",
+    "DroneMovementResult",
+    "resolve_drone_movement",
+    "hex_line_simple",
+    "cube_round",
+]
