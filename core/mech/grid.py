@@ -26,7 +26,13 @@ __all__ = [
 
 
 class HexCoord(FrozenModel):
-    """Axial hex coordinate (q, r)."""
+    """Axial hex coordinate (q, r).
+
+    Supports tuple-like comparison and indexing for migration compatibility:
+    - h == (x, y) returns True if coordinates match
+    - h[0] == h.q, h[1] == h.r
+    - hash(h) == hash((x, y))
+    """
 
     q: int = Field(..., description="Axial q coordinate")
     r: int = Field(..., description="Axial r coordinate")
@@ -36,6 +42,34 @@ class HexCoord(FrozenModel):
     def s(self) -> int:
         """Derived s coordinate (q + r + s = 0)."""
         return -self.q - self.r
+
+    def __getitem__(self, index: int) -> int:
+        """Enable tuple-like indexing (hex[0] == hex.q, hex[1] == hex.r)."""
+        if index == 0:
+            return self.q
+        elif index == 1:
+            return self.r
+        raise IndexError("HexCoord index out of range (only 0 and 1 are valid)")
+
+    def __len__(self) -> int:
+        """Return 2 for tuple compatibility."""
+        return 2
+
+    def __eq__(self, other: object) -> bool:
+        """Support equality with HexCoord and tuple[int, int]."""
+        if isinstance(other, HexCoord):
+            return self.q == other.q and self.r == other.r
+        if isinstance(other, tuple) and len(other) == 2:
+            return self.q == other[0] and self.r == other[1]
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """Support use as dict key and set member."""
+        return hash((self.q, self.r))
+
+    def __repr__(self) -> str:
+        """Tuple-like repr for debugging."""
+        return f"HexCoord({self.q}, {self.r})"
 
     def distance_to(self, other: "HexCoord") -> int:
         """Hex distance between two axial coordinates."""
@@ -279,3 +313,7 @@ def _cube_round(cube: tuple[float, float, float]) -> tuple[float, float, float]:
         rz = -rx - ry
 
     return (rx, ry, rz)
+
+
+if __name__ == "__main__":
+    pass
