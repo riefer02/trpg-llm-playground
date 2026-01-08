@@ -169,7 +169,6 @@ __all__ = [
     # AI effects
     "AISystemLimitEffect",
     "AIControlTransferEffect",
-    "AIControlTransferEffect",
     # Phase & protocol effects
     "PhaseShiftEffect",
     "ProtocolEffect",
