@@ -25,6 +25,7 @@ from core.mech.combat_resolution import (
     end_swarm_body_condition,
     ResolutionSettings,
 )
+from core.mech.grid import HexCoord
 
 
 class TestBalorScouringSwarmResult:
@@ -441,7 +442,7 @@ class TestHiveDroneResult:
         """Test creating a result for drone deployment."""
         result = HiveDroneResult(
             drone_deployed=True,
-            drone_position=(5, 5),
+            drone_position=HexCoord(q=5, r=5),
             damage_dealt=False,
             affected_targets=[],
         )
@@ -453,7 +454,7 @@ class TestHiveDroneResult:
         """Test creating a result for drone damage."""
         result = HiveDroneResult(
             drone_deployed=True,
-            drone_position=(5, 5),
+            drone_position=HexCoord(q=5, r=5),
             damage_dealt=True,
             affected_targets=["enemy_1"],
         )
@@ -468,7 +469,7 @@ class TestDeployHiveDrone:
         """Test successful drone deployment."""
         result = deploy_hive_drone(
             combatant_id="balor_1",
-            deploy_position=(5, 5),
+            deploy_position=HexCoord(q=5, r=5),
             enemy_target_ids=["enemy_1"],
         )
         assert result.drone_deployed is True
@@ -479,7 +480,7 @@ class TestDeployHiveDrone:
         """Test that enemy targets are preserved for later use."""
         result = deploy_hive_drone(
             combatant_id="balor_1",
-            deploy_position=(3, 7),
+            deploy_position=HexCoord(q=3, r=7),
             enemy_target_ids=["enemy_1", "enemy_2"],
         )
         assert result is not None
@@ -491,7 +492,7 @@ class TestResolveHiveDroneTurnStart:
     def test_damage_to_enemies(self):
         """Test damage to enemies in drone zone at turn start."""
         result = resolve_hive_drone_turn_start(
-            drone_position=(5, 5),
+            drone_position=HexCoord(q=5, r=5),
             enemy_target_ids=["enemy_1", "enemy_2"],
         )
         assert result.damage_dealt is True
@@ -500,7 +501,7 @@ class TestResolveHiveDroneTurnStart:
     def test_no_damage_without_enemies(self):
         """Test no damage when no enemies in zone."""
         result = resolve_hive_drone_turn_start(
-            drone_position=(5, 5),
+            drone_position=HexCoord(q=5, r=5),
             enemy_target_ids=[],
         )
         assert result.damage_dealt is False
@@ -509,7 +510,7 @@ class TestResolveHiveDroneTurnStart:
     def test_zone_size_parameter(self):
         """Test that zone size parameter is accepted."""
         result = resolve_hive_drone_turn_start(
-            drone_position=(5, 5),
+            drone_position=HexCoord(q=5, r=5),
             enemy_target_ids=[],
             zone_size=3,
         )
@@ -523,7 +524,7 @@ class TestResolveHiveDroneZoneEntry:
         """Test damage to combatant entering zone."""
         result = resolve_hive_drone_zone_entry(
             entering_combatant_id="enemy_1",
-            drone_position=(5, 5),
+            drone_position=HexCoord(q=5, r=5),
         )
         assert result.damage_dealt is True
         assert "enemy_1" in result.affected_targets
@@ -532,7 +533,7 @@ class TestResolveHiveDroneZoneEntry:
         """Test that only the entering combatant is affected."""
         result = resolve_hive_drone_zone_entry(
             entering_combatant_id="enemy_1",
-            drone_position=(5, 5),
+            drone_position=HexCoord(q=5, r=5),
         )
         assert len(result.affected_targets) == 1
         assert result.affected_targets[0] == "enemy_1"
@@ -709,7 +710,7 @@ class TestBalorResolutionIntegration:
 
     def test_full_hive_drone_lifecycle(self):
         """Test the complete Hive Drone deployment and damage sequence."""
-        drone_pos = (5, 5)
+        drone_pos = HexCoord(q=5, r=5)
         deploy_result = deploy_hive_drone(
             combatant_id="balor_1",
             deploy_position=drone_pos,

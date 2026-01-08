@@ -24,6 +24,7 @@ from core.mech.combat_state import (
     MechCombatScenario,
     HexPosition,
 )
+from core.mech.grid import HexCoord
 from core.shared.effects import (
     PerTargetCounter,
     CooldownState,
@@ -1031,7 +1032,7 @@ class HiveDroneResult(FrozenModel):
     """Result of Hive Drone activation."""
 
     drone_deployed: bool = Field(..., description="Whether drone was deployed")
-    drone_position: tuple[int, int] | None = Field(
+    drone_position: HexCoord | None = Field(
         default=None, description="Position of deployed drone (hex coordinates)"
     )
     damage_dealt: bool = Field(..., description="Whether drone damage was applied")
@@ -1254,7 +1255,7 @@ def activate_hellswarm_protocol(
 def deploy_hive_drone(
     *,
     combatant_id: str,
-    deploy_position: tuple[int, int],
+    deploy_position: HexCoord,
     enemy_target_ids: list[str],
 ) -> HiveDroneResult:
     """Deploy a Hive Drone to a specific position.
@@ -1280,7 +1281,7 @@ def deploy_hive_drone(
 
 def resolve_hive_drone_turn_start(
     *,
-    drone_position: tuple[int, int],
+    drone_position: HexCoord,
     enemy_target_ids: list[str],
     zone_size: int = 2,
 ) -> HiveDroneResult:
@@ -1310,7 +1311,7 @@ def resolve_hive_drone_turn_start(
 def resolve_hive_drone_zone_entry(
     *,
     entering_combatant_id: str,
-    drone_position: tuple[int, int],
+    drone_position: HexCoord,
     zone_size: int = 2,
 ) -> HiveDroneResult:
     """Resolve Hive Drone damage on zone entry.

@@ -21,6 +21,7 @@ from core.shared.integration.npc_ai import (
     select_npc_action_with_role,
     is_adjacent,
 )
+from core.mech.grid import HexCoord
 from core.npc.state import NPCState, NPCCombatStats
 
 
@@ -276,20 +277,24 @@ class TestIsAdjacent:
 
     def test_same_position_not_adjacent(self):
         """Same position should not be adjacent."""
-        assert not is_adjacent((0, 0), (0, 0), "size_1", "size_1")
+        assert not is_adjacent(
+            HexCoord(q=0, r=0), HexCoord(q=0, r=0), "size_1", "size_1"
+        )
 
     def test_adjacent_positions(self):
         """Orthogonal adjacent positions should be adjacent."""
-        assert is_adjacent((0, 0), (1, 0), "size_1", "size_1")
-        assert is_adjacent((0, 0), (0, 1), "size_1", "size_1")
+        assert is_adjacent(HexCoord(q=0, r=0), HexCoord(q=1, r=0), "size_1", "size_1")
+        assert is_adjacent(HexCoord(q=0, r=0), HexCoord(q=0, r=1), "size_1", "size_1")
 
     def test_diagonal_not_adjacent(self):
         """Diagonal positions are not adjacent for size 1."""
-        assert not is_adjacent((0, 0), (1, 1), "size_1", "size_1")
+        assert not is_adjacent(
+            HexCoord(q=0, r=0), HexCoord(q=1, r=1), "size_1", "size_1"
+        )
 
     def test_size_2_extends_reach(self):
         """Size 2 units have extended adjacency."""
-        assert is_adjacent((0, 0), (2, 0), "size_2", "size_1")
+        assert is_adjacent(HexCoord(q=0, r=0), HexCoord(q=2, r=0), "size_2", "size_1")
 
 
 class TestTargetInfo:

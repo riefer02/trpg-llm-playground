@@ -30,6 +30,26 @@ if TYPE_CHECKING:
     from core.mech.grid import HexPosition
 
 
+__all__ = [
+    "TerrainHex",
+    "TerrainMap",
+    "terrain_index",
+    "TerrainEffectResult",
+    "CoverDifficultyResult",
+    "HardCoverAvailabilityResult",
+    "DangerousTerrainResult",
+    "get_terrain_at",
+    "get_terrain_effects_at",
+    "calculate_movement_cost",
+    "get_cover_difficulty",
+    "check_soft_cover",
+    "check_hard_cover_available",
+    "resolve_dangerous_terrain",
+    "get_elevation_bonus",
+    "calculate_climb_cost",
+]
+
+
 class TerrainHex(FrozenModel):
     """Terrain entry for a single hex."""
 

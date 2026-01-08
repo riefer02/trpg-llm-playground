@@ -11,6 +11,7 @@ from core.shared.damage import (
     compute_armor_reduction,
     compute_resistance_reduction,
 )
+from core.mech.grid import HexCoord
 from core.shared.enums import DamageType, StatusType
 from core.mech.combat_state import (
     CombatantState,
@@ -98,7 +99,7 @@ class TestDamageResolutionContext:
         ctx = DamageResolutionContext(
             attacker_id="attacker_1",
             target=combatant,
-            target_position=(3, 4),
+            target_position=HexCoord(q=3, r=4),
         )
         assert ctx.target_position == (3, 4)
 

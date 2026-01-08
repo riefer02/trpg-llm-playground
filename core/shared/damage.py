@@ -15,6 +15,7 @@ from core.shared.enums import DamageType, StatusType
 from core.shared.dice import round_up
 from core.mech.combat_rules import DamageResolutionRules
 from core.mech.combat_state import CombatantState, CombatStats
+from core.mech.grid import HexCoord
 
 
 class DamageInput(FrozenModel):
@@ -47,7 +48,7 @@ class DamageResolutionContext(FrozenModel):
 
     attacker_id: str = Field(..., description="ID of the damage source")
     target: CombatantState = Field(..., description="Target combatant state")
-    target_position: tuple[int, int] | None = Field(
+    target_position: HexCoord | None = Field(
         default=None, description="Target grid position"
     )
     accuracy_bonus: int = Field(

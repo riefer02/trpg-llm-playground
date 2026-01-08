@@ -21,6 +21,7 @@ from core.shared.models import FrozenModel
 from core.shared.enums import ActionType, SizeClass
 from core.npc.models import NPCRole
 from core.npc.state import NPCState, NPCTemplate
+from core.mech.grid import HexCoord
 
 
 TargetPriority = Literal["low_hp", "high_threat", "nearest", "objective", "low_hp_ally"]
@@ -295,7 +296,7 @@ def select_npc_action_with_role(
 
 
 def is_adjacent(
-    pos1: tuple[int, int], pos2: tuple[int, int], size1: SizeClass, size2: SizeClass
+    pos1: HexCoord, pos2: HexCoord, size1: SizeClass, size2: SizeClass
 ) -> bool:
     """Check if two units are adjacent considering size.
 
@@ -305,8 +306,8 @@ def is_adjacent(
     if pos1 == pos2:
         return False
 
-    dx = abs(pos1[0] - pos2[0])
-    dy = abs(pos1[1] - pos2[1])
+    dx = abs(pos1.q - pos2.q)
+    dy = abs(pos1.r - pos2.r)
 
     max_dist = max(dx, dy)
     min_dist = min(dx, dy)
