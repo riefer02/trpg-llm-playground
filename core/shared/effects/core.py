@@ -398,8 +398,15 @@ class ReactionCondition(FrozenModel):
 
     @model_validator(mode="after")
     def _validate_reaction_condition(self) -> "ReactionCondition":
+        """Ensure at least one condition parameter is set.
+
+        Raises:
+            ValueError: If both reaction_id and is_attack are None.
+        """
         if self.reaction_id is None and self.is_attack is None:
-            raise ValueError("ReactionCondition must define reaction_id or is_attack")
+            raise ValueError(
+                "ReactionCondition must define 'reaction_id' or 'is_attack'"
+            )
         return self
 
 
@@ -421,6 +428,11 @@ class ConditionGroup(FrozenModel):
 
     @model_validator(mode="after")
     def _validate_group(self) -> "ConditionGroup":
+        """Ensure at least one condition list is defined.
+
+        Raises:
+            ValueError: If all_of, any_of, and none_of are all empty.
+        """
         if not self.all_of and not self.any_of and not self.none_of:
             raise ValueError("ConditionGroup must define at least one condition list")
         return self
@@ -594,8 +606,10 @@ class RangeModifier(FrozenModel):
 
 
 class DirectDamage(FrozenModel):
-    """
-    Direct damage not tied to a standard weapon attack.
+    """Direct damage not tied to a standard weapon attack.
+
+    Per PR2 3960-3964: Damage is calculated from dice and flat modifiers,
+    then reduced by armor and resistance. AP ignores armor.
 
     Examples:
         DirectDamage(damage_type="explosive", dice=DiceExpression.parse("1d3"), ap=True)
@@ -749,8 +763,10 @@ class TechActionOverrideEffect(FrozenModel):
 
 
 class TechAction(FrozenModel):
-    """
-    Defines a tech action granted by a system.
+    """Defines a tech action granted by a system.
+
+    Per PR2 4060-4095: Tech actions target E-Defense and can apply status
+    effects, debuffs, or direct damage. Some tech actions are attacks.
 
     Examples:
         TechAction(name="Track", action_type="quick", is_attack=True, range=TechRange(range_type="sensors"))
@@ -858,6 +874,14 @@ class DicePoolSpendOption(FrozenModel):
 
     @model_validator(mode="after")
     def _validate_spend_option(self) -> "DicePoolSpendOption":
+        """Validate spend option configuration.
+
+        Ensures dice_cost, spend_any_number, spend_all, and roll/roll_threshold
+        are consistent.
+
+        Raises:
+            ValueError: If configuration is invalid.
+        """
         if self.spend_all and not self.spend_any_number:
             raise ValueError("spend_any_number must be True when spend_all is True")
         if self.spend_any_number:
@@ -913,6 +937,13 @@ class DicePoolEffect(FrozenModel):
 
     @model_validator(mode="after")
     def _validate_pool(self) -> "DicePoolEffect":
+        """Validate dice pool configuration.
+
+        Ensures starting_dice does not exceed max_dice.
+
+        Raises:
+            ValueError: If starting_dice exceeds max_dice.
+        """
         if self.max_dice is not None and self.starting_dice > self.max_dice:
             raise ValueError("starting_dice cannot exceed max_dice")
         return self
@@ -963,6 +994,14 @@ class CountdownDieEffect(FrozenModel):
 
     @model_validator(mode="after")
     def _validate_countdown(self) -> "CountdownDieEffect":
+        """Validate countdown die configuration.
+
+        Ensures starting_value, spend_requires_value, and reset_value are
+        within valid ranges relative to minimum_value and die_size.
+
+        Raises:
+            ValueError: If any value is out of valid range.
+        """
         if self.starting_value < self.minimum_value:
             raise ValueError("starting_value cannot be below minimum_value")
         if self.starting_value > self.die_size:
@@ -975,6 +1014,7 @@ class CountdownDieEffect(FrozenModel):
             self.reset_value < self.minimum_value or self.reset_value > self.die_size
         ):
             raise ValueError("reset_value must be within die range")
+        return self
         return self
 
 
@@ -1186,8 +1226,10 @@ class DamageReductionRollEffect(FrozenModel):
 
 
 class MovementGrant(FrozenModel):
-    """
-    Grants movement or teleportation.
+    """Grants movement or teleportation.
+
+    Per PR2 4132-4145: Movement includes walking, flying, and teleporting.
+    Movement grants can be triggered by actions, reactions, or conditions.
 
     Examples:
         MovementGrant(spaces=2, movement_type="fly", trigger="on_successful_save")
@@ -1247,8 +1289,10 @@ class PositionSwapEffect(FrozenModel):
 
 
 class ForcedMovement(FrozenModel):
-    """
-    Forced push/pull movement applied to a target.
+    """Forced push/pull movement applied to a target.
+
+    Per PR2 4146-4151: Forced movement moves targets against their will.
+    Push moves away from source, pull moves toward source or zone.
 
     Examples:
         ForcedMovement(direction="pull", distance=5, ignores_engagement=True)
@@ -1728,8 +1772,11 @@ class AreaSelectionEffect(FrozenModel):
 
 
 class AttackRollOverrideEffect(FrozenModel):
-    """
-    Overrides attack roll resolution details for a weapon or effect.
+    """Overrides attack roll resolution details for a weapon or effect.
+
+    Per PR2 3965-3969: Attack rolls use d20 + relevant skill + any bonuses.
+    This effect allows overriding the target defense, attack type restrictions,
+    and cover/line-of-sight handling.
 
     Examples:
         AttackRollOverrideEffect(attack_vs="evasion", fixed_target_defense=8, target="ally",
@@ -1760,8 +1807,10 @@ class AttackTargetingEffect(FrozenModel):
 
 
 class AreaAttackPattern(FrozenModel):
-    """
-    Defines multi-area attack patterns for weapons.
+    """Defines multi-area attack patterns for weapons.
+
+    Per PR2 3970-3974: Area attacks use geometric patterns (blast, burst, line, cone)
+    to affect multiple targets simultaneously.
 
     Examples:
         AreaAttackPattern(area_shape="blast", area_size=1, area_count_options=[1, 2], non_overlapping=True)
@@ -1774,8 +1823,10 @@ class AreaAttackPattern(FrozenModel):
 
 
 class LineAttackEffect(FrozenModel):
-    """
-    Line-based attack behavior that augments a weapon or action.
+    """Line-based attack behavior that augments a weapon or action.
+
+    Per PR2 3970-3974: Line attacks affect all targets in a straight line.
+    This effect allows customizing line length, origin point, and obstacle handling.
 
     Examples:
         LineAttackEffect(between_self_and_target=True, heat_per_additional_target=1)
@@ -2549,8 +2600,10 @@ class ReloadRestrictionEffect(FrozenModel):
 
 
 class ReloadEffect(FrozenModel):
-    """
-    Reloads one or more weapons, optionally filtered by tag.
+    """Reloads one or more weapons, optionally filtered by tag.
+
+    Per PR2 4332-4334: The Reload quick action reloads all loading weapons
+    on a mount or reloads a specific weapon.
 
     Examples:
         ReloadEffect(target="ally", count=1, requires_tag="loading")

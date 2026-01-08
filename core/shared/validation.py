@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Literal, TYPE_CHECKING
+from typing import Literal, TYPE_CHECKING, Generic, TypeVar
 from pydantic import Field
 from core.shared.models import FrozenModel
 
 if TYPE_CHECKING:
-    from typing import TypeVar
-
     V = TypeVar("V", bound="ValidationIssue")
+else:
+    V = TypeVar("V")
 
 
 class ValidationIssue(FrozenModel):
@@ -24,8 +24,14 @@ class ValidationIssue(FrozenModel):
         return self.model_copy(update={"severity": severity})
 
 
-class ValidationResult(FrozenModel):
-    """A validation result containing issues and an overall validity flag."""
+class ValidationResult(FrozenModel, Generic[V]):
+    """A validation result containing issues and an overall validity flag.
+
+    Generic type parameter V is bound to ValidationIssue for type safety.
+
+    Example:
+        result: ValidationResult[ValidationIssue] = ValidationResult(valid=True, issues=[])
+    """
 
     valid: bool
     issues: list[ValidationIssue] = Field(default_factory=list)

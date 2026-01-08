@@ -14,7 +14,7 @@ Per PR2 rules:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Generic, TypeVar
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
@@ -31,6 +31,11 @@ if TYPE_CHECKING:
     from core.shared.heat import MeltdownState
     from core.shared.turn_end import TurnEndEffectState
     from core.shared.effects import EffectDuration
+    from core.shared.protocols import ProtocolState
+
+    S = TypeVar("S", bound="CombatantState")
+else:
+    S = TypeVar("S")
 
 
 # Runtime imports - OverchargeState doesn't have forward references that need TYPE_CHECKING
@@ -78,8 +83,17 @@ __all__ = [
 # =============================================================================
 
 
-class StateUpdateResult(FrozenModel):
-    """Result of applying state updates with change tracking."""
+class StateUpdateResult(FrozenModel, Generic[S]):
+    """Result of applying state updates with change tracking.
+
+    Generic type parameter S is bound to CombatantState for type safety.
+
+    Example:
+        result: StateUpdateResult[CombatantState] = StateUpdateResult(
+            updated_combatant=combatant,
+            changes_summary={"hp": (10, 5)}
+        )
+    """
 
     updated_combatant: CombatantState
     changes_summary: dict[str, tuple[int, int]] = Field(

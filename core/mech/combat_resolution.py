@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Generic, TypeVar
 from pydantic import Field
 from core.shared.models import FrozenModel
 
@@ -33,6 +33,8 @@ from core.shared.effects import (
     TriggerType,
 )
 
+T = TypeVar("T")
+
 
 class DiceRollResult(FrozenModel):
     """Raw dice roll outcome."""
@@ -41,11 +43,20 @@ class DiceRollResult(FrozenModel):
     chosen: list[int] = Field(default_factory=list)
 
 
-class StructureResolution(FrozenModel):
-    """Resolution result for structure damage."""
+class ResolutionResult(FrozenModel, Generic[T]):
+    """Generic base for resolution results containing outcome and dice information."""
 
-    outcome: StructureOutcomeType
+    outcome: T
     dice: DiceRollResult
+
+
+class StructureResolution(ResolutionResult[StructureOutcomeType]):
+    """Resolution result for structure damage.
+
+    Per PR2 4618-4636: Structure checks determine damage to systems and mounts
+    when a mech takes damage that exceeds its remaining HP.
+    """
+
     direct_hit_outcome: StructureOutcomeType | None = None
     system_trauma: SystemTraumaSelection | None = None
     updated_inventory: MechInventory | None = None
@@ -53,11 +64,13 @@ class StructureResolution(FrozenModel):
     spillover_damage: int = 0
 
 
-class OverheatResolution(FrozenModel):
-    """Resolution result for overheat checks."""
+class OverheatResolution(ResolutionResult[OverheatOutcomeType]):
+    """Resolution result for overheat checks.
 
-    outcome: OverheatOutcomeType
-    dice: DiceRollResult
+    Per PR2 4654-4706: Overheat checks determine stress damage and potential
+    meltdown when a mech's heat exceeds its threshold.
+    """
+
     meltdown_outcome: OverheatOutcomeType | None = None
     stress_damage: int = 1
 

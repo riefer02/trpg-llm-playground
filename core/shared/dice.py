@@ -39,7 +39,7 @@ class DiceExpression(FrozenModel):
     @classmethod
     def count_must_be_positive(cls, v: int) -> int:
         if v < 1:
-            raise ValueError("dice count must be at least 1")
+            raise ValueError("Dice count must be at least 1")
         return v
 
     @classmethod
