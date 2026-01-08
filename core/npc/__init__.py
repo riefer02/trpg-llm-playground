@@ -9,6 +9,12 @@ from core.npc.enums import (
     NPCTier,
     NPCClass,
     NPCAbilityTriggerType,
+    NPCSpecialClass,
+    UltraTraitType,
+    VeteranTraitType,
+    ExoticModuleType,
+    CommanderTraitType,
+    VehicleType,
 )
 from core.npc.models import (
     NPCStats,
@@ -16,6 +22,12 @@ from core.npc.models import (
     NPCAbility,
     NPCGear,
     NPCRole,
+    UltraTrait,
+    VeteranTrait,
+    ExoticModule,
+    CommanderTrait,
+    InfantrySquadStats,
+    SpecialNPCTemplate,
 )
 from core.npc.state import (
     NPCState,
@@ -33,6 +45,8 @@ from core.npc.compendium import (
     NPC_TEMPLATES,
     NPC_TEMPLATES_BY_ID,
     get_npc_template,
+    get_special_class_template,
+    get_all_special_classes,
     get_templates_by_class,
     get_templates_by_tier,
 )
@@ -47,21 +61,33 @@ from core.npc.templates import (
     create_elite_variant,
     create_veteran_variant,
     create_boss_variant,
-    NPCSpecialClass,
     get_special_class_description,
 )
+from core.npc import special_classes
 
 __all__ = [
     # Enums
     "NPCTier",
     "NPCClass",
     "NPCAbilityTriggerType",
+    "NPCSpecialClass",
+    "UltraTraitType",
+    "VeteranTraitType",
+    "ExoticModuleType",
+    "CommanderTraitType",
+    "VehicleType",
     # Models
     "NPCStats",
     "NPCTemplate",
     "NPCAbility",
     "NPCGear",
     "NPCRole",
+    "UltraTrait",
+    "VeteranTrait",
+    "ExoticModule",
+    "CommanderTrait",
+    "InfantrySquadStats",
+    "SpecialNPCTemplate",
     # State
     "NPCState",
     "NPCCombatStats",
@@ -76,6 +102,8 @@ __all__ = [
     "NPC_TEMPLATES",
     "NPC_TEMPLATES_BY_ID",
     "get_npc_template",
+    "get_special_class_template",
+    "get_all_special_classes",
     "get_templates_by_class",
     "get_templates_by_tier",
     # Templates
@@ -89,6 +117,7 @@ __all__ = [
     "create_elite_variant",
     "create_veteran_variant",
     "create_boss_variant",
-    "NPCSpecialClass",
     "get_special_class_description",
+    # Special Classes Module
+    "special_classes",
 ]

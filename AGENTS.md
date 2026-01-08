@@ -43,6 +43,10 @@ trpg-llm-playground/
 ### Shared Types (`core/shared/`)
 - **`enums.py`**: ActionType, DamageType, RangeType, StatusType, etc.
 - **`dice.py`**: DiceExpression with parsing, rolling, and stats
+- **`combat/tactical_initiative.py`**: Tactical combat turn order (Priority 51)
+  - `TacticalInitiativeTracker`: Nomination-based turn order per PR2 3703-3725
+  - `ActorPriority`: Priority override for veteran NPCs (Viper's Speed)
+  - Functions: `start_tactical_combat()`, `nominate_next()`, `complete_turn()`
 
 ### JSON Schema Export
 - **`export.py`**: Export Pydantic models to JSON Schema
@@ -109,6 +113,7 @@ trpg-llm-playground/
 - ✅ **Pilot Schemas**: Skills, backgrounds, talents, licenses, core bonuses
 - ✅ **Shared Types**: Dice expressions, action/damage enums
 - ✅ **JSON Schema Export**: Individual and combined schema files
+- ✅ **Tactical Combat**: Nomination-based turn order, alternation, priorities (Priority 51)
 
 ### LLM
 - ✅ **RAG Integration**: Heading-aware chunking, FAISS indexing

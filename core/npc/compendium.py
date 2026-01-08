@@ -21,6 +21,7 @@ from core.shared.effects import (
     DirectDamage,
     ActionGrant,
 )
+from core.npc import special_classes
 
 
 def _make_grunt_scaling() -> NPCTierScaling:
@@ -98,6 +99,7 @@ GMS_GRUNT_T1 = NPCTemplate(
     npc_class="grunt",
     tier="tier_1",
     role="striker",
+    victory_count=0.25,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -140,6 +142,7 @@ GMS_GRUNT_T2 = NPCTemplate(
     npc_class="grunt",
     tier="tier_2",
     role="controller",
+    victory_count=0.25,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -179,6 +182,7 @@ GMS_ELITE_T2 = NPCTemplate(
     npc_class="elite",
     tier="tier_2",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_2",
@@ -219,6 +223,7 @@ IPSN_GRUNT_T1 = NPCTemplate(
     npc_class="grunt",
     tier="tier_1",
     role="striker",
+    victory_count=0.25,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -246,6 +251,7 @@ IPSN_BOSS_T3 = NPCTemplate(
     npc_class="boss",
     tier="tier_3",
     role="defender",
+    victory_count=1.0,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_3",
@@ -302,6 +308,7 @@ SSC_SPECIALIST_T2 = NPCTemplate(
     npc_class="specialist",
     tier="tier_2",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -352,6 +359,7 @@ HORUS_ELITE_T3 = NPCTemplate(
     npc_class="elite",
     tier="tier_3",
     role="defender",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_2",
@@ -401,6 +409,7 @@ HA_BOSS_T3 = NPCTemplate(
     npc_class="boss",
     tier="tier_3",
     role="defender",
+    victory_count=1.0,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_3",
@@ -449,6 +458,7 @@ PR2_ACE_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -478,6 +488,7 @@ PR2_ASSAULT_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -506,6 +517,7 @@ PR2_ARCHER_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -534,6 +546,7 @@ PR2_ASSASSIN_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_half",
@@ -563,6 +576,7 @@ PR2_BASTION_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="defender",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_2",
@@ -593,6 +607,7 @@ PR2_BERSERKER_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -622,6 +637,7 @@ PR2_BREACHER_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -650,6 +666,7 @@ PR2_CATAPHRACT_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -678,6 +695,7 @@ PR2_DEMOLISHER_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="defender",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_2",
@@ -707,6 +725,7 @@ PR2_ENGINEER_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -735,6 +754,7 @@ PR2_PRIEST_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_half",
@@ -765,6 +785,7 @@ PR2_RAINMAKER_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -793,6 +814,7 @@ PR2_RONIN_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -821,6 +843,7 @@ PR2_SCOURER_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -850,6 +873,7 @@ PR2_SNIPER_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -878,6 +902,7 @@ PR2_SPECTRE_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -907,6 +932,7 @@ PR2_WITCH_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_half",
@@ -936,6 +962,7 @@ PR2_AEGIS_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="defender",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -965,6 +992,7 @@ PR2_BARRICADE_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="defender",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -994,6 +1022,7 @@ PR2_BOMBARD_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -1023,6 +1052,7 @@ PR2_GOLIATH_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="defender",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_2",
@@ -1052,6 +1082,7 @@ PR2_HIVE_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -1081,6 +1112,7 @@ PR2_HORNET_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_half",
@@ -1110,6 +1142,7 @@ PR2_MIRAGE_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -1139,6 +1172,7 @@ PR2_OPERATOR_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -1168,6 +1202,7 @@ PR2_PYRO_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -1197,6 +1232,7 @@ PR2_SCOUT_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="striker",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -1226,6 +1262,7 @@ PR2_SEEDER_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="controller",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -1255,6 +1292,7 @@ PR2_SENTINEL_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="defender",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -1284,6 +1322,7 @@ PR2_SUPPORT_T1 = NPCTemplate(
     npc_class="specialist",
     tier="tier_1",
     role="supporter",
+    victory_count=0.5,
     stats=NPCStats(
         base=NPCStatsBase(
             size="size_1",
@@ -1339,8 +1378,6 @@ PR2_NPC_TEMPLATES: list[NPCTemplate] = [
     PR2_WITCH_T1,
 ]
 
-NPC_SPECIAL_CLASSES: list[NPCTemplate] = []
-
 NPC_TEMPLATES: list[NPCTemplate] = [
     GMS_GRUNT_T1,
     GMS_GRUNT_T2,
@@ -1351,12 +1388,15 @@ NPC_TEMPLATES: list[NPCTemplate] = [
     HORUS_ELITE_T3,
     HA_BOSS_T3,
     *PR2_NPC_TEMPLATES,
-    *NPC_SPECIAL_CLASSES,
 ]
 
 
 NPC_TEMPLATES_BY_ID: dict[str, NPCTemplate] = {
     template.id: template for template in NPC_TEMPLATES
+}
+
+NPC_SPECIAL_CLASSES_BY_ID: dict[str, special_classes.SpecialNPCTemplate] = {
+    template.id: template for template in special_classes.NPC_SPECIAL_CLASSES
 }
 
 
@@ -1370,6 +1410,37 @@ def get_npc_template(template_id: str) -> NPCTemplate | None:
         The template if found, None otherwise
     """
     return NPC_TEMPLATES_BY_ID.get(template_id)
+
+
+def get_special_class_template(
+    template_id: str,
+) -> special_classes.SpecialNPCTemplate | None:
+    """Get a special NPC class template by ID.
+
+    Args:
+        template_id: The unique identifier for the template
+
+    Returns:
+        The special class template if found, None otherwise
+    """
+    return NPC_SPECIAL_CLASSES_BY_ID.get(template_id)
+
+
+def get_any_template(
+    template_id: str,
+) -> NPCTemplate | special_classes.SpecialNPCTemplate | None:
+    """Get any NPC template (regular or special class) by ID.
+
+    Args:
+        template_id: The unique identifier for the template
+
+    Returns:
+        The template if found, None otherwise
+    """
+    template = get_npc_template(template_id)
+    if template is not None:
+        return template
+    return get_special_class_template(template_id)
 
 
 def get_templates_by_class(npc_class: NPCClass) -> list[NPCTemplate]:
@@ -1394,3 +1465,12 @@ def get_templates_by_tier(tier: NPCTier) -> list[NPCTemplate]:
         List of templates with the specified tier
     """
     return [t for t in NPC_TEMPLATES if t.tier == tier]
+
+
+def get_all_special_classes() -> list[special_classes.SpecialNPCTemplate]:
+    """Get all special NPC class templates.
+
+    Returns:
+        List of all 15 special class templates
+    """
+    return list(special_classes.NPC_SPECIAL_CLASSES)

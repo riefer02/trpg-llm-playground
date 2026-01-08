@@ -121,6 +121,312 @@ class OverheatApplicationResult(FrozenModel):
     heat_current: int = Field(..., description="New heat value (should be 0 per PR2)")
 
 
+class StressCheckInput(FrozenModel):
+    """Input for unified stress check resolution.
+
+    Captures all context needed to resolve stress damage from overheat.
+    """
+
+    heat_exceeded: int = Field(
+        ..., ge=0, description="Amount by which heat exceeded capacity"
+    )
+    heat_cap: int = Field(..., ge=0, description="Heat capacity limit")
+    current_stress: int = Field(
+        ..., ge=0, le=4, description="Current stress boxes marked"
+    )
+    additional_stress: int = Field(
+        default=1, ge=1, description="Stress to add (usually 1 per overheat)"
+    )
+    rules: OverheatRules | None = Field(
+        default=None, description="Override resolution rules"
+    )
+
+
+class StressCheckResult(FrozenModel):
+    """Complete result of unified stress check resolution.
+
+    Provides comprehensive breakdown of stress damage resolution.
+    """
+
+    outcome: OverheatOutcomeLiteral = Field(..., description="Primary outcome")
+    dice_rolls: list[int] = Field(default_factory=list, description="All d6 rolls made")
+    lowest_roll: int = Field(..., description="Lowest roll for outcome determination")
+    statuses_to_apply: list[StatusType] = Field(
+        default_factory=list, description="Status effects to apply"
+    )
+    stress_before: int = Field(..., description="Stress before this check")
+    stress_after: int = Field(..., description="Stress after this check")
+    heat_after: int = Field(..., description="Heat after clearance")
+    engineering_check_required: bool = Field(
+        default=False, description="Whether Engineering check is needed"
+    )
+    engineering_check_target: int | None = Field(
+        default=None, description="Target for Engineering check"
+    )
+    countdown_turns: int | None = Field(
+        default=None, description="Countdown turns if countdown started"
+    )
+    meltdown_immediate: bool = Field(
+        default=False, description="Whether immediate meltdown is triggered"
+    )
+    meltdown_state: MeltdownState | None = Field(
+        default=None, description="Meltdown state if countdown applies"
+    )
+
+
+class StressCheckApplicationResult(FrozenModel):
+    """Result of applying stress check result to combatant state."""
+
+    updated_combatant: CombatantState = Field(
+        ..., description="Combatant with stress check result applied"
+    )
+    statuses_applied: list[StatusType] = Field(
+        default_factory=list, description="Status effects that were applied"
+    )
+    stress_current: int = Field(..., description="New stress value")
+    heat_current: int = Field(..., description="New heat value")
+
+
+def resolve_stress_check(
+    input: StressCheckInput,
+    force_roll: int | None = None,
+) -> StressCheckResult:
+    """Resolve stress check with unified workflow per PR2 rules.
+
+    This is a convenience orchestrator that combines:
+    1. Overheat check resolution (from OverheatInput)
+    2. Stress damage marking
+    3. Meltdown outcome determination
+
+    Per PR2 4654-4706:
+    - Roll 1d6 per point of stress you have (including the point you just took)
+    - Choose the lowest result
+    - Apply outcome based on roll and remaining stress
+    - Clear all heat
+
+    Args:
+        input: Stress check input context
+        force_roll: Optional forced roll value for deterministic testing
+
+    Returns:
+        Detailed breakdown of stress check resolution
+    """
+    rules = input.rules or DEFAULT_OVERHEAT_RULES
+
+    stress_before = input.current_stress
+    stress_after = max(0, input.current_stress - input.additional_stress)
+
+    dice_count = stress_after if rules.roll_dice_per_stress else 1
+    if force_roll is not None:
+        rolls = [force_roll]
+    else:
+        rolls = DiceExpression.parse(f"{dice_count}d6").roll()
+
+    lowest = min(rolls)
+    num_ones = rolls.count(1)
+
+    statuses: list[StatusType] = []
+    engineering_check_required = False
+    engineering_check_target: int | None = None
+    countdown_turns: int | None = None
+    meltdown_immediate = False
+    meltdown_state: MeltdownState | None = None
+
+    if num_ones >= 2 and rules.irreversible_meltdown_on_multiple_ones:
+        outcome: OverheatOutcomeLiteral = "irreversible_meltdown"
+        meltdown_state = MeltdownState(
+            turns_remaining=1,
+            triggered_by_overheat=True,
+            exposed_applied=True,
+            is_immediate=False,
+        )
+    else:
+        outcome = _lookup_overheat_outcome(lowest, rules)
+
+        if outcome == "emergency_shunt":
+            statuses.append("impaired")
+
+        elif outcome == "power_plant_destabilize":
+            statuses.append("exposed")
+
+        elif outcome == "meltdown":
+            if stress_after >= 3:
+                statuses.append("exposed")
+            elif stress_after == 2:
+                statuses.append("exposed")
+                engineering_check_required = True
+                engineering_check_target = 10
+                countdown_turns = 6
+            elif stress_after == 1:
+                meltdown_immediate = True
+                meltdown_state = MeltdownState(
+                    turns_remaining=1,
+                    triggered_by_overheat=True,
+                    exposed_applied=True,
+                    is_immediate=True,
+                )
+            elif stress_after == 0:
+                meltdown_immediate = True
+                meltdown_state = MeltdownState(
+                    turns_remaining=1,
+                    triggered_by_overheat=True,
+                    exposed_applied=True,
+                    is_immediate=True,
+                )
+
+    heat_after = 0 if rules.reset_heat_after_overheat else input.heat_exceeded
+
+    return StressCheckResult(
+        outcome=outcome,
+        dice_rolls=rolls,
+        lowest_roll=lowest,
+        statuses_to_apply=statuses,
+        stress_before=stress_before,
+        stress_after=stress_after,
+        heat_after=heat_after,
+        engineering_check_required=engineering_check_required,
+        engineering_check_target=engineering_check_target,
+        countdown_turns=countdown_turns,
+        meltdown_immediate=meltdown_immediate,
+        meltdown_state=meltdown_state,
+    )
+
+
+def apply_stress_check_result(
+    combatant: CombatantState,
+    result: StressCheckResult,
+) -> StressCheckApplicationResult:
+    """Apply stress check result to combatant state.
+
+    Updates combatant with new stress, statuses, and meltdown state.
+
+    Args:
+        combatant: Current combatant state
+        result: Stress check result to apply
+
+    Returns:
+        Updated combatant with stress check effects applied
+    """
+    statuses_applied = result.statuses_to_apply.copy()
+
+    updated_statuses = list(combatant.statuses)
+    for status in statuses_applied:
+        if status not in updated_statuses:
+            updated_statuses.append(status)
+
+    updated_combatant = combatant.model_copy(
+        update={
+            "statuses": updated_statuses,
+            "meltdown_state": result.meltdown_state,
+            "resources": combatant.resources.model_copy(
+                update={
+                    "stress_current": result.stress_after,
+                    "heat_current": result.heat_after,
+                }
+            ),
+        }
+    )
+
+    return StressCheckApplicationResult(
+        updated_combatant=updated_combatant,
+        statuses_applied=statuses_applied,
+        stress_current=result.stress_after,
+        heat_current=result.heat_after,
+    )
+
+
+class MeltdownCountdownInput(FrozenModel):
+    """Input for meltdown countdown engineering check resolution.
+
+    Per PR2 4692-4696: When at 2 stress and rolling 1 on overheat check,
+    must pass Engineering check or suffer countdown to meltdown.
+    """
+
+    current_turns_remaining: int = Field(
+        ..., ge=1, description="Current countdown turns"
+    )
+    engineering_check_target: int = Field(default=10, ge=0, description="Check DC")
+    engineering_check_bonus: int = Field(default=0, description="Check bonus")
+    stress_at_countdown_start: int = Field(
+        ..., ge=0, description="Stress when countdown began"
+    )
+    rules: OverheatRules | None = Field(default=None, description="Override rules")
+
+
+class MeltdownCountdownResult(FrozenModel):
+    """Result of meltdown countdown check resolution."""
+
+    check_roll: int = Field(..., description="Engineering check roll")
+    check_total: int = Field(..., description="Engineering check total")
+    check_passed: bool = Field(..., description="Whether check passed")
+    countdown_extended: bool = Field(
+        default=False, description="Whether countdown was extended (success)"
+    )
+    countdown_triggers: bool = Field(
+        default=False, description="Whether countdown triggers meltdown"
+    )
+    meltdown_triggered: bool = Field(
+        default=False, description="Whether meltdown actually occurred"
+    )
+    new_turns_remaining: int | None = Field(
+        default=None, description="New countdown turns (if not triggered)"
+    )
+    exposed_applied: bool = Field(default=False, description="Whether exposed applied")
+
+
+def resolve_meltdown_countdown(
+    input: MeltdownCountdownInput,
+    force_roll: int | None = None,
+) -> MeltdownCountdownResult:
+    """Resolve meltdown countdown engineering check per PR2 rules.
+
+    Per PR2 4692-4696: "Your mech must pass an engineering check or suffer
+    a reactor meltdown at the end of 1d6 turns after this one. You can reverse
+    it by taking a full action and repeating this check. Even on a successful
+    check, your mech suffers from the exposed condition."
+
+    Args:
+        input: Countdown check input
+        force_roll: Optional forced d20 roll for testing
+
+    Returns:
+        Detailed breakdown of countdown check resolution
+    """
+    from core.shared.dice import DiceExpression
+
+    check_bonus = input.engineering_check_bonus
+    if force_roll is not None:
+        check_roll = force_roll
+    else:
+        check_roll = DiceExpression.parse("1d20").roll()[0]
+
+    check_total = check_roll + check_bonus
+    check_passed = check_total >= input.engineering_check_target
+
+    if check_passed:
+        return MeltdownCountdownResult(
+            check_roll=check_roll,
+            check_total=check_total,
+            check_passed=True,
+            countdown_extended=True,
+            countdown_triggers=False,
+            meltdown_triggered=False,
+            new_turns_remaining=input.current_turns_remaining,
+            exposed_applied=True,
+        )
+    else:
+        return MeltdownCountdownResult(
+            check_roll=check_roll,
+            check_total=check_total,
+            check_passed=False,
+            countdown_extended=False,
+            countdown_triggers=True,
+            meltdown_triggered=True,
+            new_turns_remaining=None,
+            exposed_applied=True,
+        )
+
+
 def resolve_overheat(
     input: OverheatInput,
     force_roll: int | None = None,

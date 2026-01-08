@@ -42,3 +42,93 @@ NPCTierScalingType = Literal[
     "adder",
     "fixed_override",
 ]
+
+
+NPCSpecialClass = Literal[
+    "human",
+    "infantry_squad",
+    "monstrosity",
+    "ultra",
+    "elite",
+    "grunt",
+    "veteran",
+    "exotic",
+    "drone",
+    "mercenary",
+    "commander",
+    "pirate",
+    "spacer",
+    "vehicle",
+    "ship",
+]
+
+
+UltraTraitType = Literal[
+    "berserker",
+    "devastator",
+    "evasive",
+    "extra_deadly",
+    "fortress",
+    "legion",
+    "limitless",
+    "unstoppable",
+    "sight",
+    "superior_construction",
+    "superior_frame",
+    "superior_reactor",
+    "superior_targeting",
+    "supreme_maintenance",
+    "supreme_skirmisher",
+]
+
+
+VeteranTraitType = Literal[
+    "nhp_copilot",
+    "acrobat",
+    "deadly",
+    "insulated",
+    "self_repair",
+    "feign_death",
+    "hacker",
+    "headshot",
+    "hardened_target",
+    "legendary",
+    "lesser_sight",
+    "limitless",
+    "lightning_reflexes",
+    "parting_gift",
+    "rodeo_master",
+    "shock_armor",
+    "skirmisher",
+    "slippery",
+    "steel_jaw",
+    "vipers_speed",
+]
+
+
+ExoticModuleType = Literal[
+    "bio_integrated",
+    "blinkspace_carver",
+    "extrusion",
+    "living_weaponry",
+    "paracausal_weapon",
+    "ouroboros_brand",
+    "regenerator",
+]
+
+
+CommanderTraitType = Literal[
+    "bolster_network",
+    "retribution",
+    "press_on",
+    "reposition",
+    "rank_and_file",
+]
+
+
+VehicleType = Literal[
+    "flier",
+    "transport",
+    "treads",
+    "hover",
+]

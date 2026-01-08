@@ -209,7 +209,7 @@ def resolve_structure_damage(
                     outcome = "direct_hit"
                     inventory_update = input.inventory
                 else:
-                    inventory_update = _apply_system_trauma(
+                    inventory_update = apply_system_trauma(
                         input.inventory, trauma_result
                     )
 
@@ -425,11 +425,25 @@ def _weapon_valid(weapon: WeaponState, exclude_limited_no_charges: bool) -> bool
     return True
 
 
-def _apply_system_trauma(
+def apply_system_trauma(
     inventory: MechInventory,
     selection: SystemTraumaSelection,
 ) -> MechInventory:
-    """Apply system trauma to inventory."""
+    """Apply system trauma to inventory per PR2 4618-4622 rules.
+
+    This is the public interface for applying system trauma. It supports
+    defender's choice by accepting a pre-resolved SystemTraumaSelection.
+
+    Per PR2: "You choose what's destroyed, but systems or weapons with the
+    limited tag and no charges left are not valid."
+
+    Args:
+        inventory: Current inventory state
+        selection: Resolved system trauma selection
+
+    Returns:
+        Updated inventory with destruction applied
+    """
     if selection.resolved_target == "mount" and selection.mount_index is not None:
         mounts: list[WeaponMountState] = []
         for mount in inventory.mounts:
@@ -453,6 +467,175 @@ def _apply_system_trauma(
         return inventory.model_copy(update={"systems": systems})
 
     return inventory
+
+
+class DefenderTraumaInput(FrozenModel):
+    """Input for defender's choice system trauma resolution.
+
+    Per PR2 4618-4622, the defender chooses what gets destroyed on system trauma.
+    This input model captures the defender's selection.
+    """
+
+    trauma_roll: int = Field(
+        ..., ge=1, le=6, description="d6 roll that triggered system trauma"
+    )
+    defender_choice: Literal["mount", "system", "defer"] = Field(
+        ...,
+        description="Defender's choice: 'mount', 'system', or 'defer' (use random)",
+    )
+    mount_index: int | None = Field(
+        default=None,
+        description="Mount index to destroy (if defender chose mount)",
+    )
+    system_id: str | None = Field(
+        default=None,
+        description="System ID to destroy (if defender chose system)",
+    )
+    rules: SystemTraumaRules | None = Field(
+        default=None,
+        description="Override resolution rules",
+    )
+
+
+class DefenderTraumaResult(FrozenModel):
+    """Result of defender's choice system trauma resolution."""
+
+    trauma_roll: int = Field(..., description="Original trauma roll")
+    initial_target: Literal["mount", "system"] = Field(
+        ..., description="Initial target based on roll"
+    )
+    resolved_target: Literal["mount", "system", "direct_hit"] = Field(
+        ..., description="Final resolved target"
+    )
+    mount_index: int | None = Field(default=None, description="Mount destroyed, if any")
+    system_id: str | None = Field(default=None, description="System destroyed, if any")
+    inventory_update: MechInventory | None = Field(
+        default=None, description="Updated inventory, if destruction applied"
+    )
+    fallback_reason: Literal["none", "no_mounts", "no_systems", "none_available"] = (
+        Field(default="none", description="Reason for fallback to direct hit")
+    )
+
+
+def resolve_defender_trauma(
+    inventory: MechInventory,
+    input: DefenderTraumaInput,
+) -> DefenderTraumaResult:
+    """Resolve system trauma with defender's choice per PR2 rules.
+
+    Per PR2 4618-4622: "You choose what's destroyed, but systems or weapons
+    with the limited tag and no charges left are not valid. If there's nothing
+    left of one result, it becomes the other. If there's absolutely nothing
+    left to destroy, this result becomes DIRECT HIT instead."
+
+    Args:
+        inventory: Current inventory state
+        input: Defender's trauma choice
+
+    Returns:
+        Detailed breakdown of trauma resolution
+    """
+    rules = input.rules or SystemTraumaRules()
+    exclude_limited = rules.exclude_limited_no_charges
+
+    eligible_mounts = _eligible_mounts(inventory, exclude_limited)
+    eligible_systems = _eligible_systems(inventory, exclude_limited)
+
+    if rules.mount_on.roll_min <= input.trauma_roll <= rules.mount_on.roll_max:
+        initial_target: Literal["mount", "system"] = "mount"
+    elif rules.system_on.roll_min <= input.trauma_roll <= rules.system_on.roll_max:
+        initial_target = "system"
+    else:
+        initial_target = "mount"
+
+    resolved_target: Literal["mount", "system", "direct_hit"] = "mount"
+    mount_index: int | None = None
+    system_id: str | None = None
+    fallback_reason: Literal["none", "no_mounts", "no_systems", "none_available"] = (
+        "none"
+    )
+
+    if input.defender_choice == "defer":
+        if initial_target == "mount":
+            if eligible_mounts:
+                mount_index = eligible_mounts[0]
+            elif eligible_systems and rules.fallback_to_other_if_none:
+                resolved_target = "system"
+                system_id = eligible_systems[0]
+                fallback_reason = "no_mounts"
+            elif rules.fallback_to_direct_hit_if_none:
+                resolved_target = "direct_hit"
+                fallback_reason = "none_available"
+            else:
+                fallback_reason = "no_mounts"
+        else:
+            if eligible_systems:
+                system_id = eligible_systems[0]
+            elif eligible_mounts and rules.fallback_to_other_if_none:
+                resolved_target = "mount"
+                mount_index = eligible_mounts[0]
+                fallback_reason = "no_systems"
+            elif rules.fallback_to_direct_hit_if_none:
+                resolved_target = "direct_hit"
+                fallback_reason = "none_available"
+            else:
+                fallback_reason = "no_systems"
+    elif input.defender_choice == "mount":
+        if input.mount_index is not None and input.mount_index in eligible_mounts:
+            mount_index = input.mount_index
+        elif eligible_mounts:
+            mount_index = eligible_mounts[0]
+            fallback_reason = "none"
+        elif eligible_systems and rules.fallback_to_other_if_none:
+            resolved_target = "system"
+            system_id = eligible_systems[0]
+            fallback_reason = "no_mounts"
+        elif rules.fallback_to_direct_hit_if_none:
+            resolved_target = "direct_hit"
+            fallback_reason = "none_available"
+        else:
+            resolved_target = "direct_hit"
+            fallback_reason = "no_mounts"
+    else:
+        if input.system_id is not None and input.system_id in eligible_systems:
+            system_id = input.system_id
+        elif eligible_systems:
+            system_id = eligible_systems[0]
+            fallback_reason = "none"
+        elif eligible_mounts and rules.fallback_to_other_if_none:
+            resolved_target = "mount"
+            mount_index = eligible_mounts[0]
+            fallback_reason = "no_systems"
+        elif rules.fallback_to_direct_hit_if_none:
+            resolved_target = "direct_hit"
+            fallback_reason = "none_available"
+        else:
+            resolved_target = "direct_hit"
+            fallback_reason = "no_systems"
+
+    inventory_update: MechInventory | None = None
+    if resolved_target in ("mount", "system"):
+        selection = SystemTraumaSelection(
+            trauma_roll=input.trauma_roll,
+            initial_target=initial_target,
+            resolved_target=resolved_target,
+            mount_index=mount_index,
+            system_id=system_id,
+            eligible_mounts=eligible_mounts,
+            eligible_systems=eligible_systems,
+            fallback_reason=fallback_reason,
+        )
+        inventory_update = apply_system_trauma(inventory, selection)
+
+    return DefenderTraumaResult(
+        trauma_roll=input.trauma_roll,
+        initial_target=initial_target,
+        resolved_target=resolved_target,
+        mount_index=mount_index,
+        system_id=system_id,
+        inventory_update=inventory_update,
+        fallback_reason=fallback_reason,
+    )
 
 
 def _lookup_structure_outcome(

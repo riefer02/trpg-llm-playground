@@ -250,3 +250,9 @@ __all__ = [
     "PilotInMechCombatRules",
     "DEFAULT_PILOT_IN_MECH_RULES",
 ]
+
+# Rebuild Pilot model to resolve forward references to CloneState
+from core.pilot.pilot import Pilot
+from core.pilot.clone_state import CloneState
+
+Pilot.model_rebuild(_types_namespace={"CloneState": CloneState})

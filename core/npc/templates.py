@@ -184,23 +184,7 @@ def create_boss_variant(template: NPCTemplate) -> NPCTemplate:
     return create_variant(template, variant)
 
 
-NPCSpecialClass = Literal[
-    "human",
-    "infantry_squad",
-    "monstrosity",
-    "ultra",
-    "elite",
-    "grunt",
-    "veteran",
-    "exotic",
-    "drone",
-    "mercenary",
-    "commander",
-    "pirate",
-    "spacer",
-    "vehicle",
-    "ship",
-]
+from core.npc.enums import NPCSpecialClass
 
 
 def get_special_class_description(npc_class: NPCSpecialClass) -> str:

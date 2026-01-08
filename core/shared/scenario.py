@@ -625,6 +625,14 @@ SitrepReservePattern = Literal["none", "half", "normal", "double", "increasing"]
 
 SitrepType = Literal["escort", "control", "extract", "hold_out", "gauntlet", "recon"]
 
+SitrepVictoryOutcome = Literal["players_win", "enemies_win", "draw", "ongoing"]
+
+ZoneControlState = Literal[
+    "player_controlled", "enemy_controlled", "contested", "neutral"
+]
+
+ReserveSpawnCause = Literal["round_start", "turn_end", "event_triggered", "manual"]
+
 VictoryConditionType = Literal[
     "extract_objective",
     "control_zones",
@@ -665,6 +673,47 @@ class VictoryCondition(FrozenModel):
     condition_type: VictoryConditionType
     threshold: int | None = Field(default=None, ge=0)
     description: str = Field(..., description="Human-readable description")
+
+
+class ZoneControlStateTracker(FrozenModel):
+    zone_id: str
+    state: ZoneControlState = Field(default="neutral")
+    controlling_side: str | None = Field(default=None)
+    last_checked_turn: int = Field(default=1, ge=1)
+
+
+class SitrepVictoryCondition(FrozenModel):
+    condition_type: VictoryConditionType
+    target_value: int | None = Field(default=None, ge=1)
+    current_value: int = Field(default=0, ge=0)
+    is_met: bool = Field(default=False)
+    description: str = Field(..., description="Human-readable description")
+
+
+class SitrepDeployment(FrozenModel):
+    player_zones: list[SitrepZone] = Field(default_factory=list)
+    enemy_zones: list[SitrepZone] = Field(default_factory=list)
+    ingress_zones: list[SitrepZone] = Field(default_factory=list)
+    reserve_pool: list[str] = Field(default_factory=list)
+    reserves_spawned_per_round: int | None = Field(default=None, ge=1)
+    last_ingress_zone: str | None = Field(default=None)
+
+
+class SitrepResolution(FrozenModel):
+    template_type: SitrepType
+    current_round: int = Field(default=1, ge=1)
+    max_rounds: int = Field(default=6, ge=1)
+    player_score: int = Field(default=0, ge=0)
+    enemy_score: int = Field(default=0, ge=0)
+    zone_states: dict[str, ZoneControlStateTracker] = Field(default_factory=dict)
+    victory_conditions: list[SitrepVictoryCondition] = Field(default_factory=list)
+    extraction_progress: float = Field(default=0.0, ge=0.0, le=1.0)
+    surviving_players: int = Field(default=0, ge=0)
+    surviving_enemies: int = Field(default=0, ge=0)
+    outcome: SitrepVictoryOutcome | None = Field(default=None)
+    turn_limit_reached: bool = Field(default=False)
+    reserves_remaining: int = Field(default=0, ge=0)
+    deployment: SitrepDeployment | None = Field(default=None)
 
 
 class SitrepTemplate(FrozenModel):

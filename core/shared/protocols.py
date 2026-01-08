@@ -547,3 +547,255 @@ def validate_protocol_count(
         ]
 
     return True, []
+
+
+class ProtocolChainInput(FrozenModel):
+    """Input for chain protocol operations (multiple protocols at once).
+
+    Per PR2: Multiple protocols can be activated at start of turn.
+    Some mechs/frames have protocols that trigger other protocols.
+
+    Attributes:
+        actor_id: Combatant performing the chain
+        protocol_ids: List of protocol IDs to activate
+        activation_order: Order of activation (for effects that depend on order)
+    """
+
+    actor_id: str = Field(..., description="Combatant performing chain activation")
+    protocol_ids: list[str] = Field(
+        ..., description="Protocol IDs to activate in sequence"
+    )
+    activation_order: list[int] = Field(
+        default_factory=list, description="Optional custom activation order indices"
+    )
+
+
+class ProtocolActivationResult(FrozenModel):
+    """Detailed result of protocol activation with effect application.
+
+    Attributes:
+        success: Whether the activation succeeded
+        protocol_id: ID of the protocol
+        protocol_name: Human-readable name
+        effects_applied: List of effects applied to combatant state
+        state_changes: State changes (conditions, buffs, etc.)
+        validation_errors: Errors if failed
+        timing_warnings: Timing-related warnings
+    """
+
+    success: bool = Field(default=True)
+    protocol_id: str = Field(..., description="ID of the protocol")
+    protocol_name: str = Field(..., description="Human-readable name")
+    effects_applied: list[str] = Field(default_factory=list)
+    state_changes: dict[str, Any] = Field(default_factory=dict)
+    validation_errors: list[str] = Field(default_factory=list)
+    timing_warnings: list[str] = Field(default_factory=list)
+
+
+class ProtocolChainResult(FrozenModel):
+    """Result of chain protocol activation.
+
+    Attributes:
+        all_succeeded: Whether all protocols activated successfully
+        results: Individual results per protocol
+        total_effects: Combined effects from all protocols
+        errors: Errors that blocked the chain
+    """
+
+    all_succeeded: bool = Field(..., description="True if all protocols activated")
+    results: list[ProtocolActivationResult] = Field(
+        default_factory=list, description="Results per protocol"
+    )
+    total_effects: list[str] = Field(
+        default_factory=list, description="Combined effect descriptions"
+    )
+    errors: list[str] = Field(default_factory=list, description="Blocking errors")
+
+
+def activate_protocol_with_effects(
+    input_data: ProtocolActivationInput,
+    current_phase: TurnPhase,
+    active_protocols: dict[str, ProtocolState] | None = None,
+    settings: ProtocolValidationSettings | None = None,
+) -> tuple[ProtocolActivationResult, dict[str, ProtocolState]]:
+    """Activate a protocol and apply its effects in one operation.
+
+    Combines resolve_protocol_activation() with apply_protocol_state()
+    for a single-step protocol activation workflow.
+
+    Args:
+        input_data: Protocol activation input
+        current_phase: Current turn phase (must be "start" for protocols)
+        active_protocols: Current active protocols (None if new)
+        settings: Validation settings
+
+    Returns:
+        Tuple of (ProtocolActivationResult, updated_active_protocols)
+    """
+    if settings is None:
+        settings = DEFAULT_PROTOCOL_VALIDATION
+
+    if active_protocols is None:
+        active_protocols = {}
+
+    base_result = resolve_protocol_activation(
+        input=input_data,
+        current_phase=current_phase,
+        settings=ActionTimingValidationSettings(
+            strict_mode=settings.strict_mode,
+            allow_protocol_outside_start=settings.allow_protocol_outside_start,
+        ),
+    )
+
+    result = ProtocolActivationResult(
+        success=base_result.success,
+        protocol_id=base_result.protocol_id,
+        protocol_name=base_result.protocol_name,
+        effects_applied=base_result.effects_applied,
+        validation_errors=base_result.validation_errors,
+    )
+
+    if not base_result.success:
+        return result, active_protocols
+
+    updated_protocols = apply_protocol_state(
+        active_protocols=active_protocols,
+        result=base_result,
+        input=input_data,
+    )
+
+    state_changes: dict[str, Any] = {}
+    if input_data.effect_type == "condition":
+        state_changes["conditions_added"] = [input_data.effect_data.get("condition")]
+    elif input_data.effect_type == "buff":
+        state_changes["buffs"] = [input_data.effect_data]
+    elif input_data.effect_type == "accuracy_mod":
+        state_changes["accuracy_mods"] = [input_data.effect_data]
+
+    result = result.model_copy(update={"state_changes": state_changes})
+
+    return result, updated_protocols
+
+
+def deactivate_all_protocols(
+    active_protocols: dict[str, ProtocolState],
+    current_phase: TurnPhase,
+    settings: ActionTimingValidationSettings | None = None,
+) -> tuple[dict[str, ProtocolState], list[str]]:
+    """Deactivate all active protocols at turn start.
+
+    Useful for clearing protocols between rounds or when changing modes.
+    Applies deactivation effects where defined.
+
+    Args:
+        active_protocols: Current active protocols
+        current_phase: Current turn phase
+        settings: Validation settings
+
+    Returns:
+        Tuple of (updated_protocols, deactivation_effects_applied)
+    """
+    if settings is None:
+        settings = DEFAULT_TIMING_VALIDATION
+
+    deactivation_effects: list[str] = []
+
+    updated_protocols: dict[str, ProtocolState] = {}
+
+    for protocol_id, protocol in active_protocols.items():
+        if protocol.is_toggle and protocol.deactivation_effect:
+            deactivation_effects.append(
+                f"Deactivated {protocol.protocol_name}: applied "
+                f"{protocol.deactivation_effect.get('type', 'effect')}"
+            )
+
+    return updated_protocols, deactivation_effects
+
+
+def activate_protocol_chain(
+    input_data: ProtocolChainInput,
+    current_phase: TurnPhase,
+    protocol_definitions: dict[str, ProtocolActivationInput],
+    active_protocols: dict[str, ProtocolState] | None = None,
+    settings: ProtocolValidationSettings | None = None,
+) -> tuple[ProtocolChainResult, dict[str, ProtocolState]]:
+    """Activate multiple protocols in sequence.
+
+    Per PR2: Multiple protocols can be activated at start of turn.
+    Some frames (e.g., Black Witch) have protocols that chain together.
+
+    Args:
+        input_data: Chain activation input
+        current_phase: Current turn phase
+        protocol_definitions: Map of protocol_id to ProtocolActivationInput
+        active_protocols: Current active protocols
+        settings: Validation settings
+
+    Returns:
+        Tuple of (ProtocolChainResult, updated_active_protocols)
+    """
+    if settings is None:
+        settings = DEFAULT_PROTOCOL_VALIDATION
+
+    if active_protocols is None:
+        active_protocols = {}
+
+    results: list[ProtocolActivationResult] = []
+    total_effects: list[str] = []
+    errors: list[str] = []
+
+    for protocol_id in input_data.protocol_ids:
+        if protocol_id not in protocol_definitions:
+            errors.append(f"Unknown protocol: {protocol_id}")
+            continue
+
+        definition = protocol_definitions[protocol_id]
+        definition = definition.model_copy(update={"actor_id": input_data.actor_id})
+
+        result, updated_protocols = activate_protocol_with_effects(
+            input_data=definition,
+            current_phase=current_phase,
+            active_protocols=active_protocols,
+            settings=settings,
+        )
+
+        active_protocols = updated_protocols
+        results.append(result)
+
+        if result.success:
+            total_effects.extend(result.effects_applied)
+        else:
+            errors.extend(result.validation_errors)
+
+    chain_result = ProtocolChainResult(
+        all_succeeded=len(errors) == 0,
+        results=results,
+        total_effects=total_effects,
+        errors=errors,
+    )
+
+    return chain_result, active_protocols
+
+
+def get_protocol_summary(active_protocols: dict[str, ProtocolState]) -> dict:
+    """Get a summary of all active protocols for display/debugging.
+
+    Args:
+        active_protocols: Current active protocols
+
+    Returns:
+        Summary dict with protocol details
+    """
+    return {
+        "count": len(active_protocols),
+        "protocols": [
+            {
+                "id": pid,
+                "name": p.protocol_name,
+                "type": p.effect_type,
+                "duration": p.duration.duration_type,
+                "is_toggle": p.is_toggle,
+            }
+            for pid, p in active_protocols.items()
+        ],
+    }

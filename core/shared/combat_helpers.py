@@ -42,6 +42,71 @@ from core.shared.saves import resolve_save, SaveRequest, SaveResult
 HexCoord = tuple[int, int]
 
 
+class InvisibilityMissChanceResult(BaseModel):
+    """Result of applying invisibility miss chance to an attack."""
+
+    miss_applies: bool
+    miss_roll: int | None = None
+    attack_proceeds: bool = True
+    reason: str = ""
+
+
+def apply_invisibility_miss_chance(
+    target_is_invisible: bool,
+    attacker_ignores_invisibility: bool = False,
+    force_roll: int | None = None,
+) -> InvisibilityMissChanceResult:
+    """Apply 50% miss chance for attacks on invisible targets.
+
+    Per PR2 4075:
+    "All attacks of any kind have a flat 50% chance to miss outright (roll
+    a dice or flip a coin) - checked before rolling"
+
+    This function implements the coin flip/1d2 roll to determine if the
+    attack misses due to invisibility. If miss applies, the attack does
+    not proceed at all.
+
+    Args:
+        target_is_invisible: Whether the target has invisibility status
+        attacker_ignores_invisibility: Whether attacker's abilities negate invisibility
+        force_roll: Optional forced 1d2 roll for testing (1=miss, 2=hit)
+
+    Returns:
+        InvisibilityMissChanceResult with miss chance outcome
+    """
+    if not target_is_invisible:
+        return InvisibilityMissChanceResult(
+            miss_applies=False,
+            attack_proceeds=True,
+            reason="Target is not invisible",
+        )
+
+    if attacker_ignores_invisibility:
+        return InvisibilityMissChanceResult(
+            miss_applies=False,
+            attack_proceeds=True,
+            reason="Attacker ignores invisibility",
+        )
+
+    roll = force_roll if force_roll is not None else roll_dice("1d2")[0]
+    miss_applies = roll == 1
+
+    if miss_applies:
+        return InvisibilityMissChanceResult(
+            miss_applies=True,
+            miss_roll=roll,
+            attack_proceeds=False,
+            reason=f"Invisibility miss chance (1d2={roll}), attack automatically misses",
+        )
+
+    return InvisibilityMissChanceResult(
+        miss_applies=False,
+        miss_roll=roll,
+        attack_proceeds=True,
+        reason=f"Invisibility check passed (1d2={roll}), attack proceeds",
+    )
+
+
 AttackPatternType = Literal["single", "line", "cone", "blast", "burst"]
 
 
