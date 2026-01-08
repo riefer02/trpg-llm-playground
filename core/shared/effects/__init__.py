@@ -56,12 +56,12 @@ from core.shared.effects.types import (
     DirectDamageType,
 )
 
-# Re-export everything from effects_old for backward compatibility
+# Re-export everything from core module for backward compatibility
 # This ensures all effect classes are available
-from core.shared.effects_old import *  # noqa: F401, F403
+from core.shared.effects.core import *  # noqa: F401, F403
 
-# Explicitly re-export the __all__ from effects_old to maintain compatibility
-from core.shared.effects_old import __all__ as _old_all
+# Explicitly re-export the __all__ from core to maintain compatibility
+from core.shared.effects.core import __all__ as _core_all
 
 # Combine all exports
 __all__ = [
@@ -107,4 +107,4 @@ __all__ = [
     "UsesPer",
     "DamageTypeScope",
     "DirectDamageType",
-] + _old_all
+] + _core_all
