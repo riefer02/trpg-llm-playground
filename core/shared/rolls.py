@@ -1,6 +1,22 @@
 """Roll mechanics models for Lancer TTRPG."""
 
 from typing import Literal
+
+__all__ = [
+    "RollType",
+    "FlatBonusSource",
+    "AccuracyDifficulty",
+    "FlatBonus",
+    "RollModifiers",
+    "DifficultyModifier",
+    "SkillCheck",
+    "AttackRoll",
+    "SaveRoll",
+    "ContestedCheck",
+    "AttackResolutionResult",
+    "resolve_attack",
+]
+
 from pydantic import Field, computed_field
 from core.shared.models import FrozenModel
 

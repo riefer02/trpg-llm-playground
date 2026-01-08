@@ -2,7 +2,7 @@
 
 from core.mech.build import MechBuild, build_mech_from_compendium, compute_mech_stats
 from core.mech.frame import MechFrameDefinition
-from core.mech.validation import MechBuildValidation, validate_mech_build
+from core.mech.build_validation import MechBuildValidation, validate_mech_build
 from core.mech.compendium import (
     get_frame_definition,
     SYSTEM_DEFINITIONS_BY_ID,
@@ -23,7 +23,10 @@ from core.mech.combat_state import (
     MechSystemState,
     MechInventory,
 )
-from core.mech.combat_validation import CombatValidation, validate_combat_scenario
+from core.mech.validation.combat_validation import (
+    CombatValidation,
+    validate_combat_scenario,
+)
 from core.mech.grid import HexCoord, HexPosition
 from core.mech.terrain import TerrainHex, TerrainMap
 from core.mech.combat_action_builder import build_action_use_from_weapon
@@ -47,7 +50,9 @@ def build_example_raleigh_frame() -> MechFrameDefinition:
     return frame
 
 
-def build_oda_ll0_mech_example() -> tuple[MechFrameDefinition, MechBuild, SkillSet, int, list[MechanicalEffect]]:
+def build_oda_ll0_mech_example() -> tuple[
+    MechFrameDefinition, MechBuild, SkillSet, int, list[MechanicalEffect]
+]:
     """Build Oda's LL0 Everest mech loadout."""
     frame = build_example_everest_frame()
     build = build_mech_from_compendium(
@@ -71,7 +76,9 @@ def build_oda_ll0_mech_example() -> tuple[MechFrameDefinition, MechBuild, SkillS
     return frame, build, skills, grit, bonus_effects
 
 
-def build_oda_ll3_mech_example() -> tuple[MechFrameDefinition, MechBuild, SkillSet, int, list[MechanicalEffect]]:
+def build_oda_ll3_mech_example() -> tuple[
+    MechFrameDefinition, MechBuild, SkillSet, int, list[MechanicalEffect]
+]:
     """Build Oda's LL3 Raleigh mech loadout."""
     frame = build_example_raleigh_frame()
     build = build_mech_from_compendium(
@@ -215,7 +222,9 @@ def build_example_combat_scenario() -> MechCombatScenario:
                         action_type="quick",
                         target_id="bravo",
                     ),
-                    ActionUse(action_id="overcharge", action_type="free", heat_generated=1),
+                    ActionUse(
+                        action_id="overcharge", action_type="free", heat_generated=1
+                    ),
                     ActionUse(
                         action_id="boost",
                         action_type="quick",
@@ -320,7 +329,9 @@ def build_example_combat_scenario_with_reaction_metadata() -> MechCombatScenario
                 actor_id="alpha",
                 move_used=False,
                 actions=[
-                    ActionUse(action_id="overcharge", action_type="free", heat_generated=1),
+                    ActionUse(
+                        action_id="overcharge", action_type="free", heat_generated=1
+                    ),
                     ActionUse(
                         action_id="overwatch",
                         action_type="reaction",
@@ -517,7 +528,9 @@ def evaluate_example_combat_scenario_with_line() -> CombatValidation:
     return validate_combat_scenario(scenario)
 
 
-def evaluate_structure_and_overheat_examples() -> dict[str, dict[str, str | int | list[int] | None]]:
+def evaluate_structure_and_overheat_examples() -> dict[
+    str, dict[str, str | int | list[int] | None]
+]:
     """Evaluate deterministic structure and overheat resolution examples."""
     from core.mech.combat_resolution import (
         resolve_structure_damage,
@@ -560,7 +573,9 @@ def evaluate_structure_and_overheat_examples() -> dict[str, dict[str, str | int 
             "rolls": structure_result.dice.rolls,
             "chosen": structure_result.dice.chosen,
             "outcome": structure_result.outcome.name,
-            "direct_hit": structure_result.direct_hit_outcome.name if structure_result.direct_hit_outcome else None,
+            "direct_hit": structure_result.direct_hit_outcome.name
+            if structure_result.direct_hit_outcome
+            else None,
             "spillover": structure_result.spillover_damage,
         },
         "system_trauma": {
@@ -587,7 +602,9 @@ def evaluate_structure_and_overheat_examples() -> dict[str, dict[str, str | int 
             "rolls": overheat_result.dice.rolls,
             "chosen": overheat_result.dice.chosen,
             "outcome": overheat_result.outcome.name,
-            "meltdown": overheat_result.meltdown_outcome.name if overheat_result.meltdown_outcome else None,
+            "meltdown": overheat_result.meltdown_outcome.name
+            if overheat_result.meltdown_outcome
+            else None,
         },
     }
 
@@ -651,7 +668,9 @@ def build_example_combat_scenario_with_flight() -> MechCombatScenario:
                     HexPosition(coord=HexCoord(q=1, r=1), elevation=2),
                 ],
                 actions=[
-                    ActionUse(action_id="skirmish", action_type="quick", target_id="bravo"),
+                    ActionUse(
+                        action_id="skirmish", action_type="quick", target_id="bravo"
+                    ),
                 ],
             ),
         ],
@@ -682,7 +701,9 @@ def build_example_combat_scenario_with_grapple() -> MechCombatScenario:
         bravo = bravo.model_copy(
             update={
                 "position": HexPosition(
-                    coord=HexCoord(q=alpha.position.coord.q + 1, r=alpha.position.coord.r),
+                    coord=HexCoord(
+                        q=alpha.position.coord.q + 1, r=alpha.position.coord.r
+                    ),
                     elevation=alpha.position.elevation,
                 )
             }

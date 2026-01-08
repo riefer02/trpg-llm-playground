@@ -4,32 +4,13 @@ This module provides ability trigger resolution for NPCs during combat,
 integrating with the broader combat state system.
 """
 
-from typing import Literal, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.shared.effects import MechanicalEffect
+from core.shared.effects import MechanicalEffect, TriggerType
 
 if TYPE_CHECKING:
     from core.npc.models import NPCState, NPCAbility
-
-
-TriggerContextType = Literal[
-    "on_hit",
-    "on_miss",
-    "on_crit",
-    "on_kill",
-    "on_turn_start",
-    "on_turn_end",
-    "on_damaged",
-    "on_attacked",
-    "on_adjacent",
-    "on_deploy",
-    "on_destroyed",
-    "on_initiative",
-    "on_ally_killed",
-    "on_hp_below_half",
-    "on_damage_dealt",
-]
 
 
 class TriggerContext(FrozenModel):
@@ -38,7 +19,7 @@ class TriggerContext(FrozenModel):
     Contains information about the event that triggered the ability.
     """
 
-    trigger_type: TriggerContextType
+    trigger_type: TriggerType
     source_id: str | None = None
     target_id: str | None = None
     damage_dealt: int | None = None
@@ -112,7 +93,7 @@ class NPCAbilityTracker(FrozenModel):
 
 def get_abilities_for_trigger(
     npc: "NPCState",
-    trigger_type: TriggerContextType,
+    trigger_type: TriggerType,
 ) -> list["NPCAbility"]:
     """Get all abilities on an NPC that match a trigger type.
 

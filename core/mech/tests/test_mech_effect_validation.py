@@ -4,7 +4,7 @@ from core.mech.compendium import (
     WEAPON_DEFINITIONS_BY_ID,
     get_frame_definition,
 )
-from core.mech.validation import validate_mech_build
+from core.mech.build_validation import validate_mech_build
 from core.pilot.skill import SkillSet
 from core.shared.effects import MechanicalEffect, DicePoolEffect, DicePoolSpendOption
 
@@ -43,5 +43,7 @@ def test_mech_build_effect_validation() -> None:
         system_definitions=SYSTEM_DEFINITIONS_BY_ID,
         bonus_effects=[invalid_effect],
     )
-    error_codes = {issue.code for issue in validation.issues if issue.severity == "error"}
+    error_codes = {
+        issue.code for issue in validation.issues if issue.severity == "error"
+    }
     assert "effect_validation_error" in error_codes

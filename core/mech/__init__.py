@@ -160,7 +160,7 @@ from core.mech.combat_state import (
     CombatRound,
     MechCombatScenario,
 )
-from core.mech.combat_validation import (
+from core.mech.validation.combat_validation import (
     CombatValidationIssue,
     CombatValidation,
     validate_combat_scenario,
@@ -215,7 +215,7 @@ from core.mech.build import (
     build_installed_system,
     build_mech_from_compendium,
 )
-from core.mech.validation import (
+from core.mech.build_validation import (
     MechBuildIssue,
     MechBuildValidation,
     validate_mech_build,

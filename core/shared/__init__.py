@@ -369,6 +369,15 @@ from core.shared.effects import (
     damage_bonus,
     immunity_to,
 )
+from core.shared.triggers import (
+    TriggerContext,
+    TriggerResolution,
+    check_trigger_condition,
+    resolve_trigger,
+    is_valid_for_player,
+    is_valid_for_npc,
+    NPC_ONLY_TRIGGERS,
+)
 from core.shared.effects_validation import (
     EffectValidationIssue,
     merge_dice_pools_by_name,
@@ -628,6 +637,14 @@ __all__ = [
     "StatType",
     "ConditionType",
     "TriggerType",
+    # Trigger resolution
+    "TriggerContext",
+    "TriggerResolution",
+    "check_trigger_condition",
+    "resolve_trigger",
+    "is_valid_for_player",
+    "is_valid_for_npc",
+    "NPC_ONLY_TRIGGERS",
     "ActionCategoryType",
     "EffectDuration",
     "IntelAudience",

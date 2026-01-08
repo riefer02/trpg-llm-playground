@@ -8,7 +8,7 @@ from core.mech.combat_state import (
     CombatTurn,
     MechCombatScenario,
 )
-from core.mech.combat_validation import validate_combat_scenario
+from core.mech.validation.combat_validation import validate_combat_scenario
 from core.mech.grid import HexCoord, HexPosition
 from core.mech.terrain import TerrainHex, TerrainMap
 

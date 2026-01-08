@@ -16,7 +16,7 @@ from core.mech.combat_resolution import (
     OverchargeUsageResult,
     OverchargeResetResult,
 )
-from core.mech.combat_validation import (
+from core.mech.validation.combat_validation import (
     _validate_overcharge_escalation,
     CombatValidationIssue,
 )

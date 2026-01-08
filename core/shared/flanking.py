@@ -111,9 +111,8 @@ def is_line_clear_of_hard_cover(
 
     terrain_idx = terrain_index(terrain)
     for hex_coord in hexes_to_check:
-        key = (hex_coord.q, hex_coord.r)
-        if key in terrain_idx:
-            hex_terrain = terrain_idx[key]
+        if hex_coord in terrain_idx:
+            hex_terrain = terrain_idx[hex_coord]
             if hex_terrain.provides_hard_cover:
                 return False
 
@@ -136,7 +135,7 @@ def get_adjacent_hard_covers(
     if terrain is None:
         return []
 
-    adjacent_coords = _get_adjacent_hexes(target_coord)
+    adjacent_coords = target_coord.neighbors()
     hard_covers: list[HexCoord] = []
 
     for adj_coord in adjacent_coords:
@@ -369,24 +368,4 @@ def get_terrain_at(
         return None
 
     idx = terrain_index(terrain)
-    return idx.get((coord.q, coord.r))
-
-
-def _get_adjacent_hexes(coord: HexCoord) -> list[HexCoord]:
-    """Get all adjacent hex coordinates (axial coordinates).
-
-    Args:
-        coord: The origin coordinate
-
-    Returns:
-        List of 6 adjacent hex coordinates
-    """
-    directions = [
-        (1, 0),
-        (1, -1),
-        (0, -1),
-        (-1, 0),
-        (-1, 1),
-        (0, 1),
-    ]
-    return [HexCoord(q=coord.q + dq, r=coord.r + dr) for dq, dr in directions]
+    return idx.get(coord)

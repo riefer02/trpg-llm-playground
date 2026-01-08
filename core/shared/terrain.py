@@ -12,17 +12,71 @@ Terrain Rules (per PR2 ~3851-3860):
 - Dangerous Terrain: Engineering check on entry, 5 damage on failure
 - Cover: Soft (+1 difficulty) or Hard (+2 difficulty, requires adjacency)
 - Elevation: Higher elevation grants +1 accuracy (talent-dependent)
+
+Terrain types are defined here (moved from core/mech/terrain.py).
 """
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType, SizeClass
 from core.shared.dice import roll_dice, round_up
-from core.mech.terrain import TerrainHex, TerrainMap, terrain_index
 from core.mech.grid import HexCoord
+
+if TYPE_CHECKING:
+    from core.mech.grid import HexPosition
+
+
+class TerrainHex(FrozenModel):
+    """Terrain entry for a single hex."""
+
+    coord: HexCoord
+    elevation: int = Field(default=0, ge=0)
+    blocks_line_of_sight: bool = False
+    provides_soft_cover: bool = False
+    provides_hard_cover: bool = False
+    hard_cover_size: SizeClass | None = None
+    difficult: bool = False
+    dangerous: bool = False
+
+
+class TerrainMap(FrozenModel):
+    """Sparse terrain map for combat scenarios."""
+
+    tiles: list[TerrainHex] = Field(default_factory=list)
+
+
+def terrain_index(terrain: TerrainMap | None) -> dict[HexCoord, TerrainHex]:
+    """Build a lookup table for terrain by axial coordinates.
+
+    Args:
+        terrain: The terrain map (None for empty dict)
+
+    Returns:
+        Dict mapping HexCoord to TerrainHex
+    """
+    if terrain is None:
+        return {}
+    return {tile.coord: tile for tile in terrain.tiles}
+
+
+def terrain_at(terrain: TerrainMap | None, coord: HexCoord) -> TerrainHex | None:
+    """Get terrain at a specific coordinate.
+
+    Args:
+        terrain: The terrain map (None for no terrain)
+        coord: The coordinate to check
+
+    Returns:
+        TerrainHex at that coordinate, or None if no terrain/invalid
+    """
+    if terrain is None:
+        return None
+    idx = terrain_index(terrain)
+    return idx.get(coord)
 
 
 class TerrainEffectResult(FrozenModel):
@@ -81,11 +135,7 @@ def get_terrain_at(
     Returns:
         TerrainHex at that coordinate, or None if no terrain/invalid
     """
-    if terrain is None:
-        return None
-
-    idx = terrain_index(terrain)
-    return idx.get((coord.q, coord.r))
+    return terrain_at(terrain, coord)
 
 
 def get_terrain_effects_at(
@@ -314,7 +364,7 @@ def check_hard_cover_available(
     target_size_val = size_order.get(target_size, 0)
 
     if requires_adjacency:
-        adjacent_coords = _get_adjacent_hexes(target_coord)
+        adjacent_coords = target_coord.neighbors()
         best_adjacent_cover: HardCoverAvailabilityResult | None = None
 
         for adj_coord in adjacent_coords:
@@ -377,26 +427,6 @@ def check_hard_cover_available(
         size_match=False,
         reason="Adjacency check disabled but no cover at target location",
     )
-
-
-def _get_adjacent_hexes(coord: HexCoord) -> list[HexCoord]:
-    """Get all adjacent hex coordinates (axial coordinates).
-
-    Args:
-        coord: The origin coordinate
-
-    Returns:
-        List of 6 adjacent hex coordinates
-    """
-    directions = [
-        (1, 0),
-        (1, -1),
-        (0, -1),
-        (-1, 0),
-        (-1, 1),
-        (0, 1),
-    ]
-    return [HexCoord(q=coord.q + dq, r=coord.r + dr) for dq, dr in directions]
 
 
 def resolve_dangerous_terrain(

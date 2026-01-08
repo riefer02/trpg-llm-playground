@@ -9,11 +9,10 @@ from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import SizeClass
-from core.shared.effects import MechanicalEffect
+from core.shared.effects import MechanicalEffect, TriggerType
 from core.npc.enums import (
     NPCTier,
     NPCClass,
-    NPCAbilityTriggerType,
     NPCSpecialClass,
     UltraTraitType,
     VeteranTraitType,
@@ -86,7 +85,7 @@ class NPCAbility(FrozenModel):
 
     id: str
     name: str
-    trigger: NPCAbilityTriggerType
+    trigger: TriggerType
     effect: MechanicalEffect = Field(default_factory=MechanicalEffect)
     uses_per_combat: int | None = None
 

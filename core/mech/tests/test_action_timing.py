@@ -22,7 +22,7 @@ from core.mech.combat_state import (
     MechCombatScenario,
 )
 from core.shared.enums import StatusType
-from core.mech.combat_validation import validate_combat_scenario
+from core.mech.validation.combat_validation import validate_combat_scenario
 
 
 class TestPreparedActionState:

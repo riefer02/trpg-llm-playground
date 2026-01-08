@@ -25,7 +25,7 @@ from core.mech.combat_state import (
     CombatResources,
     CombatantState,
 )
-from core.mech.combat_validation import (
+from core.mech.validation.combat_validation import (
     validate_combat_scenario,
     _index_cooldown_states,
     _check_action_on_cooldown,

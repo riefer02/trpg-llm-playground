@@ -1,16 +1,25 @@
-"""Validation helpers for mech combat scenarios."""
+"""Combat validation helpers for mech combat scenarios.
+
+This module provides validation for combat scenarios including action economy,
+targeting rules, deployment, and turn-by-turn validation.
+
+Note: This module is the main entry point. For specialized validation helpers,
+see:
+    - core.mech.validation.geometry_validation: Cover, LOS, movement helpers
+    - core.mech.validation.action_validation: Action timing, cooldowns
+    - core.mech.validation.area_validation: Area attack geometry
+"""
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
 from pydantic import Field
+from pydantic.functional_validators import model_validator
 from core.shared.models import FrozenModel
 
-from core.mech.combat_rules import (
-    DEFAULT_MECH_COMBAT_RULES,
-    LineOfSightRules,
-    OverchargeRules,
-)
+from core.mech.combat_actions import ACTION_RULES_BY_ID, ActionRule
+from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
 from core.mech.combat_state import (
     MechCombatScenario,
     CombatTurn,
@@ -18,20 +27,26 @@ from core.mech.combat_state import (
     ActionUse,
     OverchargeState,
 )
-from core.mech.combat_actions import ACTION_RULES_BY_ID, ActionRule
-from core.mech.grid import (
-    HexCoord,
-    hexes_between,
-    hex_cone,
-    hex_cone_centered,
-    hex_line_from_direction,
-    hexes_in_radius,
-    normalize_hex_direction,
-)
-from core.mech.grid import HexPosition
-from core.mech.terrain import terrain_index, TerrainHex
+from core.mech.grid import HexCoord, HexPosition
 from core.mech.statuses import STATUS_DEFINITIONS_BY_ID
-from core.shared.enums import CoverType
+from core.mech.terrain import terrain_index, TerrainHex
+from core.mech.timing import (
+    TurnPhase,
+    ActionTimingValidationSettings,
+)
+from core.mech.validation.geometry_validation import (
+    _adjacency_distance,
+    _size_value,
+    _hostiles_for,
+    _surface_elevation,
+    _movement_segments,
+    _is_engaged,
+    _line_of_sight_clear,
+    _path_clear,
+    _cover_between,
+    _blocked_area_coords_by_los,
+    _blocked_area_coords_by_path,
+)
 from core.shared.effects import (
     AttackContextCondition,
     CheckContextCondition,
@@ -42,14 +57,9 @@ from core.shared.effects import (
     PerTargetCounter,
     CooldownState,
 )
-from core.mech.timing import (
-    TurnPhase,
-    PreparedActionState,
-    ActionTimingValidationSettings,
-    validate_protocol_timing,
-    validate_action_while_prepared,
-    validate_per_round_reaction,
-)
+
+if TYPE_CHECKING:
+    from typing import Any
 
 
 class CombatValidationIssue(FrozenModel):
@@ -65,6 +75,13 @@ class CombatValidation(FrozenModel):
 
     valid: bool
     issues: list[CombatValidationIssue] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def compute_validity(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "issues" in data:
+            data["valid"] = not any(i.severity == "error" for i in data["issues"])
+        return data
 
 
 STRICT_AOE_WARNING_CODES = {
@@ -129,89 +146,40 @@ def _condition_matches_statuses(
     return False
 
 
-def _adjacent_hard_cover_coords(
-    tiles: dict[tuple[int, int], TerrainHex],
-    target_coord: HexCoord,
-    target_size: str | None,
-) -> set[tuple[int, int]]:
-    adjacent: set[tuple[int, int]] = set()
-    for neighbor in target_coord.neighbors():
-        tile = tiles.get((neighbor.q, neighbor.r))
-        if (
-            tile
-            and tile.provides_hard_cover
-            and _cover_size_allows_target(tile.hard_cover_size, target_size)
-        ):
-            adjacent.add((neighbor.q, neighbor.r))
-    return adjacent
-
-
-def _cover_size_allows_target(cover_size: str | None, target_size: str | None) -> bool:
-    if cover_size is None or target_size is None:
-        return True
-    return _size_value(cover_size) >= _size_value(target_size)
-
-
-def _is_flanking(
-    tiles: dict[tuple[int, int], TerrainHex],
-    attacker_coord: HexCoord,
-    target_coord: HexCoord,
-) -> bool:
-    line = hexes_between(attacker_coord, target_coord, include_endpoints=False)
-    if not line:
-        return True
-    cover_coord = line[-1]
-    tile = tiles.get((cover_coord.q, cover_coord.r))
-    return not (tile and tile.provides_hard_cover)
-
-
-def _cover_between(
-    tiles: dict[tuple[int, int], TerrainHex],
-    start_coord: tuple[int, int],
-    end_coord: tuple[int, int],
-    target_size: str | None,
-) -> CoverType:
-    cover_rules = DEFAULT_MECH_COMBAT_RULES.cover_rules
-    start = HexCoord(q=start_coord[0], r=start_coord[1])
-    end = HexCoord(q=end_coord[0], r=end_coord[1])
-    line = hexes_between(start, end, include_endpoints=False)
-    hard_between = any(
-        tiles.get((coord.q, coord.r)) and tiles[(coord.q, coord.r)].provides_hard_cover
-        for coord in line
-    )
-    hard_between_size_ok = any(
-        tiles.get((coord.q, coord.r))
-        and tiles[(coord.q, coord.r)].provides_hard_cover
-        and _cover_size_allows_target(
-            tiles[(coord.q, coord.r)].hard_cover_size, target_size
+def _action_targets(
+    action: ActionUse,
+    combatants_by_id: dict[str, CombatantState],
+) -> list[tuple[CombatantState | None, HexPosition | None]]:
+    targets: list[tuple[CombatantState | None, HexPosition | None]] = []
+    for target_id in action.target_ids:
+        target = combatants_by_id.get(target_id)
+        targets.append((target, target.position if target else None))
+    targets.extend((None, pos) for pos in action.target_positions)
+    if action.target_id or action.target_position:
+        target = combatants_by_id.get(action.target_id) if action.target_id else None
+        targets.append(
+            (target, action.target_position or (target.position if target else None))
         )
-        for coord in line
-    )
-    soft_between = any(
-        tiles.get((coord.q, coord.r)) and tiles[(coord.q, coord.r)].provides_soft_cover
-        for coord in line
-    )
+    return targets
 
-    if not cover_rules.hard_cover_requires_adjacency and hard_between:
-        if cover_rules.hard_cover_requires_size_match and not hard_between_size_ok:
-            return "soft" if hard_between or soft_between else "none"
-        return "hard"
 
-    size_check = target_size if cover_rules.hard_cover_requires_size_match else None
-    hard_adjacent = _adjacent_hard_cover_coords(tiles, end, size_check)
-    if hard_adjacent:
-        hard_cover = True
-        if cover_rules.hard_cover_flanking_negates and _is_flanking(tiles, start, end):
-            hard_cover = False
-        if cover_rules.hard_cover_requires_adjacency and hard_cover:
-            return "hard"
-        if not cover_rules.hard_cover_requires_adjacency and hard_between:
-            return "hard"
-
-    if soft_between or hard_between:
-        return "soft"
-
-    return "none"
+def _resolve_area_origin(
+    action: ActionUse,
+    actor_position: HexPosition | None,
+    target_position: HexPosition | None,
+) -> HexPosition | None:
+    if not action.area_pattern:
+        return None
+    pattern = action.area_pattern.pattern
+    if pattern == "burst":
+        return actor_position
+    if action.area_origin:
+        return action.area_origin
+    if pattern == "blast":
+        return action.target_position or target_position
+    if pattern in ("line", "cone"):
+        return actor_position
+    return None
 
 
 def _line_of_sight_clear(
@@ -220,9 +188,11 @@ def _line_of_sight_clear(
     end_coord: tuple[int, int],
     start_elevation: int,
     end_elevation: int,
-    line_of_sight_rules: LineOfSightRules,
+    line_of_sight_rules: Any,
     target_coord: HexCoord | None = None,
 ) -> bool:
+    from core.mech.grid import hexes_between
+
     for coord in hexes_between(
         HexCoord(q=start_coord[0], r=start_coord[1]),
         HexCoord(q=end_coord[0], r=end_coord[1]),
@@ -246,9 +216,11 @@ def _path_clear(
     tiles: dict[tuple[int, int], TerrainHex],
     start_coord: tuple[int, int],
     end_coord: tuple[int, int],
-    line_of_sight_rules: LineOfSightRules,
+    line_of_sight_rules: Any,
     target_coord: HexCoord | None = None,
 ) -> bool:
+    from core.mech.grid import hexes_between
+
     for coord in hexes_between(
         HexCoord(q=start_coord[0], r=start_coord[1]),
         HexCoord(q=end_coord[0], r=end_coord[1]),
@@ -267,194 +239,75 @@ def _path_clear(
     return True
 
 
-def _terrain_elevation(
+def _cover_between(
     tiles: dict[tuple[int, int], TerrainHex],
-    coord: HexCoord,
-) -> int:
-    tile = tiles.get((coord.q, coord.r))
-    return tile.elevation if tile else 0
+    start_coord: tuple[int, int],
+    end_coord: tuple[int, int],
+    target_size: str | None,
+) -> CoverType:
+    from core.mech.grid import hexes_between
 
+    cover_rules = DEFAULT_MECH_COMBAT_RULES.cover_rules
+    start = HexCoord(q=start_coord[0], r=start_coord[1])
+    end = HexCoord(q=end_coord[0], r=end_coord[1])
+    line = hexes_between(start, end, include_endpoints=False)
 
-def _blocked_area_coords_by_los(
-    tiles: dict[tuple[int, int], TerrainHex],
-    origin: HexPosition,
-    coords: list[HexCoord],
-    line_of_sight_rules: LineOfSightRules,
-) -> set[tuple[int, int]]:
-    blocked: set[tuple[int, int]] = set()
-    start_coord = (origin.coord.q, origin.coord.r)
-    for coord in coords:
-        end_coord = (coord.q, coord.r)
-        end_elevation = _terrain_elevation(tiles, coord)
-        if not _line_of_sight_clear(
-            tiles,
-            start_coord,
-            end_coord,
-            origin.elevation,
-            end_elevation,
-            line_of_sight_rules,
-            coord,
-        ):
-            blocked.add(end_coord)
-    return blocked
+    def has_hard_cover(c: HexCoord) -> bool:
+        t = tiles.get((c.q, c.r))
+        return t is not None and t.provides_hard_cover
 
-
-def _blocked_area_coords_by_path(
-    tiles: dict[tuple[int, int], TerrainHex],
-    origin: HexPosition,
-    coords: list[HexCoord],
-    line_of_sight_rules: LineOfSightRules,
-) -> set[tuple[int, int]]:
-    blocked: set[tuple[int, int]] = set()
-    start_coord = (origin.coord.q, origin.coord.r)
-    for coord in coords:
-        end_coord = (coord.q, coord.r)
-        if not _path_clear(
-            tiles,
-            start_coord,
-            end_coord,
-            line_of_sight_rules,
-            coord,
-        ):
-            blocked.add(end_coord)
-    return blocked
-
-
-def _adjacency_distance(attacker: CombatantState, target: CombatantState) -> int:
-    size_to_radius = {
-        "size_half": 1,
-        "size_1": 1,
-        "size_2": 2,
-        "size_3": 3,
-        "size_4": 4,
-        "size_5": 5,
-    }
-    return max(size_to_radius[attacker.stats.size], size_to_radius[target.stats.size])
-
-
-def _size_value(size: str) -> float:
-    size_values = {
-        "size_half": 0.5,
-        "size_1": 1.0,
-        "size_2": 2.0,
-        "size_3": 3.0,
-        "size_4": 4.0,
-        "size_5": 5.0,
-    }
-    return size_values.get(size, 1.0)
-
-
-def _hostiles_for(
-    actor: CombatantState, combatants: dict[str, CombatantState]
-) -> list[CombatantState]:
-    if actor.side == "players":
-        return [c for c in combatants.values() if c.side == "hostiles"]
-    if actor.side == "hostiles":
-        return [c for c in combatants.values() if c.side == "players"]
-    return []
-
-
-def _surface_elevation(
-    terrain_tiles: dict[tuple[int, int], TerrainHex],
-    position: HexPosition,
-) -> int:
-    tile = terrain_tiles.get((position.coord.q, position.coord.r))
-    return tile.elevation if tile else 0
-
-
-def _movement_segments(path: list[HexPosition]) -> int:
-    if len(path) < 2:
-        return 0
-    directions: list[tuple[int, int, int]] = []
-    for prev, curr in zip(path, path[1:]):
-        dq = curr.coord.q - prev.coord.q
-        dr = curr.coord.r - prev.coord.r
-        de = curr.elevation - prev.elevation
-        if dq == 0 and dr == 0 and de == 0:
-            continue
-        directions.append((dq, dr, de))
-    if not directions:
-        return 0
-    segments = 1
-    for prev_dir, curr_dir in zip(directions, directions[1:]):
-        if curr_dir != prev_dir:
-            segments += 1
-    return segments
-
-
-def _is_engaged(actor: CombatantState, hostiles: list[CombatantState]) -> bool:
-    if not actor.position:
-        return False
-    for hostile in hostiles:
-        if not hostile.position:
-            continue
-        distance = actor.position.distance_3d(hostile.position)
-        if distance <= _adjacency_distance(actor, hostile):
+    def hard_cover_size_ok(c: HexCoord) -> bool:
+        t = tiles.get((c.q, c.r))
+        if t is None or not t.provides_hard_cover:
+            return False
+        if t.hard_cover_size is None or target_size is None:
             return True
-    return False
+        return _size_value(t.hard_cover_size) >= _size_value(target_size)
 
+    def has_soft_cover(c: HexCoord) -> bool:
+        t = tiles.get((c.q, c.r))
+        return t is not None and t.provides_soft_cover
 
-def _effective_ignores_los(
-    action: ActionUse, line_of_sight_rules: LineOfSightRules
-) -> bool:
-    tags = set(action.weapon_tags)
-    if action.ignores_line_of_sight:
-        return True
-    if "seeking" in tags and line_of_sight_rules.seeking_ignores_los:
-        return True
-    if "arcing" in tags and line_of_sight_rules.arcing_allows_no_los:
-        return True
-    return False
+    hard_between = any(has_hard_cover(c) for c in line)
+    hard_between_size_ok = any(hard_cover_size_ok(c) for c in line)
+    soft_between = any(has_soft_cover(c) for c in line)
 
+    def is_flanking() -> bool:
+        if not line:
+            return True
+        cover_coord = line[-1]
+        tile = tiles.get((cover_coord.q, cover_coord.r))
+        return not (tile and tile.provides_hard_cover)
 
-def _effective_ignores_cover(
-    action: ActionUse,
-    rule: ActionRule | None,
-    line_of_sight_rules: LineOfSightRules,
-) -> bool:
-    tags = set(action.weapon_tags)
-    rule_ignores = bool(rule and rule.attack and rule.attack.ignores_cover)
-    if action.ignores_cover or rule_ignores:
-        return True
-    if "seeking" in tags and line_of_sight_rules.seeking_ignores_cover:
-        return True
-    return False
+    def adjacent_hard_cover() -> bool:
+        for neighbor in end.neighbors():
+            tile = tiles.get((neighbor.q, neighbor.r))
+            if tile and tile.provides_hard_cover:
+                if tile.hard_cover_size is None or target_size is None:
+                    return True
+                if _size_value(tile.hard_cover_size) >= _size_value(target_size):
+                    return True
+        return False
 
+    if not cover_rules.hard_cover_requires_adjacency and hard_between:
+        if cover_rules.hard_cover_requires_size_match and not hard_between_size_ok:
+            return "soft" if hard_between or soft_between else "none"
+        return "hard"
 
-def _resolve_area_origin(
-    action: ActionUse,
-    actor_position: HexPosition | None,
-    target_position: HexPosition | None,
-) -> HexPosition | None:
-    if not action.area_pattern:
-        return None
-    pattern = action.area_pattern.pattern
-    if pattern == "burst":
-        return actor_position
-    if action.area_origin:
-        return action.area_origin
-    if pattern == "blast":
-        return action.target_position or target_position
-    if pattern in ("line", "cone"):
-        return actor_position
+    size_check = target_size if cover_rules.hard_cover_requires_size_match else None
+    if adjacent_hard_cover():
+        hard_cover = True
+        if cover_rules.hard_cover_flanking_negates and is_flanking():
+            hard_cover = False
+        if cover_rules.hard_cover_requires_adjacency and hard_cover:
+            return "hard"
+        if not cover_rules.hard_cover_requires_adjacency and hard_between:
+            return "hard"
+
+    if soft_between or hard_between:
+        return "soft"
+
     return None
-
-
-def _action_targets(
-    action: ActionUse,
-    combatants_by_id: dict[str, CombatantState],
-) -> list[tuple[CombatantState | None, HexPosition | None]]:
-    targets: list[tuple[CombatantState | None, HexPosition | None]] = []
-    for target_id in action.target_ids:
-        target = combatants_by_id.get(target_id)
-        targets.append((target, target.position if target else None))
-    targets.extend((None, pos) for pos in action.target_positions)
-    if action.target_id or action.target_position:
-        target = combatants_by_id.get(action.target_id) if action.target_id else None
-        targets.append(
-            (target, action.target_position or (target.position if target else None))
-        )
-    return targets
 
 
 def _index_per_target_counters(
@@ -518,22 +371,14 @@ def _check_action_on_cooldown(
 def _validate_overcharge_escalation(
     action: ActionUse,
     actor_overcharge_state: OverchargeState | None,
-    rules: OverchargeRules = DEFAULT_MECH_COMBAT_RULES.overcharge_rules,
+    rules: Any = None,
     strict_mode: bool = True,
 ) -> list[CombatValidationIssue]:
-    """Validate that overcharge heat cost matches expected escalation level.
-
-    Args:
-        action: The action being validated
-        actor_overcharge_state: Current overcharge state for the actor
-        rules: Overcharge rules to use
-        strict_mode: If True, produce errors; otherwise produce warnings
-
-    Returns:
-        List of validation issues (empty if valid)
-    """
     from core.mech.combat_resolution import compute_overcharge_escalation
     from core.shared.dice import DiceExpression
+
+    if rules is None:
+        rules = DEFAULT_MECH_COMBAT_RULES.overcharge_rules
 
     issues: list[CombatValidationIssue] = []
 
@@ -577,24 +422,12 @@ def _validate_action_timing(
     issues: list[CombatValidationIssue],
     timing_settings: ActionTimingValidationSettings | None = None,
 ) -> bool:
-    """Validate timing constraints for an action.
+    from core.mech.timing import (
+        validate_action_while_prepared,
+        validate_per_round_reaction,
+        validate_protocol_timing,
+    )
 
-    Validates:
-    - Protocol timing (must be at start of turn)
-    - Prepared action lockout (cannot act/react/move while prepared)
-    - Per-round reaction limits (brace/overwatch once per round)
-
-    Args:
-        action: The action being validated
-        actor: The combatant taking the action
-        current_phase: Current turn phase
-        round_reaction_counts: Per-round reaction counts for this actor
-        issues: List to append validation issues to
-        timing_settings: Validation settings (uses defaults if None)
-
-    Returns:
-        True if all timing constraints are valid
-    """
     if timing_settings is None:
         timing_settings = ActionTimingValidationSettings(strict_mode=True)
 
@@ -780,6 +613,14 @@ def _area_coords_for_action(
     origin: HexPosition,
     issues: list[CombatValidationIssue],
 ) -> set[tuple[int, int]] | None:
+    from core.mech.grid import (
+        hex_cone,
+        hex_cone_centered,
+        hex_line_from_direction,
+        hexes_in_radius,
+        normalize_hex_direction,
+    )
+
     if not action.area_pattern:
         return None
     pattern = action.area_pattern.pattern
@@ -1860,50 +1701,62 @@ def _validate_turn(
                             )
 
         line_of_sight_rules = DEFAULT_MECH_COMBAT_RULES.line_of_sight_rules
-        if rule.requires_line_of_sight and not _effective_ignores_los(
-            action,
-            line_of_sight_rules,
-        ):
-            if not actor_position:
-                issues.append(
-                    CombatValidationIssue(
-                        code="line_of_sight_unknown",
-                        message=f"Action {action.action_id} requires line of sight but actor position is missing.",
-                        severity="warning",
-                    )
-                )
-            else:
-                origin_position = area_origin or actor_position
-                if not origin_position:
+        if rule.requires_line_of_sight:
+
+            def effective_ignores_los() -> bool:
+                tags = set(action.weapon_tags)
+                if action.ignores_line_of_sight:
+                    return True
+                if "seeking" in tags and line_of_sight_rules.seeking_ignores_los:
+                    return True
+                if "arcing" in tags and line_of_sight_rules.arcing_allows_no_los:
+                    return True
+                return False
+
+            if not effective_ignores_los():
+                if not actor_position:
                     issues.append(
                         CombatValidationIssue(
                             code="line_of_sight_unknown",
-                            message=f"Action {action.action_id} requires line of sight but origin is missing.",
+                            message=f"Action {action.action_id} requires line of sight but actor position is missing.",
                             severity="warning",
                         )
                     )
                 else:
-                    for target, position in targets:
-                        if not position:
-                            continue
-                        start_coord = (origin_position.coord.q, origin_position.coord.r)
-                        end_coord = (position.coord.q, position.coord.r)
-                        if not _line_of_sight_clear(
-                            terrain_tiles,
-                            start_coord,
-                            end_coord,
-                            origin_position.elevation,
-                            position.elevation,
-                            line_of_sight_rules,
-                            position.coord,
-                        ):
-                            issues.append(
-                                CombatValidationIssue(
-                                    code="line_of_sight_blocked",
-                                    message=f"Action {action.action_id} lacks line of sight to target.",
-                                    severity="warning",
-                                )
+                    origin_position = area_origin or actor_position
+                    if not origin_position:
+                        issues.append(
+                            CombatValidationIssue(
+                                code="line_of_sight_unknown",
+                                message=f"Action {action.action_id} requires line of sight but origin is missing.",
+                                severity="warning",
                             )
+                        )
+                    else:
+                        for target, position in targets:
+                            if not position:
+                                continue
+                            start_coord = (
+                                origin_position.coord.q,
+                                origin_position.coord.r,
+                            )
+                            end_coord = (position.coord.q, position.coord.r)
+                            if not _line_of_sight_clear(
+                                terrain_tiles,
+                                start_coord,
+                                end_coord,
+                                origin_position.elevation,
+                                position.elevation,
+                                line_of_sight_rules,
+                                position.coord,
+                            ):
+                                issues.append(
+                                    CombatValidationIssue(
+                                        code="line_of_sight_blocked",
+                                        message=f"Action {action.action_id} lacks line of sight to target.",
+                                        severity="warning",
+                                    )
+                                )
 
         if (
             action.area_pattern
@@ -1911,28 +1764,39 @@ def _validate_turn(
             and actor_position
             and area_origin
             and rule.requires_line_of_sight
-            and not _effective_ignores_los(action, line_of_sight_rules)
         ):
-            start_coord = (actor_position.coord.q, actor_position.coord.r)
-            end_coord = (area_origin.coord.q, area_origin.coord.r)
-            if not _line_of_sight_clear(
-                terrain_tiles,
-                start_coord,
-                end_coord,
-                actor_position.elevation,
-                area_origin.elevation,
-                line_of_sight_rules,
-                area_origin.coord,
-            ):
-                issues.append(
-                    CombatValidationIssue(
-                        code="area_origin_line_of_sight_blocked",
-                        message=(
-                            f"Action {action.action_id} places origin without line of sight."
-                        ),
-                        severity="warning",
+
+            def effective_ignores_los() -> bool:
+                tags = set(action.weapon_tags)
+                if action.ignores_line_of_sight:
+                    return True
+                if "seeking" in tags and line_of_sight_rules.seeking_ignores_los:
+                    return True
+                if "arcing" in tags and line_of_sight_rules.arcing_allows_no_los:
+                    return True
+                return False
+
+            if not effective_ignores_los():
+                start_coord = (actor_position.coord.q, actor_position.coord.r)
+                end_coord = (area_origin.coord.q, area_origin.coord.r)
+                if not _line_of_sight_clear(
+                    terrain_tiles,
+                    start_coord,
+                    end_coord,
+                    actor_position.elevation,
+                    area_origin.elevation,
+                    line_of_sight_rules,
+                    area_origin.coord,
+                ):
+                    issues.append(
+                        CombatValidationIssue(
+                            code="area_origin_line_of_sight_blocked",
+                            message=(
+                                f"Action {action.action_id} places origin without line of sight."
+                            ),
+                            severity="warning",
+                        )
                     )
-                )
 
         tags = set(action.weapon_tags)
         requires_path_check = (
@@ -1997,10 +1861,20 @@ def _validate_turn(
             else:
                 area_check_coords = []
 
+            def effective_ignores_los() -> bool:
+                tags = set(action.weapon_tags)
+                if action.ignores_line_of_sight:
+                    return True
+                if "seeking" in tags and line_of_sight_rules.seeking_ignores_los:
+                    return True
+                if "arcing" in tags and line_of_sight_rules.arcing_allows_no_los:
+                    return True
+                return False
+
             if (
                 area_check_coords
                 and rule.requires_line_of_sight
-                and not _effective_ignores_los(action, line_of_sight_rules)
+                and not effective_ignores_los()
             ):
                 blocked = _blocked_area_coords_by_los(
                     terrain_tiles,
@@ -2062,24 +1936,31 @@ def _validate_turn(
                         target.stats.size if target else None,
                     )
                     attack_type = action.attack_type_override or rule.attack.attack_type
-                    if (
-                        cover != "none"
-                        and attack_type != "melee"
-                        and not _effective_ignores_cover(
-                            action,
-                            rule,
-                            DEFAULT_MECH_COMBAT_RULES.line_of_sight_rules,
-                        )
-                    ):
-                        issues.append(
-                            CombatValidationIssue(
-                                code="cover_applies",
-                                message=(
-                                    f"Action {action.action_id} has {cover} cover between attacker and target."
-                                ),
-                                severity="warning",
+                    if cover != "none" and attack_type != "melee":
+
+                        def effective_ignores_cover() -> bool:
+                            rule_ignores = bool(
+                                rule and rule.attack and rule.attack.ignores_cover
                             )
-                        )
+                            if action.ignores_cover or rule_ignores:
+                                return True
+                            if (
+                                "seeking" in tags
+                                and line_of_sight_rules.seeking_ignores_cover
+                            ):
+                                return True
+                            return False
+
+                        if not effective_ignores_cover():
+                            issues.append(
+                                CombatValidationIssue(
+                                    code="cover_applies",
+                                    message=(
+                                        f"Action {action.action_id} has {cover} cover between attacker and target."
+                                    ),
+                                    severity="warning",
+                                )
+                            )
 
         if action.area_pattern and target_position:
             origin_position = area_origin or actor_position
@@ -2309,7 +2190,15 @@ def validate_combat_scenario(
     scenario: MechCombatScenario,
     strict: bool = False,
 ) -> CombatValidation:
-    """Validate a combat scenario against action economy and targeting rules."""
+    """Validate a combat scenario against action economy and targeting rules.
+
+    Args:
+        scenario: The combat scenario to validate
+        strict: If True, promote warnings to errors for AOE-related issues
+
+    Returns:
+        CombatValidation result with valid flag and list of issues
+    """
     issues: list[CombatValidationIssue] = []
     combatants_by_id = {combatant.id: combatant for combatant in scenario.combatants}
     terrain_tiles = terrain_index(scenario.terrain)
@@ -2437,7 +2326,7 @@ def validate_deployment(
                     )
 
     terrain_tiles = terrain_index(scenario.terrain)
-    target_tile = terrain_tiles.get((target_position.coord.q, target_position.coord.r))
+    target_tile = terrain_tiles.get(target_position.coord)
     if target_tile is not None and target_tile.elevation != 0:
         if requires_flat_surface:
             issues.append(
@@ -2448,13 +2337,11 @@ def validate_deployment(
             )
 
     if requires_line_of_sight:
-        from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
-
         los_rules = DEFAULT_MECH_COMBAT_RULES.line_of_sight_rules
         if not _line_of_sight_clear(
             terrain_tiles,
-            (deployer.position.coord.q, deployer.position.coord.r),
-            (target_position.coord.q, target_position.coord.r),
+            deployer.position.coord,
+            target_position.coord,
             deployer.position.elevation,
             target_position.elevation,
             los_rules,

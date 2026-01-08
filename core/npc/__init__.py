@@ -8,7 +8,6 @@ and can reuse player compendium gear without license requirements.
 from core.npc.enums import (
     NPCTier,
     NPCClass,
-    NPCAbilityTriggerType,
     NPCSpecialClass,
     UltraTraitType,
     VeteranTraitType,
@@ -69,7 +68,6 @@ __all__ = [
     # Enums
     "NPCTier",
     "NPCClass",
-    "NPCAbilityTriggerType",
     "NPCSpecialClass",
     "UltraTraitType",
     "VeteranTraitType",

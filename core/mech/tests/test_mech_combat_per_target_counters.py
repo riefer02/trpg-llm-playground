@@ -8,7 +8,7 @@ from core.mech.combat_state import (
     CombatTurn,
     MechCombatScenario,
 )
-from core.mech.combat_validation import validate_combat_scenario
+from core.mech.validation.combat_validation import validate_combat_scenario
 from core.mech.grid import HexCoord, HexPosition
 from core.shared.effects import PerTargetCounter
 
@@ -96,8 +96,12 @@ def test_per_target_limit_exceeded_with_template() -> None:
         ),
     ]
     validation = validate_combat_scenario(_scenario(actions, template_counters))
-    error_codes = {issue.code for issue in validation.issues if issue.severity == "error"}
-    warning_codes = {issue.code for issue in validation.issues if issue.severity == "warning"}
+    error_codes = {
+        issue.code for issue in validation.issues if issue.severity == "error"
+    }
+    warning_codes = {
+        issue.code for issue in validation.issues if issue.severity == "warning"
+    }
 
     assert "per_target_limit_exceeded" in error_codes
     assert "per_target_limit_unknown" not in warning_codes
@@ -118,8 +122,12 @@ def test_per_target_limit_unknown_without_template() -> None:
         )
     ]
     validation = validate_combat_scenario(_scenario(actions))
-    error_codes = {issue.code for issue in validation.issues if issue.severity == "error"}
-    warning_codes = {issue.code for issue in validation.issues if issue.severity == "warning"}
+    error_codes = {
+        issue.code for issue in validation.issues if issue.severity == "error"
+    }
+    warning_codes = {
+        issue.code for issue in validation.issues if issue.severity == "warning"
+    }
 
     assert "per_target_limit_exceeded" not in error_codes
     assert "per_target_limit_unknown" in warning_codes

@@ -389,3 +389,21 @@ def create_npc_combatant(
             structure_current=npc_structure,
         ),
     )
+
+
+# Rebuild CombatantState to resolve forward references
+# This must be done after CombatantState is defined and types are available
+try:
+    from core.shared.heat import MeltdownState
+    from core.shared.protocols import ProtocolState
+    from core.shared.turn_end import TurnEndEffectState
+
+    CombatantState.model_rebuild(
+        _types_namespace={
+            "MeltdownState": MeltdownState,
+            "ProtocolState": ProtocolState,
+            "TurnEndEffectState": TurnEndEffectState,
+        }
+    )
+except ImportError:
+    pass  # Types not yet available during initial import

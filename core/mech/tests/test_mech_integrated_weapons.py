@@ -4,7 +4,7 @@ from core.mech.compendium import (
     WEAPON_DEFINITIONS_BY_ID,
     get_frame_definition,
 )
-from core.mech.validation import validate_mech_build
+from core.mech.build_validation import validate_mech_build
 from core.pilot.skill import SkillSet
 
 

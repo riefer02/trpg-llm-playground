@@ -18,23 +18,10 @@ NPCClass = Literal[
 ]
 
 
-NPCAbilityTriggerType = Literal[
-    "on_hit",
-    "on_miss",
-    "on_crit",
-    "on_kill",
-    "on_turn_start",
-    "on_turn_end",
-    "on_damaged",
-    "on_attacked",
-    "on_adjacent",
-    "on_deploy",
-    "on_destroyed",
-    "on Initiative",
-    "on_ally_killed",
-    "on_hp_below_half",
-    "on_damage_dealt",
-]
+# NOTE: NPCAbilityTriggerType has been removed.
+# NPC abilities now use TriggerType from core.shared.effects for unified trigger system.
+# This ensures consistency between NPC and player mech triggers.
+# See: core.shared.effects.TriggerType for full list of triggers.
 
 
 NPCTierScalingType = Literal[

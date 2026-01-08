@@ -29,7 +29,7 @@ from core.mech.combat_resolution import (
     MineTriggerResult,
     DangerZoneStatus,
 )
-from core.mech.combat_validation import (
+from core.mech.validation.combat_validation import (
     validate_deployment,
     validate_mine_detection,
     validate_mine_disarm,

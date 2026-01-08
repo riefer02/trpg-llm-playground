@@ -146,26 +146,6 @@ class LiftResult(FrozenModel):
     reason: str = ""
 
 
-def _get_adjacent_hexes(coord: HexCoord) -> list[HexCoord]:
-    """Get all adjacent hex coordinates (axial coordinates).
-
-    Args:
-        coord: The origin coordinate
-
-    Returns:
-        List of 6 adjacent hex coordinates
-    """
-    directions = [
-        (1, 0),
-        (1, -1),
-        (0, -1),
-        (-1, 0),
-        (-1, 1),
-        (0, 1),
-    ]
-    return [HexCoord(q=coord.q + dq, r=coord.r + dr) for dq, dr in directions]
-
-
 def _is_coord_occupied(
     coord: HexCoord,
     terrain: TerrainMap | None,

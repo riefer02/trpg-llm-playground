@@ -7,9 +7,14 @@ from core.mech.combat_state import (
     CombatTurn,
     MechCombatScenario,
 )
-from core.mech.combat_validation import validate_combat_scenario
+from core.mech.validation.combat_validation import validate_combat_scenario
 from core.mech.grid import HexCoord, HexPosition
-from core.shared.effects import ActionRestriction, MechanicalEffect, ModeEffect, ReactionTriggerEffect
+from core.shared.effects import (
+    ActionRestriction,
+    MechanicalEffect,
+    ModeEffect,
+    ReactionTriggerEffect,
+)
 
 
 def _base_combatant(
@@ -112,8 +117,12 @@ def test_mode_heat_generation_and_overwatch_override() -> None:
     scenario = MechCombatScenario(combatants=[alpha, bravo], rounds=[round_one])
     validation = validate_combat_scenario(scenario)
 
-    error_codes = {issue.code for issue in validation.issues if issue.severity == "error"}
-    warning_codes = {issue.code for issue in validation.issues if issue.severity == "warning"}
+    error_codes = {
+        issue.code for issue in validation.issues if issue.severity == "error"
+    }
+    warning_codes = {
+        issue.code for issue in validation.issues if issue.severity == "warning"
+    }
 
     assert "mode_heat_generation_disallowed" in error_codes
     assert "overwatch_trigger_invalid" not in error_codes

@@ -4,7 +4,7 @@ from core.mech.compendium import (
     WEAPON_DEFINITIONS_BY_ID,
     get_frame_definition,
 )
-from core.mech.validation import validate_mech_build
+from core.mech.build_validation import validate_mech_build
 from core.pilot.skill import SkillSet
 
 
@@ -39,5 +39,7 @@ def test_weapon_license_rank_required() -> None:
         system_definitions=SYSTEM_DEFINITIONS_BY_ID,
         license_ranks={"raleigh": 1},
     )
-    allowed_errors = {issue.code for issue in allowed.issues if issue.severity == "error"}
+    allowed_errors = {
+        issue.code for issue in allowed.issues if issue.severity == "error"
+    }
     assert "license_requirement_not_met" not in allowed_errors

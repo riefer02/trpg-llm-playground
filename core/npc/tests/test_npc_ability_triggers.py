@@ -158,14 +158,14 @@ class TestNPCAbilityTriggers:
         )
         assert ability.trigger == "on_turn_start"
 
-    def test_trigger_on_damaged(self) -> None:
-        """on_damaged trigger should be accepted."""
+    def test_trigger_on_take_damage(self) -> None:
+        """on_take_damage trigger should be accepted."""
         ability = NPCAbility(
             id="test_damaged",
             name="Test On Damaged",
-            trigger="on_damaged",
+            trigger="on_take_damage",
         )
-        assert ability.trigger == "on_damaged"
+        assert ability.trigger == "on_take_damage"
 
     def test_trigger_on_kill(self) -> None:
         """on_kill trigger should be accepted."""

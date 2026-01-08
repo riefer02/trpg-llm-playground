@@ -238,7 +238,10 @@ from core.mech.combat_state import (
     CombatRound,
     MechCombatScenario,
 )
-from core.mech.combat_validation import CombatValidationIssue, CombatValidation
+from core.mech.validation.combat_validation import (
+    CombatValidationIssue,
+    CombatValidation,
+)
 from core.mech.combat_resolution import (
     DiceRollResult,
     StructureResolution,

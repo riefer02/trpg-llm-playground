@@ -73,7 +73,7 @@ def get_terrain_at(
         return None
 
     idx = terrain_index(terrain)
-    return idx.get((coord.q, coord.r))
+    return idx.get(coord)
 
 
 def check_line_of_sight(request: LOSCheckRequest) -> LOSResult:

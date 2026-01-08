@@ -4,7 +4,7 @@ from core.mech.compendium import (
     WEAPON_DEFINITIONS_BY_ID,
     get_frame_definition,
 )
-from core.mech.validation import validate_mech_build
+from core.mech.build_validation import validate_mech_build
 from core.pilot.skill import SkillSet
 from core.shared.dice import DiceExpression
 from core.shared.effects import MechanicalEffect, WeaponGrantEffect, WeaponRangeSpec
@@ -48,6 +48,8 @@ def test_weapon_grant_integrated_mounts_validate() -> None:
         system_definitions=SYSTEM_DEFINITIONS_BY_ID,
         bonus_effects=[grant_effect],
     )
-    error_codes = {issue.code for issue in validation.issues if issue.severity == "error"}
+    error_codes = {
+        issue.code for issue in validation.issues if issue.severity == "error"
+    }
     assert "mount_index_out_of_range" not in error_codes
     assert "integrated_weapon_requires_integrated_mount" not in error_codes

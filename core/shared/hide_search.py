@@ -182,7 +182,7 @@ def is_soft_cover_area(
     if target_terrain is None or not target_terrain.provides_soft_cover:
         return False
 
-    adjacent_coords = _get_adjacent_hexes(target_coord)
+    adjacent_coords = target_coord.neighbors()
     adjacent_soft_cover = 0
 
     for adj_coord in adjacent_coords:
@@ -484,7 +484,7 @@ def get_cover_for_hiding(
     target_terrain = get_terrain_at(terrain, target_coord)
 
     has_hard_cover = False
-    adjacent_coords = _get_adjacent_hexes(target_coord)
+    adjacent_coords = target_coord.neighbors()
     for adj_coord in adjacent_coords:
         adj_terrain = get_terrain_at(terrain, adj_coord)
         if adj_terrain and adj_terrain.provides_hard_cover:
@@ -503,23 +503,3 @@ def get_cover_for_hiding(
         return False, False, "Blocks line of sight but no cover for hiding"
 
     return False, False, "No valid cover for hiding"
-
-
-def _get_adjacent_hexes(coord: HexCoord) -> list[HexCoord]:
-    """Get all adjacent hex coordinates (axial coordinates).
-
-    Args:
-        coord: The origin coordinate
-
-    Returns:
-        List of 6 adjacent hex coordinates
-    """
-    directions = [
-        (1, 0),
-        (1, -1),
-        (0, -1),
-        (-1, 0),
-        (-1, 1),
-        (0, 1),
-    ]
-    return [HexCoord(q=coord.q + dq, r=coord.r + dr) for dq, dr in directions]

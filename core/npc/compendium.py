@@ -284,7 +284,7 @@ IPSN_BOSS_T3 = NPCTemplate(
         NPCAbility(
             id="siege_mode",
             name="Siege Mode",
-            trigger="on_damaged",
+            trigger="on_take_damage",
             effect=MechanicalEffect(
                 damage_multipliers=[DamageMultiplierEffect(multiplier=1.5)]
             ),
@@ -435,7 +435,7 @@ HA_BOSS_T3 = NPCTemplate(
         NPCAbility(
             id="armor_plating",
             name="Armor Plating",
-            trigger="on_damaged",
+            trigger="on_take_damage",
             effect=MechanicalEffect(resistances=[Resistance(damage_type="kinetic")]),
             uses_per_combat=2,
         ),

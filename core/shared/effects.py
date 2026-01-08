@@ -9,6 +9,227 @@ Lancer Third Party License), not copyrighted expression/flavor text.
 """
 
 from __future__ import annotations
+
+__all__ = [
+    # Type aliases
+    "StatType",
+    "ConditionType",
+    "SpatialRelation",
+    "AttackAreaShape",
+    "TriggerType",
+    "ReactionTriggerEvent",
+    "ActionCategoryType",
+    "EffectDuration",
+    "MovementDistanceType",
+    "ForcedMovementDistanceType",
+    "IntelAudience",
+    "IntelType",
+    "MovementMode",
+    "CheckKind",
+    "NonCombatInteractionScope",
+    "PassengerLocation",
+    "BreakTriggerType",
+    "WeaponSizeType",
+    "WeaponTypeType",
+    "AreaSelectionScope",
+    "ZoneEndTriggerType",
+    "ZoneEndScope",
+    "RollPatternType",
+    "OutOfPlayDuration",
+    "ResourceType",
+    "ResourceAmount",
+    "ResourceDirection",
+    "TechRangeType",
+    "DeploymentActivationCondition",
+    "DelayedImpactTiming",
+    "PhaseState",
+    "HologramTrailTrigger",
+    "HologramDetonationTrigger",
+    "EffectTarget",
+    "EffectTargetNoAll",
+    "EffectTargetWithObject",
+    "EffectTargetWithObjectNoAll",
+    "UsesPer",
+    "EffectCondition",
+    # Condition classes
+    "SpatialCondition",
+    "AttackContextCondition",
+    "SizeCondition",
+    "CheckContextCondition",
+    "ReactionCondition",
+    "ConditionGroup",
+    # Stat modification effects
+    "StatModifier",
+    "CompanionStatModifierEffect",
+    "StatOverrideEffect",
+    # Mount slot effects
+    "MountSlotGrant",
+    "MountSlotReplacement",
+    "MountSizeUpgradeEffect",
+    "IntegratedWeaponEffect",
+    # Damage effects
+    "DamageModifier",
+    "DamageMultiplierEffect",
+    "DirectDamage",
+    "DamageReduction",
+    "DamageReductionRollEffect",
+    # Attack effects
+    "RangeModifier",
+    "AttackRollOverrideEffect",
+    "AttackTargetingEffect",
+    "AreaAttackPattern",
+    "LineAttackEffect",
+    "AttackSequenceModifierEffect",
+    "AttackRerollEffect",
+    "AttackOutcomeEffect",
+    "CriticalDamageOverrideEffect",
+    "DamageRollOverrideEffect",
+    "AccuracyTradeEffect",
+    # Tech effects
+    "TechRange",
+    "TechActionOverrideEffect",
+    "TechAction",
+    "TechAttackModifier",
+    "TechActionRestriction",
+    # Resource & capacity effects
+    "ActionGrant",
+    "ActionRestriction",
+    "ReactionLimitEffect",
+    "ReactionTriggerEffect",
+    "NonCombatCapacityEffect",
+    # Status effects
+    "StatusToggleEffect",
+    "StatusGrant",
+    "StatusClear",
+    "StatusBreakCondition",
+    "StatusStackLimit",
+    "MovementScopedStatus",
+    "StatusRestriction",
+    "StatusActionOverrideEffect",
+    "StatusTrigger",
+    # Movement effects
+    "MovementGrant",
+    "MoveAdjacentEffect",
+    "PositionSwapEffect",
+    "ForcedMovement",
+    "MovementRestrictionEffect",
+    "MovementSurfaceEffect",
+    "MovementModeAccessEffect",
+    "JumpDistanceEffect",
+    "MovementOverrideEffect",
+    # Cover & targeting effects
+    "CoverRestriction",
+    "CoverGrant",
+    "LineOfSightRestriction",
+    # Save & check effects
+    "SaveOverrideEffect",
+    "SaveCheck",
+    "RandomCheckEffect",
+    "RollPatternEffect",
+    "CheckModifierEffect",
+    "CheckValueModifierEffect",
+    # Heat & structure effects
+    "HeatResistanceEffect",
+    "StructureDamageAvoidanceEffect",
+    "ZeroHpSurvivalEffect",
+    # Resistance & immunity effects
+    "Immunity",
+    "TagImmunityEffect",
+    "Resistance",
+    # Accuracy effects
+    "AccuracyModifier",
+    # Special targeting effects
+    "TargetMarkEffect",
+    "IntelEffect",
+    # Dice pool effects
+    "DicePoolGain",
+    "DicePoolSpendOption",
+    "DicePoolEffect",
+    "LeadershipDicePoolEffect",
+    # Countdown effects
+    "CountdownDieTrigger",
+    "CountdownDieEffect",
+    # Area effects
+    "AreaSelectionEffect",
+    # Repair effects
+    "RepairCostModifier",
+    "RepairShareEffect",
+    "RepairActionEffect",
+    # Deployment effects
+    "DeploymentEffect",
+    "AttachmentEffect",
+    # Weapon effects
+    "WeaponTagGrant",
+    "WeaponRangeSpec",
+    "WeaponSizeBonus",
+    "WeaponGrantEffect",
+    "WeaponModEffect",
+    "WeaponSpinUpEffect",
+    "WeaponAIControlEffect",
+    # AI effects
+    "AISystemLimitEffect",
+    "AIControlTransferEffect",
+    "AIControlTransferEffect",
+    # Phase & protocol effects
+    "PhaseShiftEffect",
+    "ProtocolEffect",
+    "CorePowerEffect",
+    # Zone effects
+    "ZoneEndCondition",
+    "AttackCaptureEffect",
+    "ZoneEffect",
+    # Special combat effects
+    "TetherEffect",
+    "GrappleEffect",
+    "SizeInteractionEffect",
+    "MountedAllyEffect",
+    "EffectRemoval",
+    # Hologram effects
+    "HolographicDuplicateEffect",
+    "MovementTrailEffect",
+    "HologramTrailEffect",
+    # Reload effects
+    "ReloadRestrictionEffect",
+    "ReloadEffect",
+    # Damage sharing effects
+    "DamageShareEffect",
+    "DamageNegationEffect",
+    "DamageAbsorption",
+    # Out of play effects
+    "OutOfPlayEffect",
+    # Mode & progression effects
+    "ModeEffect",
+    "ProgressionState",
+    "GateProgressionEffect",
+    "ProgressionEffect",
+    # Counter effects
+    "PerTargetCounter",
+    "PerTargetCounterEffect",
+    # Cooldown effects
+    "CooldownState",
+    "CooldownEffect",
+    # Resource change effects
+    "ResourceChange",
+    "ScaledResourceChange",
+    "OverchargeCostCapEffect",
+    "LimitedUseBonusEffect",
+    "LimitedUseRechargeEffect",
+    # Allegiance effects
+    "AllegianceShiftEffect",
+    # Bond effects
+    "BondmateEffect",
+    # Delayed impact effects
+    "DelayedImpactEffect",
+    # Triggered effect
+    "TriggeredEffect",
+    # Main effect class
+    "MechanicalEffect",
+    # Convenience functions
+    "stat_bonus",
+    "damage_bonus",
+    "immunity_to",
+]
+
 from typing import Literal
 from pydantic import Field, model_validator
 from core.shared.models import FrozenModel
@@ -466,6 +687,17 @@ TriggerType = Literal[
     "on_extra_overwatch",
     "on_ally_hit_target_within_range",
     "on_lock_on_consumed",
+    # NPC-style triggers (unified system)
+    "on_deploy",
+    "on_destroyed",
+    "on_adjacent",
+    "on_attacked",
+    "on_ally_killed",
+    "on_hp_below_half",
+    "on_damage_dealt",
+    # Complex triggers (require additional context)
+    "on_first_adjacent_turn",
+    "on_any_damage",
 ]
 ReactionTriggerEvent = Literal[
     "enemy_starts_movement_in_threat",

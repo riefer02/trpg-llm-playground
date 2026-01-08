@@ -3,8 +3,26 @@
 from __future__ import annotations
 
 from typing import Iterable
+
 from pydantic import Field, computed_field
+
 from core.shared.models import FrozenModel
+
+
+__all__ = [
+    "HexCoord",
+    "HexPosition",
+    "hex_line",
+    "hexes_between",
+    "hexes_in_radius",
+    "hex_cone",
+    "hex_cone_centered",
+    "hex_line_from_direction",
+    "hex_add",
+    "hex_scale",
+    "iter_neighbors",
+    "normalize_hex_direction",
+]
 
 
 class HexCoord(FrozenModel):
@@ -12,7 +30,6 @@ class HexCoord(FrozenModel):
 
     q: int = Field(..., description="Axial q coordinate")
     r: int = Field(..., description="Axial r coordinate")
-
 
     @computed_field
     @property
@@ -30,10 +47,7 @@ class HexCoord(FrozenModel):
 
     def neighbors(self) -> list["HexCoord"]:
         """Return axial neighbors (6 directions)."""
-        return [
-            HexCoord(q=self.q + dq, r=self.r + dr)
-            for dq, dr in _AXIAL_DIRECTIONS
-        ]
+        return [HexCoord(q=self.q + dq, r=self.r + dr) for dq, dr in _AXIAL_DIRECTIONS]
 
     def is_adjacent(self, other: "HexCoord") -> bool:
         """Check whether another coordinate is adjacent."""
@@ -49,7 +63,6 @@ class HexPosition(FrozenModel):
 
     coord: HexCoord
     elevation: int = Field(default=0, ge=0, description="Vertical elevation in spaces")
-
 
     def distance_2d(self, other: "HexPosition") -> int:
         """2D hex distance ignoring elevation."""
@@ -92,7 +105,9 @@ def hex_line(start: HexCoord, end: HexCoord) -> list[HexCoord]:
     return results
 
 
-def hexes_between(start: HexCoord, end: HexCoord, include_endpoints: bool = False) -> list[HexCoord]:
+def hexes_between(
+    start: HexCoord, end: HexCoord, include_endpoints: bool = False
+) -> list[HexCoord]:
     """Return coordinates between two points on the hex line."""
     line = hex_line(start, end)
     if include_endpoints:
@@ -237,7 +252,9 @@ def _cube_to_axial(cube: tuple[float, float, float]) -> HexCoord:
     return HexCoord(q=int(cube[0]), r=int(cube[1]))
 
 
-def _cube_lerp(a: tuple[float, float, float], b: tuple[float, float, float], t: float) -> tuple[float, float, float]:
+def _cube_lerp(
+    a: tuple[float, float, float], b: tuple[float, float, float], t: float
+) -> tuple[float, float, float]:
     return (
         a[0] + (b[0] - a[0]) * t,
         a[1] + (b[1] - a[1]) * t,

@@ -12,7 +12,7 @@ from core.mech.examples import (
     build_oda_ll3_mech_example,
 )
 from core.mech.build import compute_mech_stats
-from core.mech.validation import MechBuildValidation, validate_mech_build
+from core.mech.build_validation import MechBuildValidation, validate_mech_build
 from core.mech.compendium import SYSTEM_DEFINITIONS_BY_ID, WEAPON_DEFINITIONS_BY_ID
 from core.pilot.gear import PilotLoadout
 from core.pilot.mission import (

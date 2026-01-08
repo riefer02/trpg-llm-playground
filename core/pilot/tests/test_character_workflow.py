@@ -3,7 +3,7 @@ import pytest
 from core.mech.build import compute_mech_stats
 from core.mech.compendium import SYSTEM_DEFINITIONS_BY_ID, WEAPON_DEFINITIONS_BY_ID
 from core.mech.examples import build_oda_ll0_mech_example, build_oda_ll3_mech_example
-from core.mech.validation import validate_mech_build
+from core.mech.build_validation import validate_mech_build
 from core.pilot.core_bonus import get_core_bonus_definition
 from core.pilot.examples import build_oda_ll0_pilot, build_oda_ll3_pilot
 
