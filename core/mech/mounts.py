@@ -1,20 +1,21 @@
 """Mech mount slots and compatibility for Lancer TTRPG."""
+
 from pydantic import Field
 from core.shared.enums import MountSlotType
 from core.shared.models import FrozenModel
 
 from core.mech.weapon import WeaponSize
+from core.shared.id_helpers import WeaponIdField
 
 
 class MountSlot(FrozenModel):
     """A mount slot on a mech frame."""
 
     slot_type: MountSlotType
-    integrated_weapon_id: str | None = Field(
+    integrated_weapon_id: WeaponIdField | None = Field(
         default=None,
         description="Integrated weapon ID (only for integrated mounts)",
     )
-
 
 
 def allowed_weapon_sizes(slot_type: MountSlotType) -> set[WeaponSize]:

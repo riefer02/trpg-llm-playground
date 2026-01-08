@@ -11,6 +11,7 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 
 from core.shared.enums import ManufacturerType as Manufacturer
+from core.shared.id_helpers import LicenseIdField, FrameIdField
 
 # Manufacturer full names (these are proper nouns, allowed)
 MANUFACTURER_NAMES: dict[Manufacturer, str] = {
@@ -25,35 +26,37 @@ MANUFACTURER_NAMES: dict[Manufacturer, str] = {
 class LicenseDefinition(FrozenModel):
     """
     A license definition - the template for a manufacturer license.
-    
+
     Each license corresponds to a frame and unlocks:
     - Rank 1: Basic frame systems and weapons
     - Rank 2: Advanced systems
     - Rank 3: The frame itself plus signature gear
-    
+
     Note: The 'description' field has been intentionally removed
     to avoid including copyrighted flavor text.
     """
-    
-    id: str = Field(..., description="Unique identifier (e.g., 'blackbeard', 'nelson')")
+
+    id: LicenseIdField = Field(
+        ..., description="Unique identifier (e.g., 'blackbeard', 'nelson')"
+    )
     name: str = Field(..., description="Display name (usually the frame name)")
     manufacturer: Manufacturer
-    frame_id: str = Field(..., description="ID of the frame this license provides")
-    
+    frame_id: FrameIdField = Field(
+        ..., description="ID of the frame this license provides"
+    )
 
 
 class License(FrozenModel):
     """
     A license that a pilot has ranks in.
-    
+
     Pilots gain 1 license level per level up (starting at LL1).
     They can put this into a new license or increase an existing one.
     """
-    
-    license_id: str = Field(..., description="ID of the license definition")
+
+    license_id: LicenseIdField = Field(..., description="ID of the license definition")
     rank: int = Field(default=1, ge=1, le=3, description="Current rank (1-3)")
-    
-    
+
     def is_maxed(self) -> bool:
         """Check if this license is at maximum rank."""
         return self.rank >= 3
@@ -107,7 +110,7 @@ EXAMPLE_LICENSES: list[LicenseDefinition] = [
 ]
 
 
-def get_license_definition(license_id: str) -> LicenseDefinition | None:
+def get_license_definition(license_id: LicenseIdField) -> LicenseDefinition | None:
     """Look up a license definition by ID."""
     for lic in EXAMPLE_LICENSES:
         if lic.id == license_id:

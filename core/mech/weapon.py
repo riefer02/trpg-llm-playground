@@ -12,6 +12,7 @@ from core.shared.effects import (
     MechanicalEffect,
     UsesPer,
 )
+from core.shared.id_helpers import WeaponIdField, LicenseIdField, FrameIdField
 
 
 WeaponSize = Literal["aux", "main", "heavy", "superheavy"]
@@ -49,14 +50,12 @@ class WeaponRange(FrozenModel):
     value: int = Field(..., ge=0)
 
 
-
 class WeaponDamage(FrozenModel):
     """Damage component for a weapon."""
 
     damage_type: WeaponDamageType
     dice: DiceExpression | None = None
     flat: int = 0
-
 
 
 class WeaponTag(FrozenModel):
@@ -66,11 +65,10 @@ class WeaponTag(FrozenModel):
     value: int | None = None
 
 
-
 class WeaponProfile(FrozenModel):
     """Alternate profile for a weapon (e.g., selectable damage type)."""
 
-    profile_id: str = Field(..., description="Unique profile identifier")
+    profile_id: WeaponIdField = Field(..., description="Unique profile identifier")
     name: str = Field(..., description="Display name")
     damage_type: WeaponDamageType | None = Field(
         default=None,
@@ -127,7 +125,7 @@ class DynamicWeaponDefinition(FrozenModel):
 class MountlessWeaponDefinition(FrozenModel):
     """Weapon-like profile that does not count as a weapon or occupy a mount."""
 
-    id: str = Field(..., description="Unique identifier")
+    id: WeaponIdField = Field(..., description="Unique identifier")
     name: str = Field(..., description="Display name")
     profile: WeaponProfile
     action_type: ActionType = "free"
@@ -158,7 +156,7 @@ class MountlessWeaponDefinition(FrozenModel):
 class MechWeaponDefinition(FrozenModel):
     """Definition for a mech weapon."""
 
-    id: str = Field(..., description="Unique weapon identifier")
+    id: WeaponIdField = Field(..., description="Unique weapon identifier")
     name: str = Field(..., description="Display name")
     size: WeaponSize
     weapon_type: WeaponType
@@ -166,7 +164,7 @@ class MechWeaponDefinition(FrozenModel):
         default=None,
         description="Base damage type (None for non-damaging weapons)",
     )
-    license_id: str | None = Field(
+    license_id: LicenseIdField | None = Field(
         default=None,
         description="License ID required to use this weapon (None for GMS/general)",
     )
@@ -177,7 +175,7 @@ class MechWeaponDefinition(FrozenModel):
         description="Required license rank if gated by a specific license",
     )
     integrated_only: bool = False
-    integrated_frame_id: str | None = Field(
+    integrated_frame_id: FrameIdField | None = Field(
         default=None,
         description="Frame ID that provides this weapon as an integrated mount",
     )
@@ -192,7 +190,7 @@ class MechWeaponDefinition(FrozenModel):
 
 def resolve_weapon_profile(
     weapon: MechWeaponDefinition,
-    profile_id: str | None = None,
+    profile_id: WeaponIdField | None = None,
 ) -> WeaponProfile:
     """Resolve a weapon profile, falling back to the base weapon definition."""
     if weapon.dynamic and weapon.dynamic.profile_choice:
@@ -202,9 +200,7 @@ def resolve_weapon_profile(
             for profile in choice.profiles:
                 if profile.profile_id == chosen_id:
                     return profile
-            raise ValueError(
-                f"Unknown profile '{chosen_id}' for weapon '{weapon.id}'."
-            )
+            raise ValueError(f"Unknown profile '{chosen_id}' for weapon '{weapon.id}'.")
         if choice.profiles:
             return choice.profiles[0]
 

@@ -43,10 +43,10 @@ def sample_pilot() -> dict:
     """Create a sample pilot dict for testing."""
     pilot = create_ll0_pilot(
         callsign="Viper",
-        name="Alex Chen",
+        name="Alexei Viper",
         background=Background(
-            id="background_nhp_specialist",
-            name="NHP Specialist",
+            id="background_mercenary",
+            name="Mercenary",
             triggers=[
                 "stay_cool",
                 "read_a_situation",
@@ -66,6 +66,7 @@ def sample_pilot() -> dict:
             Talent(talent_id="hunter", rank=1),
             Talent(talent_id="reckless", rank=1),
         ],
+        id="pilot-viper-001",
     )
     return pilot.model_dump()
 
@@ -98,6 +99,7 @@ def sample_pilot_2() -> dict:
             Talent(talent_id="cracked_hull", rank=1),
             Talent(talent_id="tactical", rank=1),
         ],
+        id="pilot-forge-002",
     )
     return pilot.model_dump()
 

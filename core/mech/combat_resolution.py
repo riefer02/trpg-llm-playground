@@ -32,6 +32,13 @@ from core.shared.effects import (
     CooldownResetTrigger,
     TriggerType,
 )
+from core.shared.id_helpers import (
+    SystemIdField,
+    EffectIdField,
+    CombatantIdField,
+    ActionIdField,
+    DeployableIdField,
+)
 
 T = TypeVar("T")
 
@@ -91,7 +98,7 @@ class SystemTraumaSelection(FrozenModel):
     eligible_mounts: list[int] = Field(default_factory=list)
     eligible_systems: list[str] = Field(default_factory=list)
     destroyed_mount_index: int | None = None
-    destroyed_system_id: str | None = None
+    destroyed_system_id: SystemIdField | None = None
     fallback_reason: Literal["none", "no_mounts", "no_systems", "none_available"] = (
         "none"
     )
@@ -100,8 +107,8 @@ class SystemTraumaSelection(FrozenModel):
 class PerTargetCounterResolution(FrozenModel):
     """Resolution result for per-target counter application."""
 
-    effect_id: str
-    target_id: str
+    effect_id: EffectIdField
+    target_id: CombatantIdField
     previous_count: int
     new_count: int
     was_applied: bool
@@ -149,30 +156,30 @@ class CooldownCheckResult(FrozenModel):
     """Result of checking if an action is on cooldown."""
 
     is_on_cooldown: bool
-    effect_id: str
+    effect_id: EffectIdField
     turns_remaining: int | None = None
-    target_id: str | None = None
+    target_id: CombatantIdField | None = None
 
 
 class CooldownApplicationResult(FrozenModel):
     """Result of applying a cooldown to a combatant."""
 
     applied: bool
-    effect_id: str
+    effect_id: EffectIdField
     duration: int
     turns_remaining: int
-    target_id: str | None = None
+    target_id: CombatantIdField | None = None
     previous_turns_remaining: int | None = None
 
 
 class CooldownDecrementResult(FrozenModel):
     """Result of decrementing cooldowns at turn/round boundary."""
 
-    effect_id: str
+    effect_id: EffectIdField
     was_decremented: bool
     turns_remaining_before: int
     turns_remaining_after: int
-    target_id: str | None = None
+    target_id: CombatantIdField | None = None
     was_expired: bool = False
 
 
@@ -813,7 +820,7 @@ class PreparedActionTriggerResult(FrozenModel):
     """Result of triggering a prepared action."""
 
     success: bool
-    executed_action_id: str | None = None
+    executed_action_id: ActionIdField | None = None
     prepared_action_cleared: bool = False
     message: str = ""
 
@@ -833,7 +840,7 @@ from core.mech.combat_state import CombatantState, CombatRound
 
 def prepare_action(
     combatant: CombatantState,
-    held_action_id: str,
+    held_action_id: ActionIdField,
     held_action_type: Literal["quick", "full"],
     trigger_condition: str,
     current_round: int,
@@ -925,7 +932,7 @@ def expire_prepared_action(
 
 def consume_per_round_reaction(
     combatant: CombatantState,
-    action_id: str,
+    action_id: ActionIdField,
     max_per_round: int,
 ) -> PerRoundReactionResult:
     """Consume a per-round reaction (brace, overwatch).
@@ -1076,7 +1083,7 @@ class SwarmBodyResult(FrozenModel):
 
 def resolve_scouring_swarm(
     *,
-    combatant_id: str,
+    combatant_id: CombatantIdField,
     is_core_power_active: bool,
     affected_target_ids: list[str],
     zone_shape: str = "burst",
@@ -1659,10 +1666,10 @@ def increment_overcharge_on_turn_start(
 class DeploymentResult(FrozenModel):
     """Result of deploying an object."""
 
-    deployable_id: str
+    deployable_id: DeployableIdField
     deployable_name: str
     kind: Literal["drone", "mine", "deployable", "other"]
-    owner_id: str | None
+    owner_id: CombatantIdField | None
     position_q: int
     position_r: int
     size: int
@@ -1697,9 +1704,9 @@ class DroneActionResult(FrozenModel):
 class MineTriggerResult(FrozenModel):
     """Result of a mine being triggered."""
 
-    mine_id: str
+    mine_id: DeployableIdField
     mine_name: str
-    triggered_by_id: str
+    triggered_by_id: CombatantIdField
     triggered_by_name: str
     was_armed: bool
     detonated: bool

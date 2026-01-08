@@ -23,6 +23,12 @@ from core.pilot.license import License
 from core.pilot.core_bonus import CoreBonus
 from core.pilot.progression import LEVEL_CAP, get_level_progression
 from core.pilot.validation import ProgressionValidation, validate_pilot_progression
+from core.shared.id_helpers import (
+    PilotIdField,
+    LicenseIdField,
+    TalentIdField,
+    CoreBonusIdField,
+)
 
 if TYPE_CHECKING:
     from core.pilot.clone_state import CloneState, Quirk, QuirkSource
@@ -44,7 +50,7 @@ class Pilot(BaseModel):
     """
 
     # Identity
-    id: str = Field(default_factory=lambda: str(uuid4()))
+    id: PilotIdField = Field(default="")
     callsign: str = Field(..., min_length=1, description="The pilot's callsign")
     name: str = Field(default="", description="The pilot's real name (optional)")
 
@@ -220,21 +226,21 @@ class Pilot(BaseModel):
         progression = get_level_progression(self.level)
         return progression.pilot_trigger_points
 
-    def get_license(self, license_id: str) -> License | None:
+    def get_license(self, license_id: LicenseIdField) -> License | None:
         """Get a specific license by ID."""
         for lic in self.licenses:
             if lic.license_id == license_id:
                 return lic
         return None
 
-    def get_talent(self, talent_id: str) -> Talent | None:
+    def get_talent(self, talent_id: TalentIdField) -> Talent | None:
         """Get a specific talent by ID."""
         for t in self.talents:
             if t.talent_id == talent_id:
                 return t
         return None
 
-    def has_core_bonus(self, core_bonus_id: str) -> bool:
+    def has_core_bonus(self, core_bonus_id: CoreBonusIdField) -> bool:
         """Check if pilot has a specific core bonus."""
         return any(cb.core_bonus_id == core_bonus_id for cb in self.core_bonuses)
 
@@ -416,6 +422,7 @@ def create_ll0_pilot(
     triggers: list[PilotTrigger] | None = None,
     talents: list[Talent] | None = None,
     pilot_gear: PilotLoadout | None = None,
+    id: PilotIdField | None = None,
 ) -> Pilot:
     """
     Create a new License Level 0 pilot.
@@ -443,6 +450,7 @@ def create_ll0_pilot(
         raise ValueError("LL0 pilots must have exactly three rank I talents.")
 
     return Pilot(
+        id=id if id is not None else "",
         callsign=callsign,
         name=name,
         background=background,

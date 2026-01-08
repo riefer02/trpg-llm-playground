@@ -37,9 +37,17 @@ from core.shared.rolls import (
     resolve_attack,
 )
 from core.shared.saves import resolve_save, SaveRequest, SaveResult
+from core.shared.id_helpers import (
+    CombatantIdField,
+    DroneIdField,
+    WeaponIdField,
+    MechIdField,
+)
+from core.shared.ids import CombatantId
 
 if TYPE_CHECKING:
     from core.mech.grid import HexCoord
+    from core.shared.ids import CombatantId
 
 
 def _get_hex_coord_class() -> type:
@@ -143,7 +151,7 @@ class GeometryValidationResult(FrozenModel):
 
     is_valid: bool
     affected_spaces: list[HexCoordField] = Field(default_factory=list)
-    affected_target_ids: list[str] = Field(default_factory=list)
+    affected_target_ids: list[CombatantId] = Field(default_factory=list)
     obstruction_coords: list[HexCoordField] = Field(default_factory=list)
     reason: str = ""
 
@@ -159,7 +167,7 @@ def validate_attack_geometry(
         return GeometryValidationResult(
             is_valid=True,
             affected_spaces=[attacker_position],
-            affected_target_ids=list(target_positions.keys()),
+            affected_target_ids=[CombatantId(tid) for tid in target_positions.keys()],
             reason="Single target: no geometry needed",
         )
 
@@ -174,7 +182,7 @@ def validate_attack_geometry(
 
     origin = pattern.origin or attacker_position
     affected_spaces: list[HexCoord] = []
-    affected_target_ids: list[str] = []
+    affected_target_ids: list[CombatantId] = []
 
     if pattern.type == "line":
         affected_spaces = _compute_line_spaces(origin, pattern.size)
@@ -188,7 +196,7 @@ def validate_attack_geometry(
     for target_id, target_pos in target_positions.items():
         if target_pos in affected_spaces:
             if target_pos not in obstructions:
-                affected_target_ids.append(target_id)
+                affected_target_ids.append(CombatantId(target_id))
 
     return GeometryValidationResult(
         is_valid=True,
@@ -315,7 +323,7 @@ def calculate_critical_damage(
 class TargetAttackResult(BaseModel):
     """Result for one target (mutable during resolution)."""
 
-    target_id: str
+    target_id: CombatantIdField
     target_position: HexCoordField | None = None
     attack_roll: int = 0
     is_hit: bool = False
@@ -333,9 +341,9 @@ class TargetAttackResult(BaseModel):
 class AttackSequenceInput(FrozenModel):
     """Complete input for attack resolution."""
 
-    attacker_id: str
+    attacker_id: CombatantIdField
     position: HexCoordField | None = None
-    target_ids: list[str]
+    target_ids: list[CombatantIdField]
     pattern: AttackPattern | None = None
     attack_bonus: int
     defense_value: int
@@ -350,7 +358,7 @@ class AttackSequenceInput(FrozenModel):
     save_type: SaveType | None = None
     save_on_miss: bool = False
     drone_assisted: bool = False
-    drone_id: str | None = None
+    drone_id: DroneIdField | None = None
     drone_bonus: int = 0
     target_positions: dict[str, HexCoordField] = Field(default_factory=dict)
     force_attack_roll: int | None = None
@@ -362,7 +370,7 @@ class AttackSequenceInput(FrozenModel):
 class AttackSequenceResult(FrozenModel):
     """Complete attack sequence result."""
 
-    attacker_id: str
+    attacker_id: CombatantIdField
     pattern: AttackPattern | None = None
     target_results: list[TargetAttackResult]
     total_targets: int
@@ -593,7 +601,7 @@ class MovementPath(FrozenModel):
 class MovementInput(FrozenModel):
     """Movement resolution input."""
 
-    mover_id: str
+    mover_id: CombatantIdField
     start_position: HexCoordField
     end_position: HexCoordField
     speed: int
@@ -611,7 +619,7 @@ class MovementInput(FrozenModel):
 class MovementResult(FrozenModel):
     """Complete movement result."""
 
-    mover_id: str
+    mover_id: CombatantIdField
     start: HexCoordField
     end: HexCoordField
     spaces_moved: int
@@ -625,7 +633,7 @@ class MovementResult(FrozenModel):
     prone_from_fall: bool = False
     fall_damage: int = 0
     disengage_used: bool = False
-    reactions_avoided: list[str] = Field(default_factory=list)
+    reactions_avoided: list[CombatantId] = Field(default_factory=list)
 
 
 def resolve_movement(input: MovementInput) -> MovementResult:
@@ -681,9 +689,9 @@ def resolve_movement(input: MovementInput) -> MovementResult:
                         )
 
     disengage_used = input.is_disengaging
-    reactions_avoided: list[str] = []
+    reactions_avoided: list[CombatantId] = []
     if disengage_used:
-        reactions_avoided = [e.get("id") for e in input.nearby_enemies]
+        reactions_avoided = [CombatantId(e.get("id")) for e in input.nearby_enemies]
         overwatch_triggers = []
 
     return MovementResult(
@@ -730,7 +738,7 @@ def _hex_distance(a: HexCoord, b: HexCoord) -> int:
 class FullActionTurnInput(FrozenModel):
     """Full action turn input."""
 
-    actor_id: str
+    actor_id: CombatantIdField
     position: HexCoordField
     action_choice: Literal["full", "two_quick"]
     full_action_type: Literal["attack", "move", "tech", "other"] | None = None
@@ -749,7 +757,7 @@ class FullActionTurnInput(FrozenModel):
 class FullActionTurnResult(FrozenModel):
     """Full action turn result."""
 
-    actor_id: str
+    actor_id: CombatantIdField
     action_type: str
     actions_taken: list[str] = Field(default_factory=list)
     movement_result: MovementResult | None = None
@@ -957,13 +965,13 @@ def check_status_effects(input: StatusCheckInput) -> StatusInteractionResult:
 class TurretDroneAttackInput(FrozenModel):
     """Turret drone reaction attack input."""
 
-    drone_id: str
-    owner_id: str
+    drone_id: DroneIdField
+    owner_id: CombatantIdField
     drone_position: HexCoordField
     ally_attack_hit: bool
-    ally_id: str
+    ally_id: CombatantIdField
     ally_position: HexCoordField
-    target_id: str
+    target_id: CombatantIdField
     target_position: HexCoordField
     drone_base_damage: int = 3
     drone_attack_bonus: int = 0
@@ -1017,9 +1025,9 @@ def resolve_turret_drone_attack(input: TurretDroneAttackInput) -> AttackSequence
 class LatchDroneInput(FrozenModel):
     """Latch drone mount attack input."""
 
-    drone_id: str
-    owner_id: str
-    target_mech_id: str
+    drone_id: DroneIdField
+    owner_id: CombatantIdField
+    target_mech_id: MechIdField
     mode: Literal["mount", "active"]
     mount_attack_bonus: int = 0
     mount_damage: int = 0
@@ -1073,9 +1081,9 @@ def resolve_latch_drone(input: LatchDroneInput) -> LatchDroneResult:
 class RestockDroneInput(FrozenModel):
     """Restock drone activation input."""
 
-    drone_id: str
-    owner_id: str
-    activating_combatant_id: str
+    drone_id: DroneIdField
+    owner_id: CombatantIdField
+    activating_combatant_id: CombatantIdField
     activating_combatant_position: HexCoordField
     action_choice: Literal["cool", "reload", "clear_condition"]
     condition_to_clear: StatusType | None = None
@@ -1110,10 +1118,10 @@ def resolve_restock_drone(input: RestockDroneInput) -> RestockDroneResult:
 class ICEOUTDroneInput(FrozenModel):
     """ICEOUT drone burst area input."""
 
-    drone_id: str
-    owner_id: str
+    drone_id: DroneIdField
+    owner_id: CombatantIdField
     drone_position: HexCoordField
-    zone_target_ids: list[str] = Field(default_factory=list)
+    zone_target_ids: list[CombatantIdField] = Field(default_factory=list)
 
 
 class ICEOUTDroneResult(FrozenModel):
@@ -1124,7 +1132,7 @@ class ICEOUTDroneResult(FrozenModel):
     zone_center: HexCoordField
     zone_radius: int = 1
     tech_immunity_granted: bool = True
-    affected_targets: list[str] = Field(default_factory=list)
+    affected_targets: list[CombatantIdField] = Field(default_factory=list)
 
 
 def resolve_iceout_drone(input: ICEOUTDroneInput) -> ICEOUTDroneResult:
@@ -1142,10 +1150,10 @@ def resolve_iceout_drone(input: ICEOUTDroneInput) -> ICEOUTDroneResult:
 class TrackingDroneInput(FrozenModel):
     """Tracking drone tech attack input."""
 
-    drone_id: str
-    owner_id: str
+    drone_id: DroneIdField
+    owner_id: CombatantIdField
     drone_position: HexCoordField
-    target_id: str
+    target_id: CombatantIdField
     target_position: HexCoordField
     tech_attack_bonus: int = 0
     target_e_defense: int = 10
@@ -1176,10 +1184,10 @@ def resolve_tracking_drone(input: TrackingDroneInput) -> TrackingDroneResult:
 class HiveDroneInput(FrozenModel):
     """Hive drone burst 2 area input."""
 
-    drone_id: str
-    owner_id: str
+    drone_id: DroneIdField
+    owner_id: CombatantIdField
     drone_position: HexCoordField
-    zone_target_ids: list[str] = Field(default_factory=list)
+    zone_target_ids: list[CombatantIdField] = Field(default_factory=list)
 
 
 class HiveDroneResult(FrozenModel):
@@ -1191,7 +1199,7 @@ class HiveDroneResult(FrozenModel):
     zone_radius: int = 2
     soft_cover_granted: bool = True
     entry_damage: int = 0
-    affected_targets: list[str] = Field(default_factory=list)
+    affected_targets: list[CombatantIdField] = Field(default_factory=list)
 
 
 def resolve_hive_drone(input: HiveDroneInput) -> HiveDroneResult:

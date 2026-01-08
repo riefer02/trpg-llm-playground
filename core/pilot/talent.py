@@ -11,6 +11,7 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.dice import DiceExpression
 from core.shared.payloads import DamageSpec
+from core.shared.id_helpers import TalentIdField
 
 from core.shared.effects import (
     MechanicalEffect,
@@ -76,34 +77,31 @@ from core.shared.effects import (
 class TalentRank(FrozenModel):
     """
     A single rank of a talent (1, 2, or 3).
-    
+
     Each rank provides specific mechanical effects.
     """
-    
+
     rank: int = Field(..., ge=1, le=3)
     name: str = Field(..., description="Name of this rank's ability")
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
-    
 
 
 class TalentDefinition(FrozenModel):
     """
     A talent definition - the template for a learnable talent.
-    
+
     This is the "type" of talent (e.g., ACE, BONDED, etc.)
     that defines what each rank provides.
     """
-    
-    id: str = Field(..., description="Unique identifier (e.g., 'ace', 'bonded')")
+
+    id: TalentIdField = Field(
+        ..., description="Unique identifier (e.g., 'ace', 'bonded')"
+    )
     name: str = Field(..., description="Display name")
     ranks: list[TalentRank] = Field(
-        ...,
-        min_length=3,
-        max_length=3,
-        description="The three ranks of this talent"
+        ..., min_length=3, max_length=3, description="The three ranks of this talent"
     )
-    
-    
+
     def get_rank(self, rank: int) -> TalentRank:
         """Get a specific rank (1-3)."""
         if rank < 1 or rank > 3:
@@ -114,14 +112,13 @@ class TalentDefinition(FrozenModel):
 class Talent(FrozenModel):
     """
     A talent that a pilot has learned.
-    
+
     This represents a pilot's progress in a specific talent,
     tracking which ranks they have unlocked.
     """
-    
-    talent_id: str = Field(..., description="ID of the talent definition")
+
+    talent_id: TalentIdField = Field(..., description="ID of the talent definition")
     rank: int = Field(default=1, ge=1, le=3, description="Current rank (1-3)")
-    
 
 
 # Example talent definitions with pure mechanical effects
@@ -312,7 +309,9 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                             trigger="on_crit",
                             effect=MechanicalEffect(
                                 forced_movements=[
-                                    ForcedMovement(direction="push", distance=1, target="enemy")
+                                    ForcedMovement(
+                                        direction="push", distance=1, target="enemy"
+                                    )
                                 ],
                             ),
                         )
@@ -1057,7 +1056,9 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                             condition="improvised_attack",
                             effect=MechanicalEffect(
                                 forced_movements=[
-                                    ForcedMovement(direction="push", distance=2, target="enemy")
+                                    ForcedMovement(
+                                        direction="push", distance=2, target="enemy"
+                                    )
                                 ]
                             ),
                         )
@@ -1104,7 +1105,9 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                                                     direct_damages=[
                                                         DirectDamage(
                                                             damage_type="kinetic",
-                                                            dice=DiceExpression.parse("2d6"),
+                                                            dice=DiceExpression.parse(
+                                                                "2d6"
+                                                            ),
                                                             flat=2,
                                                             target="enemy",
                                                         )
@@ -2068,7 +2071,9 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                                             resource_changes=[
                                                 ResourceChange(
                                                     resource="heat",
-                                                    amount=DiceExpression.parse("1d3+3"),
+                                                    amount=DiceExpression.parse(
+                                                        "1d3+3"
+                                                    ),
                                                     direction="gain",
                                                     target="self",
                                                 )
@@ -2271,29 +2276,29 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                             condition="cannon_attack",
                             effect=MechanicalEffect(
                                 save_checks=[
-                                        SaveCheck(
-                                            trigger="on_attack_roll",
-                                            save="hull",
-                                            target="adjacent",
-                                            condition="adjacent_to_self",
-                                            on_failure=MechanicalEffect(
-                                                forced_movements=[
-                                                    ForcedMovement(
-                                                        direction="push",
-                                                        distance=2,
-                                                        target="adjacent",
-                                                    )
-                                                ],
-                                                status_grants=[
-                                                    StatusGrant(
-                                                        status="prone",
-                                                        target="adjacent",
-                                                        duration="until_cleared",
-                                                    )
-                                                ],
-                                            ),
-                                        )
-                                    ],
+                                    SaveCheck(
+                                        trigger="on_attack_roll",
+                                        save="hull",
+                                        target="adjacent",
+                                        condition="adjacent_to_self",
+                                        on_failure=MechanicalEffect(
+                                            forced_movements=[
+                                                ForcedMovement(
+                                                    direction="push",
+                                                    distance=2,
+                                                    target="adjacent",
+                                                )
+                                            ],
+                                            status_grants=[
+                                                StatusGrant(
+                                                    status="prone",
+                                                    target="adjacent",
+                                                    duration="until_cleared",
+                                                )
+                                            ],
+                                        ),
+                                    )
+                                ],
                                 forced_movements=[
                                     ForcedMovement(
                                         direction="push",
@@ -2587,7 +2592,9 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                                                     direct_damages=[
                                                         DirectDamage(
                                                             damage_type="explosive",
-                                                            dice=DiceExpression.parse("2d6"),
+                                                            dice=DiceExpression.parse(
+                                                                "2d6"
+                                                            ),
                                                             target="enemy",
                                                         )
                                                     ],
@@ -2608,7 +2615,9 @@ EXAMPLE_TALENTS: list[TalentDefinition] = [
                                                     direct_damages=[
                                                         DirectDamage(
                                                             damage_type="explosive",
-                                                            dice=DiceExpression.parse("2d6"),
+                                                            dice=DiceExpression.parse(
+                                                                "2d6"
+                                                            ),
                                                             multiplier=0.5,
                                                             target="enemy",
                                                         )

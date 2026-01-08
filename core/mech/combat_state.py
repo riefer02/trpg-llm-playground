@@ -25,6 +25,15 @@ from core.mech.weapon import WeaponTagType
 from core.mech.mounts import MountSlotType
 from core.mech.combat_rules import AttackPatternDefinition
 from core.mech.timing import PreparedActionState
+from core.shared.id_helpers import (
+    DeployableIdField,
+    CombatantIdField,
+    WeaponIdField,
+    SystemIdField,
+    EffectIdField,
+    ActionIdField,
+    NpcIdField,
+)
 
 if TYPE_CHECKING:
     from core.shared.heat import MeltdownState
@@ -47,10 +56,10 @@ class DeployableState(FrozenModel):
     Deployables: 10 HP/size, evasion 5, default armor 0
     """
 
-    id: str
+    id: DeployableIdField
     name: str
     kind: DeployableKind
-    owner_id: str | None = None
+    owner_id: CombatantIdField | None = None
     position: HexPosition
     size: int = Field(..., ge=1)
     hp: int = Field(..., ge=0)
@@ -99,7 +108,7 @@ class CombatResources(FrozenModel):
 class WeaponState(FrozenModel):
     """Weapon state for a mounted weapon."""
 
-    weapon_id: str
+    weapon_id: WeaponIdField
     tags: list[WeaponTagType] = Field(default_factory=list)
     destroyed: bool = False
     limited_charges_remaining: int | None = Field(default=None, ge=0)
@@ -117,7 +126,7 @@ class WeaponMountState(FrozenModel):
 class MechSystemState(FrozenModel):
     """System state for a mech."""
 
-    system_id: str
+    system_id: SystemIdField
     destroyed: bool = False
     limited_charges_remaining: int | None = Field(default=None, ge=0)
 
@@ -160,7 +169,7 @@ class CombatantState(FrozenModel):
     and convert to CombatantState using the helper functions.
     """
 
-    id: str
+    id: CombatantIdField
     name: str
     side: CombatSide
     kind: CombatantKind
@@ -239,8 +248,8 @@ class CombatantState(FrozenModel):
 class GrappleLink(FrozenModel):
     """Link between grappling combatants."""
 
-    grappler_id: str
-    target_id: str
+    grappler_id: CombatantIdField
+    target_id: CombatantIdField
     grappler_total_size: int = Field(default=1, ge=0)
     target_total_size: int = Field(default=1, ge=0)
 
@@ -251,8 +260,8 @@ PerTargetEffectSource = Literal["save_check", "triggered_effect", "direct"]
 class AppliedPerTargetEffect(FrozenModel):
     """Applied per-target effect metadata for action resolution."""
 
-    effect_id: str
-    target_id: str
+    effect_id: EffectIdField
+    target_id: CombatantIdField
     count: int = Field(default=1, ge=1)
     max_count: int | None = Field(default=None, ge=1)
     reset_on: ProgressionResetTrigger | None = None
@@ -262,9 +271,9 @@ class AppliedPerTargetEffect(FrozenModel):
 class ActionUse(FrozenModel):
     """An action taken during a combat turn."""
 
-    action_id: str
+    action_id: ActionIdField
     action_type: ActionType
-    target_id: str | None = None
+    target_id: CombatantIdField | None = None
     target_position: HexPosition | None = None
     target_ids: list[str] = Field(default_factory=list)
     target_positions: list[HexPosition] = Field(default_factory=list)
@@ -299,7 +308,7 @@ class ActionUse(FrozenModel):
 class CombatTurn(FrozenModel):
     """A single combat turn."""
 
-    actor_id: str
+    actor_id: CombatantIdField
     move_used: bool = False
     movement_mode: Literal["ground", "flight", "hover", "teleport"] = "ground"
     movement_path: list[HexPosition] = Field(default_factory=list)
@@ -331,7 +340,7 @@ class MechCombatScenario(FrozenModel):
 
 
 def create_npc_combatant(
-    npc_id: str,
+    npc_id: NpcIdField,
     npc_name: str,
     npc_side: CombatSide,
     npc_size: str,

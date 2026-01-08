@@ -2,6 +2,7 @@
 
 import re
 
+from typing import Union
 from pydantic import Field
 from core.shared.models import FrozenModel
 
@@ -25,34 +26,34 @@ from core.shared.effects import (
     AISystemLimitEffect,
     WeaponGrantEffect,
 )
+from core.shared.id_helpers import WeaponIdField, SystemIdField, FrameIdField
 
 
 class MountedWeapon(FrozenModel):
     """Weapon installed on a specific mount slot."""
 
     mount_index: int = Field(..., ge=0)
-    weapon_id: str
+    weapon_id: WeaponIdField
     weapon_size: WeaponSize
-
 
 
 class InstalledSystem(FrozenModel):
     """System installed on a mech."""
 
-    system_id: str
+    system_id: SystemIdField
     sp_cost: int | None = Field(default=None, ge=0)
-
 
 
 class MechBuild(FrozenModel):
     """A mech build derived from a frame and loadout."""
 
-    frame_id: str
+    frame_id: FrameIdField
     weapons: list[MountedWeapon] = Field(default_factory=list)
     systems: list[InstalledSystem] = Field(default_factory=list)
 
-
-    def total_sp(self, system_definitions: dict[str, MechSystemDefinition] | None = None) -> int:
+    def total_sp(
+        self, system_definitions: dict[str, MechSystemDefinition] | None = None
+    ) -> int:
         """Total system points spent (uses definitions if needed)."""
         total = 0
         for system in self.systems:
@@ -68,7 +69,7 @@ class MechBuild(FrozenModel):
 
 def build_mounted_weapon(
     mount_index: int,
-    weapon_id: str,
+    weapon_id: WeaponIdField,
     weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
 ) -> MountedWeapon:
     """Create a mounted weapon using compendium definitions."""
@@ -87,7 +88,7 @@ def build_mounted_weapon(
 
 
 def build_installed_system(
-    system_id: str,
+    system_id: SystemIdField,
     system_definitions: dict[str, MechSystemDefinition] | None = None,
 ) -> InstalledSystem:
     """Create an installed system using compendium definitions."""
@@ -138,7 +139,9 @@ def build_weapon_definition_from_grant(
         for range_spec in grant.ranges
     ]
     tags = [WeaponTag(tag=tag.tag, value=tag.value) for tag in grant.tags]
-    if any(spec.ap for spec in grant.damage) and not any(tag.tag == "ap" for tag in tags):
+    if any(spec.ap for spec in grant.damage) and not any(
+        tag.tag == "ap" for tag in tags
+    ):
         tags.append(WeaponTag(tag="ap"))
 
     damage: list[WeaponDamage] = []
@@ -208,7 +211,7 @@ def build_weapon_definitions_with_grants(
 
 
 def build_mech_from_compendium(
-    frame_id: str,
+    frame_id: FrameIdField,
     weapon_mounts: list[tuple[int, str]],
     system_ids: list[str],
     weapon_definitions: dict[str, MechWeaponDefinition] | None = None,
@@ -257,13 +260,11 @@ class MechDerivedStats(FrozenModel):
     ai_system_limit: int = Field(default=1, ge=0)
 
 
-
 class LimitedUseEntry(FrozenModel):
     """Effective limited uses for a single item instance."""
 
-    item_id: str
+    item_id: WeaponIdField | SystemIdField
     uses: int
-
 
 
 class LimitedUseSummary(FrozenModel):
@@ -271,7 +272,6 @@ class LimitedUseSummary(FrozenModel):
 
     weapons: list[LimitedUseEntry] = Field(default_factory=list)
     systems: list[LimitedUseEntry] = Field(default_factory=list)
-
 
 
 def compute_limited_uses(
@@ -350,7 +350,21 @@ def compute_mech_stats(
     if bonus_effects:
         for effect in bonus_effects:
             for mod in effect.stat_mods:
-                size, hp, armor, evasion, e_defense, speed, sensor_range, tech_attack, heat_cap, repair_cap, save_target, limited_bonus, system_points = _apply_stat_modifier(
+                (
+                    size,
+                    hp,
+                    armor,
+                    evasion,
+                    e_defense,
+                    speed,
+                    sensor_range,
+                    tech_attack,
+                    heat_cap,
+                    repair_cap,
+                    save_target,
+                    limited_bonus,
+                    system_points,
+                ) = _apply_stat_modifier(
                     mod,
                     size,
                     hp,
@@ -450,7 +464,14 @@ def _apply_stat_modifier(
 
 
 def _adjust_size(size: SizeClass, delta: int) -> SizeClass:
-    order: list[SizeClass] = ["size_half", "size_1", "size_2", "size_3", "size_4", "size_5"]
+    order: list[SizeClass] = [
+        "size_half",
+        "size_1",
+        "size_2",
+        "size_3",
+        "size_4",
+        "size_5",
+    ]
     index = order.index(size) + delta
     if index < 0 or index >= len(order):
         raise ValueError(f"Size adjustment {delta} out of bounds for {size}")
@@ -552,7 +573,9 @@ def _apply_limited_use_bonuses(
         if item_type == "weapon" and "weapon" not in applies_to:
             continue
         if item_type == "system":
-            type_match = "system" in applies_to or (is_deployable and "deployable" in applies_to)
+            type_match = "system" in applies_to or (
+                is_deployable and "deployable" in applies_to
+            )
             if not type_match:
                 continue
         if not _limited_use_tag_match(bonus, tags, limited_uses):

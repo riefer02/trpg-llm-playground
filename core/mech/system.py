@@ -5,8 +5,22 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 
 from core.shared.effects import MechanicalEffect
-from core.shared.enums import ActionType, CoverType, RangeType, SaveType, SizeClass, SystemType
-from core.shared.payloads import AreaEffect, DamageSpec, GrenadePayload, MineDetonation, MinePayload
+from core.shared.enums import (
+    ActionType,
+    CoverType,
+    RangeType,
+    SaveType,
+    SizeClass,
+    SystemType,
+)
+from core.shared.payloads import (
+    AreaEffect,
+    DamageSpec,
+    GrenadePayload,
+    MineDetonation,
+    MinePayload,
+)
+from core.shared.id_helpers import SystemIdField, LicenseIdField
 
 
 SystemTagType = Literal[
@@ -31,7 +45,6 @@ class SystemTag(FrozenModel):
     value: int | None = None
 
 
-
 EnvironmentType = Literal["low_g", "zero_g", "submarine"]
 
 
@@ -45,7 +58,6 @@ class FlightEffect(FrozenModel):
     ignores_slowed_in_environment: bool = False
 
 
-
 class DeployableObject(FrozenModel):
     """Single deployable object definition."""
 
@@ -55,14 +67,12 @@ class DeployableObject(FrozenModel):
     hp: int = Field(default=10, ge=0)
 
 
-
 class DeployableEffect(FrozenModel):
     """Deployable system payload."""
 
     count: int = Field(default=1, ge=1)
     obj: DeployableObject
     pickup_action: ActionType | None = None
-
 
 
 DroneReactionTrigger = Literal["ally_hit_target_within_range"]
@@ -76,7 +86,6 @@ class DroneReaction(FrozenModel):
     range: int = Field(..., ge=0)
     damage: DamageSpec
     uses_per_round: int = Field(default=1, ge=1)
-
 
 
 class DronePayload(FrozenModel):
@@ -98,15 +107,14 @@ class DronePayload(FrozenModel):
     recall_requires_line_of_sight: bool = False
 
 
-
 class MechSystemDefinition(FrozenModel):
     """Definition for a mech system or chassis mod."""
 
-    id: str = Field(..., description="Unique system identifier")
+    id: SystemIdField = Field(..., description="Unique system identifier")
     name: str = Field(..., description="Display name")
     system_type: SystemType = "system"
     sp_cost: int = Field(default=0, ge=0)
-    license_id: str | None = Field(
+    license_id: LicenseIdField | None = Field(
         default=None,
         description="License ID required to use this system (None for GMS/general)",
     )

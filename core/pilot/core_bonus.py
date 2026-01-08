@@ -47,6 +47,7 @@ from core.shared.effects import (
     AISystemLimitEffect,
     AIControlTransferEffect,
 )
+from core.shared.id_helpers import CoreBonusIdField
 
 
 class CoreBonusDefinition(FrozenModel):
@@ -58,7 +59,7 @@ class CoreBonusDefinition(FrozenModel):
     (3 total license levels with that manufacturer).
     """
 
-    id: str = Field(..., description="Unique identifier")
+    id: CoreBonusIdField = Field(..., description="Unique identifier")
     name: str = Field(..., description="Display name")
     manufacturer: Manufacturer
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
@@ -67,7 +68,9 @@ class CoreBonusDefinition(FrozenModel):
 class CoreBonus(FrozenModel):
     """A core bonus that a pilot has earned."""
 
-    core_bonus_id: str = Field(..., description="ID of the core bonus definition")
+    core_bonus_id: CoreBonusIdField = Field(
+        ..., description="ID of the core bonus definition"
+    )
 
 
 # GMS Core Bonuses (available to all pilots)
@@ -639,7 +642,9 @@ ALL_CORE_BONUSES: list[CoreBonusDefinition] = (
 )
 
 
-def get_core_bonus_definition(core_bonus_id: str) -> CoreBonusDefinition | None:
+def get_core_bonus_definition(
+    core_bonus_id: CoreBonusIdField,
+) -> CoreBonusDefinition | None:
     """Look up a core bonus definition by ID."""
     for cb in ALL_CORE_BONUSES:
         if cb.id == core_bonus_id:

@@ -7,17 +7,17 @@ from core.shared.enums import ManufacturerType, SizeClass
 from core.shared.effects import MechanicalEffect
 from core.mech.mounts import MountSlot
 from core.mech.weapon import MountlessWeaponDefinition
+from core.shared.id_helpers import SystemIdField, FrameIdField, LicenseIdField
 
 
 class CoreSystemDefinition(FrozenModel):
     """Core system ability unique to a frame."""
 
-    id: str = Field(..., description="Unique core system identifier")
+    id: SystemIdField = Field(..., description="Unique core system identifier")
     name: str = Field(..., description="Display name")
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
     mountless_weapons: list[MountlessWeaponDefinition] = Field(default_factory=list)
     uses_per_mission: int = Field(default=1, ge=1)
-
 
 
 class FrameTrait(FrozenModel):
@@ -25,7 +25,6 @@ class FrameTrait(FrozenModel):
 
     name: str = Field(..., description="Display name")
     effects: MechanicalEffect = Field(default_factory=MechanicalEffect)
-
 
 
 class MechFrameBaseStats(FrozenModel):
@@ -45,14 +44,13 @@ class MechFrameBaseStats(FrozenModel):
     structure: int = Field(default=4, ge=0)
 
 
-
 class MechFrameDefinition(FrozenModel):
     """Definition for a mech frame."""
 
-    id: str = Field(..., description="Unique frame identifier")
+    id: FrameIdField = Field(..., description="Unique frame identifier")
     name: str = Field(..., description="Display name")
     manufacturer: ManufacturerType
-    license_id: str | None = Field(
+    license_id: LicenseIdField | None = Field(
         default=None,
         description="License ID required to use this frame (None for GMS/general)",
     )

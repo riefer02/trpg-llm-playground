@@ -240,6 +240,14 @@ from typing import Literal
 from pydantic import Field, model_validator
 from core.shared.models import FrozenModel
 
+from core.shared.id_helpers import (
+    ReactionIdField,
+    WeaponIdField,
+    ActionIdField,
+    EffectIdField,
+    CombatantIdField,
+)
+
 from core.shared.enums import (
     ActionType,
     AttackType,
@@ -393,7 +401,7 @@ class ReactionCondition(FrozenModel):
         ReactionCondition(reaction_id="overwatch", is_attack=True)
     """
 
-    reaction_id: str | None = None
+    reaction_id: ReactionIdField | None = None
     is_attack: bool | None = None
 
     @model_validator(mode="after")
@@ -663,7 +671,7 @@ class ReactionTriggerEffect(FrozenModel):
         ReactionTriggerEffect(reaction_id="overwatch", trigger_events=["enemy_enters_threat"])
     """
 
-    reaction_id: str
+    reaction_id: ReactionIdField
     trigger_events: list[ReactionTriggerEvent] = Field(default_factory=list)
     uses_per: UsesPer = "unlimited"
     condition: EffectCondition | None = None
@@ -929,7 +937,7 @@ class DicePoolEffect(FrozenModel):
     starting_dice: int = Field(default=0, ge=0)
     gain_triggers: list[DicePoolGain] = Field(default_factory=list)
     spend_options: list[DicePoolSpendOption] = Field(default_factory=list)
-    weapon_id: str | None = None
+    weapon_id: WeaponIdField | None = None
     expires_on_scene_end: bool = False
     lost_on_rest: bool = False
     lost_on_full_repair: bool = False
@@ -2048,7 +2056,7 @@ class WeaponGrantEffect(FrozenModel):
         )
     """
 
-    weapon_id: str | None = None
+    weapon_id: WeaponIdField | None = None
     name: str
     size: WeaponSizeType
     weapon_type: WeaponTypeType
@@ -2810,9 +2818,9 @@ class ModeEffect(FrozenModel):
     """
 
     name: str
-    activation_action_id: str
+    activation_action_id: ActionIdField
     activation_action_type: ActionType
-    deactivation_action_id: str | None = None
+    deactivation_action_id: ActionIdField | None = None
     deactivation_action_type: ActionType | None = None
     duration: EffectDuration | None = None
     effects: MechanicalEffect = Field(default_factory=lambda: MechanicalEffect())
@@ -2875,7 +2883,7 @@ class ProgressionState(FrozenModel):
     max_gate: int = Field(default=4, ge=1)
     reset_on: ProgressionResetTrigger = "scene_end"
     per_target: bool = True
-    target_id: str | None = None
+    target_id: CombatantIdField | None = None
 
 
 class GateProgressionEffect(FrozenModel):
@@ -2933,11 +2941,11 @@ class PerTargetCounter(FrozenModel):
         PerTargetCounter(effect_id="basilisk_stun", max_count=1, reset_on="scene_end")
     """
 
-    effect_id: str
+    effect_id: EffectIdField
     current_count: int = 0
     max_count: int = Field(default=1, ge=1)
     reset_on: ProgressionResetTrigger = "scene_end"
-    target_id: str | None = None
+    target_id: CombatantIdField | None = None
 
 
 class PerTargetCounterEffect(FrozenModel):
@@ -2955,7 +2963,7 @@ class PerTargetCounterEffect(FrozenModel):
         )
     """
 
-    effect_id: str
+    effect_id: EffectIdField
     max_count: int = Field(default=1, ge=1)
     reset_on: ProgressionResetTrigger = "scene_end"
     effect: "MechanicalEffect"
@@ -2977,13 +2985,13 @@ class CooldownState(FrozenModel):
         CooldownState(effect_id="ability_id", duration=1, trigger_on="on_hit")
     """
 
-    effect_id: str
+    effect_id: EffectIdField
     turns_remaining: int = 0
     duration: int = Field(default=1, ge=1)
     trigger_on: TriggerType | None = None
     reset_on: CooldownResetTrigger = "scene_end"
     per_target: bool = False
-    target_id: str | None = None
+    target_id: CombatantIdField | None = None
 
 
 class CooldownEffect(FrozenModel):
