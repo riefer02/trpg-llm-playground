@@ -182,134 +182,6 @@ def _resolve_area_origin(
     return None
 
 
-def _line_of_sight_clear(
-    tiles: dict[tuple[int, int], TerrainHex],
-    start_coord: tuple[int, int],
-    end_coord: tuple[int, int],
-    start_elevation: int,
-    end_elevation: int,
-    line_of_sight_rules: Any,
-    target_coord: HexCoord | None = None,
-) -> bool:
-    from core.mech.grid import hexes_between
-
-    for coord in hexes_between(
-        HexCoord(q=start_coord[0], r=start_coord[1]),
-        HexCoord(q=end_coord[0], r=end_coord[1]),
-        include_endpoints=False,
-    ):
-        tile = tiles.get((coord.q, coord.r))
-        if tile and tile.blocks_line_of_sight:
-            if (
-                line_of_sight_rules.adjacent_cover_does_not_block_los
-                and target_coord
-                and tile.provides_hard_cover
-                and coord.distance_to(target_coord) == 1
-            ):
-                continue
-            if tile.elevation >= min(start_elevation, end_elevation):
-                return False
-    return True
-
-
-def _path_clear(
-    tiles: dict[tuple[int, int], TerrainHex],
-    start_coord: tuple[int, int],
-    end_coord: tuple[int, int],
-    line_of_sight_rules: Any,
-    target_coord: HexCoord | None = None,
-) -> bool:
-    from core.mech.grid import hexes_between
-
-    for coord in hexes_between(
-        HexCoord(q=start_coord[0], r=start_coord[1]),
-        HexCoord(q=end_coord[0], r=end_coord[1]),
-        include_endpoints=False,
-    ):
-        tile = tiles.get((coord.q, coord.r))
-        if tile and tile.blocks_line_of_sight:
-            if (
-                line_of_sight_rules.adjacent_cover_does_not_block_los
-                and target_coord
-                and tile.provides_hard_cover
-                and coord.distance_to(target_coord) == 1
-            ):
-                continue
-            return False
-    return True
-
-
-def _cover_between(
-    tiles: dict[tuple[int, int], TerrainHex],
-    start_coord: tuple[int, int],
-    end_coord: tuple[int, int],
-    target_size: str | None,
-) -> CoverType:
-    from core.mech.grid import hexes_between
-
-    cover_rules = DEFAULT_MECH_COMBAT_RULES.cover_rules
-    start = HexCoord(q=start_coord[0], r=start_coord[1])
-    end = HexCoord(q=end_coord[0], r=end_coord[1])
-    line = hexes_between(start, end, include_endpoints=False)
-
-    def has_hard_cover(c: HexCoord) -> bool:
-        t = tiles.get((c.q, c.r))
-        return t is not None and t.provides_hard_cover
-
-    def hard_cover_size_ok(c: HexCoord) -> bool:
-        t = tiles.get((c.q, c.r))
-        if t is None or not t.provides_hard_cover:
-            return False
-        if t.hard_cover_size is None or target_size is None:
-            return True
-        return _size_value(t.hard_cover_size) >= _size_value(target_size)
-
-    def has_soft_cover(c: HexCoord) -> bool:
-        t = tiles.get((c.q, c.r))
-        return t is not None and t.provides_soft_cover
-
-    hard_between = any(has_hard_cover(c) for c in line)
-    hard_between_size_ok = any(hard_cover_size_ok(c) for c in line)
-    soft_between = any(has_soft_cover(c) for c in line)
-
-    def is_flanking() -> bool:
-        if not line:
-            return True
-        cover_coord = line[-1]
-        tile = tiles.get((cover_coord.q, cover_coord.r))
-        return not (tile and tile.provides_hard_cover)
-
-    def adjacent_hard_cover() -> bool:
-        for neighbor in end.neighbors():
-            tile = tiles.get((neighbor.q, neighbor.r))
-            if tile and tile.provides_hard_cover:
-                if tile.hard_cover_size is None or target_size is None:
-                    return True
-                if _size_value(tile.hard_cover_size) >= _size_value(target_size):
-                    return True
-        return False
-
-    if not cover_rules.hard_cover_requires_adjacency and hard_between:
-        if cover_rules.hard_cover_requires_size_match and not hard_between_size_ok:
-            return "soft" if hard_between or soft_between else "none"
-        return "hard"
-
-    size_check = target_size if cover_rules.hard_cover_requires_size_match else None
-    if adjacent_hard_cover():
-        hard_cover = True
-        if cover_rules.hard_cover_flanking_negates and is_flanking():
-            hard_cover = False
-        if cover_rules.hard_cover_requires_adjacency and hard_cover:
-            return "hard"
-        if not cover_rules.hard_cover_requires_adjacency and hard_between:
-            return "hard"
-
-    if soft_between or hard_between:
-        return "soft"
-
-    return None
-
-
 def _index_per_target_counters(
     combatant: CombatantState,
 ) -> tuple[dict[tuple[str, str], PerTargetCounter], dict[str, PerTargetCounter]]:
@@ -1743,8 +1615,8 @@ def _validate_turn(
                             end_coord = (position.coord.q, position.coord.r)
                             if not _line_of_sight_clear(
                                 terrain_tiles,
-                                start_coord,
-                                end_coord,
+                                origin_position.coord,
+                                position.coord,
                                 origin_position.elevation,
                                 position.elevation,
                                 line_of_sight_rules,
@@ -1777,12 +1649,10 @@ def _validate_turn(
                 return False
 
             if not effective_ignores_los():
-                start_coord = (actor_position.coord.q, actor_position.coord.r)
-                end_coord = (area_origin.coord.q, area_origin.coord.r)
                 if not _line_of_sight_clear(
                     terrain_tiles,
-                    start_coord,
-                    end_coord,
+                    actor_position.coord,
+                    area_origin.coord,
                     actor_position.elevation,
                     area_origin.elevation,
                     line_of_sight_rules,
@@ -1808,12 +1678,10 @@ def _validate_turn(
                 for target, position in targets:
                     if not position:
                         continue
-                    start_coord = (origin_position.coord.q, origin_position.coord.r)
-                    end_coord = (position.coord.q, position.coord.r)
                     if not _path_clear(
                         terrain_tiles,
-                        start_coord,
-                        end_coord,
+                        origin_position.coord,
+                        position.coord,
                         line_of_sight_rules,
                         position.coord,
                     ):
@@ -1828,12 +1696,10 @@ def _validate_turn(
                         )
                 if action.area_pattern and area_origin:
                     if action.area_pattern.pattern in ("line", "cone", "blast"):
-                        start_coord = (actor_position.coord.q, actor_position.coord.r)
-                        end_coord = (area_origin.coord.q, area_origin.coord.r)
                         if not _path_clear(
                             terrain_tiles,
-                            start_coord,
-                            end_coord,
+                            actor_position.coord,
+                            area_origin.coord,
                             line_of_sight_rules,
                             area_origin.coord,
                         ):
@@ -1927,12 +1793,10 @@ def _validate_turn(
                 for target, position in targets:
                     if not position:
                         continue
-                    start_coord = (origin_position.coord.q, origin_position.coord.r)
-                    end_coord = (position.coord.q, position.coord.r)
                     cover = _cover_between(
                         terrain_tiles,
-                        start_coord,
-                        end_coord,
+                        origin_position.coord,
+                        position.coord,
                         target.stats.size if target else None,
                     )
                     attack_type = action.attack_type_override or rule.attack.attack_type
