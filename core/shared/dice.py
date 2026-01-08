@@ -8,6 +8,15 @@ from typing import Literal
 from pydantic import field_validator
 from core.shared.models import FrozenModel
 
+__all__ = [
+    "DieSize",
+    "DiceExpression",
+    "roll_dice",
+    "roll_accuracy_difficulty",
+    "roll_with_advantage",
+    "round_up",
+]
+
 # Standard dice sizes used in Lancer
 DieSize = Literal[3, 6, 20]
 

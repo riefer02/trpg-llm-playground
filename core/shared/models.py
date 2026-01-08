@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, ConfigDict
 
+__all__ = ["FrozenModel"]
+
 
 class FrozenModel(BaseModel):
     """Immutable model base for rules data."""
