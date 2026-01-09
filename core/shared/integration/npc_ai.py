@@ -19,6 +19,7 @@ from typing import Literal, NamedTuple
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import ActionType, SizeClass
+from core.shared.id_helpers import CombatantIdField
 from core.npc.models import NPCRole
 from core.npc.state import NPCState, NPCTemplate
 from core.mech.grid import HexCoord
@@ -58,7 +59,7 @@ class ActionScore(FrozenModel):
     """Score for a potential action-target combination."""
 
     action: ActionType
-    target_id: str | None
+    target_id: CombatantIdField | None
     score: float
     reasoning: str = ""
 
@@ -67,7 +68,7 @@ class NPCActionDecision(FrozenModel):
     """Result of AI decision-making for an NPC turn."""
 
     action: ActionType
-    target_id: str | None
+    target_id: CombatantIdField | None
     reasoning: str
     fallback_used: bool = False
 

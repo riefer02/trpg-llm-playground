@@ -17,6 +17,7 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType, AttackType
 from core.shared.dice import DiceExpression, round_up
+from core.shared.id_helpers import CombatantIdField
 from core.mech.combat_state import CombatantState
 from core.shared.rolls import resolve_attack
 
@@ -42,7 +43,7 @@ class ImprovisedInput(FrozenModel):
     actor_id: str = Field(
         ..., description="ID of the mech making the improvised attack"
     )
-    target_id: str = Field(..., description="ID of the target")
+    target_id: CombatantIdField = Field(..., description="ID of the target")
     is_unarmed: bool = Field(..., description="Whether the actor is unarmed")
     rules: ImprovisedRule | None = Field(
         default=None, description="Override resolution rules"

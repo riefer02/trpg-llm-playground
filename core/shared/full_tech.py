@@ -16,6 +16,7 @@ from typing import Literal, Union
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
+from core.shared.id_helpers import CombatantIdField
 
 from core.mech.tech_actions import (
     ScanResult,
@@ -37,7 +38,7 @@ FullTechOption = Literal["scan", "bolster", "lock_on", "invade"]
 class ScanTechParams(FrozenModel):
     """Parameters for Scan action in Full Tech."""
 
-    target_id: str
+    target_id: CombatantIdField
     scan_options: list[Literal["stats", "hidden_info", "public_info"]] = Field(
         default_factory=lambda: ["stats", "hidden_info", "public_info"]
     )
@@ -46,7 +47,7 @@ class ScanTechParams(FrozenModel):
 class BolsterTechParams(FrozenModel):
     """Parameters for Bolster action in Full Tech."""
 
-    target_id: str
+    target_id: CombatantIdField
     attacker_systems: int = Field(..., ge=0)
     accuracy_bonus: int = Field(default=2, ge=0)
 
@@ -54,14 +55,14 @@ class BolsterTechParams(FrozenModel):
 class LockOnTechParams(FrozenModel):
     """Parameters for Lock On action in Full Tech."""
 
-    target_id: str
+    target_id: CombatantIdField
     accuracy_bonus: int = Field(default=1, ge=0)
 
 
 class InvadeTechParams(FrozenModel):
     """Parameters for Invade action in Full Tech."""
 
-    target_id: str
+    target_id: CombatantIdField
     attacker_systems: int = Field(..., ge=0)
     target_e_defense: int = Field(..., ge=0)
     heat_on_hit: int = Field(default=2, ge=0)

@@ -6,6 +6,7 @@ creating template variants, and working with NPC special classes.
 
 from typing import Literal
 from core.shared.models import FrozenModel
+from core.shared.id_helpers import TemplateIdField
 from core.npc.models import NPCTemplate, NPCStats, NPCStatsBase, NPCRole
 
 
@@ -50,7 +51,7 @@ class NPCTemplateVariant(FrozenModel):
     of base templates without duplicating template definitions.
     """
 
-    base_template_id: str
+    base_template_id: TemplateIdField
     variant_name: str
     hp_modifier: int = 0
     evasion_modifier: int = 0

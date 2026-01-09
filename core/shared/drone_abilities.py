@@ -31,6 +31,7 @@ from typing import Literal, Any, Union
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType
+from core.shared.id_helpers import CombatantIdField
 from core.shared.dice import roll_dice
 from core.mech.grid import HexPosition, HexCoord, hexes_in_radius
 from core.mech.combat_state import MechCombatScenario
@@ -53,7 +54,9 @@ class TurretDroneInput(FrozenModel):
     ally_attack_hit: bool = Field(
         ..., description="Whether the allied attack hit (trigger condition)"
     )
-    target_id: str = Field(..., description="ID of the target of the allied attack")
+    target_id: CombatantIdField = Field(
+        ..., description="ID of the target of the allied attack"
+    )
     ally_position: HexPosition = Field(
         ..., description="Position of the ally who made the attack"
     )
@@ -143,9 +146,9 @@ class LatchDroneInput(FrozenModel):
     owner_id: str = Field(..., description="ID of the drone's owner")
     tier: int = Field(default=1, ge=1, le=3, description="NPC tier for scaling")
     mode: LatchMode = Field(..., description="Mode of latch drone operation")
-    target_id: str = Field(..., description="ID of the target mech")
+    target_id: CombatantIdField = Field(..., description="ID of the target mech")
     target_position: HexPosition = Field(..., description="Position of the target mech")
-    shooter_id: str = Field(..., description="ID of the shooter/owner")
+    shooter_id: CombatantIdField = Field(..., description="ID of the shooter/owner")
     shooter_position: HexPosition = Field(..., description="Position of the shooter")
     shooter_systems_bonus: int = Field(..., description="Systems bonus for attack roll")
     has_core_power: bool = Field(
@@ -190,7 +193,7 @@ class ICEOUTDroneInput(FrozenModel):
     owner_id: str = Field(..., description="ID of the drone's owner")
     tier: int = Field(default=1, ge=1, le=3, description="NPC tier for scaling")
     drone_position: HexPosition = Field(..., description="Position of the ICEOUT drone")
-    affected_combatant_ids: list[str] = Field(
+    affected_combatant_ids: list[CombatantIdField] = Field(
         default_factory=list, description="IDs of combatants in the burst 1 zone"
     )
     zone_size: int = Field(default=1, ge=1, description="Size of the zone (burst)")
@@ -206,10 +209,10 @@ class ICEOUTDroneResult(FrozenModel):
     success: bool = Field(..., description="Whether the ability succeeded")
     zone_created: bool = Field(..., description="Whether the zone was created/moved")
     zone_size: int = Field(default=1, description="Size of the zone (burst)")
-    affected_combatant_ids: list[str] = Field(
+    affected_combatant_ids: list[CombatantIdField] = Field(
         default_factory=list, description="IDs of combatants in the zone"
     )
-    tech_immunity_granted: list[str] = Field(
+    tech_immunity_granted: list[CombatantIdField] = Field(
         default_factory=list, description="Combatants granted tech immunity"
     )
     statuses_cleared: list[str] = Field(
@@ -228,8 +231,8 @@ class TrackingDroneInput(FrozenModel):
     drone_id: str = Field(..., description="ID of the tracking drone")
     owner_id: str = Field(..., description="ID of the drone's owner")
     tier: int = Field(default=1, ge=1, le=3, description="NPC tier for scaling")
-    target_id: str = Field(..., description="ID of the target to track")
-    shooter_id: str = Field(..., description="ID of the shooter")
+    target_id: CombatantIdField = Field(..., description="ID of the target to track")
+    shooter_id: CombatantIdField = Field(..., description="ID of the shooter")
     shooter_systems_bonus: int = Field(..., description="Systems bonus for tech attack")
     target_systems_save_bonus: int = Field(
         default=0, description="Systems save bonus for target (if applicable)"
@@ -272,10 +275,10 @@ class HiveDroneInput(FrozenModel):
     owner_id: str = Field(..., description="ID of the drone's owner")
     tier: int = Field(default=1, ge=1, le=3, description="NPC tier for scaling")
     drone_position: HexPosition = Field(..., description="Position of the Hive drone")
-    enemy_ids: list[str] = Field(
+    enemy_ids: list[CombatantIdField] = Field(
         default_factory=list, description="IDs of enemies potentially in the zone"
     )
-    ally_ids: list[str] = Field(
+    ally_ids: list[CombatantIdField] = Field(
         default_factory=list, description="IDs of allies potentially in the zone"
     )
     zone_size: int = Field(default=2, ge=1, description="Size of the zone (burst)")
@@ -292,13 +295,13 @@ class HiveDroneResult(FrozenModel):
     success: bool = Field(..., description="Whether the ability succeeded")
     zone_created: bool = Field(..., description="Whether the zone was created/moved")
     zone_size: int = Field(default=2, description="Size of the zone (burst)")
-    allies_covered: list[str] = Field(
+    allies_covered: list[CombatantIdField] = Field(
         default_factory=list, description="Allies receiving soft cover"
     )
-    enemies_damaged: list[str] = Field(
+    enemies_damaged: list[CombatantIdField] = Field(
         default_factory=list, description="Enemies taking damage"
     )
-    soft_cover_granted: list[str] = Field(
+    soft_cover_granted: list[CombatantIdField] = Field(
         default_factory=list, description="Allies granted soft cover"
     )
     damage_per_target: int = Field(default=1, description="Damage per enemy target")

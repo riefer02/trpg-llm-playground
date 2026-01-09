@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import Literal, TYPE_CHECKING, cast, Any
 from pydantic import Field, model_validator
 from core.shared.models import FrozenModel
+from core.shared.id_helpers import CombatantIdField
 
 if TYPE_CHECKING:
     from core.shared.combat_loop import CombatLoopState
@@ -58,7 +59,7 @@ class ObjectiveCriterion(FrozenModel):
 
     criterion_type: ObjectiveCriterionType
     description: str = Field(..., description="What must be true for this criterion")
-    target_id: str | None = Field(
+    target_id: CombatantIdField | None = Field(
         default=None,
         description="Target ID for target-based criteria",
     )

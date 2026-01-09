@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
+from core.shared.id_helpers import CombatantIdField
 
 if TYPE_CHECKING:
     from core.mech.combat_state import CombatantState
@@ -36,7 +37,7 @@ RestSecondaryChoice = Literal[
 class RepairSpec(FrozenModel):
     """Specification for a single repair operation."""
 
-    target_id: str = Field(..., description="ID of target to repair")
+    target_id: CombatantIdField = Field(..., description="ID of target to repair")
     repair_type: Literal[
         "hp",
         "structure",

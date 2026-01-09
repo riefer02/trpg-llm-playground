@@ -8,9 +8,14 @@ from typing import TYPE_CHECKING, Any
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.effects import MechanicalEffect, TriggerType
+from core.shared.id_helpers import (
+    CombatantIdField,
+    NpcIdField,
+)
 
 if TYPE_CHECKING:
-    from core.npc.models import NPCState, NPCAbility
+    from core.npc.state import NPCState
+    from core.npc.models import NPCAbility
 
 
 class TriggerContext(FrozenModel):
@@ -21,7 +26,7 @@ class TriggerContext(FrozenModel):
 
     trigger_type: TriggerType
     source_id: str | None = None
-    target_id: str | None = None
+    target_id: CombatantIdField | None = None
     damage_dealt: int | None = None
     hp_before: int | None = None
     hp_after: int | None = None
@@ -44,7 +49,7 @@ class NPCAbilityResolution(FrozenModel):
 class NPCAbilityTracker(FrozenModel):
     """Tracks ability usage for an NPC in combat."""
 
-    npc_id: str
+    npc_id: NpcIdField
     abilities_used: dict[str, int] = Field(default_factory=dict)
 
     def can_use_ability(self, ability: "NPCAbility") -> bool:
@@ -213,7 +218,7 @@ def apply_ability_effect(
     effect: MechanicalEffect,
     combat_state: dict[str, Any],
     source_id: str,
-    target_id: str | None = None,
+    target_id: CombatantIdField | None = None,
 ) -> dict[str, Any]:
     """Apply a MechanicalEffect from an NPC ability to the combat state.
 

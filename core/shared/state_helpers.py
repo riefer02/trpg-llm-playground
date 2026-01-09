@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Literal, Generic, TypeVar
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
+from core.shared.id_helpers import SystemIdField, ActionIdField
 
 if TYPE_CHECKING:
     from core.mech.combat_state import (
@@ -376,7 +377,7 @@ def destroy_mount(inventory: MechInventory, mount_index: int) -> MechInventory:
     return inventory.model_copy(update={"mounts": updated_mounts})
 
 
-def destroy_system(inventory: MechInventory, system_id: str) -> MechInventory:
+def destroy_system(inventory: MechInventory, system_id: SystemIdField) -> MechInventory:
     """Mark a system as destroyed (for system trauma).
 
     Args:
@@ -457,7 +458,9 @@ def clear_per_round_reactions(state: CombatantState) -> CombatantState:
     return state.model_copy(update={"per_round_reactions": {}})
 
 
-def increment_reaction_use(state: CombatantState, action_id: str) -> CombatantState:
+def increment_reaction_use(
+    state: CombatantState, action_id: ActionIdField
+) -> CombatantState:
     """Increment the use count for a per-round reaction.
 
     Args:

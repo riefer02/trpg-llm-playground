@@ -10,6 +10,12 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import SizeClass
 from core.shared.effects import MechanicalEffect, TriggerType
+from core.shared.id_helpers import (
+    ActionIdField,
+    WeaponIdField,
+    SystemIdField,
+    TemplateIdField,
+)
 from core.npc.enums import (
     NPCTier,
     NPCClass,
@@ -83,7 +89,7 @@ class NPCAbility(FrozenModel):
     limited uses per combat.
     """
 
-    id: str
+    id: ActionIdField
     name: str
     trigger: TriggerType
     effect: MechanicalEffect = Field(default_factory=MechanicalEffect)
@@ -97,8 +103,8 @@ class NPCGear(FrozenModel):
     license requirements.
     """
 
-    weapon_id: str | None = None
-    system_id: str | None = None
+    weapon_id: WeaponIdField | None = None
+    system_id: SystemIdField | None = None
     effect: MechanicalEffect = Field(default_factory=MechanicalEffect)
 
 
@@ -112,7 +118,7 @@ class NPCTemplate(FrozenModel):
     Multiple instances can be created from a single template.
     """
 
-    id: str
+    id: TemplateIdField
     name: str
     description: str = ""
     npc_class: NPCClass
@@ -180,7 +186,7 @@ class SpecialNPCTemplate(FrozenModel):
     Spacer, Vehicle, Ship.
     """
 
-    id: str
+    id: TemplateIdField
     name: str
     description: str = ""
     npc_class: NPCClass

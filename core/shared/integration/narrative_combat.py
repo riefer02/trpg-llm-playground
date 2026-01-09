@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Literal, Callable
 from pydantic import Field
 from core.shared.models import FrozenModel
+from core.shared.id_helpers import CombatantIdField
 from core.shared.narrative import (
     NarrativeGoalTracker,
     NarrativeGoal,
@@ -40,8 +41,8 @@ class CombatEvent(FrozenModel):
         "objective_secured",
         "turn_completed",
     ]
-    source_id: str
-    target_id: str | None = None
+    source_id: CombatantIdField
+    target_id: CombatantIdField | None = None
     details: dict = Field(default_factory=dict)
 
 

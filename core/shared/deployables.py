@@ -28,6 +28,7 @@ from typing import Literal, Any
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType, SaveType
+from core.shared.id_helpers import CombatantIdField
 from core.shared.dice import roll_dice
 from core.shared.terrain import TerrainMap, get_terrain_at, calculate_movement_cost
 from core.shared.saves import resolve_save, SaveRequest, SaveResult
@@ -268,7 +269,9 @@ class DroneActivationInput(FrozenModel):
     move_destination: HexPosition | None = Field(
         default=None, description="Target position for move"
     )
-    attack_target_id: str | None = Field(default=None, description="Target for attack")
+    attack_target_id: CombatantIdField | None = Field(
+        default=None, description="Target for attack"
+    )
     drone_evasion: int = Field(default=10, description="Drone evasion for defense")
     drone_e_defense: int = Field(default=10, description="Drone e-defense")
     attacker_engaged: bool = Field(

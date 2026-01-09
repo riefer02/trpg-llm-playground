@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from core.shared.effects import TriggerType, MechanicalEffect
 
 if TYPE_CHECKING:
+    from core.shared.id_helpers import CombatantIdField
     from core.npc.models import NPCState
 
 

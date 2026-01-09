@@ -20,9 +20,10 @@ like passing WeaponId where SystemId is expected.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Annotated, Any, TypeVar
 
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, Field
+
 
 if TYPE_CHECKING:
     from core.shared.ids import (
@@ -75,13 +76,13 @@ def _coerce_id(raw_id: Any, id_type: type[T]) -> T:
         ValueError: If the value cannot be coerced
     """
     if isinstance(raw_id, str):
-        return id_type(raw_id)
+        return id_type(raw_id)  # type: ignore[call-arg]
     if isinstance(raw_id, id_type):
         return raw_id
     raise ValueError(f"Cannot coerce {raw_id!r} to {id_type.__name__}")
 
 
-def IdField(id_type: type[T]) -> type:
+def IdField(id_type: type[T]) -> Any:
     """Create a field type that coerces strings to typed IDs.
 
     Args:
@@ -94,12 +95,14 @@ def IdField(id_type: type[T]) -> type:
         class Pilot(FrozenModel):
             id: IdField[PilotId]
     """
-    return Annotated[type(raw_id), BeforeValidator(lambda x: _coerce_id(x, id_type))]
+    validator = BeforeValidator(lambda x: _coerce_id(x, id_type))
+    return Annotated[str, validator]
 
 
-def _id_field_factory(id_type: type[T]) -> type:
+def _id_field_factory(id_type: type[T]) -> Any:
     """Factory for creating ID field types at runtime."""
-    return Annotated[str, BeforeValidator(lambda x: _coerce_id(x, id_type))]
+    validator = BeforeValidator(lambda x: _coerce_id(x, id_type))
+    return Annotated[str, validator]
 
 
 if TYPE_CHECKING:

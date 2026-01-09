@@ -15,6 +15,7 @@ from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
+from core.shared.id_helpers import CombatantIdField
 from core.mech.combat_state import CombatantState
 from core.mech.weapon import WeaponTagType
 
@@ -65,7 +66,7 @@ class StabilizeInput(FrozenModel):
         ...,
         description="Secondary stabilize option: reload, clear burn, or clear condition",
     )
-    condition_target_id: str | None = Field(
+    condition_target_id: CombatantIdField | None = Field(
         default=None,
         description="Target ID for condition clearing (required if secondary_choice is clear_condition)",
     )

@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType
+from core.shared.id_helpers import CombatantIdField
 from core.shared.rolls import resolve_attack, AttackResolutionResult
 
 if TYPE_CHECKING:
@@ -33,7 +34,7 @@ class FightInput(FrozenModel):
     """
 
     actor_id: str = Field(..., description="ID of the pilot making the attack")
-    target_id: str = Field(..., description="ID of the target")
+    target_id: CombatantIdField = Field(..., description="ID of the target")
     weapon_id: str | None = Field(
         default=None,
         description="Pilot weapon ID (None for unarmed/improvised)",

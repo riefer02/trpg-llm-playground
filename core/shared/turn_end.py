@@ -24,6 +24,7 @@ from typing import Literal, Any
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.effects import EffectDuration
+from core.shared.id_helpers import CombatantIdField
 
 
 TurnEndTriggerSource = Literal[
@@ -55,7 +56,9 @@ class TurnEndEffectState(FrozenModel):
 
     effect_id: str = Field(..., description="Unique identifier for this effect")
     effect_type: str = Field(..., description="Type of effect")
-    target_id: str | None = Field(default=None, description="Target of the effect")
+    target_id: CombatantIdField | None = Field(
+        default=None, description="Target of the effect"
+    )
     duration_type: EffectDuration = Field(..., description="When the effect expires")
     applied_by: str = Field(..., description="Actor who applied this effect")
     effect_data: dict[str, Any] = Field(

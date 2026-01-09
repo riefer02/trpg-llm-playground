@@ -38,6 +38,7 @@ trpg-llm-playground/
 ```python
 from core import Pilot, SkillSet, create_ll0_pilot, PilotTrigger, Talent
 from core.pilot import STANDARD_BACKGROUNDS
+from core.shared.ids import PilotId, TalentId
 
 # Create a new pilot
 pilot = create_ll0_pilot(
@@ -52,9 +53,9 @@ pilot = create_ll0_pilot(
         PilotTrigger(trigger_id="take_control", rank=2),
     ],
     talents=[
-        Talent(talent_id="ace", rank=1),
-        Talent(talent_id="bonded", rank=1),
-        Talent(talent_id="brutal", rank=1),
+        Talent(talent_id=TalentId("ace"), rank=1),
+        Talent(talent_id=TalentId("bonded"), rank=1),
+        Talent(talent_id=TalentId("brutal"), rank=1),
     ],
 )
 
@@ -109,6 +110,30 @@ The `/core` directory contains Pydantic v2 models that define the Lancer game sy
 |--------|----------|
 | `enums.py` | Action types, damage types, status effects |
 | `dice.py` | Dice expressions with parsing and rolling |
+| `ids.py` | 36 typed ID definitions (PilotId, MechId, WeaponId, etc.) |
+| `id_helpers.py` | IdField[T] pattern for Pydantic model fields with coercion |
+
+### Typed ID System
+
+The project uses typed IDs for compile-time type safety:
+
+```python
+from core.shared.ids import PilotId, WeaponId, CombatantId
+from core.shared.id_helpers import PilotIdField, CombatantIdField
+
+class MountedWeapon(FrozenModel):
+    weapon_id: WeaponId  # Typed ID for type checking
+
+class AttackResult(FrozenModel):
+    attacker_id: CombatantIdField  # Coerces "c1" → CombatantId("c1")
+    target_id: CombatantIdField | None
+```
+
+Benefits:
+- Type checkers catch ID mismatches (e.g., `WeaponId` where `SystemId` expected)
+- IdField[T] pattern maintains backward compatibility with string inputs
+- 36 typed IDs cover all game entities, equipment, and combat objects
+- See `notes/phase_3b_implementation_plan.md` for migration details
 
 ### JSON Schema Export
 
@@ -208,6 +233,9 @@ Modal, Replicate, or dedicated GPU hosting (RunPod, Vast.ai).
 
 ### Completed
 - [x] Type-driven Pilot schemas with Pydantic v2
+- [x] Typed ID system (36 NewType definitions with coercion)
+- [x] Mech domain schemas (frames, systems, weapons)
+- [x] Combat domain schemas (actions, conditions, initiative)
 - [x] JSON Schema export for cross-language use
 - [x] Synthetic data generation pipeline
 - [x] Multi-turn conversation generation
@@ -215,8 +243,6 @@ Modal, Replicate, or dedicated GPU hosting (RunPod, Vast.ai).
 - [x] Local Ollama + RAG chat
 
 ### Planned
-- [ ] Mech domain schemas (frames, systems, weapons)
-- [ ] Combat domain schemas (actions, conditions)
 - [ ] Database layer (SQLModel)
 - [ ] Web application (FastAPI + frontend)
 - [ ] Game engine using type dispatch

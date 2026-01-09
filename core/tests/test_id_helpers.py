@@ -631,3 +631,512 @@ class TestEffectsSystemTypedIds:
         )
         assert state.effect_id == "ability_cooldown"
         assert state.target_id == "c_enemy_1"
+
+
+class TestNPCDomainTypedIds:
+    """Test typed IDs in NPC domain models."""
+
+    def test_npc_ability_id(self):
+        """Test NPCAbility with typed id."""
+        from core.npc.models import NPCAbility
+
+        ability = NPCAbility(
+            id="strike",
+            name="Strike",
+            trigger="on_attacked",
+        )
+        assert ability.id == "strike"
+
+    def test_npc_gear_weapon_id(self):
+        """Test NPCGear with typed weapon_id."""
+        from core.npc.models import NPCGear
+
+        gear = NPCGear(weapon_id="w_heavy_cannon")
+        assert gear.weapon_id == "w_heavy_cannon"
+
+    def test_npc_gear_system_id(self):
+        """Test NPCGear with typed system_id."""
+        from core.npc.models import NPCGear
+
+        gear = NPCGear(system_id="s_coolant_injection")
+        assert gear.system_id == "s_coolant_injection"
+
+    def test_npc_gear_both_ids(self):
+        """Test NPCGear with both weapon_id and system_id."""
+        from core.npc.models import NPCGear
+
+        gear = NPCGear(
+            weapon_id="w_rifle",
+            system_id="s_sensor",
+        )
+        assert gear.weapon_id == "w_rifle"
+        assert gear.system_id == "s_sensor"
+
+    def test_npc_template_id(self):
+        """Test NPCTemplate with typed id."""
+        from core.npc.models import NPCTemplate, NPCStats, NPCStatsBase
+
+        stats = NPCStats(
+            base=NPCStatsBase(hp_base=10),
+        )
+        template = NPCTemplate(
+            id="t_assault",
+            name="Assault",
+            npc_class="grunt",
+            tier="tier_1",
+            role="striker",
+            stats=stats,
+        )
+        assert template.id == "t_assault"
+
+    def test_special_npc_template_id(self):
+        """Test SpecialNPCTemplate with typed id."""
+        from core.npc.models import SpecialNPCTemplate, NPCStats, NPCStatsBase
+
+        stats = NPCStats(
+            base=NPCStatsBase(hp_base=10),
+        )
+        template = SpecialNPCTemplate(
+            id="t_ultra_boss",
+            name="Ultra Boss",
+            npc_class="boss",
+            tier="tier_3",
+            role="striker",
+            special_class="ultra",
+            stats=stats,
+        )
+        assert template.id == "t_ultra_boss"
+
+    def test_npc_template_variant_base_template_id(self):
+        """Test NPCTemplateVariant with typed base_template_id."""
+        from core.npc.templates import NPCTemplateVariant
+
+        variant = NPCTemplateVariant(
+            base_template_id="t_assault",
+            variant_name="elite",
+            hp_modifier=5,
+        )
+        assert variant.base_template_id == "t_assault"
+
+    def test_trigger_context_target_id(self):
+        """Test TriggerContext with typed target_id."""
+        from core.npc.combat import TriggerContext
+
+        context = TriggerContext(
+            trigger_type="on_hit",
+            target_id="c_enemy_1",
+        )
+        assert context.target_id == "c_enemy_1"
+
+    def test_npc_ability_tracker_npc_id(self):
+        """Test NPCAbilityTracker with typed npc_id."""
+        from core.npc.combat import NPCAbilityTracker
+
+        tracker = NPCAbilityTracker(npc_id="npc_001")
+        assert tracker.npc_id == "npc_001"
+
+    def test_create_npc_ability_tracker(self):
+        """Test create_npc_ability_tracker function."""
+        from core.npc.combat import create_npc_ability_tracker
+        from core.npc.state import NPCState, NPCCombatStats
+
+        stats = NPCCombatStats(
+            size="size_1",
+            hp_max=10,
+            evasion=8,
+            e_defense=8,
+            armor=0,
+            speed=4,
+            sensor_range=10,
+            tech_attack=0,
+        )
+        state = NPCState(
+            id="npc_test",
+            name="Test NPC",
+            npc_class="grunt",
+            tier="tier_1",
+            stats=stats,
+        )
+        tracker = create_npc_ability_tracker(state)
+        assert tracker.npc_id == "npc_test"
+
+
+class TestSharedModulesTypedIds:
+    """Test typed IDs in shared modules (Phase 3B-9)."""
+
+    def test_damage_resolution_context_attacker_id(self):
+        """Test DamageResolutionContext with typed attacker_id (accepts string)."""
+        from core.shared.id_helpers import CombatantIdField
+        from pydantic import BaseModel
+
+        class TestModel(BaseModel):
+            attacker_id: CombatantIdField
+
+        model = TestModel(attacker_id="c_player_1")
+        assert model.attacker_id == "c_player_1"
+
+    def test_state_helpers_destroy_system_system_id(self):
+        """Test destroy_system function with typed system_id."""
+        from core.shared.state_helpers import destroy_system
+        from core.mech.combat_state import MechInventory, MechSystemState
+
+        inventory = MechInventory(
+            mounts=[],
+            systems=[
+                MechSystemState(
+                    system_id="s_coolant", system_name="Coolant", destroyed=False
+                ),
+            ],
+        )
+        result = destroy_system(inventory, system_id="s_coolant")
+        assert len(result.systems) == 1
+        assert result.systems[0].destroyed is True
+
+    def test_state_helpers_increment_reaction_use_action_id(self):
+        """Test increment_reaction_use function with typed action_id."""
+        from core.shared.state_helpers import increment_reaction_use
+        from core.mech.combat_state import CombatantState, CombatStats, CombatResources
+
+        state = CombatantState(
+            id="c_player_1",
+            name="Player 1",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=10,
+            ),
+            resources=CombatResources(hp_current=10),
+            statuses=[],
+            conditions=[],
+        )
+        result = increment_reaction_use(state, action_id="overwatch")
+        assert "overwatch" in result.per_round_reactions
+        assert result.per_round_reactions["overwatch"] == 1
+
+    def test_triggers_context_target_id(self):
+        """Test TriggerContext with typed target_id."""
+        from core.shared.triggers import TriggerContext
+
+        context = TriggerContext(
+            trigger_type="on_damage_dealt",
+            target_id="c_enemy_1",
+        )
+        assert context.target_id == "c_enemy_1"
+
+    def test_turn_end_effect_state_target_id(self):
+        """Test TurnEndEffectState with typed target_id."""
+        from core.shared.turn_end import TurnEndEffectState
+
+        effect = TurnEndEffectState(
+            effect_id="e_buff_1",
+            effect_type="buff",
+            target_id="c_player_1",
+            duration_type="end_of_turn",
+            applied_by="c_player_2",
+        )
+        assert effect.target_id == "c_player_1"
+
+    def test_protocol_activation_input_target_id(self):
+        """Test ProtocolActivationInput with typed target_id."""
+        from core.shared.protocols import ProtocolActivationInput
+
+        input_model = ProtocolActivationInput(
+            actor_id="c_player_1",
+            protocol_id="p_shield",
+            protocol_name="Shield Protocol",
+            effect_type="buff",
+            target_id="c_player_2",
+        )
+        assert input_model.target_id == "c_player_2"
+
+    def test_repair_spec_target_id(self):
+        """Test RepairSpec with typed target_id."""
+        from core.shared.repair import RepairSpec
+
+        spec = RepairSpec(
+            target_id="c_player_1",
+            repair_type="hp",
+            repairs_spent=1,
+        )
+        assert spec.target_id == "c_player_1"
+
+    def test_stabilize_input_condition_target_id(self):
+        """Test StabilizeInput with typed condition_target_id."""
+        from core.shared.stabilize import StabilizeInput
+
+        input_model = StabilizeInput(
+            primary_choice="cool_heat",
+            secondary_choice="clear_condition",
+            condition_target_id="c_player_1",
+        )
+        assert input_model.condition_target_id == "c_player_1"
+
+    def test_full_tech_scan_params_target_id(self):
+        """Test ScanTechParams with typed target_id."""
+        from core.shared.full_tech import ScanTechParams
+
+        params = ScanTechParams(target_id="c_enemy_1")
+        assert params.target_id == "c_enemy_1"
+
+    def test_full_tech_bolster_params_target_id(self):
+        """Test BolsterTechParams with typed target_id."""
+        from core.shared.full_tech import BolsterTechParams
+
+        params = BolsterTechParams(
+            target_id="c_enemy_1",
+            attacker_systems=5,
+        )
+        assert params.target_id == "c_enemy_1"
+
+    def test_full_tech_lock_on_params_target_id(self):
+        """Test LockOnTechParams with typed target_id."""
+        from core.shared.full_tech import LockOnTechParams
+
+        params = LockOnTechParams(target_id="c_enemy_1")
+        assert params.target_id == "c_enemy_1"
+
+    def test_full_tech_invade_params_target_id(self):
+        """Test InvadeTechParams with typed target_id."""
+        from core.shared.full_tech import InvadeTechParams
+
+        params = InvadeTechParams(
+            target_id="c_enemy_1",
+            attacker_systems=5,
+            target_e_defense=8,
+        )
+        assert params.target_id == "c_enemy_1"
+
+    def test_fight_input_target_id(self):
+        """Test FightInput with typed target_id."""
+        from core.shared.fight import FightInput
+
+        input_model = FightInput(
+            actor_id="p_pilot_1",
+            target_id="c_enemy_1",
+        )
+        assert input_model.target_id == "c_enemy_1"
+
+    def test_improvised_input_target_id(self):
+        """Test ImprovisedInput with typed target_id."""
+        from core.shared.improvised import ImprovisedInput
+
+        input_model = ImprovisedInput(
+            actor_id="c_player_1",
+            target_id="c_enemy_1",
+            is_unarmed=True,
+        )
+        assert input_model.target_id == "c_enemy_1"
+
+    def test_drone_activation_input_attack_target_id(self):
+        """Test DroneActivationInput with typed attack_target_id."""
+        from core.shared.deployables import DroneActivationInput
+
+        input_model = DroneActivationInput(
+            drone_id="dr_turret_1",
+            owner_id="c_player_1",
+            action_type="attack",
+            attack_target_id="c_enemy_1",
+        )
+        assert input_model.attack_target_id == "c_enemy_1"
+
+    def test_tracking_drone_input_typed_ids(self):
+        """Test TrackingDroneInput with typed drone_id and target_id."""
+        from core.shared.drone_abilities import TrackingDroneInput
+
+        input_model = TrackingDroneInput(
+            drone_id="dr_tracking_1",
+            owner_id="c_player_1",
+            target_id="c_enemy_1",
+            shooter_id="c_player_1",
+            shooter_systems_bonus=5,
+        )
+        assert input_model.drone_id == "dr_tracking_1"
+        assert input_model.target_id == "c_enemy_1"
+        assert input_model.shooter_id == "c_player_1"
+
+    def test_drone_turn_start_input_latch_target_id(self):
+        """Test DroneTurnStartInput with typed latch_drone_target_id."""
+        from core.shared.drone_turn import DroneTurnStartInput
+
+        input_model = DroneTurnStartInput(
+            owner_id="c_player_1",
+            deployed_drones={},
+            current_turn=1,
+            latch_drone_active=True,
+            latch_drone_target_id="c_enemy_1",
+        )
+        assert input_model.latch_drone_target_id == "c_enemy_1"
+
+    def test_self_destruct_input_mech_id(self):
+        """Test SelfDestructInput with typed mech_id."""
+        from core.shared.self_destruct import SelfDestructInput
+
+        input_model = SelfDestructInput(
+            actor_id="p_pilot_1",
+            mech_id="m_everest_1",
+            delay_turns=1,
+        )
+        assert input_model.mech_id == "m_everest_1"
+
+    def test_scenario_objective_criterion_target_id(self):
+        """Test ObjectiveCriterion with typed target_id."""
+        from core.shared.scenario import ObjectiveCriterion
+
+        criterion = ObjectiveCriterion(
+            criterion_type="target_destroyed",
+            description="Destroy the enemy mech",
+            target_id="c_enemy_1",
+        )
+        assert criterion.target_id == "c_enemy_1"
+
+    def test_drone_abilities_list_combatant_ids(self):
+        """Test drone abilities accept list of typed combatant IDs."""
+        from core.shared.id_helpers import CombatantIdField
+        from pydantic import BaseModel
+
+        class TestModel(BaseModel):
+            enemy_ids: list[CombatantIdField]
+            ally_ids: list[CombatantIdField]
+            affected_ids: list[CombatantIdField]
+
+        model = TestModel(
+            enemy_ids=["c_enemy_1", "c_enemy_2"],
+            ally_ids=["c_player_2", "c_player_3"],
+            affected_ids=["c_target_1"],
+        )
+        assert len(model.enemy_ids) == 2
+        assert len(model.ally_ids) == 2
+        assert len(model.affected_ids) == 1
+
+
+class TestIntegrationLayerTypedIds:
+    """Test typed IDs in integration layer (Phase 3B-10)."""
+
+    def test_npc_ai_action_score_target_id(self):
+        """Test ActionScore with typed target_id."""
+        from core.shared.integration.npc_ai import ActionScore
+
+        score = ActionScore(
+            action="full",
+            target_id="c_enemy_1",
+            score=8.5,
+            reasoning="High threat target",
+        )
+        assert score.target_id == "c_enemy_1"
+
+    def test_npc_ai_action_score_no_target(self):
+        """Test ActionScore with None target_id."""
+        from core.shared.integration.npc_ai import ActionScore
+
+        score = ActionScore(
+            action="move",
+            target_id=None,
+            score=0.0,
+            reasoning="No targets visible",
+        )
+        assert score.target_id is None
+
+    def test_npc_ai_action_decision_target_id(self):
+        """Test NPCActionDecision with typed target_id."""
+        from core.shared.integration.npc_ai import NPCActionDecision
+
+        decision = NPCActionDecision(
+            action="full",
+            target_id="c_enemy_1",
+            reasoning="Attacking high-threat target",
+        )
+        assert decision.target_id == "c_enemy_1"
+
+    def test_narrative_combat_event_combatant_ids(self):
+        """Test CombatEvent with typed source_id and target_id."""
+        from core.shared.integration.narrative_combat import CombatEvent
+
+        event = CombatEvent(
+            event_type="target_destroyed",
+            source_id="c_player_1",
+            target_id="c_enemy_1",
+            details={"damage": 10},
+        )
+        assert event.source_id == "c_player_1"
+        assert event.target_id == "c_enemy_1"
+
+    def test_narrative_combat_event_no_target(self):
+        """Test CombatEvent with None target_id."""
+        from core.shared.integration.narrative_combat import CombatEvent
+
+        event = CombatEvent(
+            event_type="turn_completed",
+            source_id="c_player_1",
+            target_id=None,
+            details={"turn": 3},
+        )
+        assert event.source_id == "c_player_1"
+        assert event.target_id is None
+
+
+class TestIntegrationLayerTypedIds:
+    """Test typed IDs in integration layer (Phase 3B-10)."""
+
+    def test_npc_ai_action_score_target_id(self):
+        """Test ActionScore with typed target_id."""
+        from core.shared.integration.npc_ai import ActionScore
+
+        score = ActionScore(
+            action="full",
+            target_id="c_enemy_1",
+            score=8.5,
+            reasoning="High threat target",
+        )
+        assert score.target_id == "c_enemy_1"
+
+    def test_npc_ai_action_score_no_target(self):
+        """Test ActionScore with None target_id."""
+        from core.shared.integration.npc_ai import ActionScore
+
+        score = ActionScore(
+            action="move",
+            target_id=None,
+            score=0.0,
+            reasoning="No targets visible",
+        )
+        assert score.target_id is None
+
+    def test_npc_ai_action_decision_target_id(self):
+        """Test NPCActionDecision with typed target_id."""
+        from core.shared.integration.npc_ai import NPCActionDecision
+
+        decision = NPCActionDecision(
+            action="full",
+            target_id="c_enemy_1",
+            reasoning="Attacking high-threat target",
+        )
+        assert decision.target_id == "c_enemy_1"
+
+    def test_narrative_combat_event_combatant_ids(self):
+        """Test CombatEvent with typed source_id and target_id."""
+        from core.shared.integration.narrative_combat import CombatEvent
+
+        event = CombatEvent(
+            event_type="target_destroyed",
+            source_id="c_player_1",
+            target_id="c_enemy_1",
+            details={"damage": 10},
+        )
+        assert event.source_id == "c_player_1"
+        assert event.target_id == "c_enemy_1"
+
+    def test_narrative_combat_event_no_target(self):
+        """Test CombatEvent with None target_id."""
+        from core.shared.integration.narrative_combat import CombatEvent
+
+        event = CombatEvent(
+            event_type="turn_completed",
+            source_id="c_player_1",
+            target_id=None,
+            details={"turn": 3},
+        )
+        assert event.source_id == "c_player_1"
+        assert event.target_id is None

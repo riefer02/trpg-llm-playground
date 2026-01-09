@@ -24,6 +24,7 @@ from __future__ import annotations
 from typing import Literal, Any
 from pydantic import Field
 from core.shared.models import FrozenModel
+from core.shared.id_helpers import CombatantIdField
 
 from core.mech.timing import (
     TurnPhase,
@@ -89,7 +90,7 @@ class ProtocolActivationInput(FrozenModel):
     duration_turns: int | None = Field(
         default=None, ge=1, description="Turns remaining for turns duration"
     )
-    target_id: str | None = Field(
+    target_id: CombatantIdField | None = Field(
         default=None, description="Target of the protocol (None for self)"
     )
     is_toggle: bool = Field(

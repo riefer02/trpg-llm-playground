@@ -13,6 +13,7 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType, StatusType
 from core.shared.dice import round_up
+from core.shared.id_helpers import CombatantIdField
 from core.mech.combat_rules import DamageResolutionRules
 from core.mech.combat_state import CombatantState, CombatStats
 from core.mech.grid import HexCoord
@@ -46,7 +47,7 @@ class DamageResolutionContext(FrozenModel):
     accurate damage resolution.
     """
 
-    attacker_id: str = Field(..., description="ID of the damage source")
+    attacker_id: CombatantIdField = Field(..., description="ID of the damage source")
     target: CombatantState = Field(..., description="Target combatant state")
     target_position: HexCoord | None = Field(
         default=None, description="Target grid position"

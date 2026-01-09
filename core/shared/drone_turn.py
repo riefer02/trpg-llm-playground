@@ -34,6 +34,7 @@ from typing import Literal, Union
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
+from core.shared.id_helpers import CombatantIdField
 from core.mech.grid import HexCoord, HexPosition, hexes_in_radius
 from core.mech.combat_state import DeployableState, MechCombatScenario
 
@@ -63,7 +64,7 @@ class DroneTurnStartInput(FrozenModel):
     latch_drone_active: bool = Field(
         default=False, description="Whether any latch drone is in active mode"
     )
-    latch_drone_target_id: str | None = Field(
+    latch_drone_target_id: CombatantIdField | None = Field(
         default=None, description="Target ID of active latch drone"
     )
     tier: int = Field(default=1, ge=1, le=3, description="NPC tier for scaling")
@@ -173,7 +174,7 @@ class DroneTurnEndInput(FrozenModel):
     latch_drone_active: bool = Field(
         default=False, description="Whether any latch drone is in active mode"
     )
-    latch_drone_target_id: str | None = Field(
+    latch_drone_target_id: CombatantIdField | None = Field(
         default=None, description="Target ID of active latch drone"
     )
     tier: int = Field(default=1, ge=1, le=3, description="NPC tier for scaling")
@@ -476,7 +477,7 @@ class DroneTurnInput(FrozenModel):
     latch_drone_active: bool = Field(
         default=False, description="Whether any latch drone is in active mode"
     )
-    latch_drone_target_id: str | None = Field(
+    latch_drone_target_id: CombatantIdField | None = Field(
         default=None, description="Target ID of active latch drone"
     )
 

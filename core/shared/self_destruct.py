@@ -21,6 +21,7 @@ from typing import Literal, TYPE_CHECKING
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType, SizeClass
+from core.shared.id_helpers import MechIdField
 from core.shared.dice import DiceExpression
 from core.shared.saves import SaveRequest, SaveResult, resolve_save
 from core.shared.heat import MeltdownState, trigger_meltdown
@@ -54,7 +55,7 @@ class SelfDestructInput(FrozenModel):
     """Input for Self Destruct initiation."""
 
     actor_id: str = Field(..., description="ID of the pilot initiating self destruct")
-    mech_id: str = Field(..., description="ID of the mech to self destruct")
+    mech_id: MechIdField = Field(..., description="ID of the mech to self destruct")
     delay_turns: int = Field(..., ge=1, description="Turns until explosion (1-2)")
     rules: SelfDestructRule | None = Field(
         default=None, description="Override resolution rules"
