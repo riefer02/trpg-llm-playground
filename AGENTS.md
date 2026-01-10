@@ -266,6 +266,21 @@ except PydanticValidationError as e:
     raise core_validation_error_to_api(e, "pilot data")
 ```
 
+**Shared Response Schemas** (`app/backend/schemas/`):
+```python
+from app.backend.schemas import ListResponse, ValidationResponse, ValidationIssue
+
+# Generic list response with pagination metadata
+@router.get("", response_model=ListResponse[CharacterResponse])
+async def list_characters(...) -> ListResponse[CharacterResponse]:
+    return ListResponse(items=characters, total=len(characters))
+
+# Validation response for game rule checking
+@router.get("/{id}/validate", response_model=ValidationResponse)
+async def validate(...) -> ValidationResponse:
+    return ValidationResponse(valid=True, issues=[])
+```
+
 **Error handling pattern:**
 ```python
 from app.backend.exceptions import NotFoundError, ValidationError

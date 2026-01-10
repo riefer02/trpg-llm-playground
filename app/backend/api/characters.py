@@ -1,5 +1,6 @@
 """Character CRUD endpoints with unified pilot + mech validation.
 
+
 This module provides the primary user-facing API for character management.
 A Character is the unified abstraction combining a Pilot with their Mechs.
 
@@ -27,6 +28,7 @@ from app.backend.db.engine import get_session
 from app.backend.db.models import CharacterDB, utc_now
 from app.backend.dependencies import get_current_user
 from app.backend.exceptions import NotFoundError, ValidationError
+from app.backend.schemas import ListResponse, ValidationIssue, ValidationResponse
 from app.backend.utils import validate_core_model, core_validation_error_to_api
 
 # Import core models - these are the source of truth
@@ -202,26 +204,8 @@ class CharacterResponse(BaseModel):
     core_bonus_effects: list[dict[str, Any]]
 
 
-class CharacterListResponse(BaseModel):
-    """Response model for listing characters."""
-
-    items: list[CharacterResponse]
-    total: int
-
-
-class ValidationIssueResponse(BaseModel):
-    """A single validation issue."""
-
-    code: str
-    message: str
-    severity: str = "error"
-
-
-class CharacterValidationResponse(BaseModel):
-    """Validation results for a character."""
-
-    valid: bool
-    issues: list[ValidationIssueResponse]
+# Use shared ListResponse[CharacterResponse] for list endpoint
+# Use shared ValidationResponse for validation endpoint
 
 
 # =============================================================================
@@ -520,12 +504,12 @@ async def create_character(
     return _character_to_response(db_char)
 
 
-@router.get("", response_model=CharacterListResponse)
+@router.get("", response_model=ListResponse[CharacterResponse])
 async def list_characters(
     session: AsyncSession = Depends(get_session),
     user: dict = Depends(get_current_user),
     campaign_id: str | None = None,
-) -> CharacterListResponse:
+) -> ListResponse[CharacterResponse]:
     """List characters for the current user.
 
     Optionally filter by campaign_id.
@@ -538,7 +522,7 @@ async def list_characters(
     result = await session.exec(query)
     characters = result.all()
 
-    return CharacterListResponse(
+    return ListResponse(
         items=[_character_to_response(c) for c in characters],
         total=len(characters),
     )
@@ -628,12 +612,12 @@ async def delete_character(
     await session.commit()
 
 
-@router.get("/{character_id}/validate", response_model=CharacterValidationResponse)
+@router.get("/{character_id}/validate", response_model=ValidationResponse)
 async def validate_character_endpoint(
     character_id: str,
     session: AsyncSession = Depends(get_session),
     user: dict = Depends(get_current_user),
-) -> CharacterValidationResponse:
+) -> ValidationResponse:
     """Validate a character against game rules.
 
     Returns validation results including any issues with:
@@ -656,10 +640,10 @@ async def validate_character_endpoint(
     core_char = Character.model_validate(char_db.data)
     validation = validate_character(core_char)
 
-    return CharacterValidationResponse(
+    return ValidationResponse(
         valid=validation.valid,
         issues=[
-            ValidationIssueResponse(
+            ValidationIssue(
                 code=issue.code,
                 message=issue.message,
                 severity=issue.severity,
