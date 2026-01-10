@@ -7,7 +7,6 @@ Design principle: Core is the source of truth. Request bodies accept raw dicts
 which are validated by core models via validate_core_model().
 """
 
-from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
@@ -20,8 +19,14 @@ from app.backend.db.engine import get_session
 from app.backend.db.models import PilotDB, utc_now
 from app.backend.dependencies import get_current_user
 from app.backend.exceptions import NotFoundError
-from app.backend.schemas import ListResponse, ValidationIssue, ValidationResponse
-from app.backend.utils import validate_core_model
+from app.backend.schemas import (
+    DatabaseMetadata,
+    ListResponse,
+    ValidationIssue,
+    ValidationResponse,
+)
+from app.backend.serializers import serialize_pilot_response_fields
+from app.backend.utils import validate_core_model, validate_core_model_list
 
 # Import core models - these are the source of truth
 from core.pilot import (
@@ -104,18 +109,11 @@ class PilotUpdateRequest(BaseModel):
 # =============================================================================
 
 
-class PilotResponse(BaseModel):
+class PilotResponse(DatabaseMetadata):
     """Response model for pilot data.
 
     Includes database metadata and hydrated Pilot with computed fields.
     """
-
-    # Database metadata
-    id: str
-    user_id: str
-    campaign_id: str | None
-    created_at: datetime
-    updated_at: datetime
 
     # Core pilot data (hydrated from JSON)
     callsign: str
@@ -176,25 +174,22 @@ def _build_core_pilot(
         data["skills"] = validate_core_model(SkillSet, request.skills, "skills")
 
     if request.triggers is not None:
-        data["triggers"] = [
-            validate_core_model(PilotTrigger, t, "trigger") for t in request.triggers
-        ]
+        data["triggers"] = validate_core_model_list(
+            PilotTrigger, request.triggers, "trigger"
+        )
 
     if request.talents is not None:
-        data["talents"] = [
-            validate_core_model(Talent, t, "talent") for t in request.talents
-        ]
+        data["talents"] = validate_core_model_list(Talent, request.talents, "talent")
 
     if request.licenses is not None:
-        data["licenses"] = [
-            validate_core_model(License, lic, "license") for lic in request.licenses
-        ]
+        data["licenses"] = validate_core_model_list(
+            License, request.licenses, "license"
+        )
 
     if request.core_bonuses is not None:
-        data["core_bonuses"] = [
-            validate_core_model(CoreBonus, cb, "core_bonus")
-            for cb in request.core_bonuses
-        ]
+        data["core_bonuses"] = validate_core_model_list(
+            CoreBonus, request.core_bonuses, "core_bonus"
+        )
 
     if request.background is not None:
         data["background"] = validate_core_model(
@@ -224,26 +219,7 @@ def _pilot_to_response(pilot_db: PilotDB) -> PilotResponse:
         campaign_id=pilot_db.campaign_id,
         created_at=pilot_db.created_at,
         updated_at=pilot_db.updated_at,
-        callsign=core_pilot.callsign,
-        name=core_pilot.name,
-        level=core_pilot.level,
-        skills=core_pilot.skills.as_dict(),
-        triggers=[t.model_dump() for t in core_pilot.triggers],
-        talents=[t.model_dump() for t in core_pilot.talents],
-        licenses=[lic.model_dump() for lic in core_pilot.licenses],
-        core_bonuses=[cb.model_dump() for cb in core_pilot.core_bonuses],
-        background=core_pilot.background.model_dump()
-        if core_pilot.background
-        else None,
-        notes=core_pilot.notes,
-        grit=core_pilot.grit,
-        hp=core_pilot.hp,
-        armor=core_pilot.armor,
-        evasion=core_pilot.evasion,
-        e_defense=core_pilot.e_defense,
-        speed=core_pilot.speed,
-        save_target=core_pilot.save_target,
-        attack_bonus=core_pilot.attack_bonus,
+        **serialize_pilot_response_fields(core_pilot),
     )
 
 

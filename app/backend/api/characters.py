@@ -15,7 +15,6 @@ that passes data to core models via model_validate(). Never duplicate
 validation logic - let core handle it.
 """
 
-from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
@@ -28,8 +27,18 @@ from app.backend.db.engine import get_session
 from app.backend.db.models import CharacterDB, utc_now
 from app.backend.dependencies import get_current_user
 from app.backend.exceptions import NotFoundError, ValidationError
-from app.backend.schemas import ListResponse, ValidationIssue, ValidationResponse
-from app.backend.utils import validate_core_model, core_validation_error_to_api
+from app.backend.schemas import (
+    DatabaseMetadata,
+    ListResponse,
+    ValidationIssue,
+    ValidationResponse,
+)
+from app.backend.serializers import serialize_character_response_fields
+from app.backend.utils import (
+    core_validation_error_to_api,
+    validate_core_model,
+    validate_core_model_list,
+)
 
 # Import core models - these are the source of truth
 from core.character import (
@@ -165,18 +174,11 @@ class MechConfigResponse(BaseModel):
     build: dict[str, Any]
 
 
-class CharacterResponse(BaseModel):
+class CharacterResponse(DatabaseMetadata):
     """Response model for character data.
 
     Includes database metadata, full character data, and computed fields.
     """
-
-    # Database metadata
-    id: str
-    user_id: str
-    campaign_id: str | None
-    created_at: datetime
-    updated_at: datetime
 
     # Pilot data
     pilot_id: str
@@ -242,16 +244,13 @@ def _build_character_from_request(
 
             triggers = None
             if request.triggers:
-                triggers = [
-                    validate_core_model(PilotTrigger, t, "trigger")
-                    for t in request.triggers
-                ]
+                triggers = validate_core_model_list(
+                    PilotTrigger, request.triggers, "trigger"
+                )
 
             talents = None
             if request.talents:
-                talents = [
-                    validate_core_model(Talent, t, "talent") for t in request.talents
-                ]
+                talents = validate_core_model_list(Talent, request.talents, "talent")
 
             background = None
             if request.background:
@@ -351,25 +350,24 @@ def _update_character_from_request(
         )
 
     if request.triggers is not None:
-        pilot_updates["triggers"] = [
-            validate_core_model(PilotTrigger, t, "trigger") for t in request.triggers
-        ]
+        pilot_updates["triggers"] = validate_core_model_list(
+            PilotTrigger, request.triggers, "trigger"
+        )
 
     if request.talents is not None:
-        pilot_updates["talents"] = [
-            validate_core_model(Talent, t, "talent") for t in request.talents
-        ]
+        pilot_updates["talents"] = validate_core_model_list(
+            Talent, request.talents, "talent"
+        )
 
     if request.licenses is not None:
-        pilot_updates["licenses"] = [
-            validate_core_model(License, lic, "license") for lic in request.licenses
-        ]
+        pilot_updates["licenses"] = validate_core_model_list(
+            License, request.licenses, "license"
+        )
 
     if request.core_bonuses is not None:
-        pilot_updates["core_bonuses"] = [
-            validate_core_model(CoreBonus, cb, "core_bonus")
-            for cb in request.core_bonuses
-        ]
+        pilot_updates["core_bonuses"] = validate_core_model_list(
+            CoreBonus, request.core_bonuses, "core_bonus"
+        )
 
     if request.background is not None:
         pilot_updates["background"] = validate_core_model(
@@ -402,61 +400,13 @@ def _character_to_response(char_db: CharacterDB) -> CharacterResponse:
     """
     core_char = Character.model_validate(char_db.data)
 
-    # Build mech responses
-    mech_responses = [
-        MechConfigResponse(
-            id=m.id,
-            name=m.name,
-            frame_id=m.frame_id,
-            build=m.build.model_dump(mode="json"),
-        )
-        for m in core_char.mechs
-    ]
-
-    # Get active mech stats if available
-    active_stats = None
-    if core_char.active_mech_stats:
-        stats = core_char.active_mech_stats
-        active_stats = MechStatsResponse(
-            hp=stats.hp,
-            armor=stats.armor,
-            evasion=stats.evasion,
-            e_defense=stats.e_defense,
-            speed=stats.speed,
-            sensor_range=stats.sensor_range,
-            tech_attack=stats.tech_attack,
-            heat_cap=stats.heat_cap,
-            repair_cap=stats.repair_cap,
-            system_points=stats.system_points,
-            save_target=stats.save_target,
-            size=stats.size,
-        )
-
     return CharacterResponse(
         id=char_db.id,
         user_id=char_db.user_id,
         campaign_id=char_db.campaign_id,
         created_at=char_db.created_at,
         updated_at=char_db.updated_at,
-        pilot_id=core_char.pilot.id,
-        callsign=core_char.pilot.callsign,
-        name=core_char.pilot.name,
-        level=core_char.pilot.level,
-        skills=core_char.pilot.skills.as_dict(),
-        triggers=[t.model_dump() for t in core_char.pilot.triggers],
-        talents=[t.model_dump() for t in core_char.pilot.talents],
-        licenses=[lic.model_dump() for lic in core_char.pilot.licenses],
-        core_bonuses=[cb.model_dump() for cb in core_char.pilot.core_bonuses],
-        background=core_char.pilot.background.model_dump()
-        if core_char.pilot.background
-        else None,
-        notes=core_char.pilot.notes,
-        grit=core_char.pilot.grit,
-        pilot_hp=core_char.pilot.hp,
-        mechs=mech_responses,
-        active_mech_id=core_char.active_mech_id,
-        active_mech_stats=active_stats,
-        core_bonus_effects=[e.model_dump() for e in core_char.core_bonus_effects],
+        **serialize_character_response_fields(core_char),
     )
 
 
