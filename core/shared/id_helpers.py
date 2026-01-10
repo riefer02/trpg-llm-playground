@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from core.shared.ids import (
         PilotId,
         MechId,
+        CharacterId,
         NpcId,
         CombatantId,
         ActorId,
@@ -108,6 +109,7 @@ def _id_field_factory(id_type: type[T]) -> Any:
 if TYPE_CHECKING:
     PilotIdField = Annotated[str, BeforeValidator]
     MechIdField = Annotated[str, BeforeValidator]
+    CharacterIdField = Annotated[str, BeforeValidator]
     NpcIdField = Annotated[str, BeforeValidator]
     CombatantIdField = Annotated[str, BeforeValidator]
     ActorIdField = Annotated[str, BeforeValidator]
@@ -140,6 +142,7 @@ else:
     from core.shared.ids import (
         PilotId,
         MechId,
+        CharacterId,
         NpcId,
         CombatantId,
         ActorId,
@@ -172,6 +175,7 @@ else:
 
     PilotIdField = _id_field_factory(PilotId)
     MechIdField = _id_field_factory(MechId)
+    CharacterIdField = _id_field_factory(CharacterId)
     NpcIdField = _id_field_factory(NpcId)
     CombatantIdField = _id_field_factory(CombatantId)
     ActorIdField = _id_field_factory(ActorId)
@@ -206,6 +210,7 @@ __all__ = [
     "IdField",
     "PilotIdField",
     "MechIdField",
+    "CharacterIdField",
     "NpcIdField",
     "CombatantIdField",
     "ActorIdField",

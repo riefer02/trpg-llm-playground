@@ -11,8 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PilotsIndexRouteImport } from './routes/pilots/index'
+import { Route as CharactersIndexRouteImport } from './routes/characters/index'
 import { Route as PilotsNewRouteImport } from './routes/pilots/new'
 import { Route as PilotsPilotIdRouteImport } from './routes/pilots/$pilotId'
+import { Route as CharactersNewRouteImport } from './routes/characters/new'
+import { Route as CharactersCharacterIdRouteImport } from './routes/characters/$characterId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const PilotsIndexRoute = PilotsIndexRouteImport.update({
   id: '/pilots/',
   path: '/pilots/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CharactersIndexRoute = CharactersIndexRouteImport.update({
+  id: '/characters/',
+  path: '/characters/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PilotsNewRoute = PilotsNewRouteImport.update({
@@ -34,38 +42,82 @@ const PilotsPilotIdRoute = PilotsPilotIdRouteImport.update({
   path: '/pilots/$pilotId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CharactersNewRoute = CharactersNewRouteImport.update({
+  id: '/characters/new',
+  path: '/characters/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CharactersCharacterIdRoute = CharactersCharacterIdRouteImport.update({
+  id: '/characters/$characterId',
+  path: '/characters/$characterId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/characters/$characterId': typeof CharactersCharacterIdRoute
+  '/characters/new': typeof CharactersNewRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/characters': typeof CharactersIndexRoute
   '/pilots': typeof PilotsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/characters/$characterId': typeof CharactersCharacterIdRoute
+  '/characters/new': typeof CharactersNewRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/characters': typeof CharactersIndexRoute
   '/pilots': typeof PilotsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/characters/$characterId': typeof CharactersCharacterIdRoute
+  '/characters/new': typeof CharactersNewRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/characters/': typeof CharactersIndexRoute
   '/pilots/': typeof PilotsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/pilots/$pilotId' | '/pilots/new' | '/pilots'
+  fullPaths:
+    | '/'
+    | '/characters/$characterId'
+    | '/characters/new'
+    | '/pilots/$pilotId'
+    | '/pilots/new'
+    | '/characters'
+    | '/pilots'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/pilots/$pilotId' | '/pilots/new' | '/pilots'
-  id: '__root__' | '/' | '/pilots/$pilotId' | '/pilots/new' | '/pilots/'
+  to:
+    | '/'
+    | '/characters/$characterId'
+    | '/characters/new'
+    | '/pilots/$pilotId'
+    | '/pilots/new'
+    | '/characters'
+    | '/pilots'
+  id:
+    | '__root__'
+    | '/'
+    | '/characters/$characterId'
+    | '/characters/new'
+    | '/pilots/$pilotId'
+    | '/pilots/new'
+    | '/characters/'
+    | '/pilots/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CharactersCharacterIdRoute: typeof CharactersCharacterIdRoute
+  CharactersNewRoute: typeof CharactersNewRoute
   PilotsPilotIdRoute: typeof PilotsPilotIdRoute
   PilotsNewRoute: typeof PilotsNewRoute
+  CharactersIndexRoute: typeof CharactersIndexRoute
   PilotsIndexRoute: typeof PilotsIndexRoute
 }
 
@@ -85,6 +137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PilotsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/characters/': {
+      id: '/characters/'
+      path: '/characters'
+      fullPath: '/characters'
+      preLoaderRoute: typeof CharactersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pilots/new': {
       id: '/pilots/new'
       path: '/pilots/new'
@@ -99,13 +158,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PilotsPilotIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/characters/new': {
+      id: '/characters/new'
+      path: '/characters/new'
+      fullPath: '/characters/new'
+      preLoaderRoute: typeof CharactersNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/characters/$characterId': {
+      id: '/characters/$characterId'
+      path: '/characters/$characterId'
+      fullPath: '/characters/$characterId'
+      preLoaderRoute: typeof CharactersCharacterIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CharactersCharacterIdRoute: CharactersCharacterIdRoute,
+  CharactersNewRoute: CharactersNewRoute,
   PilotsPilotIdRoute: PilotsPilotIdRoute,
   PilotsNewRoute: PilotsNewRoute,
+  CharactersIndexRoute: CharactersIndexRoute,
   PilotsIndexRoute: PilotsIndexRoute,
 }
 export const routeTree = rootRouteImport

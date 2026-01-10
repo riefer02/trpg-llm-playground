@@ -73,6 +73,25 @@ class CampaignDB(TimestampMixin, table=True):
     settings: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
 
 
+class CharacterDB(TimestampMixin, table=True):
+    """Character storage with full JSON blob (pilot + mechs).
+
+    The `data` column contains the full core.character.Character model
+    serialized as JSON. This includes the pilot, all mech configurations,
+    and the active mech ID.
+
+    Indexed columns support common queries without parsing JSON.
+    """
+
+    __tablename__ = "characters"
+
+    id: str = Field(primary_key=True)
+    callsign: str = Field(index=True)  # Pilot callsign for search
+    data: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    user_id: str = Field(index=True, default="default_user")
+    campaign_id: str | None = Field(default=None, index=True)
+
+
 CombatSessionStatus = str  # "active", "paused", "completed", "abandoned"
 
 

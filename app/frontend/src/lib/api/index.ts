@@ -2,7 +2,7 @@
  * API module exports.
  * 
  * Import from this file for cleaner imports:
- *   import { useHealth, usePilots, api } from '@/lib/api'
+ *   import { useHealth, useCharacters, api } from '@/lib/api'
  */
 
 // Core client
@@ -13,7 +13,32 @@ export type { RequestOptions } from './client'
 export { useHealth, useDatabaseHealth, healthKeys } from './health'
 export type { HealthResponse, DatabaseHealthResponse } from './health'
 
-// Pilot hooks
+// Character hooks (primary user-facing API)
+export {
+  useCharacters,
+  useCharacter,
+  useCharacterValidation,
+  useCreateCharacter,
+  useUpdateCharacter,
+  useDeleteCharacter,
+  useAddMech,
+  useRemoveMech,
+  useSetActiveMech,
+  characterKeys,
+} from './characters'
+export type {
+  CharacterResponse,
+  CharacterListResponse,
+  CharacterCreateRequest,
+  CharacterUpdateRequest,
+  CharacterValidationResponse,
+  MechAddRequest,
+  MechStats,
+  MechConfig,
+  ValidationIssue,
+} from './characters'
+
+// Pilot hooks (internal/low-level primitive)
 export {
   usePilots,
   usePilot,

@@ -20,6 +20,7 @@ __all__ = [
     # Entity IDs
     "PilotId",
     "MechId",
+    "CharacterId",
     "NpcId",
     "CombatantId",
     "ActorId",
@@ -65,6 +66,9 @@ PilotId = NewType("PilotId", str)
 
 MechId = NewType("MechId", str)
 """Unique identifier for a mech unit."""
+
+CharacterId = NewType("CharacterId", str)
+"""Unique identifier for a character (pilot + mechs)."""
 
 NpcId = NewType("NpcId", str)
 """Unique identifier for an NPC."""

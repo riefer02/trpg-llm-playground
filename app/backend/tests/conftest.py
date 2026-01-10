@@ -16,7 +16,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.backend.main import create_app
 from app.backend.db.engine import get_session
-from app.backend.db.models import PilotDB, MechDB, CampaignDB, CombatSessionDB  # noqa: F401
+from app.backend.db.models import PilotDB, MechDB, CampaignDB, CombatSessionDB, CharacterDB  # noqa: F401
 
 
 @pytest.fixture(scope="session")

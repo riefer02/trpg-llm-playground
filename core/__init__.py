@@ -8,6 +8,18 @@ Legal Note: This type system encodes game mechanics (allowed under
 the Lancer Third Party License), not copyrighted expression/flavor text.
 """
 
+# Re-export character domain (unified Pilot + Mech)
+from core.character import (
+    Character,
+    MechConfiguration,
+    CharacterValidation,
+    CharacterIssue,
+    MechValidationEntry,
+    validate_character,
+    create_ll0_character,
+    create_empty_character,
+)
+
 # Re-export pilot domain
 from core.pilot import (
     Pilot,
@@ -313,6 +325,15 @@ from core.mech import (
 )
 
 __all__ = [
+    # Character domain (unified Pilot + Mech)
+    "Character",
+    "MechConfiguration",
+    "CharacterValidation",
+    "CharacterIssue",
+    "MechValidationEntry",
+    "validate_character",
+    "create_ll0_character",
+    "create_empty_character",
     # Pilot domain
     "Pilot",
     "create_ll0_pilot",

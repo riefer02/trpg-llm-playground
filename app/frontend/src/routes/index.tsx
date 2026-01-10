@@ -44,14 +44,14 @@ function HomePage() {
         </h2>
         <div className="grid gap-4 md:grid-cols-3">
           <QuickActionCard
-            title="Create Pilot"
-            description="Build a new pilot character"
-            href="/pilots/new"
+            title="Create Character"
+            description="Build a new pilot and mech"
+            href="/characters/new"
           />
           <QuickActionCard
-            title="Mech Loadout"
-            description="Configure mech equipment"
-            href="/mechs"
+            title="My Characters"
+            description="View and manage characters"
+            href="/characters"
           />
           <QuickActionCard
             title="Start Combat"

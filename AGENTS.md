@@ -1,8 +1,76 @@
 # Agents Documentation
 
+## Core-First Philosophy (READ THIS FIRST)
+
+This project is built on a **type-driven, core-first architecture**. The `/core` module is the foundation - a complete, validated mechanical system for the Lancer TTRPG with 3277+ tests. Everything else builds on top.
+
+### The Golden Rule
+
+> **Core is the source of truth. Never duplicate what core provides.**
+
+When implementing any feature:
+
+1. **Start with core** - Does the type/validation already exist? Use it.
+2. **Fix gaps in core first** - Missing validation? Add it to core, not the API layer.
+3. **API is a thin wrapper** - Passes data to core via `model_validate()`, converts errors.
+4. **Frontend consumes types** - Generated from core via `make generate-types`.
+
+### What Core Provides
+
+```
+core/
+├── Character          # Unified pilot + mech (source of truth for a "character")
+├── Pilot              # Skills, triggers, talents, licenses, core bonuses
+├── Mech               # Frames, weapons, systems, combat state
+├── validation.py      # Game rule enforcement (LL0 restrictions, point limits)
+└── computed fields    # Grit, HP, derived stats - calculated at model level
+```
+
+### Anti-Patterns to Avoid
+
+```python
+# ❌ WRONG: Duplicating validation in API layer
+class SkillSetInput(BaseModel):
+    hull: int = Field(ge=0, le=6)  # Core already does this!
+
+# ❌ WRONG: Custom types in frontend
+interface Pilot { ... }  # Use generated types!
+
+# ❌ WRONG: Recomputing derived values
+mech_hp = frame_hp + hull * 2 + grit  # Core's computed_field does this!
+```
+
+### Correct Patterns
+
+```python
+# ✅ RIGHT: Let core validate
+from app.backend.utils import validate_core_model
+skills = validate_core_model(SkillSet, request.skills, "skills")
+
+# ✅ RIGHT: Use core's computed fields
+character = Character.model_validate(db_record.data)
+hp = character.active_mech_stats.hp  # Computed from pilot + frame + bonuses
+
+# ✅ RIGHT: Fix validation gaps in core
+# If validation is missing, add it to core/pilot/validation.py, not the API
+```
+
+### Development Flow
+
+```
+1. Need new feature? → Check if core model exists
+2. Core model missing? → Add to core/ with tests first
+3. Validation missing? → Add to core validation, not API
+4. API endpoint → Thin wrapper using validate_core_model()
+5. Frontend → Use generated types from make generate-types
+```
+
+---
+
 ## Project Context
+
 This project is a **monorepo** for Lancer TTRPG tooling with three domains:
-1. **`/core`**: Type-driven game schemas using Pydantic v2
+1. **`/core`**: Type-driven game schemas using Pydantic v2 (3277+ tests)
 2. **`/llm`**: Synthetic data generation and LLM fine-tuning pipeline
 3. **`/app`**: Full-stack web application (FastAPI + TanStack Start)
 
@@ -152,24 +220,28 @@ make dev            # Start backend + frontend
 
 ### Backend Architecture (`app/backend/`)
 
-FastAPI application with dependency injection pattern:
+FastAPI application with dependency injection pattern. **Remember: API is a thin wrapper around core.**
 
 ```python
 # Adding a new endpoint
 from fastapi import APIRouter, Depends
 from app.backend.db.engine import get_session
 from app.backend.dependencies import get_current_user
+from app.backend.utils import validate_core_model  # Use shared utilities!
+from core.pilot import Pilot  # Import core models directly
 
 router = APIRouter(prefix="/resource", tags=["resource"])
 
-@router.get("")
-async def list_resources(
+@router.post("")
+async def create_resource(
+    body: dict,  # Accept raw dict, let core validate
     session: AsyncSession = Depends(get_session),
     user: dict = Depends(get_current_user),
 ):
-    # session: database connection (auto-commits on success)
-    # user: authenticated user (stub returns mock user)
-    pass
+    # Let core handle validation
+    pilot = validate_core_model(Pilot, body, "pilot")
+    # Store as JSON blob
+    db_record.data = pilot.model_dump(mode="json")
 ```
 
 **Key files:**
@@ -177,9 +249,22 @@ async def list_resources(
 - **`config.py`**: pydantic-settings configuration from `.env`
 - **`dependencies.py`**: Dependency injection (stub auth, easy to swap)
 - **`exceptions.py`**: Custom exceptions → consistent JSON error format
+- **`utils.py`**: Shared utilities for core model validation (use this!)
 - **`api/router.py`**: Main router aggregating all endpoints
 - **`db/engine.py`**: Async SQLAlchemy engine + session dependency
 - **`db/models.py`**: SQLModel tables (JSON blob pattern)
+
+**Shared Utilities** (`app/backend/utils.py`):
+```python
+from app.backend.utils import validate_core_model, core_validation_error_to_api
+
+# Validate request data against core model
+skills = validate_core_model(SkillSet, request.skills, "skills")
+
+# Convert caught validation errors to HTTP format
+except PydanticValidationError as e:
+    raise core_validation_error_to_api(e, "pilot data")
+```
 
 **Error handling pattern:**
 ```python
@@ -384,7 +469,8 @@ core/ change → make test-core → make generate-types → update app/ → make
 
 ## Completed Features
 
-### Core (3225+ tests passing)
+### Core (3277+ tests passing)
+- ✅ **Character System**: Unified Pilot + Mech model (52 tests) - the primary abstraction
 - ✅ **Pilot System**: Skills, backgrounds, 34 talents, licenses, 31 core bonuses, cloning
 - ✅ **Mech System**: 29 frames, 88 weapons, 124 systems, combat state tracking
 - ✅ **Combat System**: Actions, conditions, initiative, heat/structure/stress
@@ -393,6 +479,14 @@ core/ change → make test-core → make generate-types → update app/ → make
 - ✅ **Effects System**: 136 mechanical effect types with typed primitives
 - ✅ **Typed IDs**: NewType definitions for compile-time ID safety
 - ✅ **JSON Schema Export**: Individual and combined schema files
+- ✅ **Validation System**: Pilot progression, mech builds, LL0 rules, license gating
+
+### Web Application (59 tests passing)
+- ✅ **Character API**: Full CRUD with unified pilot + mech (20 tests)
+- ✅ **Character Frontend**: List, create, detail routes
+- ✅ **Pilot API**: Low-level primitive API (kept for internal use)
+- ✅ **Combat Session API**: CRUD foundation
+- ✅ **Shared Utilities**: `validate_core_model()` for DRY API layer
 
 ### LLM
 - ✅ **RAG Integration**: Heading-aware chunking, FAISS indexing
@@ -404,16 +498,16 @@ core/ change → make test-core → make generate-types → update app/ → make
 
 ## Roadmap
 
-### Current: Web Application (Phase 4)
-- ✅ Phase 4A: Pilot CRUD API with core validation
-- ✅ Phase 4B: Combat session CRUD (foundation complete, 39 app tests)
-- 🔲 Phase 4B: Action execution endpoints
-- 🔲 Phase 4C: Frontend combat UI (hex grid, action panel)
+### Current: Combat UI (Phase 6)
+- 🔲 Action execution endpoints
+- 🔲 Frontend combat UI (hex grid, action panel)
 
 ### Completed
-- ✅ Phase 1: Core type system (3225+ tests)
+- ✅ Phase 1: Core type system (3277+ tests)
 - ✅ Phase 2: Code cleanliness (HexCoord, effects splitting)
 - ✅ Phase 3: App foundation (FastAPI, TanStack Start, type generation)
+- ✅ Phase 4: Pilot & Combat session CRUD APIs
+- ✅ Phase 5: Character system (core model + API + frontend)
 
 ### Future
 - Campaign persistence and GM tools
