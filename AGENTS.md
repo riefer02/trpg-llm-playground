@@ -279,6 +279,33 @@ Backend tests use in-memory SQLite (no Docker needed).
 - **Type Safety**: Run `make generate-types` after changing Python models
 - **Use Generated Types**: Never create ad-hoc types for core data (see below)
 
+### API Layer Pattern (Critical)
+
+**Rule**: Use core models directly via `model_validate()`. Don't create duplicate input schemas.
+
+```python
+# ❌ WRONG: Duplicating core validation
+class CombatStatsInput(BaseModel):
+    hp_max: int = Field(..., ge=1)  # Core already validates this!
+    evasion: int = Field(default=10, ge=0)
+
+# ✅ RIGHT: Let core handle validation
+def _validate_combatant(data: dict) -> CombatantState:
+    try:
+        return CombatantState.model_validate(data)
+    except ValidationError as e:
+        raise APIValidationError(e.errors())
+```
+
+**JSON Blob Pattern**: Store complex models as JSONB, hydrate on read:
+```python
+# Write
+db_record.data = core_model.model_dump(mode="json")
+
+# Read
+core_model = CoreModel.model_validate(db_record.data)
+```
+
 ### Type Usage (Critical)
 
 **Rule**: Always check for existing types before creating new ones.
@@ -357,7 +384,7 @@ core/ change → make test-core → make generate-types → update app/ → make
 
 ## Completed Features
 
-### Core (3144 tests passing)
+### Core (3225+ tests passing)
 - ✅ **Pilot System**: Skills, backgrounds, 34 talents, licenses, 31 core bonuses, cloning
 - ✅ **Mech System**: 29 frames, 88 weapons, 124 systems, combat state tracking
 - ✅ **Combat System**: Actions, conditions, initiative, heat/structure/stress
@@ -377,18 +404,16 @@ core/ change → make test-core → make generate-types → update app/ → make
 
 ## Roadmap
 
-### Current: Web Application (Phase 3)
-- ✅ Phase 3A: Backend foundation (FastAPI, SQLModel, PostgreSQL)
-- ✅ Phase 3B: Frontend foundation (TanStack Start, React Query, Tailwind)
-- ✅ Phase 3C: Type bridge (JSON Schema → TypeScript generation)
-- 🔲 Phase 3D: Character builder (Pilot/Mech CRUD with full validation)
-- 🔲 Phase 3E: Combat core (WebGPU hex renderer, WebSocket sync)
-- 🔲 Phase 3F: Full combat (actions, damage, effects, NPC AI)
+### Current: Web Application (Phase 4)
+- ✅ Phase 4A: Pilot CRUD API with core validation
+- ✅ Phase 4B: Combat session CRUD (foundation complete, 39 app tests)
+- 🔲 Phase 4B: Action execution endpoints
+- 🔲 Phase 4C: Frontend combat UI (hex grid, action panel)
 
 ### Completed
-- ✅ Phase 1: Core type system (3200+ tests)
-- ✅ Phase 2A: HexCoord migration with coercion validators
-- ✅ Phase 2B: Import consistency, `__all__` exports
+- ✅ Phase 1: Core type system (3225+ tests)
+- ✅ Phase 2: Code cleanliness (HexCoord, effects splitting)
+- ✅ Phase 3: App foundation (FastAPI, TanStack Start, type generation)
 
 ### Future
 - Campaign persistence and GM tools

@@ -18,9 +18,10 @@ _async_session_factory: sessionmaker | None = None
 
 
 async def init_db() -> None:
-    """Initialize database connection and create tables.
+    """Initialize database connection.
     
     Called during application startup via lifespan context manager.
+    Tables are created via Alembic migrations (run `make db-migrate`).
     """
     global _engine, _async_session_factory
 
@@ -40,10 +41,6 @@ async def init_db() -> None:
         class_=AsyncSession,
         expire_on_commit=False,
     )
-
-    # Create tables (in production, use Alembic migrations instead)
-    async with _engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
 
 
 async def close_db() -> None:

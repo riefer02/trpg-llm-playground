@@ -17,7 +17,7 @@ from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
 # Import all models to ensure they're registered with SQLModel.metadata
-from app.backend.db.models import PilotDB, MechDB, CampaignDB  # noqa: F401
+from app.backend.db.models import PilotDB, MechDB, CampaignDB, CombatSessionDB  # noqa: F401
 from app.backend.config import settings
 
 # Alembic Config object

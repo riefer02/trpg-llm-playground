@@ -71,3 +71,35 @@ class CampaignDB(TimestampMixin, table=True):
     description: str = ""
     gm_user_id: str = Field(index=True)
     settings: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+
+CombatSessionStatus = str  # "active", "paused", "completed", "abandoned"
+
+
+class CombatSessionDB(TimestampMixin, table=True):
+    """Combat session storage with full scenario as JSON blob.
+    
+    The `scenario` column contains the full core.mech.combat_state.MechCombatScenario
+    model serialized as JSON. This includes all combatants, rounds, terrain, and
+    deployables.
+    
+    Indexed columns support queries for active sessions and session history.
+    """
+
+    __tablename__ = "combat_sessions"
+
+    id: str = Field(primary_key=True)
+    name: str = Field(index=True)
+    status: CombatSessionStatus = Field(default="active", index=True)
+    current_round: int = Field(default=1, ge=1)
+    current_turn_index: int = Field(default=0, ge=0)
+    
+    # Full combat scenario as JSON blob
+    scenario: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    
+    # Ownership and organization
+    gm_user_id: str = Field(index=True, default="default_user")
+    campaign_id: str | None = Field(default=None, index=True)
+    
+    # Optional metadata
+    notes: str = Field(default="")
