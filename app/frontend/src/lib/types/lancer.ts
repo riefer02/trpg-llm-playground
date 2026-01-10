@@ -37,6 +37,8 @@ export type LancerTTRPGSchema =
   | DownAndOutRule
   | PilotRestRule
   | PilotCombatRules
+  | Character
+  | MechConfiguration
   | DiceExpression
   | MechanicalEffect
   | StatModifier
@@ -158,7 +160,7 @@ export type LancerTTRPGSchema =
   | SystemPointRules
   | MountedWeapon
   | InstalledSystem
-  | MechBuild
+  | MechBuild1
   | MechDerivedStats
   | ValidationIssue2
   | MechBuildValidation
@@ -28031,6 +28033,59 @@ export type FullRestHours = number;
 export type DamageBands = PilotDamageSeverity[];
 export type MaxArmor = number;
 export type ArmorPiercingIgnoresArmor = boolean;
+/**
+ * Unique character ID
+ */
+export type Id9 = string;
+/**
+ * Unique mech configuration ID
+ */
+export type Id10 = string;
+/**
+ * Custom name (e.g., 'RAIJIN')
+ */
+export type Name26 = string;
+/**
+ * Frame definition ID
+ */
+export type FrameId1 = string;
+export type FrameId2 = string;
+export type MountIndex = number;
+export type WeaponId2 = string;
+export type WeaponSize1 = "aux" | "main" | "heavy" | "superheavy";
+export type Weapons1 = MountedWeapon[];
+export type SystemId = string;
+export type SpCost = number | null;
+export type Systems1 = InstalledSystem[];
+/**
+ * Mech configurations owned by this character
+ */
+export type Mechs = MechConfiguration[];
+/**
+ * ID of the currently active mech (None if no mech selected)
+ */
+export type ActiveMechId = string | null;
+/**
+ * Collect mechanical effects from all pilot core bonuses.
+ */
+export type CoreBonusEffects = MechanicalEffect[];
+export type Size9 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
+export type Armor2 = number;
+export type Hp2 = number;
+export type Evasion2 = number;
+export type EDefense2 = number;
+export type Speed2 = number;
+export type SensorRange = number;
+export type TechAttack = number;
+export type HeatCap = number;
+export type RepairCap = number;
+export type SaveTarget1 = number;
+export type Structure = number;
+export type SystemPoints = number;
+export type AttackBonus1 = number;
+export type LimitedBonus = number;
+export type OverchargeCostCaps1 = OverchargeCostCapEffect[];
+export type AiSystemLimit = number;
 export type Accuracy = number;
 export type Difficulty = number;
 /**
@@ -28109,7 +28164,7 @@ export type ComplicationDescription = string | null;
 /**
  * Unique condition identifier
  */
-export type Id9 = string;
+export type Id11 = string;
 export type ConditionType =
   | "skill_check"
   | "position_reached"
@@ -28141,7 +28196,7 @@ export type TargetId = string | null;
 /**
  * Unique goal identifier
  */
-export type Id10 = string;
+export type Id12 = string;
 /**
  * Pilot's stated goal
  */
@@ -28240,7 +28295,7 @@ export type RequiredAmount1 = number | null;
 /**
  * Unique complication identifier
  */
-export type Id11 = string;
+export type Id13 = string;
 export type ComplicationType1 = "harm" | "time" | "resources" | "collateral" | "position" | "effect";
 /**
  * What is going wrong
@@ -28291,7 +28346,7 @@ export type ProfileId = string;
 /**
  * Display name
  */
-export type Name26 = string;
+export type Name27 = string;
 /**
  * Primary damage type for the profile (if applicable)
  */
@@ -28339,11 +28394,11 @@ export type RerollActionType = "full";
 /**
  * Unique identifier
  */
-export type Id12 = string;
+export type Id14 = string;
 /**
  * Display name
  */
-export type Name27 = string;
+export type Name28 = string;
 export type ActionType15 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type Target83 = "self" | "enemy" | "ally" | "adjacent" | "object";
 export type UsesPer14 = "unlimited" | "round" | "scene" | "mission" | "rest" | "full_repair";
@@ -28358,12 +28413,12 @@ export type BenefitsFromTalents = boolean;
 /**
  * Unique weapon identifier
  */
-export type Id13 = string;
+export type Id15 = string;
 /**
  * Display name
  */
-export type Name28 = string;
-export type Size9 = "aux" | "main" | "heavy" | "superheavy";
+export type Name29 = string;
+export type Size10 = "aux" | "main" | "heavy" | "superheavy";
 export type WeaponType1 = "cqb" | "rifle" | "launcher" | "cannon" | "melee" | "nexus";
 /**
  * Base damage type (None for non-damaging weapons)
@@ -28395,33 +28450,33 @@ export type IntegratedWeaponId = string | null;
 /**
  * Unique core system identifier
  */
-export type Id14 = string;
-/**
- * Display name
- */
-export type Name29 = string;
-export type MountlessWeapons = MountlessWeaponDefinition[];
-export type UsesPerMission = number;
-export type Size10 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
-export type Armor2 = number;
-export type Hp2 = number;
-export type Evasion2 = number;
-export type EDefense2 = number;
-export type Speed2 = number;
-export type SensorRange = number;
-export type TechAttack = number;
-export type HeatCap = number;
-export type RepairCap = number;
-export type SaveTarget1 = number;
-export type Structure = number;
-/**
- * Unique frame identifier
- */
-export type Id15 = string;
+export type Id16 = string;
 /**
  * Display name
  */
 export type Name30 = string;
+export type MountlessWeapons = MountlessWeaponDefinition[];
+export type UsesPerMission = number;
+export type Size11 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
+export type Armor3 = number;
+export type Hp3 = number;
+export type Evasion3 = number;
+export type EDefense3 = number;
+export type Speed3 = number;
+export type SensorRange1 = number;
+export type TechAttack1 = number;
+export type HeatCap1 = number;
+export type RepairCap1 = number;
+export type SaveTarget2 = number;
+export type Structure1 = number;
+/**
+ * Unique frame identifier
+ */
+export type Id17 = string;
+/**
+ * Display name
+ */
+export type Name31 = string;
 export type Manufacturer2 = "GMS" | "IPS-N" | "SSC" | "HORUS" | "HA";
 /**
  * License ID required to use this frame (None for GMS/general)
@@ -28432,11 +28487,11 @@ export type LicenseId2 = string | null;
  */
 export type LicenseRank1 = number | null;
 export type Mounts = MountSlot[];
-export type SystemPoints = number;
+export type SystemPoints1 = number;
 /**
  * Display name
  */
-export type Name31 = string;
+export type Name32 = string;
 export type Traits = FrameTrait[];
 export type UnlicensedStatusPenalties = (
   | "braced"
@@ -28461,31 +28516,6 @@ export type RestoresOnMissionStart = boolean;
 export type RestoresOnFullRepair = boolean;
 export type GritBonus = boolean;
 export type SystemsPerBonusSp = number;
-export type MountIndex = number;
-export type WeaponId2 = string;
-export type WeaponSize1 = "aux" | "main" | "heavy" | "superheavy";
-export type SystemId = string;
-export type SpCost = number | null;
-export type FrameId1 = string;
-export type Weapons1 = MountedWeapon[];
-export type Systems1 = InstalledSystem[];
-export type Size11 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
-export type Armor3 = number;
-export type Hp3 = number;
-export type Evasion3 = number;
-export type EDefense3 = number;
-export type Speed3 = number;
-export type SensorRange1 = number;
-export type TechAttack1 = number;
-export type HeatCap1 = number;
-export type RepairCap1 = number;
-export type SaveTarget2 = number;
-export type Structure1 = number;
-export type SystemPoints1 = number;
-export type AttackBonus1 = number;
-export type LimitedBonus = number;
-export type OverchargeCostCaps1 = OverchargeCostCapEffect[];
-export type AiSystemLimit = number;
 export type Code3 = string;
 export type Message3 = string;
 export type Severity4 = "error" | "warning";
@@ -28689,7 +28719,7 @@ export type ChooseDestroyedBy = "target" | "attacker";
 export type ExcludeLimitedNoCharges = boolean;
 export type FallbackToOtherIfNone = boolean;
 export type FallbackToDirectHitIfNone = boolean;
-export type Name32 = "glancing_blow" | "system_trauma" | "direct_hit" | "crushing_hit";
+export type Name33 = "glancing_blow" | "system_trauma" | "direct_hit" | "crushing_hit";
 export type ImpairedUntilEndNextTurn = boolean;
 export type DestroyMount = boolean;
 export type DestroySystem = boolean;
@@ -28711,7 +28741,7 @@ export type DangerZoneFraction = number;
 export type DangerZoneRounding = "up" | "down";
 export type RollMin2 = number;
 export type RollMax2 = number;
-export type Name33 = "emergency_shunt" | "power_plant_destabilize" | "meltdown" | "irreversible_meltdown";
+export type Name34 = "emergency_shunt" | "power_plant_destabilize" | "meltdown" | "irreversible_meltdown";
 export type ImpairedUntilEndNextTurn1 = boolean;
 export type ExposedUntilCleared = boolean;
 export type MeltdownImmediate = boolean;
@@ -28804,8 +28834,8 @@ export type CannotReactWhileDragging1 = boolean;
 export type CannotReactWhileLifting1 = boolean;
 export type SlowedWhileDragging = boolean;
 export type ImmobilizedWhileLifting = boolean;
-export type Id16 = string;
-export type Name34 = string;
+export type Id18 = string;
+export type Name35 = string;
 export type ActionType16 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type AlternateActionTypes = ("free" | "quick" | "full" | "reaction" | "protocol" | "move")[];
 export type Scope = "mech" | "pilot" | "both";
@@ -28984,7 +29014,7 @@ export type UsesPerRound = number;
 export type UsesPilotWeapon = boolean;
 export type SidearmCanBeQuick = boolean;
 export type ContestedCheck1 = "grit_vs_hull";
-export type Name35 = "distract" | "shred" | "damage";
+export type Name36 = "distract" | "shred" | "damage";
 export type InflictsConditions1 = (
   | "braced"
   | "immobilized"
@@ -29070,8 +29100,8 @@ export type HeatCap2 = number;
 export type StructureCurrent = number;
 export type StressCurrent = number;
 export type RepairsRemaining = number;
-export type Id17 = string;
-export type Name36 = string;
+export type Id19 = string;
+export type Name37 = string;
 export type Side = "players" | "hostiles" | "neutral";
 export type Kind = "mech" | "pilot" | "npc" | "object";
 export type Statuses1 = (
@@ -29420,8 +29450,8 @@ export type Combatants = CombatantState[];
 export type Grapples = GrappleLink[];
 export type Rounds = CombatRound[];
 export type Environment = "standard" | "zero_g" | "underwater";
-export type Id18 = string;
-export type Name37 = string;
+export type Id20 = string;
+export type Name38 = string;
 export type Kind1 = "drone" | "mine" | "deployable" | "other";
 export type OwnerId = string | null;
 export type Size14 = number;
@@ -32701,6 +32731,143 @@ export interface PilotRestRule1 {
   [k: string]: unknown;
 }
 /**
+ * A complete Lancer character: pilot + mech(s).
+ *
+ * The Character model unifies pilot progression and mech loadouts,
+ * automatically computing mech stats based on pilot data.
+ *
+ * Key features:
+ * - Owns the Pilot model (composition)
+ * - Owns list of MechConfiguration (multiple mechs allowed)
+ * - Automatically computes active mech stats from pilot skills/grit
+ * - Automatically collects core bonus effects
+ * - Provides holistic validation (pilot + mech + license gating)
+ */
+export interface Character {
+  id?: Id9;
+  pilot: Pilot1;
+  mechs?: Mechs;
+  active_mech_id?: ActiveMechId;
+  /**
+   * Get the currently active mech configuration.
+   */
+  active_mech: MechConfiguration | null;
+  core_bonus_effects: CoreBonusEffects;
+  /**
+   * Compute derived stats for the active mech.
+   *
+   * Returns None if no active mech is selected or frame is invalid.
+   * Stats are computed using:
+   * - Frame base stats
+   * - Pilot mech skills (HASE)
+   * - Pilot grit (1/2 level)
+   * - Core bonus effects
+   */
+  active_mech_stats: MechDerivedStats | null;
+  [k: string]: unknown;
+}
+/**
+ * The pilot (person inside the machine)
+ */
+export interface Pilot1 {
+  id?: Id;
+  callsign: Callsign;
+  name?: Name;
+  background?: Background | null;
+  notes?: Notes;
+  /**
+   * Pilot gear loadout
+   */
+  pilot_gear?: PilotLoadout | null;
+  level?: Level;
+  skills?: SkillSet;
+  triggers?: Triggers1;
+  talents?: Talents;
+  licenses?: Licenses;
+  core_bonuses?: CoreBonuses;
+  hp_bonus?: HpBonus;
+  armor_bonus?: ArmorBonus;
+  /**
+   * Cloning state for campaign tracking (None if cloning not in use)
+   */
+  clone_state?: CloneState | null;
+  is_dead?: IsDead1;
+  has_down_and_out_trauma?: HasDownAndOutTrauma;
+  grit: Grit;
+  hp: Hp;
+  armor: Armor1;
+  evasion: Evasion;
+  e_defense: EDefense;
+  speed: Speed;
+  size: Size;
+  save_target: SaveTarget;
+  attack_bonus: AttackBonus;
+  [k: string]: unknown;
+}
+/**
+ * A named mech loadout owned by a character.
+ *
+ * Represents a single mech configuration that a pilot can use.
+ * The actual combat stats are computed based on the pilot's skills,
+ * grit, and core bonuses when accessed through the Character model.
+ */
+export interface MechConfiguration {
+  id: Id10;
+  name: Name26;
+  frame_id: FrameId1;
+  build?: MechBuild;
+  [k: string]: unknown;
+}
+/**
+ * Weapon and system loadout
+ */
+export interface MechBuild {
+  frame_id: FrameId2;
+  weapons?: Weapons1;
+  systems?: Systems1;
+  [k: string]: unknown;
+}
+/**
+ * Weapon installed on a specific mount slot.
+ */
+export interface MountedWeapon {
+  mount_index: MountIndex;
+  weapon_id: WeaponId2;
+  weapon_size: WeaponSize1;
+  [k: string]: unknown;
+}
+/**
+ * System installed on a mech.
+ */
+export interface InstalledSystem {
+  system_id: SystemId;
+  sp_cost?: SpCost;
+  [k: string]: unknown;
+}
+/**
+ * Final mech stats after pilot bonuses are applied.
+ */
+export interface MechDerivedStats {
+  size: Size9;
+  armor: Armor2;
+  hp: Hp2;
+  evasion: Evasion2;
+  e_defense: EDefense2;
+  speed: Speed2;
+  sensor_range: SensorRange;
+  tech_attack: TechAttack;
+  heat_cap: HeatCap;
+  repair_cap: RepairCap;
+  save_target: SaveTarget1;
+  structure: Structure;
+  system_points: SystemPoints;
+  attack_bonus: AttackBonus1;
+  limited_bonus: LimitedBonus;
+  overcharge_cost_caps?: OverchargeCostCaps1;
+  ai_system_limit?: AiSystemLimit;
+  [k: string]: unknown;
+}
+/**
  * Accuracy and difficulty dice pool for a roll.
  */
 export interface AccuracyDifficulty {
@@ -32820,7 +32987,7 @@ export interface NarrativeGoalOutcome {
  * Condition that must be met to complete a narrative goal.
  */
 export interface NarrativeGoalCondition {
-  id: Id9;
+  id: Id11;
   condition_type: ConditionType;
   description: Description2;
   required_tier?: RequiredTier;
@@ -32833,7 +33000,7 @@ export interface NarrativeGoalCondition {
  * Goal definition for narrative combat.
  */
 export interface NarrativeGoal {
-  id: Id10;
+  id: Id12;
   description: Description3;
   success_conditions?: SuccessConditions;
   successes_required?: SuccessesRequired;
@@ -32904,7 +33071,7 @@ export interface NarrativeResolutionRequirement {
  * Complication that persists in narrative combat until resolved.
  */
 export interface NarrativeComplication {
-  id: Id11;
+  id: Id13;
   complication_type: ComplicationType1;
   description: Description5;
   severity?: Severity3;
@@ -32939,7 +33106,7 @@ export interface NarrativeCombatState {
  */
 export interface WeaponProfile {
   profile_id: ProfileId;
-  name: Name26;
+  name: Name27;
   damage_type?: DamageType8;
   ranges?: Ranges1;
   damage?: Damage1;
@@ -33021,8 +33188,8 @@ export interface DynamicWeaponDefinition {
  * Weapon-like profile that does not count as a weapon or occupy a mount.
  */
 export interface MountlessWeaponDefinition {
-  id: Id12;
-  name: Name27;
+  id: Id14;
+  name: Name28;
   profile: WeaponProfile;
   action_type?: ActionType15;
   target?: Target83;
@@ -33041,9 +33208,9 @@ export interface MountlessWeaponDefinition {
  * Definition for a mech weapon.
  */
 export interface MechWeaponDefinition {
-  id: Id13;
-  name: Name28;
-  size: Size9;
+  id: Id15;
+  name: Name29;
+  size: Size10;
   weapon_type: WeaponType1;
   damage_type?: DamageType10;
   license_id?: LicenseId1;
@@ -33071,8 +33238,8 @@ export interface MountSlot {
  * Core system ability unique to a frame.
  */
 export interface CoreSystemDefinition {
-  id: Id14;
-  name: Name29;
+  id: Id16;
+  name: Name30;
   effects?: MechanicalEffect;
   mountless_weapons?: MountlessWeapons;
   uses_per_mission?: UsesPerMission;
@@ -33082,32 +33249,32 @@ export interface CoreSystemDefinition {
  * Base statistics provided by a frame before pilot bonuses.
  */
 export interface MechFrameBaseStats {
-  size: Size10;
-  armor?: Armor2;
-  hp?: Hp2;
-  evasion?: Evasion2;
-  e_defense?: EDefense2;
-  speed?: Speed2;
-  sensor_range?: SensorRange;
-  tech_attack?: TechAttack;
-  heat_cap?: HeatCap;
-  repair_cap?: RepairCap;
-  save_target?: SaveTarget1;
-  structure?: Structure;
+  size: Size11;
+  armor?: Armor3;
+  hp?: Hp3;
+  evasion?: Evasion3;
+  e_defense?: EDefense3;
+  speed?: Speed3;
+  sensor_range?: SensorRange1;
+  tech_attack?: TechAttack1;
+  heat_cap?: HeatCap1;
+  repair_cap?: RepairCap1;
+  save_target?: SaveTarget2;
+  structure?: Structure1;
   [k: string]: unknown;
 }
 /**
  * Definition for a mech frame.
  */
 export interface MechFrameDefinition {
-  id: Id15;
-  name: Name30;
+  id: Id17;
+  name: Name31;
   manufacturer: Manufacturer2;
   license_id?: LicenseId2;
   license_rank?: LicenseRank1;
   base_stats: MechFrameBaseStats;
   mounts?: Mounts;
-  system_points?: SystemPoints;
+  system_points?: SystemPoints1;
   core_system?: CoreSystemDefinition | null;
   traits?: Traits;
   [k: string]: unknown;
@@ -33116,7 +33283,7 @@ export interface MechFrameDefinition {
  * Passive trait provided by a mech frame.
  */
 export interface FrameTrait {
-  name: Name31;
+  name: Name32;
   effects?: MechanicalEffect;
   [k: string]: unknown;
 }
@@ -33160,52 +33327,12 @@ export interface SystemPointRules {
   [k: string]: unknown;
 }
 /**
- * Weapon installed on a specific mount slot.
- */
-export interface MountedWeapon {
-  mount_index: MountIndex;
-  weapon_id: WeaponId2;
-  weapon_size: WeaponSize1;
-  [k: string]: unknown;
-}
-/**
- * System installed on a mech.
- */
-export interface InstalledSystem {
-  system_id: SystemId;
-  sp_cost?: SpCost;
-  [k: string]: unknown;
-}
-/**
  * A mech build derived from a frame and loadout.
  */
-export interface MechBuild {
-  frame_id: FrameId1;
+export interface MechBuild1 {
+  frame_id: FrameId2;
   weapons?: Weapons1;
   systems?: Systems1;
-  [k: string]: unknown;
-}
-/**
- * Final mech stats after pilot bonuses are applied.
- */
-export interface MechDerivedStats {
-  size: Size11;
-  armor: Armor3;
-  hp: Hp3;
-  evasion: Evasion3;
-  e_defense: EDefense3;
-  speed: Speed3;
-  sensor_range: SensorRange1;
-  tech_attack: TechAttack1;
-  heat_cap: HeatCap1;
-  repair_cap: RepairCap1;
-  save_target: SaveTarget2;
-  structure: Structure1;
-  system_points: SystemPoints1;
-  attack_bonus: AttackBonus1;
-  limited_bonus: LimitedBonus;
-  overcharge_cost_caps?: OverchargeCostCaps1;
-  ai_system_limit?: AiSystemLimit;
   [k: string]: unknown;
 }
 /**
@@ -33561,7 +33688,7 @@ export interface D6Range {
  * Outcome detail for structure damage.
  */
 export interface StructureOutcomeType {
-  name: Name32;
+  name: Name33;
   impaired_until_end_next_turn?: ImpairedUntilEndNextTurn;
   destroy_mount?: DestroyMount;
   destroy_system?: DestroySystem;
@@ -33618,7 +33745,7 @@ export interface OverheatTableEntry {
  * Outcome detail for overheat checks.
  */
 export interface OverheatOutcomeType {
-  name: Name33;
+  name: Name34;
   impaired_until_end_next_turn?: ImpairedUntilEndNextTurn1;
   exposed_until_cleared?: ExposedUntilCleared;
   meltdown_immediate?: MeltdownImmediate;
@@ -33875,8 +34002,8 @@ export interface LiftDragRules {
  * Rule definition for a combat action.
  */
 export interface ActionRule {
-  id: Id16;
-  name: Name34;
+  id: Id18;
+  name: Name35;
   action_type: ActionType16;
   alternate_action_types?: AlternateActionTypes;
   scope?: Scope;
@@ -34073,7 +34200,7 @@ export interface JockeyRule {
  * Jockey follow-up option.
  */
 export interface JockeyOption {
-  name: Name35;
+  name: Name36;
   inflicts_conditions?: InflictsConditions1;
   heat?: Heat;
   damage?: Damage3;
@@ -34156,8 +34283,8 @@ export interface CombatResources {
  * and convert to CombatantState using the helper functions.
  */
 export interface CombatantState {
-  id: Id17;
-  name: Name36;
+  id: Id19;
+  name: Name37;
   side: Side;
   kind: Kind;
   stats: CombatStats;
@@ -34534,8 +34661,8 @@ export interface Deployables {
  * Deployables: 10 HP/size, evasion 5, default armor 0
  */
 export interface DeployableState {
-  id: Id18;
-  name: Name37;
+  id: Id20;
+  name: Name38;
   kind: Kind1;
   owner_id?: OwnerId;
   position: HexPosition;

@@ -41132,6 +41132,306 @@
       "title": "PilotCombatRules",
       "type": "object"
     },
+    "InstalledSystem": {
+      "description": "System installed on a mech.",
+      "properties": {
+        "system_id": {
+          "title": "System Id",
+          "type": "string"
+        },
+        "sp_cost": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sp Cost"
+        }
+      },
+      "required": [
+        "system_id"
+      ],
+      "title": "InstalledSystem",
+      "type": "object"
+    },
+    "MechBuild": {
+      "description": "A mech build derived from a frame and loadout.",
+      "properties": {
+        "frame_id": {
+          "title": "Frame Id",
+          "type": "string"
+        },
+        "weapons": {
+          "items": {
+            "$ref": "#/$defs/MountedWeapon"
+          },
+          "title": "Weapons",
+          "type": "array"
+        },
+        "systems": {
+          "items": {
+            "$ref": "#/$defs/InstalledSystem"
+          },
+          "title": "Systems",
+          "type": "array"
+        }
+      },
+      "required": [
+        "frame_id"
+      ],
+      "title": "MechBuild",
+      "type": "object"
+    },
+    "MechConfiguration": {
+      "description": "A named mech loadout owned by a character.\n\nRepresents a single mech configuration that a pilot can use.\nThe actual combat stats are computed based on the pilot's skills,\ngrit, and core bonuses when accessed through the Character model.",
+      "properties": {
+        "id": {
+          "description": "Unique mech configuration ID",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Custom name (e.g., 'RAIJIN')",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "frame_id": {
+          "description": "Frame definition ID",
+          "title": "Frame Id",
+          "type": "string"
+        },
+        "build": {
+          "$ref": "#/$defs/MechBuild",
+          "description": "Weapon and system loadout"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "frame_id"
+      ],
+      "title": "MechConfiguration",
+      "type": "object"
+    },
+    "MechDerivedStats": {
+      "description": "Final mech stats after pilot bonuses are applied.",
+      "properties": {
+        "size": {
+          "enum": [
+            "size_half",
+            "size_1",
+            "size_2",
+            "size_3",
+            "size_4",
+            "size_5"
+          ],
+          "title": "Size",
+          "type": "string"
+        },
+        "armor": {
+          "title": "Armor",
+          "type": "integer"
+        },
+        "hp": {
+          "title": "Hp",
+          "type": "integer"
+        },
+        "evasion": {
+          "title": "Evasion",
+          "type": "integer"
+        },
+        "e_defense": {
+          "title": "E Defense",
+          "type": "integer"
+        },
+        "speed": {
+          "title": "Speed",
+          "type": "integer"
+        },
+        "sensor_range": {
+          "title": "Sensor Range",
+          "type": "integer"
+        },
+        "tech_attack": {
+          "title": "Tech Attack",
+          "type": "integer"
+        },
+        "heat_cap": {
+          "title": "Heat Cap",
+          "type": "integer"
+        },
+        "repair_cap": {
+          "title": "Repair Cap",
+          "type": "integer"
+        },
+        "save_target": {
+          "title": "Save Target",
+          "type": "integer"
+        },
+        "structure": {
+          "title": "Structure",
+          "type": "integer"
+        },
+        "system_points": {
+          "title": "System Points",
+          "type": "integer"
+        },
+        "attack_bonus": {
+          "title": "Attack Bonus",
+          "type": "integer"
+        },
+        "limited_bonus": {
+          "title": "Limited Bonus",
+          "type": "integer"
+        },
+        "overcharge_cost_caps": {
+          "items": {
+            "$ref": "#/$defs/OverchargeCostCapEffect"
+          },
+          "title": "Overcharge Cost Caps",
+          "type": "array"
+        },
+        "ai_system_limit": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Ai System Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "size",
+        "armor",
+        "hp",
+        "evasion",
+        "e_defense",
+        "speed",
+        "sensor_range",
+        "tech_attack",
+        "heat_cap",
+        "repair_cap",
+        "save_target",
+        "structure",
+        "system_points",
+        "attack_bonus",
+        "limited_bonus"
+      ],
+      "title": "MechDerivedStats",
+      "type": "object"
+    },
+    "MountedWeapon": {
+      "description": "Weapon installed on a specific mount slot.",
+      "properties": {
+        "mount_index": {
+          "minimum": 0,
+          "title": "Mount Index",
+          "type": "integer"
+        },
+        "weapon_id": {
+          "title": "Weapon Id",
+          "type": "string"
+        },
+        "weapon_size": {
+          "enum": [
+            "aux",
+            "main",
+            "heavy",
+            "superheavy"
+          ],
+          "title": "Weapon Size",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mount_index",
+        "weapon_id",
+        "weapon_size"
+      ],
+      "title": "MountedWeapon",
+      "type": "object"
+    },
+    "Character": {
+      "description": "A complete Lancer character: pilot + mech(s).\n\nThe Character model unifies pilot progression and mech loadouts,\nautomatically computing mech stats based on pilot data.\n\nKey features:\n- Owns the Pilot model (composition)\n- Owns list of MechConfiguration (multiple mechs allowed)\n- Automatically computes active mech stats from pilot skills/grit\n- Automatically collects core bonus effects\n- Provides holistic validation (pilot + mech + license gating)",
+      "properties": {
+        "id": {
+          "default": "",
+          "description": "Unique character ID",
+          "title": "Id",
+          "type": "string"
+        },
+        "pilot": {
+          "$ref": "#/$defs/Pilot",
+          "description": "The pilot (person inside the machine)"
+        },
+        "mechs": {
+          "description": "Mech configurations owned by this character",
+          "items": {
+            "$ref": "#/$defs/MechConfiguration"
+          },
+          "title": "Mechs",
+          "type": "array"
+        },
+        "active_mech_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of the currently active mech (None if no mech selected)",
+          "title": "Active Mech Id"
+        },
+        "active_mech": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MechConfiguration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Get the currently active mech configuration.",
+          "readOnly": true
+        },
+        "core_bonus_effects": {
+          "description": "Collect mechanical effects from all pilot core bonuses.",
+          "items": {
+            "$ref": "#/$defs/MechanicalEffect"
+          },
+          "readOnly": true,
+          "title": "Core Bonus Effects",
+          "type": "array"
+        },
+        "active_mech_stats": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MechDerivedStats"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Compute derived stats for the active mech.\n\nReturns None if no active mech is selected or frame is invalid.\nStats are computed using:\n- Frame base stats\n- Pilot mech skills (HASE)\n- Pilot grit (1/2 level)\n- Core bonus effects",
+          "readOnly": true
+        }
+      },
+      "required": [
+        "pilot",
+        "active_mech",
+        "core_bonus_effects",
+        "active_mech_stats"
+      ],
+      "title": "Character",
+      "type": "object"
+    },
     "AccuracyDifficulty": {
       "description": "Accuracy and difficulty dice pool for a roll.",
       "properties": {
@@ -43147,197 +43447,6 @@
         }
       },
       "title": "SystemPointRules",
-      "type": "object"
-    },
-    "MountedWeapon": {
-      "description": "Weapon installed on a specific mount slot.",
-      "properties": {
-        "mount_index": {
-          "minimum": 0,
-          "title": "Mount Index",
-          "type": "integer"
-        },
-        "weapon_id": {
-          "title": "Weapon Id",
-          "type": "string"
-        },
-        "weapon_size": {
-          "enum": [
-            "aux",
-            "main",
-            "heavy",
-            "superheavy"
-          ],
-          "title": "Weapon Size",
-          "type": "string"
-        }
-      },
-      "required": [
-        "mount_index",
-        "weapon_id",
-        "weapon_size"
-      ],
-      "title": "MountedWeapon",
-      "type": "object"
-    },
-    "InstalledSystem": {
-      "description": "System installed on a mech.",
-      "properties": {
-        "system_id": {
-          "title": "System Id",
-          "type": "string"
-        },
-        "sp_cost": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Sp Cost"
-        }
-      },
-      "required": [
-        "system_id"
-      ],
-      "title": "InstalledSystem",
-      "type": "object"
-    },
-    "MechBuild": {
-      "description": "A mech build derived from a frame and loadout.",
-      "properties": {
-        "frame_id": {
-          "title": "Frame Id",
-          "type": "string"
-        },
-        "weapons": {
-          "items": {
-            "$ref": "#/$defs/MountedWeapon"
-          },
-          "title": "Weapons",
-          "type": "array"
-        },
-        "systems": {
-          "items": {
-            "$ref": "#/$defs/InstalledSystem"
-          },
-          "title": "Systems",
-          "type": "array"
-        }
-      },
-      "required": [
-        "frame_id"
-      ],
-      "title": "MechBuild",
-      "type": "object"
-    },
-    "MechDerivedStats": {
-      "description": "Final mech stats after pilot bonuses are applied.",
-      "properties": {
-        "size": {
-          "enum": [
-            "size_half",
-            "size_1",
-            "size_2",
-            "size_3",
-            "size_4",
-            "size_5"
-          ],
-          "title": "Size",
-          "type": "string"
-        },
-        "armor": {
-          "title": "Armor",
-          "type": "integer"
-        },
-        "hp": {
-          "title": "Hp",
-          "type": "integer"
-        },
-        "evasion": {
-          "title": "Evasion",
-          "type": "integer"
-        },
-        "e_defense": {
-          "title": "E Defense",
-          "type": "integer"
-        },
-        "speed": {
-          "title": "Speed",
-          "type": "integer"
-        },
-        "sensor_range": {
-          "title": "Sensor Range",
-          "type": "integer"
-        },
-        "tech_attack": {
-          "title": "Tech Attack",
-          "type": "integer"
-        },
-        "heat_cap": {
-          "title": "Heat Cap",
-          "type": "integer"
-        },
-        "repair_cap": {
-          "title": "Repair Cap",
-          "type": "integer"
-        },
-        "save_target": {
-          "title": "Save Target",
-          "type": "integer"
-        },
-        "structure": {
-          "title": "Structure",
-          "type": "integer"
-        },
-        "system_points": {
-          "title": "System Points",
-          "type": "integer"
-        },
-        "attack_bonus": {
-          "title": "Attack Bonus",
-          "type": "integer"
-        },
-        "limited_bonus": {
-          "title": "Limited Bonus",
-          "type": "integer"
-        },
-        "overcharge_cost_caps": {
-          "items": {
-            "$ref": "#/$defs/OverchargeCostCapEffect"
-          },
-          "title": "Overcharge Cost Caps",
-          "type": "array"
-        },
-        "ai_system_limit": {
-          "default": 1,
-          "minimum": 0,
-          "title": "Ai System Limit",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "size",
-        "armor",
-        "hp",
-        "evasion",
-        "e_defense",
-        "speed",
-        "sensor_range",
-        "tech_attack",
-        "heat_cap",
-        "repair_cap",
-        "save_target",
-        "structure",
-        "system_points",
-        "attack_bonus",
-        "limited_bonus"
-      ],
-      "title": "MechDerivedStats",
       "type": "object"
     },
     "MechBuildIssue": {
@@ -48912,6 +49021,12 @@
     },
     {
       "$ref": "#/$defs/PilotCombatRules"
+    },
+    {
+      "$ref": "#/$defs/Character"
+    },
+    {
+      "$ref": "#/$defs/MechConfiguration"
     },
     {
       "$ref": "#/$defs/DiceExpression"

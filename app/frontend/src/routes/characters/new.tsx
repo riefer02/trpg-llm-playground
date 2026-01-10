@@ -1,14 +1,28 @@
 /**
  * Create new character page.
  *
- * Simplified form that uses LL0 defaults for game-accurate character creation.
- * The backend's create_ll0_character factory handles triggers, talents, etc.
+ * Multi-step form following Lancer character creation:
+ * 1. Background - suggests triggers
+ * 2. Triggers - 4 at +2 each (can customize from background suggestions)
+ * 3. HASE Skills - 2 points total
+ * 4. Talents - 3 at rank I
+ * 5. Mech - name + GMS Everest (LL0)
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useCreateCharacter } from "../../lib/api";
-import type { CharacterCreateRequest } from "../../lib/api";
+import {
+  useCreateCharacter,
+  useBackgrounds,
+  useTriggers,
+  useTalents,
+} from "../../lib/api";
+import type {
+  CharacterCreateRequest,
+  Background,
+  Trigger,
+  Talent,
+} from "../../lib/api";
 import {
   Card,
   CardHeader,
@@ -22,24 +36,35 @@ export const Route = createFileRoute("/characters/new" as const)({
   component: NewCharacterPage,
 });
 
+// Form steps
+type Step = "background" | "triggers" | "skills" | "talents" | "mech";
+
 interface FormData {
   callsign: string;
   name: string;
-  mechName: string;
+  backgroundId: string | null;
+  backgroundName: string;
+  triggers: string[]; // 4 trigger IDs
   skills: {
     hull: number;
     agility: number;
     systems: number;
     engineering: number;
   };
+  talents: string[]; // 3 talent IDs
+  mechName: string;
   notes: string;
 }
 
 const defaultFormData: FormData = {
   callsign: "",
   name: "",
+  backgroundId: null,
+  backgroundName: "",
+  triggers: [],
+  skills: { hull: 0, agility: 0, systems: 0, engineering: 0 },
+  talents: [],
   mechName: "",
-  skills: { hull: 2, agility: 0, systems: 0, engineering: 0 },
   notes: "",
 };
 
@@ -47,17 +72,31 @@ function NewCharacterPage() {
   const navigate = useNavigate();
   const createMutation = useCreateCharacter();
 
+  // Reference data
+  const { data: backgrounds, isLoading: loadingBackgrounds } = useBackgrounds();
+  const { data: allTriggers, isLoading: loadingTriggers } = useTriggers();
+  const { data: allTalents, isLoading: loadingTalents } = useTalents();
+
+  const [step, setStep] = useState<Step>("background");
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [error, setError] = useState<string | null>(null);
 
-  const totalSkillPoints =
-    formData.skills.hull +
-    formData.skills.agility +
-    formData.skills.systems +
-    formData.skills.engineering;
+  // Create lookup maps
+  const triggerMap = new Map(allTriggers?.map((t) => [t.id, t]) ?? []);
+  const talentMap = new Map(allTalents?.map((t) => [t.id, t]) ?? []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // When background is selected, pre-populate triggers
+  const handleBackgroundSelect = (bg: Background) => {
+    setFormData((prev) => ({
+      ...prev,
+      backgroundId: bg.id,
+      backgroundName: bg.name,
+      triggers: [...bg.triggers], // Copy suggested triggers
+    }));
+    setStep("triggers");
+  };
+
+  const handleSubmit = async () => {
     setError(null);
 
     if (!formData.callsign.trim()) {
@@ -65,17 +104,21 @@ function NewCharacterPage() {
       return;
     }
 
-    if (totalSkillPoints !== 2) {
-      setError("LL0 characters must have exactly 2 mech skill points");
-      return;
-    }
-
-    // Build request - let backend use LL0 defaults
+    // Build request with all the selected data
     const request: CharacterCreateRequest = {
       callsign: formData.callsign,
       name: formData.name || undefined,
-      use_ll0_defaults: true,
+      use_ll0_defaults: false, // We're providing custom data
       skills: formData.skills,
+      triggers: formData.triggers.map((id) => ({ trigger_id: id, rank: 2 })),
+      talents: formData.talents.map((id) => ({ talent_id: id, rank: 1 })),
+      background: formData.backgroundId
+        ? {
+            id: formData.backgroundId,
+            name: formData.backgroundName,
+            triggers: formData.triggers,
+          }
+        : undefined,
       mech_name: formData.mechName || undefined,
       notes: formData.notes || undefined,
     };
@@ -93,18 +136,24 @@ function NewCharacterPage() {
     }
   };
 
-  const updateSkill = (
-    skill: "hull" | "agility" | "systems" | "engineering",
-    value: number
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      skills: {
-        ...prev.skills,
-        [skill]: Math.max(0, Math.min(6, value)),
-      },
-    }));
-  };
+  // Validation helpers
+  const totalSkillPoints =
+    formData.skills.hull +
+    formData.skills.agility +
+    formData.skills.systems +
+    formData.skills.engineering;
+
+  const canProceedFromTriggers = formData.triggers.length === 4;
+  const canProceedFromSkills = totalSkillPoints === 2;
+  const canProceedFromTalents = formData.talents.length === 3;
+
+  if (loadingBackgrounds || loadingTriggers || loadingTalents) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <p className="text-muted-foreground">Loading reference data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -119,55 +168,198 @@ function NewCharacterPage() {
           Create New Character
         </h1>
         <p className="text-muted-foreground">
-          Build a License Level 0 character with pilot and mech
+          Build a License Level 0 character
         </p>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Pilot Identity</CardTitle>
-            <CardDescription>Who pilots this mech?</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Callsign <span className="text-destructive">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.callsign}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, callsign: e.target.value }))
-                }
-                placeholder="NOVA"
-                className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Your pilot's combat handle
-              </p>
-            </div>
+      {/* Progress indicator */}
+      <div className="mb-6 flex gap-2">
+        {(["background", "triggers", "skills", "talents", "mech"] as Step[]).map(
+          (s, i) => (
+            <div
+              key={s}
+              className={`flex-1 h-2 rounded ${
+                step === s
+                  ? "bg-primary"
+                  : (["background", "triggers", "skills", "talents", "mech"] as Step[]).indexOf(step) > i
+                  ? "bg-primary/50"
+                  : "bg-border"
+              }`}
+            />
+          )
+        )}
+      </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Real Name
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, name: e.target.value }))
-                }
-                placeholder="Nova Chen"
-                className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+      {/* Step 1: Background */}
+      {step === "background" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Step 1: Background</CardTitle>
+            <CardDescription>
+              Choose your pilot's background. This suggests 4 starting triggers.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Callsign input first */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Callsign <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.callsign}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, callsign: e.target.value }))
+                  }
+                  placeholder="NOVA"
+                  className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Real Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  placeholder="Nova Chen"
+                  className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Select Background
+                </label>
+                <div className="grid gap-2 max-h-80 overflow-y-auto">
+                  {backgrounds?.map((bg) => (
+                    <button
+                      key={bg.id}
+                      type="button"
+                      onClick={() => handleBackgroundSelect(bg)}
+                      disabled={!formData.callsign.trim()}
+                      className={`p-3 text-left border rounded-md transition-colors ${
+                        !formData.callsign.trim()
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:bg-primary/10 hover:border-primary"
+                      }`}
+                    >
+                      <div className="font-medium">{bg.name}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Triggers:{" "}
+                        {bg.triggers
+                          .map((id) => triggerMap.get(id)?.name ?? id)
+                          .join(", ")}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {!formData.callsign.trim() && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Enter a callsign first to select a background
+                  </p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        <Card className="mb-6">
+      {/* Step 2: Triggers */}
+      {step === "triggers" && (
+        <Card>
           <CardHeader>
-            <CardTitle>Mech Skills</CardTitle>
+            <CardTitle>Step 2: Triggers</CardTitle>
+            <CardDescription>
+              Select 4 triggers at +2 each. Your background suggested these, but
+              you can customize.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 p-3 bg-primary/10 rounded-md">
+              <div className="text-sm font-medium">
+                Background: {formData.backgroundName}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Selected: {formData.triggers.length} / 4 triggers
+              </div>
+            </div>
+
+            <div className="grid gap-2 max-h-96 overflow-y-auto">
+              {allTriggers?.map((trigger) => {
+                const isSelected = formData.triggers.includes(trigger.id);
+                const isFull = formData.triggers.length >= 4;
+                return (
+                  <button
+                    key={trigger.id}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          triggers: prev.triggers.filter(
+                            (id) => id !== trigger.id
+                          ),
+                        }));
+                      } else if (!isFull) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          triggers: [...prev.triggers, trigger.id],
+                        }));
+                      }
+                    }}
+                    disabled={!isSelected && isFull}
+                    className={`p-3 text-left border rounded-md transition-colors ${
+                      isSelected
+                        ? "bg-primary/20 border-primary"
+                        : isFull
+                        ? "opacity-50"
+                        : "hover:bg-primary/10"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{trigger.name}</span>
+                      {isSelected && (
+                        <span className="text-xs text-primary font-medium">
+                          +2
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep("background")}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setStep("skills")}
+                disabled={!canProceedFromTriggers}
+              >
+                Next: Skills
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3: Skills */}
+      {step === "skills" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Step 3: Mech Skills</CardTitle>
             <CardDescription>
               Allocate 2 points across HASE. These affect your mech's stats.
             </CardDescription>
@@ -178,33 +370,61 @@ function NewCharacterPage() {
                 label="HULL"
                 description="+2 HP per point"
                 value={formData.skills.hull}
-                onChange={(v) => updateSkill("hull", v)}
+                onChange={(v) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    skills: { ...prev.skills, hull: Math.max(0, Math.min(6, v)) },
+                  }))
+                }
               />
               <SkillInput
                 label="AGILITY"
                 description="+1 Evasion per point"
                 value={formData.skills.agility}
-                onChange={(v) => updateSkill("agility", v)}
+                onChange={(v) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    skills: {
+                      ...prev.skills,
+                      agility: Math.max(0, Math.min(6, v)),
+                    },
+                  }))
+                }
               />
               <SkillInput
                 label="SYSTEMS"
                 description="+1 Tech Attack & E-Def"
                 value={formData.skills.systems}
-                onChange={(v) => updateSkill("systems", v)}
+                onChange={(v) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    skills: {
+                      ...prev.skills,
+                      systems: Math.max(0, Math.min(6, v)),
+                    },
+                  }))
+                }
               />
               <SkillInput
                 label="ENGINEERING"
                 description="+1 Heat Cap per point"
                 value={formData.skills.engineering}
-                onChange={(v) => updateSkill("engineering", v)}
+                onChange={(v) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    skills: {
+                      ...prev.skills,
+                      engineering: Math.max(0, Math.min(6, v)),
+                    },
+                  }))
+                }
               />
             </div>
+
             <div className="mt-4 text-sm">
               <span
                 className={
-                  totalSkillPoints === 2
-                    ? "text-horus"
-                    : "text-destructive"
+                  totalSkillPoints === 2 ? "text-horus" : "text-destructive"
                 }
               >
                 Total: {totalSkillPoints} / 2 points
@@ -215,35 +435,130 @@ function NewCharacterPage() {
                 </span>
               )}
             </div>
+
+            <div className="flex gap-3 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep("triggers")}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setStep("talents")}
+                disabled={!canProceedFromSkills}
+              >
+                Next: Talents
+              </Button>
+            </div>
           </CardContent>
         </Card>
+      )}
 
-        <Card className="mb-6">
+      {/* Step 4: Talents */}
+      {step === "talents" && (
+        <Card>
           <CardHeader>
-            <CardTitle>Mech</CardTitle>
+            <CardTitle>Step 4: Talents</CardTitle>
+            <CardDescription>
+              Choose 3 talents at rank I. These provide combat abilities for
+              your mech.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 p-3 bg-primary/10 rounded-md">
+              <div className="text-xs text-muted-foreground">
+                Selected: {formData.talents.length} / 3 talents
+              </div>
+            </div>
+
+            <div className="grid gap-2 max-h-96 overflow-y-auto">
+              {allTalents?.map((talent) => {
+                const isSelected = formData.talents.includes(talent.id);
+                const isFull = formData.talents.length >= 3;
+                return (
+                  <button
+                    key={talent.id}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          talents: prev.talents.filter((id) => id !== talent.id),
+                        }));
+                      } else if (!isFull) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          talents: [...prev.talents, talent.id],
+                        }));
+                      }
+                    }}
+                    disabled={!isSelected && isFull}
+                    className={`p-3 text-left border rounded-md transition-colors ${
+                      isSelected
+                        ? "bg-primary/20 border-primary"
+                        : isFull
+                        ? "opacity-50"
+                        : "hover:bg-primary/10"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{talent.name}</span>
+                      {isSelected && (
+                        <span className="text-xs text-primary font-medium">
+                          Rank I
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep("skills")}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setStep("mech")}
+                disabled={!canProceedFromTalents}
+              >
+                Next: Mech
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 5: Mech */}
+      {step === "mech" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Step 5: Your Mech</CardTitle>
             <CardDescription>
               LL0 pilots start with a GMS Everest frame
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Mech Name
-              </label>
+              <label className="block text-sm font-medium mb-1">Mech Name</label>
               <input
                 type="text"
                 value={formData.mechName}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    mechName: e.target.value,
-                  }))
+                  setFormData((prev) => ({ ...prev, mechName: e.target.value }))
                 }
                 placeholder={formData.callsign || "RAIJIN"}
                 className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Optional custom name for your mech (defaults to callsign)
+                Optional custom name (defaults to callsign)
               </p>
             </div>
 
@@ -257,59 +572,75 @@ function NewCharacterPage() {
                 <div>SP 6</div>
               </div>
             </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-1">Notes</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, notes: e.target.value }))
+                }
+                placeholder="Character backstory..."
+                rows={3}
+                className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              />
+            </div>
+
+            {/* Summary */}
+            <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-md text-sm">
+              <strong>Character Summary:</strong>
+              <ul className="mt-2 space-y-1 text-muted-foreground">
+                <li>
+                  <strong>Callsign:</strong> {formData.callsign}
+                </li>
+                <li>
+                  <strong>Background:</strong> {formData.backgroundName}
+                </li>
+                <li>
+                  <strong>Triggers:</strong>{" "}
+                  {formData.triggers
+                    .map((id) => triggerMap.get(id)?.name ?? id)
+                    .join(", ")}
+                </li>
+                <li>
+                  <strong>Skills:</strong> Hull +{formData.skills.hull}, Agi +
+                  {formData.skills.agility}, Sys +{formData.skills.systems}, Eng
+                  +{formData.skills.engineering}
+                </li>
+                <li>
+                  <strong>Talents:</strong>{" "}
+                  {formData.talents
+                    .map((id) => talentMap.get(id)?.name ?? id)
+                    .join(", ")}
+                </li>
+              </ul>
+            </div>
+
+            {error && (
+              <div className="mt-4 p-3 bg-destructive/10 border border-destructive rounded-md text-destructive text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep("talents")}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={createMutation.isPending}
+              >
+                {createMutation.isPending ? "Creating..." : "Create Character"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
-
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Notes</CardTitle>
-            <CardDescription>
-              Background, personality, goals
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <textarea
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, notes: e.target.value }))
-              }
-              placeholder="Character backstory..."
-              rows={4}
-              className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-            />
-          </CardContent>
-        </Card>
-
-        <div className="p-4 mb-6 bg-primary/10 border border-primary/20 rounded-md text-sm">
-          <strong>LL0 Defaults Applied:</strong>
-          <ul className="mt-2 text-muted-foreground list-disc list-inside">
-            <li>4 triggers at +2 each (8 points)</li>
-            <li>3 talents at rank I (3 points)</li>
-            <li>No licenses or core bonuses</li>
-            <li>GMS-only gear access</li>
-          </ul>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md text-destructive text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="flex gap-3">
-          <Button
-            type="submit"
-            disabled={createMutation.isPending || totalSkillPoints !== 2}
-          >
-            {createMutation.isPending ? "Creating..." : "Create Character"}
-          </Button>
-          <Link to="/characters">
-            <Button type="button" variant="outline">
-              Cancel
-            </Button>
-          </Link>
-        </div>
-      </form>
+      )}
     </div>
   );
 }

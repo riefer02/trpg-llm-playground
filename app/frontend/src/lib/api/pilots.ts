@@ -1,10 +1,7 @@
 /**
  * Pilot API hooks using generated types from core models.
  *
- * Usage:
- *   const { data: pilots } = usePilots()
- *   const { data: pilot } = usePilot('pilot_123')
- *   const createMutation = useCreatePilot()
+ * NOTE: This is an internal/low-level API. Use /characters for user-facing features.
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,53 +12,31 @@ import type {
   License,
   CoreBonus,
   Background,
+  SkillSet,
 } from "../types/lancer";
 
 // =============================================================================
-// Request Types (match backend API schemas)
+// Request Types (use generated primitives from core)
 // =============================================================================
 
-export interface SkillSetInput {
-  hull?: number;
-  agility?: number;
-  systems?: number;
-  engineering?: number;
-}
-
-export interface TriggerInput {
-  trigger_id: string;
-  rank?: number;
-}
-
-export interface TalentInput {
-  talent_id: string;
-  rank?: number;
-}
-
-export interface LicenseInput {
-  license_id: string;
-  rank?: number;
-}
-
-export interface CoreBonusInput {
-  core_bonus_id: string;
-}
-
-export interface BackgroundInput {
-  id: string;
-  name: string;
-}
+// Re-export generated types for backwards compatibility
+export type SkillSetInput = Partial<SkillSet>;
+export type TriggerInput = PilotTrigger;
+export type TalentInput = Talent;
+export type LicenseInput = License;
+export type CoreBonusInput = CoreBonus;
+export type BackgroundInput = Background;
 
 export interface PilotCreateRequest {
   callsign: string;
   name?: string;
   level?: number;
   skills?: SkillSetInput;
-  triggers?: TriggerInput[];
-  talents?: TalentInput[];
-  licenses?: LicenseInput[];
-  core_bonuses?: CoreBonusInput[];
-  background?: BackgroundInput | null;
+  triggers?: PilotTrigger[];
+  talents?: Talent[];
+  licenses?: License[];
+  core_bonuses?: CoreBonus[];
+  background?: Background | null;
   notes?: string;
 }
 
@@ -70,11 +45,11 @@ export interface PilotUpdateRequest {
   name?: string;
   level?: number;
   skills?: SkillSetInput;
-  triggers?: TriggerInput[];
-  talents?: TalentInput[];
-  licenses?: LicenseInput[];
-  core_bonuses?: CoreBonusInput[];
-  background?: BackgroundInput | null;
+  triggers?: PilotTrigger[];
+  talents?: Talent[];
+  licenses?: License[];
+  core_bonuses?: CoreBonus[];
+  background?: Background | null;
   notes?: string;
 }
 
@@ -90,11 +65,11 @@ export interface PilotResponse {
   created_at: string;
   updated_at: string;
 
-  // Core pilot data
+  // Core pilot data (uses generated primitives)
   callsign: string;
   name: string;
   level: number;
-  skills: Record<string, number>;
+  skills: SkillSet;
   triggers: PilotTrigger[];
   talents: Talent[];
   licenses: License[];

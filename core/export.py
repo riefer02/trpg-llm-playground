@@ -248,6 +248,10 @@ from core.mech.combat_resolution import (
     OverheatResolution,
     ResolutionSettings,
 )
+from core.character import (
+    Character,
+    MechConfiguration,
+)
 
 
 # All exportable models
@@ -286,6 +290,9 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "DownAndOutRule": DownAndOutRule,
     "PilotRestRule": PilotRestRule,
     "PilotCombatRules": PilotCombatRules,
+    # Character domain (unified pilot + mech)
+    "Character": Character,
+    "MechConfiguration": MechConfiguration,
     # Shared - Dice
     "DiceExpression": DiceExpression,
     # Shared - Effects

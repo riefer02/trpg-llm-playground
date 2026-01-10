@@ -337,6 +337,39 @@ make generate-types
 
 **What to commit**: Both `schemas/lancer.json` and `src/lib/types/lancer.ts` are tracked.
 
+**IMPORTANT: Export new models**: When adding new models to `core/`, add them to `core/export.py`:
+
+```python
+# 1. Add import
+from core.character import Character, MechConfiguration
+
+# 2. Add to EXPORTABLE_MODELS dict
+EXPORTABLE_MODELS = {
+    # ...
+    "Character": Character,
+    "MechConfiguration": MechConfiguration,
+}
+```
+
+Then run `make generate-types` to update the frontend types.
+
+**Frontend Type Strategy**: API hooks import primitives from generated types:
+
+```typescript
+// In API hooks - import generated primitives
+import type { PilotTrigger, Talent, SkillSet } from '../types/lancer'
+
+// API response types extend with DB metadata (this is OK)
+export interface CharacterResponse {
+  id: string;           // DB field
+  created_at: string;   // DB field
+  skills: SkillSet;     // Generated type ✓
+  triggers: PilotTrigger[];  // Generated type ✓
+}
+```
+
+Don't duplicate primitive types - always import from `lib/types/lancer.ts`.
+
 ### Database
 
 - **PostgreSQL** via Docker on port 5433 (avoids conflicts)
@@ -472,15 +505,17 @@ async def test_endpoint_returns_computed_fields(client):
 
 **Quick Reference**:
 ```
-core/ change → make test-core → make generate-types → update app/ → make test-app
+core/ change → make test-core → add to export.py → make generate-types → update app/ → make test-app
 ```
 
 | Change Type | Actions Required |
 |-------------|------------------|
 | Core model field | Test core → regenerate types → update API schemas → test app |
-| New core model | Add to export.py → regenerate types → create API endpoint |
+| **New core model** | **Add to `core/export.py`** → regenerate types → create API endpoint |
 | API endpoint | Create tests → validate against core → test app |
 | Frontend component | Regenerate types (if needed) → use generated types |
+
+**Don't forget `core/export.py`!** New models must be added to `EXPORTABLE_MODELS` or they won't be available in the frontend types.
 
 ## Completed Features
 

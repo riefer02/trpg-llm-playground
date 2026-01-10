@@ -1,8 +1,10 @@
 /**
  * API module exports.
- * 
+ *
  * Import from this file for cleaner imports:
  *   import { useHealth, useCharacters, api } from '@/lib/api'
+ *
+ * For core domain types, import from '@/lib/types/lancer'
  */
 
 // Core client
@@ -38,6 +40,20 @@ export type {
   ValidationIssue,
 } from './characters'
 
+// Compendium hooks (reference data for character creation)
+export {
+  useBackgrounds,
+  useTriggers,
+  useTalents,
+  compendiumKeys,
+} from './compendium'
+// Note: Compendium types are simplified API responses, not full core types
+export type {
+  Background as CompendiumBackground,
+  Trigger as CompendiumTrigger,
+  Talent as CompendiumTalent,
+} from './compendium'
+
 // Pilot hooks (internal/low-level primitive)
 export {
   usePilots,
@@ -54,10 +70,18 @@ export type {
   PilotCreateRequest,
   PilotUpdateRequest,
   PilotValidationResponse,
-  SkillSetInput,
-  TriggerInput,
-  TalentInput,
-  LicenseInput,
-  CoreBonusInput,
-  BackgroundInput,
 } from './pilots'
+
+// Re-export generated core types for convenience
+// These are the source of truth - use these for domain data
+export type {
+  PilotTrigger,
+  Talent,
+  License,
+  CoreBonus,
+  Background,
+  SkillSet,
+  Character,
+  MechConfiguration,
+  Pilot,
+} from '../types/lancer'

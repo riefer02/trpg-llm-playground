@@ -4,32 +4,37 @@
  * Characters are the unified abstraction combining Pilot + Mech(s).
  * This is the primary user-facing API for character management.
  *
- * Usage:
- *   const { data: characters } = useCharacters()
- *   const { data: character } = useCharacter('char_123')
- *   const createMutation = useCreateCharacter()
+ * Uses generated types from core for primitives (PilotTrigger, Talent, etc.)
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
+import type {
+  PilotTrigger,
+  Talent,
+  License,
+  CoreBonus,
+  Background,
+  SkillSet,
+} from "../types/lancer";
 
 // =============================================================================
-// Request Types
+// Request Types (use generated primitives)
 // =============================================================================
 
 export interface CharacterCreateRequest {
   callsign: string;
   name?: string;
   use_ll0_defaults?: boolean;
-  skills?: Record<string, number>;
-  triggers?: Array<{ trigger_id: string; rank?: number }>;
-  talents?: Array<{ talent_id: string; rank?: number }>;
-  background?: { id: string; name: string; triggers?: string[] };
+  skills?: Partial<SkillSet>;
+  triggers?: PilotTrigger[];
+  talents?: Talent[];
+  background?: Background;
   mech_name?: string;
   mech_frame_id?: string;
   level?: number;
-  licenses?: Array<{ license_id: string; rank?: number }>;
-  core_bonuses?: Array<{ core_bonus_id: string }>;
+  licenses?: License[];
+  core_bonuses?: CoreBonus[];
   notes?: string;
 }
 
@@ -37,12 +42,12 @@ export interface CharacterUpdateRequest {
   callsign?: string;
   name?: string;
   level?: number;
-  skills?: Record<string, number>;
-  triggers?: Array<{ trigger_id: string; rank: number }>;
-  talents?: Array<{ talent_id: string; rank: number }>;
-  licenses?: Array<{ license_id: string; rank: number }>;
-  core_bonuses?: Array<{ core_bonus_id: string }>;
-  background?: { id: string; name: string; triggers?: string[] };
+  skills?: Partial<SkillSet>;
+  triggers?: PilotTrigger[];
+  talents?: Talent[];
+  licenses?: License[];
+  core_bonuses?: CoreBonus[];
+  background?: Background;
   notes?: string;
   active_mech_id?: string;
 }
@@ -87,17 +92,17 @@ export interface CharacterResponse {
   created_at: string;
   updated_at: string;
 
-  // Pilot data
+  // Pilot data (uses generated primitives)
   pilot_id: string;
   callsign: string;
   name: string;
   level: number;
-  skills: Record<string, number>;
-  triggers: Array<{ trigger_id: string; rank: number }>;
-  talents: Array<{ talent_id: string; rank: number }>;
-  licenses: Array<{ license_id: string; rank: number }>;
-  core_bonuses: Array<{ core_bonus_id: string }>;
-  background: { id: string; name: string; triggers?: string[] } | null;
+  skills: SkillSet;
+  triggers: PilotTrigger[];
+  talents: Talent[];
+  licenses: License[];
+  core_bonuses: CoreBonus[];
+  background: Background | null;
   notes: string;
 
   // Pilot computed fields

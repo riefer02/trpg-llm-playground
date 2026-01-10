@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "InstalledSystem": {
+      "description": "System installed on a mech.",
+      "properties": {
+        "system_id": {
+          "title": "System Id",
+          "type": "string"
+        },
+        "sp_cost": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sp Cost"
+        }
+      },
+      "required": [
+        "system_id"
+      ],
+      "title": "InstalledSystem",
+      "type": "object"
+    },
+    "MechBuild": {
+      "description": "A mech build derived from a frame and loadout.",
+      "properties": {
+        "frame_id": {
+          "title": "Frame Id",
+          "type": "string"
+        },
+        "weapons": {
+          "items": {
+            "$ref": "#/$defs/MountedWeapon"
+          },
+          "title": "Weapons",
+          "type": "array"
+        },
+        "systems": {
+          "items": {
+            "$ref": "#/$defs/InstalledSystem"
+          },
+          "title": "Systems",
+          "type": "array"
+        }
+      },
+      "required": [
+        "frame_id"
+      ],
+      "title": "MechBuild",
+      "type": "object"
+    },
+    "MountedWeapon": {
+      "description": "Weapon installed on a specific mount slot.",
+      "properties": {
+        "mount_index": {
+          "minimum": 0,
+          "title": "Mount Index",
+          "type": "integer"
+        },
+        "weapon_id": {
+          "title": "Weapon Id",
+          "type": "string"
+        },
+        "weapon_size": {
+          "enum": [
+            "aux",
+            "main",
+            "heavy",
+            "superheavy"
+          ],
+          "title": "Weapon Size",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mount_index",
+        "weapon_id",
+        "weapon_size"
+      ],
+      "title": "MountedWeapon",
+      "type": "object"
+    }
+  },
+  "description": "A named mech loadout owned by a character.\n\nRepresents a single mech configuration that a pilot can use.\nThe actual combat stats are computed based on the pilot's skills,\ngrit, and core bonuses when accessed through the Character model.",
+  "properties": {
+    "id": {
+      "description": "Unique mech configuration ID",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "description": "Custom name (e.g., 'RAIJIN')",
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "frame_id": {
+      "description": "Frame definition ID",
+      "title": "Frame Id",
+      "type": "string"
+    },
+    "build": {
+      "$ref": "#/$defs/MechBuild",
+      "description": "Weapon and system loadout"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "frame_id"
+  ],
+  "title": "MechConfiguration",
+  "type": "object"
+}
