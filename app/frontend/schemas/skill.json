@@ -1,0 +1,27 @@
+{
+  "description": "A pilot skill with a rank.\n\nIn Lancer, pilots have 4 mech skills (HULL, AGI, SYS, ENG)\nthat determine their mech's base stats. Pilot skill checks\ninstead use triggers for flat bonuses.",
+  "properties": {
+    "skill_type": {
+      "enum": [
+        "hull",
+        "agility",
+        "systems",
+        "engineering"
+      ],
+      "title": "Skill Type",
+      "type": "string"
+    },
+    "rank": {
+      "default": 0,
+      "maximum": 6,
+      "minimum": 0,
+      "title": "Rank",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "skill_type"
+  ],
+  "title": "Skill",
+  "type": "object"
+}

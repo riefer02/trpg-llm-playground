@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    }
+  },
+  "description": "Reactor meltdown resolution rules.",
+  "properties": {
+    "burst_radius": {
+      "default": 2,
+      "minimum": 0,
+      "title": "Burst Radius",
+      "type": "integer"
+    },
+    "damage": {
+      "$ref": "#/$defs/DiceExpression"
+    },
+    "damage_type": {
+      "default": "explosive",
+      "enum": [
+        "kinetic",
+        "explosive",
+        "energy",
+        "burn"
+      ],
+      "title": "Damage Type",
+      "type": "string"
+    },
+    "save_skill": {
+      "const": "agility",
+      "default": "agility",
+      "title": "Save Skill",
+      "type": "string"
+    },
+    "save_halves_damage": {
+      "default": true,
+      "title": "Save Halves Damage",
+      "type": "boolean"
+    },
+    "pilot_survival": {
+      "default": false,
+      "title": "Pilot Survival",
+      "type": "boolean"
+    }
+  },
+  "title": "ReactorMeltdownRules",
+  "type": "object"
+}

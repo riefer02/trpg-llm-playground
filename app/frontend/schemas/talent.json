@@ -1,0 +1,23 @@
+{
+  "description": "A talent that a pilot has learned.\n\nThis represents a pilot's progress in a specific talent,\ntracking which ranks they have unlocked.",
+  "properties": {
+    "talent_id": {
+      "description": "ID of the talent definition",
+      "title": "Talent Id",
+      "type": "string"
+    },
+    "rank": {
+      "default": 1,
+      "description": "Current rank (1-3)",
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Rank",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "talent_id"
+  ],
+  "title": "Talent",
+  "type": "object"
+}

@@ -1,0 +1,72 @@
+{
+  "description": "Jockey follow-up option.",
+  "properties": {
+    "name": {
+      "enum": [
+        "distract",
+        "shred",
+        "damage"
+      ],
+      "title": "Name",
+      "type": "string"
+    },
+    "inflicts_conditions": {
+      "items": {
+        "enum": [
+          "braced",
+          "immobilized",
+          "impaired",
+          "jammed",
+          "lock_on",
+          "shredded",
+          "slowed",
+          "stunned",
+          "prone",
+          "hidden",
+          "invisible",
+          "shutdown",
+          "exposed",
+          "engaged",
+          "burn",
+          "unshackled"
+        ],
+        "type": "string"
+      },
+      "title": "Inflicts Conditions",
+      "type": "array"
+    },
+    "heat": {
+      "default": 0,
+      "title": "Heat",
+      "type": "integer"
+    },
+    "damage": {
+      "default": 0,
+      "title": "Damage",
+      "type": "integer"
+    },
+    "damage_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Damage Type"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "JockeyOption",
+  "type": "object"
+}

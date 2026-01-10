@@ -1,0 +1,80 @@
+{
+  "description": "Flight rules and restrictions.",
+  "properties": {
+    "must_move_min_spaces": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Must Move Min Spaces",
+      "type": "integer"
+    },
+    "straight_line_per_movement": {
+      "default": true,
+      "title": "Straight Line Per Movement",
+      "type": "boolean"
+    },
+    "falls_if_immobilized_or_stunned": {
+      "default": true,
+      "title": "Falls If Immobilized Or Stunned",
+      "type": "boolean"
+    },
+    "agility_save_on_structure_or_overheat": {
+      "default": true,
+      "title": "Agility Save On Structure Or Overheat",
+      "type": "boolean"
+    },
+    "combat_altitude_limit": {
+      "default": 10,
+      "minimum": 0,
+      "title": "Combat Altitude Limit",
+      "type": "integer"
+    },
+    "beyond_altitude_only_move_or_boost": {
+      "default": true,
+      "title": "Beyond Altitude Only Move Or Boost",
+      "type": "boolean"
+    },
+    "ignore_obstructions": {
+      "default": true,
+      "title": "Ignore Obstructions",
+      "type": "boolean"
+    },
+    "requires_physical_space": {
+      "default": true,
+      "title": "Requires Physical Space",
+      "type": "boolean"
+    },
+    "engage_only_on_adjacent": {
+      "default": true,
+      "title": "Engage Only On Adjacent",
+      "type": "boolean"
+    },
+    "cannot_be_prone": {
+      "default": true,
+      "title": "Cannot Be Prone",
+      "type": "boolean"
+    },
+    "hover_allows_stationary": {
+      "default": true,
+      "title": "Hover Allows Stationary",
+      "type": "boolean"
+    },
+    "hover_ignores_straight_line": {
+      "default": true,
+      "title": "Hover Ignores Straight Line",
+      "type": "boolean"
+    },
+    "carry_max_total_size": {
+      "default": 0.5,
+      "minimum": 0.0,
+      "title": "Carry Max Total Size",
+      "type": "number"
+    },
+    "carry_limit_ignored_in_zero_g": {
+      "default": true,
+      "title": "Carry Limit Ignored In Zero G",
+      "type": "boolean"
+    }
+  },
+  "title": "FlightRules",
+  "type": "object"
+}

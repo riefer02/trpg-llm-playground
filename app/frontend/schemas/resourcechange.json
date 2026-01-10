@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    }
+  },
+  "description": "Change a resource value such as HP or heat.\n\nExamples:\n    ResourceChange(resource=\"hp\", amount=\"half_max\", target=\"ally\", cost_repairs=1)\n    ResourceChange(resource=\"heat\", amount=DiceExpression.parse(\"1d6\"), direction=\"lose\", target=\"self\")",
+  "properties": {
+    "resource": {
+      "enum": [
+        "hp",
+        "heat",
+        "repairs",
+        "structure",
+        "stress",
+        "core_power"
+      ],
+      "title": "Resource",
+      "type": "string"
+    },
+    "amount": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "$ref": "#/$defs/DiceExpression"
+        },
+        {
+          "enum": [
+            "quarter_max",
+            "half_max",
+            "full"
+          ],
+          "type": "string"
+        }
+      ],
+      "title": "Amount"
+    },
+    "direction": {
+      "default": "gain",
+      "enum": [
+        "gain",
+        "lose",
+        "set"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
+    "target": {
+      "enum": [
+        "self",
+        "enemy",
+        "ally",
+        "adjacent"
+      ],
+      "title": "Target",
+      "type": "string"
+    },
+    "cost_repairs": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Cost Repairs",
+      "type": "integer"
+    },
+    "cost_source": {
+      "default": "self",
+      "enum": [
+        "self",
+        "target",
+        "either"
+      ],
+      "title": "Cost Source",
+      "type": "string"
+    }
+  },
+  "required": [
+    "resource",
+    "amount",
+    "target"
+  ],
+  "title": "ResourceChange",
+  "type": "object"
+}

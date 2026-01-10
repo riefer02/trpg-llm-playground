@@ -1,0 +1,18 @@
+{
+  "description": "System point bonus rules.",
+  "properties": {
+    "grit_bonus": {
+      "default": true,
+      "title": "Grit Bonus",
+      "type": "boolean"
+    },
+    "systems_per_bonus_sp": {
+      "default": 2,
+      "minimum": 1,
+      "title": "Systems Per Bonus Sp",
+      "type": "integer"
+    }
+  },
+  "title": "SystemPointRules",
+  "type": "object"
+}

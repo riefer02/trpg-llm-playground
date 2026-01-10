@@ -1,0 +1,171 @@
+{
+  "$defs": {
+    "NarrativeGoalCondition": {
+      "description": "Condition that must be met to complete a narrative goal.",
+      "properties": {
+        "id": {
+          "description": "Unique condition identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "condition_type": {
+          "enum": [
+            "skill_check",
+            "position_reached",
+            "target_removed",
+            "resource_spend",
+            "time_elapsed",
+            "complication_resolved",
+            "other"
+          ],
+          "title": "Condition Type",
+          "type": "string"
+        },
+        "description": {
+          "description": "What must be true for this condition",
+          "title": "Description",
+          "type": "string"
+        },
+        "required_tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "standard",
+                "difficult",
+                "risky",
+                "heroic"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tier needed if condition is check-based",
+          "title": "Required Tier"
+        },
+        "required_skill": {
+          "anyOf": [
+            {
+              "enum": [
+                "hull",
+                "agility",
+                "systems",
+                "engineering"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Skill used if condition is check-based",
+          "title": "Required Skill"
+        },
+        "required_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Quantity needed (time/resources/etc)",
+          "title": "Required Amount"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target or object tied to this condition",
+          "title": "Target Id"
+        }
+      },
+      "required": [
+        "id",
+        "condition_type",
+        "description"
+      ],
+      "title": "NarrativeGoalCondition",
+      "type": "object"
+    }
+  },
+  "description": "Goal definition for narrative combat.",
+  "properties": {
+    "id": {
+      "description": "Unique goal identifier",
+      "title": "Id",
+      "type": "string"
+    },
+    "description": {
+      "description": "Pilot's stated goal",
+      "title": "Description",
+      "type": "string"
+    },
+    "success_conditions": {
+      "description": "Conditions that represent success",
+      "items": {
+        "$ref": "#/$defs/NarrativeGoalCondition"
+      },
+      "title": "Success Conditions",
+      "type": "array"
+    },
+    "successes_required": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Successful checks required to complete the goal",
+      "title": "Successes Required"
+    },
+    "failure_limit": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Failures allowed before the goal fails",
+      "title": "Failure Limit"
+    },
+    "harm_involved": {
+      "default": false,
+      "description": "Whether the goal involves physical harm",
+      "title": "Harm Involved",
+      "type": "boolean"
+    },
+    "repeat_requires_change": {
+      "default": true,
+      "description": "Checks cannot repeat until circumstances change",
+      "title": "Repeat Requires Change",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "description"
+  ],
+  "title": "NarrativeGoal",
+  "type": "object"
+}

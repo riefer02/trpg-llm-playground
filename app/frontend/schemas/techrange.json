@@ -1,0 +1,29 @@
+{
+  "description": "Range descriptor for tech actions.\n\nExamples:\n    TechRange(range_type=\"sensors\")  # Within sensors\n    TechRange(range_type=\"range\", value=10)  # Range 10",
+  "properties": {
+    "range_type": {
+      "default": "sensors",
+      "enum": [
+        "sensors",
+        "range"
+      ],
+      "title": "Range Type",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value"
+    }
+  },
+  "title": "TechRange",
+  "type": "object"
+}

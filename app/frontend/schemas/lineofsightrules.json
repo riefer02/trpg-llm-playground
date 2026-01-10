@@ -1,0 +1,42 @@
+{
+  "description": "Line of sight interaction rules.",
+  "properties": {
+    "requires_line_of_sight": {
+      "default": true,
+      "title": "Requires Line Of Sight",
+      "type": "boolean"
+    },
+    "arcing_allows_no_los": {
+      "default": true,
+      "title": "Arcing Allows No Los",
+      "type": "boolean"
+    },
+    "seeking_ignores_cover": {
+      "default": true,
+      "title": "Seeking Ignores Cover",
+      "type": "boolean"
+    },
+    "seeking_ignores_los": {
+      "default": true,
+      "title": "Seeking Ignores Los",
+      "type": "boolean"
+    },
+    "arcing_requires_path_clear": {
+      "default": true,
+      "title": "Arcing Requires Path Clear",
+      "type": "boolean"
+    },
+    "seeking_requires_path_clear": {
+      "default": true,
+      "title": "Seeking Requires Path Clear",
+      "type": "boolean"
+    },
+    "adjacent_cover_does_not_block_los": {
+      "default": true,
+      "title": "Adjacent Cover Does Not Block Los",
+      "type": "boolean"
+    }
+  },
+  "title": "LineOfSightRules",
+  "type": "object"
+}

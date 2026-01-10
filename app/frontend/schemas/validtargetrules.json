@@ -1,0 +1,27 @@
+{
+  "description": "Target eligibility rules.",
+  "properties": {
+    "allow_characters": {
+      "default": true,
+      "title": "Allow Characters",
+      "type": "boolean"
+    },
+    "allow_objects": {
+      "default": true,
+      "title": "Allow Objects",
+      "type": "boolean"
+    },
+    "allow_points": {
+      "default": true,
+      "title": "Allow Points",
+      "type": "boolean"
+    },
+    "allow_self": {
+      "default": false,
+      "title": "Allow Self",
+      "type": "boolean"
+    }
+  },
+  "title": "ValidTargetRules",
+  "type": "object"
+}

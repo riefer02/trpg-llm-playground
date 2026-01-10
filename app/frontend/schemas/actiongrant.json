@@ -1,0 +1,106 @@
+{
+  "description": "Grants a new action or ability.\n\nExamples:\n    ActionGrant(action_type=\"quick\", name=\"Afterburner\", trigger=\"after_boost\")\n    ActionGrant(action_type=\"reaction\", name=\"Juke\", trigger=\"on_successful_agility_save\")",
+  "properties": {
+    "action_type": {
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol",
+        "move"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "trigger": {
+      "anyOf": [
+        {
+          "enum": [
+            "on_hit",
+            "on_miss",
+            "on_reload",
+            "on_first_attack",
+            "on_overkill",
+            "on_crit",
+            "on_kill",
+            "on_activation",
+            "on_attack_roll",
+            "on_detonate",
+            "on_move",
+            "on_reaction",
+            "on_action",
+            "on_take_damage",
+            "on_hide",
+            "on_overheat",
+            "on_ally_hit",
+            "on_ally_miss",
+            "on_ally_damaged",
+            "on_ally_targeted",
+            "on_turn_start",
+            "on_turn_end",
+            "on_overcharge",
+            "on_core_power_spent",
+            "on_structure_loss",
+            "on_heat_gain",
+            "on_target_failed_save",
+            "on_tech_attack_hit",
+            "on_ally_turn_start",
+            "on_stabilize",
+            "on_skirmish",
+            "on_enter",
+            "on_inflict",
+            "on_brace",
+            "on_move_or_boost",
+            "on_slipstream_jump",
+            "on_extra_overwatch",
+            "on_ally_hit_target_within_range",
+            "on_lock_on_consumed",
+            "on_deploy",
+            "on_destroyed",
+            "on_adjacent",
+            "on_attacked",
+            "on_ally_killed",
+            "on_hp_below_half",
+            "on_damage_dealt",
+            "on_first_adjacent_turn",
+            "on_any_damage"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "When this action can be used",
+      "title": "Trigger"
+    },
+    "uses_per": {
+      "default": "unlimited",
+      "enum": [
+        "unlimited",
+        "round",
+        "scene",
+        "mission",
+        "rest",
+        "full_repair"
+      ],
+      "title": "Uses Per",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action_type",
+    "name"
+  ],
+  "title": "ActionGrant",
+  "type": "object"
+}

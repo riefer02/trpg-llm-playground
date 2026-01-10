@@ -1,0 +1,31 @@
+{
+  "description": "Link between grappling combatants.",
+  "properties": {
+    "grappler_id": {
+      "title": "Grappler Id",
+      "type": "string"
+    },
+    "target_id": {
+      "title": "Target Id",
+      "type": "string"
+    },
+    "grappler_total_size": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Grappler Total Size",
+      "type": "integer"
+    },
+    "target_total_size": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Target Total Size",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "grappler_id",
+    "target_id"
+  ],
+  "title": "GrappleLink",
+  "type": "object"
+}

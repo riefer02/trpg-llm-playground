@@ -1,0 +1,26 @@
+{
+  "description": "Size-based bonus for a weapon mod.\n\nExamples:\n    WeaponSizeBonus(size=\"main\", burn=2)",
+  "properties": {
+    "size": {
+      "enum": [
+        "aux",
+        "main",
+        "heavy",
+        "superheavy"
+      ],
+      "title": "Size",
+      "type": "string"
+    },
+    "burn": {
+      "minimum": 0,
+      "title": "Burn",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "size",
+    "burn"
+  ],
+  "title": "WeaponSizeBonus",
+  "type": "object"
+}

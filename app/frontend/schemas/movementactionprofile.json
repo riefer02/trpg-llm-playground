@@ -1,0 +1,28 @@
+{
+  "description": "Movement profile for an action.",
+  "properties": {
+    "distance_multiplier": {
+      "default": 1.0,
+      "minimum": 0.0,
+      "title": "Distance Multiplier",
+      "type": "number"
+    },
+    "ignore_engagement": {
+      "default": false,
+      "title": "Ignore Engagement",
+      "type": "boolean"
+    },
+    "ignore_reactions": {
+      "default": false,
+      "title": "Ignore Reactions",
+      "type": "boolean"
+    },
+    "counts_as_boost": {
+      "default": false,
+      "title": "Counts As Boost",
+      "type": "boolean"
+    }
+  },
+  "title": "MovementActionProfile",
+  "type": "object"
+}

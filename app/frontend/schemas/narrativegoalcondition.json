@@ -1,0 +1,100 @@
+{
+  "description": "Condition that must be met to complete a narrative goal.",
+  "properties": {
+    "id": {
+      "description": "Unique condition identifier",
+      "title": "Id",
+      "type": "string"
+    },
+    "condition_type": {
+      "enum": [
+        "skill_check",
+        "position_reached",
+        "target_removed",
+        "resource_spend",
+        "time_elapsed",
+        "complication_resolved",
+        "other"
+      ],
+      "title": "Condition Type",
+      "type": "string"
+    },
+    "description": {
+      "description": "What must be true for this condition",
+      "title": "Description",
+      "type": "string"
+    },
+    "required_tier": {
+      "anyOf": [
+        {
+          "enum": [
+            "standard",
+            "difficult",
+            "risky",
+            "heroic"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Tier needed if condition is check-based",
+      "title": "Required Tier"
+    },
+    "required_skill": {
+      "anyOf": [
+        {
+          "enum": [
+            "hull",
+            "agility",
+            "systems",
+            "engineering"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Skill used if condition is check-based",
+      "title": "Required Skill"
+    },
+    "required_amount": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Quantity needed (time/resources/etc)",
+      "title": "Required Amount"
+    },
+    "target_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Target or object tied to this condition",
+      "title": "Target Id"
+    }
+  },
+  "required": [
+    "id",
+    "condition_type",
+    "description"
+  ],
+  "title": "NarrativeGoalCondition",
+  "type": "object"
+}

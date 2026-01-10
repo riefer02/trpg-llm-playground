@@ -1,0 +1,38 @@
+{
+  "description": "Damage severity bands for pilots.",
+  "properties": {
+    "name": {
+      "enum": [
+        "minor",
+        "major",
+        "lethal"
+      ],
+      "title": "Name",
+      "type": "string"
+    },
+    "min_damage": {
+      "minimum": 0,
+      "title": "Min Damage",
+      "type": "integer"
+    },
+    "max_damage": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Damage"
+    }
+  },
+  "required": [
+    "name",
+    "min_damage"
+  ],
+  "title": "PilotDamageSeverity",
+  "type": "object"
+}

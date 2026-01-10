@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "DownAndOutRule": {
+      "description": "Down and out resolution when a pilot hits 0 HP.",
+      "properties": {
+        "roll_die": {
+          "const": "1d6",
+          "default": "1d6",
+          "title": "Roll Die",
+          "type": "string"
+        },
+        "recover_roll": {
+          "default": 6,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Recover Roll",
+          "type": "integer"
+        },
+        "death_roll": {
+          "default": 1,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Death Roll",
+          "type": "integer"
+        },
+        "down_and_out_range_min": {
+          "default": 2,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Down And Out Range Min",
+          "type": "integer"
+        },
+        "down_and_out_range_max": {
+          "default": 5,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Down And Out Range Max",
+          "type": "integer"
+        },
+        "down_and_out_evasion": {
+          "default": 5,
+          "minimum": 0,
+          "title": "Down And Out Evasion",
+          "type": "integer"
+        },
+        "additional_damage_causes_death": {
+          "default": true,
+          "title": "Additional Damage Causes Death",
+          "type": "boolean"
+        },
+        "voluntary_death_allowed": {
+          "default": true,
+          "title": "Voluntary Death Allowed",
+          "type": "boolean"
+        }
+      },
+      "title": "DownAndOutRule",
+      "type": "object"
+    },
+    "PilotCombatBaseStats": {
+      "description": "Base combat stats for a pilot.",
+      "properties": {
+        "size": {
+          "default": "size_half",
+          "enum": [
+            "size_half",
+            "size_1",
+            "size_2",
+            "size_3",
+            "size_4",
+            "size_5"
+          ],
+          "title": "Size",
+          "type": "string"
+        },
+        "hp": {
+          "default": 6,
+          "minimum": 0,
+          "title": "Hp",
+          "type": "integer"
+        },
+        "evasion": {
+          "default": 10,
+          "minimum": 0,
+          "title": "Evasion",
+          "type": "integer"
+        },
+        "e_defense": {
+          "default": 10,
+          "minimum": 0,
+          "title": "E Defense",
+          "type": "integer"
+        },
+        "speed": {
+          "default": 4,
+          "minimum": 0,
+          "title": "Speed",
+          "type": "integer"
+        }
+      },
+      "title": "PilotCombatBaseStats",
+      "type": "object"
+    },
+    "PilotDamageSeverity": {
+      "description": "Damage severity bands for pilots.",
+      "properties": {
+        "name": {
+          "enum": [
+            "minor",
+            "major",
+            "lethal"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "min_damage": {
+          "minimum": 0,
+          "title": "Min Damage",
+          "type": "integer"
+        },
+        "max_damage": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Damage"
+        }
+      },
+      "required": [
+        "name",
+        "min_damage"
+      ],
+      "title": "PilotDamageSeverity",
+      "type": "object"
+    },
+    "PilotRestRule": {
+      "description": "Rest and recovery rules for pilots.",
+      "properties": {
+        "short_rest_hours": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Short Rest Hours",
+          "type": "integer"
+        },
+        "short_rest_hp_fraction": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Short Rest Hp Fraction",
+          "type": "number"
+        },
+        "full_rest_hours": {
+          "default": 10,
+          "minimum": 1,
+          "title": "Full Rest Hours",
+          "type": "integer"
+        }
+      },
+      "title": "PilotRestRule",
+      "type": "object"
+    }
+  },
+  "description": "Combined pilot combat rule references.",
+  "properties": {
+    "base_stats": {
+      "$ref": "#/$defs/PilotCombatBaseStats",
+      "default": {
+        "size": "size_half",
+        "hp": 6,
+        "evasion": 10,
+        "e_defense": 10,
+        "speed": 4
+      }
+    },
+    "damage_bands": {
+      "items": {
+        "$ref": "#/$defs/PilotDamageSeverity"
+      },
+      "title": "Damage Bands",
+      "type": "array"
+    },
+    "down_and_out": {
+      "$ref": "#/$defs/DownAndOutRule",
+      "default": {
+        "roll_die": "1d6",
+        "recover_roll": 6,
+        "death_roll": 1,
+        "down_and_out_range_min": 2,
+        "down_and_out_range_max": 5,
+        "down_and_out_evasion": 5,
+        "additional_damage_causes_death": true,
+        "voluntary_death_allowed": true
+      }
+    },
+    "rest": {
+      "$ref": "#/$defs/PilotRestRule",
+      "default": {
+        "short_rest_hours": 1,
+        "short_rest_hp_fraction": 0.5,
+        "full_rest_hours": 10
+      }
+    },
+    "max_armor": {
+      "default": 2,
+      "minimum": 0,
+      "title": "Max Armor",
+      "type": "integer"
+    },
+    "armor_piercing_ignores_armor": {
+      "default": true,
+      "title": "Armor Piercing Ignores Armor",
+      "type": "boolean"
+    }
+  },
+  "title": "PilotCombatRules",
+  "type": "object"
+}

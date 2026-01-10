@@ -1,0 +1,48 @@
+{
+  "description": "Teleport rules.",
+  "properties": {
+    "counts_as_movement_spaces": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Counts As Movement Spaces",
+      "type": "integer"
+    },
+    "requires_surface_start": {
+      "default": true,
+      "title": "Requires Surface Start",
+      "type": "boolean"
+    },
+    "requires_surface_end": {
+      "default": true,
+      "title": "Requires Surface End",
+      "type": "boolean"
+    },
+    "ignores_engagement": {
+      "default": true,
+      "title": "Ignores Engagement",
+      "type": "boolean"
+    },
+    "ignores_reactions": {
+      "default": true,
+      "title": "Ignores Reactions",
+      "type": "boolean"
+    },
+    "ignores_obstructions": {
+      "default": true,
+      "title": "Ignores Obstructions",
+      "type": "boolean"
+    },
+    "ignores_line_of_sight": {
+      "default": true,
+      "title": "Ignores Line Of Sight",
+      "type": "boolean"
+    },
+    "fails_if_destination_occupied": {
+      "default": true,
+      "title": "Fails If Destination Occupied",
+      "type": "boolean"
+    }
+  },
+  "title": "TeleportRules",
+  "type": "object"
+}

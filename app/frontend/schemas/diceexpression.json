@@ -1,0 +1,27 @@
+{
+  "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+  "properties": {
+    "count": {
+      "default": 1,
+      "title": "Count",
+      "type": "integer"
+    },
+    "size": {
+      "default": 6,
+      "enum": [
+        3,
+        6,
+        20
+      ],
+      "title": "Size",
+      "type": "integer"
+    },
+    "modifier": {
+      "default": 0,
+      "title": "Modifier",
+      "type": "integer"
+    }
+  },
+  "title": "DiceExpression",
+  "type": "object"
+}

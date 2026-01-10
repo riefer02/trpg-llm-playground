@@ -1,0 +1,23 @@
+{
+  "description": "A license that a pilot has ranks in.\n\nPilots gain 1 license level per level up (starting at LL1).\nThey can put this into a new license or increase an existing one.",
+  "properties": {
+    "license_id": {
+      "description": "ID of the license definition",
+      "title": "License Id",
+      "type": "string"
+    },
+    "rank": {
+      "default": 1,
+      "description": "Current rank (1-3)",
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Rank",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "license_id"
+  ],
+  "title": "License",
+  "type": "object"
+}

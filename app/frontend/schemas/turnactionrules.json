@@ -1,0 +1,58 @@
+{
+  "$defs": {
+    "ActionEconomyRules": {
+      "description": "Action economy rules for mech combat.",
+      "properties": {
+        "quick_actions_per_turn": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Quick Actions Per Turn",
+          "type": "integer"
+        },
+        "full_actions_per_turn": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Full Actions Per Turn",
+          "type": "integer"
+        },
+        "allows_duplicate_actions": {
+          "default": false,
+          "title": "Allows Duplicate Actions",
+          "type": "boolean"
+        },
+        "duplicate_requires_free_action": {
+          "default": true,
+          "title": "Duplicate Requires Free Action",
+          "type": "boolean"
+        }
+      },
+      "title": "ActionEconomyRules",
+      "type": "object"
+    }
+  },
+  "description": "Per-turn action economy rules.",
+  "properties": {
+    "move_per_turn": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Move Per Turn",
+      "type": "integer"
+    },
+    "action_economy": {
+      "$ref": "#/$defs/ActionEconomyRules"
+    },
+    "free_actions_on_turn_only": {
+      "default": true,
+      "title": "Free Actions On Turn Only",
+      "type": "boolean"
+    },
+    "overcharge_limit_per_turn": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Overcharge Limit Per Turn",
+      "type": "integer"
+    }
+  },
+  "title": "TurnActionRules",
+  "type": "object"
+}

@@ -1,0 +1,40 @@
+{
+  "description": "Prepared action rule.",
+  "properties": {
+    "held_action_type": {
+      "default": "quick",
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol",
+        "move"
+      ],
+      "title": "Held Action Type",
+      "type": "string"
+    },
+    "blocks_other_actions": {
+      "default": true,
+      "title": "Blocks Other Actions",
+      "type": "boolean"
+    },
+    "blocks_reactions": {
+      "default": true,
+      "title": "Blocks Reactions",
+      "type": "boolean"
+    },
+    "requires_trigger": {
+      "default": true,
+      "title": "Requires Trigger",
+      "type": "boolean"
+    },
+    "expires_start_next_turn": {
+      "default": true,
+      "title": "Expires Start Next Turn",
+      "type": "boolean"
+    }
+  },
+  "title": "PrepareRule",
+  "type": "object"
+}

@@ -1,0 +1,51 @@
+{
+  "$defs": {
+    "CombatValidationIssue": {
+      "description": "A combat validation issue.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "default": "error",
+          "enum": [
+            "error",
+            "warning"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "CombatValidationIssue",
+      "type": "object"
+    }
+  },
+  "description": "Validation result for a combat scenario.",
+  "properties": {
+    "valid": {
+      "title": "Valid",
+      "type": "boolean"
+    },
+    "issues": {
+      "items": {
+        "$ref": "#/$defs/CombatValidationIssue"
+      },
+      "title": "Issues",
+      "type": "array"
+    }
+  },
+  "required": [
+    "valid"
+  ],
+  "title": "CombatValidation",
+  "type": "object"
+}

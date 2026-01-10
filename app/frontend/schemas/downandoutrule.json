@@ -1,0 +1,57 @@
+{
+  "description": "Down and out resolution when a pilot hits 0 HP.",
+  "properties": {
+    "roll_die": {
+      "const": "1d6",
+      "default": "1d6",
+      "title": "Roll Die",
+      "type": "string"
+    },
+    "recover_roll": {
+      "default": 6,
+      "maximum": 6,
+      "minimum": 1,
+      "title": "Recover Roll",
+      "type": "integer"
+    },
+    "death_roll": {
+      "default": 1,
+      "maximum": 6,
+      "minimum": 1,
+      "title": "Death Roll",
+      "type": "integer"
+    },
+    "down_and_out_range_min": {
+      "default": 2,
+      "maximum": 6,
+      "minimum": 1,
+      "title": "Down And Out Range Min",
+      "type": "integer"
+    },
+    "down_and_out_range_max": {
+      "default": 5,
+      "maximum": 6,
+      "minimum": 1,
+      "title": "Down And Out Range Max",
+      "type": "integer"
+    },
+    "down_and_out_evasion": {
+      "default": 5,
+      "minimum": 0,
+      "title": "Down And Out Evasion",
+      "type": "integer"
+    },
+    "additional_damage_causes_death": {
+      "default": true,
+      "title": "Additional Damage Causes Death",
+      "type": "boolean"
+    },
+    "voluntary_death_allowed": {
+      "default": true,
+      "title": "Voluntary Death Allowed",
+      "type": "boolean"
+    }
+  },
+  "title": "DownAndOutRule",
+  "type": "object"
+}

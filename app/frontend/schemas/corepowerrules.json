@@ -1,0 +1,22 @@
+{
+  "description": "Core power availability rules.",
+  "properties": {
+    "starts_with_core_power": {
+      "default": true,
+      "title": "Starts With Core Power",
+      "type": "boolean"
+    },
+    "restores_on_mission_start": {
+      "default": true,
+      "title": "Restores On Mission Start",
+      "type": "boolean"
+    },
+    "restores_on_full_repair": {
+      "default": true,
+      "title": "Restores On Full Repair",
+      "type": "boolean"
+    }
+  },
+  "title": "CorePowerRules",
+  "type": "object"
+}

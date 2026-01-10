@@ -1,0 +1,63 @@
+{
+  "description": "Combat-relevant stats for a combatant.",
+  "properties": {
+    "size": {
+      "enum": [
+        "size_half",
+        "size_1",
+        "size_2",
+        "size_3",
+        "size_4",
+        "size_5"
+      ],
+      "title": "Size",
+      "type": "string"
+    },
+    "hp_max": {
+      "minimum": 0,
+      "title": "Hp Max",
+      "type": "integer"
+    },
+    "evasion": {
+      "minimum": 0,
+      "title": "Evasion",
+      "type": "integer"
+    },
+    "e_defense": {
+      "minimum": 0,
+      "title": "E Defense",
+      "type": "integer"
+    },
+    "armor": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Armor",
+      "type": "integer"
+    },
+    "speed": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Speed",
+      "type": "integer"
+    },
+    "sensor_range": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Sensor Range",
+      "type": "integer"
+    },
+    "tech_attack": {
+      "default": 0,
+      "title": "Tech Attack",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "size",
+    "hp_max",
+    "evasion",
+    "e_defense"
+  ],
+  "title": "CombatStats",
+  "type": "object"
+}

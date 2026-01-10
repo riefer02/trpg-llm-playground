@@ -1,0 +1,76 @@
+{
+  "description": "Stabilize action options.",
+  "properties": {
+    "primary_options": {
+      "items": {
+        "enum": [
+          "cool_heat",
+          "spend_repair_full_hp"
+        ],
+        "type": "string"
+      },
+      "title": "Primary Options",
+      "type": "array"
+    },
+    "repair_cost": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Repair Cost",
+      "type": "integer"
+    },
+    "cool_heat_clears_exposed": {
+      "default": true,
+      "title": "Cool Heat Clears Exposed",
+      "type": "boolean"
+    },
+    "secondary_options": {
+      "items": {
+        "enum": [
+          "reload_loading",
+          "clear_burn",
+          "clear_condition"
+        ],
+        "type": "string"
+      },
+      "title": "Secondary Options",
+      "type": "array"
+    },
+    "condition_clear_allows_adjacent_ally": {
+      "default": true,
+      "title": "Condition Clear Allows Adjacent Ally",
+      "type": "boolean"
+    },
+    "condition_clear_disallow_self_sourced": {
+      "default": true,
+      "title": "Condition Clear Disallow Self Sourced",
+      "type": "boolean"
+    },
+    "clearable_conditions": {
+      "items": {
+        "enum": [
+          "braced",
+          "immobilized",
+          "impaired",
+          "jammed",
+          "lock_on",
+          "shredded",
+          "slowed",
+          "stunned",
+          "prone",
+          "hidden",
+          "invisible",
+          "shutdown",
+          "exposed",
+          "engaged",
+          "burn",
+          "unshackled"
+        ],
+        "type": "string"
+      },
+      "title": "Clearable Conditions",
+      "type": "array"
+    }
+  },
+  "title": "StabilizeRule",
+  "type": "object"
+}

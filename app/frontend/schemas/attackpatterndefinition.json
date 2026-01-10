@@ -1,0 +1,45 @@
+{
+  "description": "Definition for area attack patterns.",
+  "properties": {
+    "pattern": {
+      "enum": [
+        "line",
+        "cone",
+        "blast",
+        "burst"
+      ],
+      "title": "Pattern",
+      "type": "string"
+    },
+    "size": {
+      "minimum": 0,
+      "title": "Size",
+      "type": "integer"
+    },
+    "cone_mode": {
+      "default": "wedge",
+      "enum": [
+        "wedge",
+        "axis"
+      ],
+      "title": "Cone Mode",
+      "type": "string"
+    },
+    "separate_attack_per_target": {
+      "default": true,
+      "title": "Separate Attack Per Target",
+      "type": "boolean"
+    },
+    "single_damage_roll": {
+      "default": true,
+      "title": "Single Damage Roll",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "pattern",
+    "size"
+  ],
+  "title": "AttackPatternDefinition",
+  "type": "object"
+}

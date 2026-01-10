@@ -1,0 +1,148 @@
+{
+  "$defs": {
+    "NarrativeCheckTierRule": {
+      "description": "Tier-specific narrative check behavior.",
+      "properties": {
+        "tier": {
+          "enum": [
+            "standard",
+            "difficult",
+            "risky",
+            "heroic"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "success_threshold": {
+          "minimum": 0,
+          "title": "Success Threshold",
+          "type": "integer"
+        },
+        "consequence_threshold": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Roll needed to avoid consequences on success",
+          "title": "Consequence Threshold"
+        },
+        "allows_push": {
+          "default": true,
+          "title": "Allows Push",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tier",
+        "success_threshold"
+      ],
+      "title": "NarrativeCheckTierRule",
+      "type": "object"
+    },
+    "NarrativeHelpRule": {
+      "description": "Rules for helping on a narrative check.",
+      "properties": {
+        "accuracy_bonus": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Accuracy Bonus",
+          "type": "integer"
+        },
+        "helpers_share_consequences": {
+          "default": true,
+          "title": "Helpers Share Consequences",
+          "type": "boolean"
+        }
+      },
+      "title": "NarrativeHelpRule",
+      "type": "object"
+    },
+    "NarrativePushRule": {
+      "description": "Rules for pushing a narrative check to a higher tier.",
+      "properties": {
+        "from_tier": {
+          "enum": [
+            "standard",
+            "difficult",
+            "risky",
+            "heroic"
+          ],
+          "title": "From Tier",
+          "type": "string"
+        },
+        "to_tier": {
+          "enum": [
+            "standard",
+            "difficult",
+            "risky",
+            "heroic"
+          ],
+          "title": "To Tier",
+          "type": "string"
+        },
+        "requires_gm_approval": {
+          "default": false,
+          "title": "Requires Gm Approval",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "from_tier",
+        "to_tier"
+      ],
+      "title": "NarrativePushRule",
+      "type": "object"
+    }
+  },
+  "description": "Combined narrative check rules.",
+  "properties": {
+    "default_target": {
+      "default": 10,
+      "minimum": 0,
+      "title": "Default Target",
+      "type": "integer"
+    },
+    "tiers": {
+      "items": {
+        "$ref": "#/$defs/NarrativeCheckTierRule"
+      },
+      "title": "Tiers",
+      "type": "array"
+    },
+    "help_rule": {
+      "$ref": "#/$defs/NarrativeHelpRule"
+    },
+    "push_rules": {
+      "items": {
+        "$ref": "#/$defs/NarrativePushRule"
+      },
+      "title": "Push Rules",
+      "type": "array"
+    },
+    "voluntary_failure_allowed": {
+      "default": true,
+      "title": "Voluntary Failure Allowed",
+      "type": "boolean"
+    },
+    "voluntary_failure_applies_to": {
+      "items": {
+        "enum": [
+          "skill_check",
+          "attack",
+          "save"
+        ],
+        "type": "string"
+      },
+      "title": "Voluntary Failure Applies To",
+      "type": "array"
+    }
+  },
+  "title": "NarrativeCheckRules",
+  "type": "object"
+}

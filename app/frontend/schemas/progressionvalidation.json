@@ -1,0 +1,51 @@
+{
+  "$defs": {
+    "ValidationIssue": {
+      "description": "A validation issue with a code, message, and severity level.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "default": "error",
+          "enum": [
+            "error",
+            "warning"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ValidationIssue",
+      "type": "object"
+    }
+  },
+  "description": "Validation result for pilot progression.",
+  "properties": {
+    "valid": {
+      "title": "Valid",
+      "type": "boolean"
+    },
+    "issues": {
+      "items": {
+        "$ref": "#/$defs/ValidationIssue"
+      },
+      "title": "Issues",
+      "type": "array"
+    }
+  },
+  "required": [
+    "valid"
+  ],
+  "title": "ProgressionValidation",
+  "type": "object"
+}

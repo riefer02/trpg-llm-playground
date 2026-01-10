@@ -1,0 +1,119 @@
+{
+  "description": "Tech action profile.",
+  "properties": {
+    "is_attack": {
+      "default": false,
+      "title": "Is Attack",
+      "type": "boolean"
+    },
+    "heat_on_hit": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Heat On Hit"
+    },
+    "grants_lock_on": {
+      "default": false,
+      "title": "Grants Lock On",
+      "type": "boolean"
+    },
+    "bolster_accuracy": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bolster Accuracy"
+    },
+    "scan_options": {
+      "items": {
+        "enum": [
+          "stats",
+          "hidden_info",
+          "public_info"
+        ],
+        "type": "string"
+      },
+      "title": "Scan Options",
+      "type": "array"
+    },
+    "inflicts_conditions": {
+      "items": {
+        "enum": [
+          "braced",
+          "immobilized",
+          "impaired",
+          "jammed",
+          "lock_on",
+          "shredded",
+          "slowed",
+          "stunned",
+          "prone",
+          "hidden",
+          "invisible",
+          "shutdown",
+          "exposed",
+          "engaged",
+          "burn",
+          "unshackled"
+        ],
+        "type": "string"
+      },
+      "title": "Inflicts Conditions",
+      "type": "array"
+    },
+    "duration": {
+      "anyOf": [
+        {
+          "enum": [
+            "end_of_next_turn",
+            "until_cleared"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duration"
+    },
+    "options_per_action": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Options Per Action"
+    },
+    "repeat_same_option_allowed": {
+      "default": true,
+      "title": "Repeat Same Option Allowed",
+      "type": "boolean"
+    },
+    "repeat_same_option_requires_free_action": {
+      "default": false,
+      "title": "Repeat Same Option Requires Free Action",
+      "type": "boolean"
+    }
+  },
+  "title": "TechActionProfile",
+  "type": "object"
+}

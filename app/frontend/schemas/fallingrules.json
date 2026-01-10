@@ -1,0 +1,46 @@
+{
+  "description": "Falling damage rules.",
+  "properties": {
+    "min_distance_for_damage": {
+      "default": 3,
+      "minimum": 0,
+      "title": "Min Distance For Damage",
+      "type": "integer"
+    },
+    "damage_per_3_spaces": {
+      "default": 3,
+      "minimum": 0,
+      "title": "Damage Per 3 Spaces",
+      "type": "integer"
+    },
+    "damage_type": {
+      "default": "kinetic",
+      "enum": [
+        "kinetic",
+        "explosive",
+        "energy",
+        "burn"
+      ],
+      "title": "Damage Type",
+      "type": "string"
+    },
+    "armor_piercing": {
+      "default": true,
+      "title": "Armor Piercing",
+      "type": "boolean"
+    },
+    "max_damage": {
+      "default": 9,
+      "minimum": 0,
+      "title": "Max Damage",
+      "type": "integer"
+    },
+    "resolves_end_of_turn": {
+      "default": true,
+      "title": "Resolves End Of Turn",
+      "type": "boolean"
+    }
+  },
+  "title": "FallingRules",
+  "type": "object"
+}

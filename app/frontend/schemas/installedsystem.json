@@ -1,0 +1,27 @@
+{
+  "description": "System installed on a mech.",
+  "properties": {
+    "system_id": {
+      "title": "System Id",
+      "type": "string"
+    },
+    "sp_cost": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sp Cost"
+    }
+  },
+  "required": [
+    "system_id"
+  ],
+  "title": "InstalledSystem",
+  "type": "object"
+}

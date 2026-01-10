@@ -1,0 +1,27 @@
+{
+  "description": "Loadout limits for pilot gear.",
+  "properties": {
+    "clothing_required": {
+      "default": true,
+      "title": "Clothing Required",
+      "type": "boolean"
+    },
+    "armor_optional": {
+      "default": true,
+      "title": "Armor Optional",
+      "type": "boolean"
+    },
+    "max_weapons": {
+      "default": 2,
+      "title": "Max Weapons",
+      "type": "integer"
+    },
+    "max_gear": {
+      "default": 3,
+      "title": "Max Gear",
+      "type": "integer"
+    }
+  },
+  "title": "PilotGearRules",
+  "type": "object"
+}

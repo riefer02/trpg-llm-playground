@@ -1,0 +1,50 @@
+{
+  "$defs": {
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    }
+  },
+  "description": "Hex position with optional elevation.",
+  "properties": {
+    "coord": {
+      "$ref": "#/$defs/HexCoord"
+    },
+    "elevation": {
+      "default": 0,
+      "description": "Vertical elevation in spaces",
+      "minimum": 0,
+      "title": "Elevation",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "coord"
+  ],
+  "title": "HexPosition",
+  "type": "object"
+}

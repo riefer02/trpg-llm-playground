@@ -1,0 +1,40 @@
+{
+  "description": "Damage resolution order and constraints.",
+  "properties": {
+    "armor_applies_to": {
+      "items": {
+        "enum": [
+          "kinetic",
+          "explosive",
+          "energy",
+          "burn"
+        ],
+        "type": "string"
+      },
+      "title": "Armor Applies To",
+      "type": "array"
+    },
+    "apply_armor_before_resistance": {
+      "default": true,
+      "title": "Apply Armor Before Resistance",
+      "type": "boolean"
+    },
+    "resistance_stacks": {
+      "default": false,
+      "title": "Resistance Stacks",
+      "type": "boolean"
+    },
+    "ap_ignores_armor": {
+      "default": true,
+      "title": "Ap Ignores Armor",
+      "type": "boolean"
+    },
+    "apply_multipliers_before_reduction": {
+      "default": true,
+      "title": "Apply Multipliers Before Reduction",
+      "type": "boolean"
+    }
+  },
+  "title": "DamageResolutionRules",
+  "type": "object"
+}

@@ -1,0 +1,138 @@
+{
+  "$defs": {
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    }
+  },
+  "description": "Attack profile for an action.",
+  "properties": {
+    "attack_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "melee",
+            "ranged",
+            "tech"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attack Type"
+    },
+    "attack_type_follows_weapon": {
+      "default": false,
+      "title": "Attack Type Follows Weapon",
+      "type": "boolean"
+    },
+    "uses_weapon": {
+      "default": true,
+      "title": "Uses Weapon",
+      "type": "boolean"
+    },
+    "weapon_count": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Weapon Count",
+      "type": "integer"
+    },
+    "allow_superheavy": {
+      "default": true,
+      "title": "Allow Superheavy",
+      "type": "boolean"
+    },
+    "allow_aux_bonus_attack": {
+      "default": false,
+      "title": "Allow Aux Bonus Attack",
+      "type": "boolean"
+    },
+    "aux_cannot_bonus_damage": {
+      "default": false,
+      "title": "Aux Cannot Bonus Damage",
+      "type": "boolean"
+    },
+    "ignores_cover": {
+      "default": false,
+      "title": "Ignores Cover",
+      "type": "boolean"
+    },
+    "fixed_damage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DiceExpression"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "on_hit_statuses": {
+      "items": {
+        "enum": [
+          "braced",
+          "immobilized",
+          "impaired",
+          "jammed",
+          "lock_on",
+          "shredded",
+          "slowed",
+          "stunned",
+          "prone",
+          "hidden",
+          "invisible",
+          "shutdown",
+          "exposed",
+          "engaged",
+          "burn",
+          "unshackled"
+        ],
+        "type": "string"
+      },
+      "title": "On Hit Statuses",
+      "type": "array"
+    },
+    "knockback_spaces": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Knockback Spaces"
+    }
+  },
+  "title": "AttackActionProfile",
+  "type": "object"
+}

@@ -1,0 +1,57 @@
+{
+  "description": "Absorbs damage before it affects the target.\n\nExamples:\n    DamageAbsorption(target=\"ally\", base_hp=4, bonus_hp_per_grit=1)",
+  "properties": {
+    "target": {
+      "enum": [
+        "self",
+        "enemy",
+        "ally",
+        "adjacent"
+      ],
+      "title": "Target",
+      "type": "string"
+    },
+    "base_hp": {
+      "minimum": 0,
+      "title": "Base Hp",
+      "type": "integer"
+    },
+    "bonus_hp_per_grit": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Bonus Hp Per Grit",
+      "type": "integer"
+    },
+    "max_instances_per_target": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Max Instances Per Target",
+      "type": "integer"
+    },
+    "spillover": {
+      "default": true,
+      "title": "Spillover",
+      "type": "boolean"
+    },
+    "ends_on_zero": {
+      "default": true,
+      "title": "Ends On Zero",
+      "type": "boolean"
+    },
+    "duration": {
+      "default": "until_destroyed",
+      "enum": [
+        "scene",
+        "until_destroyed"
+      ],
+      "title": "Duration",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target",
+    "base_hp"
+  ],
+  "title": "DamageAbsorption",
+  "type": "object"
+}

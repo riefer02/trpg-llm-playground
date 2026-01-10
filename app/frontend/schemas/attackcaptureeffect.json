@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    }
+  },
+  "description": "Captures attacks that cross a zone boundary and resolves them later.\n\nExamples:\n    AttackCaptureEffect(\n        attack_types=[\"ranged\"],\n        damage_types=[\"kinetic\", \"explosive\"],\n        capture_max=6,\n        resolve_trigger=\"turn_end\",\n        attack_bonus_per_capture=1,\n        attack_bonus_max=6,\n        damage_per_capture=DiceExpression.parse(\"1d6\"),\n        damage_type=\"kinetic\",\n    )",
+  "properties": {
+    "attack_types": {
+      "items": {
+        "enum": [
+          "melee",
+          "ranged",
+          "tech"
+        ],
+        "type": "string"
+      },
+      "title": "Attack Types",
+      "type": "array"
+    },
+    "damage_types": {
+      "items": {
+        "enum": [
+          "kinetic",
+          "explosive",
+          "energy",
+          "burn"
+        ],
+        "type": "string"
+      },
+      "title": "Damage Types",
+      "type": "array"
+    },
+    "block_crossing_boundary": {
+      "default": true,
+      "title": "Block Crossing Boundary",
+      "type": "boolean"
+    },
+    "allow_internal_attacks": {
+      "default": true,
+      "title": "Allow Internal Attacks",
+      "type": "boolean"
+    },
+    "capture_attacks": {
+      "default": true,
+      "title": "Capture Attacks",
+      "type": "boolean"
+    },
+    "capture_max": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Capture Max"
+    },
+    "resolve_trigger": {
+      "default": "turn_end",
+      "enum": [
+        "enter",
+        "start_turn",
+        "end_turn",
+        "turn_start",
+        "turn_end"
+      ],
+      "title": "Resolve Trigger",
+      "type": "string"
+    },
+    "resolve_scope": {
+      "const": "targets_in_zone",
+      "default": "targets_in_zone",
+      "title": "Resolve Scope",
+      "type": "string"
+    },
+    "attack_bonus_per_capture": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Attack Bonus Per Capture",
+      "type": "integer"
+    },
+    "attack_bonus_max": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attack Bonus Max"
+    },
+    "damage_per_capture": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DiceExpression"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "damage_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Damage Type"
+    },
+    "negate_damage_on_capture": {
+      "default": true,
+      "title": "Negate Damage On Capture",
+      "type": "boolean"
+    }
+  },
+  "title": "AttackCaptureEffect",
+  "type": "object"
+}

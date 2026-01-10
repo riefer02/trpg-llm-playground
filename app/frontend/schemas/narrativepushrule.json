@@ -1,0 +1,36 @@
+{
+  "description": "Rules for pushing a narrative check to a higher tier.",
+  "properties": {
+    "from_tier": {
+      "enum": [
+        "standard",
+        "difficult",
+        "risky",
+        "heroic"
+      ],
+      "title": "From Tier",
+      "type": "string"
+    },
+    "to_tier": {
+      "enum": [
+        "standard",
+        "difficult",
+        "risky",
+        "heroic"
+      ],
+      "title": "To Tier",
+      "type": "string"
+    },
+    "requires_gm_approval": {
+      "default": false,
+      "title": "Requires Gm Approval",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "from_tier",
+    "to_tier"
+  ],
+  "title": "NarrativePushRule",
+  "type": "object"
+}

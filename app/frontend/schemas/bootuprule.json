@@ -1,0 +1,30 @@
+{
+  "description": "Boot up action effect.",
+  "properties": {
+    "clears_status": {
+      "default": "shutdown",
+      "enum": [
+        "braced",
+        "immobilized",
+        "impaired",
+        "jammed",
+        "lock_on",
+        "shredded",
+        "slowed",
+        "stunned",
+        "prone",
+        "hidden",
+        "invisible",
+        "shutdown",
+        "exposed",
+        "engaged",
+        "burn",
+        "unshackled"
+      ],
+      "title": "Clears Status",
+      "type": "string"
+    }
+  },
+  "title": "BootUpRule",
+  "type": "object"
+}

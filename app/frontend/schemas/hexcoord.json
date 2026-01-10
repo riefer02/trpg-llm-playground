@@ -1,0 +1,28 @@
+{
+  "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+  "properties": {
+    "q": {
+      "description": "Axial q coordinate",
+      "title": "Q",
+      "type": "integer"
+    },
+    "r": {
+      "description": "Axial r coordinate",
+      "title": "R",
+      "type": "integer"
+    },
+    "s": {
+      "description": "Derived s coordinate (q + r + s = 0).",
+      "readOnly": true,
+      "title": "S",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "q",
+    "r",
+    "s"
+  ],
+  "title": "HexCoord",
+  "type": "object"
+}

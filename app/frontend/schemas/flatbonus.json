@@ -1,0 +1,26 @@
+{
+  "description": "Flat bonus applied to a roll (one source at a time).",
+  "properties": {
+    "source": {
+      "enum": [
+        "trigger",
+        "mech_skill",
+        "grit"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "value": {
+      "default": 0,
+      "maximum": 6,
+      "minimum": 0,
+      "title": "Value",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "source"
+  ],
+  "title": "FlatBonus",
+  "type": "object"
+}

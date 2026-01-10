@@ -1,0 +1,15 @@
+{
+  "description": "A core bonus that a pilot has earned.",
+  "properties": {
+    "core_bonus_id": {
+      "description": "ID of the core bonus definition",
+      "title": "Core Bonus Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "core_bonus_id"
+  ],
+  "title": "CoreBonus",
+  "type": "object"
+}

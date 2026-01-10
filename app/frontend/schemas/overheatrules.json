@@ -1,0 +1,177 @@
+{
+  "$defs": {
+    "MeltdownOutcome": {
+      "description": "Meltdown outcome by remaining stress.",
+      "properties": {
+        "remaining_stress_min": {
+          "minimum": 0,
+          "title": "Remaining Stress Min",
+          "type": "integer"
+        },
+        "remaining_stress_max": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remaining Stress Max"
+        },
+        "outcome": {
+          "$ref": "#/$defs/OverheatOutcomeType"
+        }
+      },
+      "required": [
+        "remaining_stress_min",
+        "outcome"
+      ],
+      "title": "MeltdownOutcome",
+      "type": "object"
+    },
+    "OverheatOutcomeType": {
+      "description": "Outcome detail for overheat checks.",
+      "properties": {
+        "name": {
+          "enum": [
+            "emergency_shunt",
+            "power_plant_destabilize",
+            "meltdown",
+            "irreversible_meltdown"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "impaired_until_end_next_turn": {
+          "default": false,
+          "title": "Impaired Until End Next Turn",
+          "type": "boolean"
+        },
+        "exposed_until_cleared": {
+          "default": false,
+          "title": "Exposed Until Cleared",
+          "type": "boolean"
+        },
+        "meltdown_immediate": {
+          "default": false,
+          "title": "Meltdown Immediate",
+          "type": "boolean"
+        },
+        "meltdown_countdown": {
+          "default": false,
+          "title": "Meltdown Countdown",
+          "type": "boolean"
+        },
+        "engineering_check_to_delay": {
+          "default": false,
+          "title": "Engineering Check To Delay",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "OverheatOutcomeType",
+      "type": "object"
+    },
+    "OverheatTableEntry": {
+      "description": "Table entry for overheat results.",
+      "properties": {
+        "roll_min": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Min",
+          "type": "integer"
+        },
+        "roll_max": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Max",
+          "type": "integer"
+        },
+        "outcome": {
+          "$ref": "#/$defs/OverheatOutcomeType"
+        }
+      },
+      "required": [
+        "roll_min",
+        "roll_max",
+        "outcome"
+      ],
+      "title": "OverheatTableEntry",
+      "type": "object"
+    }
+  },
+  "description": "Heat and overheat table rules.",
+  "properties": {
+    "stress_per_overheat": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Stress Per Overheat",
+      "type": "integer"
+    },
+    "roll_dice_per_stress": {
+      "default": true,
+      "title": "Roll Dice Per Stress",
+      "type": "boolean"
+    },
+    "choose_lowest": {
+      "default": true,
+      "title": "Choose Lowest",
+      "type": "boolean"
+    },
+    "reset_heat_after_overheat": {
+      "default": true,
+      "title": "Reset Heat After Overheat",
+      "type": "boolean"
+    },
+    "meltdown_at_zero_stress": {
+      "default": true,
+      "title": "Meltdown At Zero Stress",
+      "type": "boolean"
+    },
+    "danger_zone_fraction": {
+      "default": 0.5,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Danger Zone Fraction",
+      "type": "number"
+    },
+    "danger_zone_rounding": {
+      "default": "up",
+      "enum": [
+        "up",
+        "down"
+      ],
+      "title": "Danger Zone Rounding",
+      "type": "string"
+    },
+    "table": {
+      "items": {
+        "$ref": "#/$defs/OverheatTableEntry"
+      },
+      "title": "Table",
+      "type": "array"
+    },
+    "meltdown_outcomes": {
+      "items": {
+        "$ref": "#/$defs/MeltdownOutcome"
+      },
+      "title": "Meltdown Outcomes",
+      "type": "array"
+    },
+    "irreversible_meltdown_on_multiple_ones": {
+      "default": true,
+      "title": "Irreversible Meltdown On Multiple Ones",
+      "type": "boolean"
+    },
+    "irreversible_meltdown_outcome": {
+      "$ref": "#/$defs/OverheatOutcomeType"
+    }
+  },
+  "title": "OverheatRules",
+  "type": "object"
+}

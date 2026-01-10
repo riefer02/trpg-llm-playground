@@ -1,0 +1,62 @@
+{
+  "description": "Clears a status or condition from a target.\n\nExamples:\n    StatusClear(status=\"burn\", target=\"ally\")\n    StatusClear(status=\"any\", target=\"self\")",
+  "properties": {
+    "status": {
+      "anyOf": [
+        {
+          "enum": [
+            "braced",
+            "immobilized",
+            "impaired",
+            "jammed",
+            "lock_on",
+            "shredded",
+            "slowed",
+            "stunned",
+            "prone",
+            "hidden",
+            "invisible",
+            "shutdown",
+            "exposed",
+            "engaged",
+            "burn",
+            "unshackled"
+          ],
+          "type": "string"
+        },
+        {
+          "enum": [
+            "burn",
+            "any",
+            "tech"
+          ],
+          "type": "string"
+        }
+      ],
+      "title": "Status"
+    },
+    "target": {
+      "enum": [
+        "self",
+        "enemy",
+        "ally",
+        "adjacent",
+        "all"
+      ],
+      "title": "Target",
+      "type": "string"
+    },
+    "count": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "status",
+    "target"
+  ],
+  "title": "StatusClear",
+  "type": "object"
+}

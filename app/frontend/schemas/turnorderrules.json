@@ -1,0 +1,37 @@
+{
+  "description": "Turn order and round cadence rules.",
+  "properties": {
+    "players_act_first": {
+      "default": true,
+      "title": "Players Act First",
+      "type": "boolean"
+    },
+    "nomination_required": {
+      "default": true,
+      "title": "Nomination Required",
+      "type": "boolean"
+    },
+    "gm_chooses_if_no_nomination": {
+      "default": true,
+      "title": "Gm Chooses If No Nomination",
+      "type": "boolean"
+    },
+    "alternate_sides": {
+      "default": true,
+      "title": "Alternate Sides",
+      "type": "boolean"
+    },
+    "remaining_side_any_order": {
+      "default": true,
+      "title": "Remaining Side Any Order",
+      "type": "boolean"
+    },
+    "next_round_start_other_side": {
+      "default": true,
+      "title": "Next Round Start Other Side",
+      "type": "boolean"
+    }
+  },
+  "title": "TurnOrderRules",
+  "type": "object"
+}

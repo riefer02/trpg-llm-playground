@@ -1,0 +1,45 @@
+{
+  "description": "Resource tracks for a combatant.",
+  "properties": {
+    "hp_current": {
+      "minimum": 0,
+      "title": "Hp Current",
+      "type": "integer"
+    },
+    "heat_current": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Heat Current",
+      "type": "integer"
+    },
+    "heat_cap": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Heat Cap",
+      "type": "integer"
+    },
+    "structure_current": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Structure Current",
+      "type": "integer"
+    },
+    "stress_current": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Stress Current",
+      "type": "integer"
+    },
+    "repairs_remaining": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Repairs Remaining",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "hp_current"
+  ],
+  "title": "CombatResources",
+  "type": "object"
+}

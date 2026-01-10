@@ -1,0 +1,38 @@
+{
+  "description": "Defines multi-area attack patterns for weapons.\n\nPer PR2 3970-3974: Area attacks use geometric patterns (blast, burst, line, cone)\nto affect multiple targets simultaneously.\n\nExamples:\n    AreaAttackPattern(area_shape=\"blast\", area_size=1, area_count_options=[1, 2], non_overlapping=True)",
+  "properties": {
+    "area_shape": {
+      "enum": [
+        "blast",
+        "burst",
+        "line",
+        "cone"
+      ],
+      "title": "Area Shape",
+      "type": "string"
+    },
+    "area_size": {
+      "minimum": 0,
+      "title": "Area Size",
+      "type": "integer"
+    },
+    "area_count_options": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Area Count Options",
+      "type": "array"
+    },
+    "non_overlapping": {
+      "default": false,
+      "title": "Non Overlapping",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "area_shape",
+    "area_size"
+  ],
+  "title": "AreaAttackPattern",
+  "type": "object"
+}

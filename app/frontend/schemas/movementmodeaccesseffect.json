@@ -1,0 +1,1444 @@
+{
+  "$defs": {
+    "AttackContextCondition": {
+      "description": "Attack context predicates (attack types, ranges, targeting scope).\n\nExamples:\n    AttackContextCondition(attack_types=[\"ranged\"], applies_to=\"incoming\")\n    AttackContextCondition(range_comparator=\"gt\", range=5, applies_to=\"outgoing\")",
+      "properties": {
+        "attack_types": {
+          "items": {
+            "enum": [
+              "melee",
+              "ranged",
+              "tech"
+            ],
+            "type": "string"
+          },
+          "title": "Attack Types",
+          "type": "array"
+        },
+        "area_shapes": {
+          "items": {
+            "enum": [
+              "blast",
+              "burst",
+              "line",
+              "cone"
+            ],
+            "type": "string"
+          },
+          "title": "Area Shapes",
+          "type": "array"
+        },
+        "weapon_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Weapon Ids",
+          "type": "array"
+        },
+        "applies_to": {
+          "default": "incoming",
+          "enum": [
+            "incoming",
+            "outgoing",
+            "mutual"
+          ],
+          "title": "Applies To",
+          "type": "string"
+        },
+        "target": {
+          "default": "enemy",
+          "enum": [
+            "self",
+            "enemy",
+            "ally",
+            "adjacent",
+            "all"
+          ],
+          "title": "Target",
+          "type": "string"
+        },
+        "range_comparator": {
+          "anyOf": [
+            {
+              "enum": [
+                "gt",
+                "lt",
+                "within"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Range Comparator"
+        },
+        "range": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Range"
+        },
+        "range_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "range",
+                "threat",
+                "thrown",
+                "line",
+                "cone",
+                "burst",
+                "blast",
+                "sensors"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Range Type"
+        },
+        "requires_line_of_sight": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requires Line Of Sight"
+        },
+        "requires_line_of_effect_crossing_zone": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requires Line Of Effect Crossing Zone"
+        }
+      },
+      "title": "AttackContextCondition",
+      "type": "object"
+    },
+    "CheckContextCondition": {
+      "description": "Non-attack check/save predicates and equipment gating.\n\nExamples:\n    CheckContextCondition(check_kinds=[\"save\"], saves=[\"hull\"])\n    CheckContextCondition(equipment_materials=[\"metal\"])",
+      "properties": {
+        "check_kinds": {
+          "items": {
+            "enum": [
+              "check",
+              "save",
+              "contested",
+              "search"
+            ],
+            "type": "string"
+          },
+          "title": "Check Kinds",
+          "type": "array"
+        },
+        "saves": {
+          "items": {
+            "enum": [
+              "hull",
+              "agility",
+              "systems",
+              "engineering"
+            ],
+            "type": "string"
+          },
+          "title": "Saves",
+          "type": "array"
+        },
+        "target": {
+          "default": "self",
+          "enum": [
+            "self",
+            "enemy",
+            "ally",
+            "adjacent",
+            "all"
+          ],
+          "title": "Target",
+          "type": "string"
+        },
+        "requires_line_of_sight": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requires Line Of Sight"
+        },
+        "equipment_materials": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Equipment Materials",
+          "type": "array"
+        },
+        "equipment_tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Equipment Tags",
+          "type": "array"
+        }
+      },
+      "title": "CheckContextCondition",
+      "type": "object"
+    },
+    "ConditionGroup": {
+      "description": "Combine multiple conditions with AND/OR/NOT semantics.\n\nExamples:\n    ConditionGroup(all_of=[SpatialCondition(relation=\"adjacent\", target=\"ally\")])\n    ConditionGroup(\n        all_of=[SpatialCondition(relation=\"using_cover_from_source\", cover=\"hard\")],\n        any_of=[AttackContextCondition(area_shapes=[\"blast\", \"line\", \"cone\"])],\n    )",
+      "properties": {
+        "all_of": {
+          "items": {
+            "anyOf": [
+              {
+                "enum": [
+                  "target_prone",
+                  "target_immobilized",
+                  "target_below_half_hp",
+                  "target_below_max_hp",
+                  "target_has_lock_on",
+                  "target_larger",
+                  "target_smaller",
+                  "target_same_size",
+                  "from_smaller",
+                  "target_hidden",
+                  "target_jammed",
+                  "target_shredded",
+                  "target_impaired",
+                  "target_slowed",
+                  "target_stunned",
+                  "target_grappled",
+                  "target_biological",
+                  "target_exposed",
+                  "target_invisible",
+                  "target_engaged",
+                  "target_marked",
+                  "target_within_range_3",
+                  "covering_fire_target",
+                  "covering_fire_target_moves",
+                  "covering_fire_bracketing",
+                  "covering_fire_overwatch",
+                  "jackhammer_target_object",
+                  "jackhammer_adjacent_to_object",
+                  "cannon_collateral_burst",
+                  "different_target_in_threat",
+                  "threat_except_original_target",
+                  "exemplar_marked_target",
+                  "ally_attacks_exemplar_marked_target",
+                  "spotter_adjacent_ally_consumes_lock_on",
+                  "exemplar_marked_target_attacks_other_within_3",
+                  "exemplar_challenge_active",
+                  "exemplar_challenge_other_targets",
+                  "during_rest",
+                  "while_flying",
+                  "while_hidden",
+                  "hidden_at_turn_start",
+                  "hidden_end_turn",
+                  "after_boost",
+                  "juggernaut_supercharge",
+                  "juggernaut_supercharge_through_character",
+                  "juggernaut_supercharge_through_obstacle",
+                  "after_move_8_plus",
+                  "in_danger_zone",
+                  "hidden",
+                  "engaged",
+                  "exposed",
+                  "overheated",
+                  "stunned",
+                  "braced",
+                  "brace",
+                  "reserve_power_mode",
+                  "steady_aim",
+                  "steady_aim_rifle_attack",
+                  "steady_aim_rifle_attack_crit",
+                  "rifle_attack",
+                  "rifle_attack_crit",
+                  "bondmate_adjacent",
+                  "bondmate_adjacent_and_damaged",
+                  "bondmate_targeted",
+                  "cover_me_overwatch",
+                  "leadership_die",
+                  "steel_assassin_charge",
+                  "selected_mount",
+                  "selected_weapon",
+                  "exclude_integrated_mounts",
+                  "structure_1_or_less",
+                  "zero_hp",
+                  "ram_or_grapple",
+                  "melee_knockback",
+                  "flying_this_turn",
+                  "natural_20",
+                  "after_miss",
+                  "turn_only_move_hide_boost",
+                  "caused_by_self",
+                  "gain_stress",
+                  "stabilize_cool",
+                  "tech_attack_hit",
+                  "invade_action",
+                  "performed_tech_action",
+                  "lock_on_action",
+                  "hacker_jam_cockpit",
+                  "hacker_disable_life_support",
+                  "hacker_hack_slash",
+                  "shutdown_action",
+                  "burn_equals_current_heat",
+                  "on_turn",
+                  "next_melee_vs_tech_hit_target",
+                  "ally_engaged_with_target",
+                  "higher_elevation_than_target",
+                  "target_not_in_cover",
+                  "cqb_target_within_3",
+                  "cqb_target_within_3_with_los",
+                  "next_ranged_vs_target_after_melee_hit",
+                  "next_melee_vs_target_after_ranged_hit",
+                  "adjacent_to_engaged_self",
+                  "before_or_after_skirmish",
+                  "first_reaction_attack_against_self",
+                  "flank_overwatch",
+                  "cqb_overwatch",
+                  "nexus_weapon_crit",
+                  "lock_on_consumed_drone_or_nexus_attack",
+                  "lock_on_consumed_tech_attack",
+                  "chaff_soft_cover_break_on_attack_or_save",
+                  "stormbringer_concussive_action",
+                  "stormbringer_torrent_attack",
+                  "stormbringer_thunder_blast",
+                  "thrown_aux_melee_attack",
+                  "adjacent_to_target",
+                  "adjacent_to_self",
+                  "restricting_swarm_active",
+                  "target_grappled_by_self",
+                  "heavy_or_superheavy_melee_attack",
+                  "backswing_cut_followup",
+                  "melee_attack",
+                  "ranged_attack",
+                  "tech_attack",
+                  "ram_attack",
+                  "ram_attack_after_boost",
+                  "ram_knockback_into_character",
+                  "ram_knockback_into_obstacle",
+                  "improvised_attack",
+                  "main_melee_attack",
+                  "aux_ranged_attack",
+                  "aux_melee_attack",
+                  "launcher_attack",
+                  "lock_on_consumed_launcher_attack",
+                  "cannon_attack",
+                  "fuel_rod_gun_attack",
+                  "melee_attack_no_other_adjacent",
+                  "melee_crit",
+                  "attack_roll_1_or_2",
+                  "save_vs_knockback_or_prone",
+                  "adjacent",
+                  "adjacent_recover_charged_stake",
+                  "adjacent_start_or_move",
+                  "ally_target",
+                  "ally_target_range_5",
+                  "hostile_target_range_5",
+                  "target_empty_space",
+                  "target_destroyed",
+                  "target_is_object",
+                  "target_is_drone",
+                  "target_is_deployable",
+                  "target_prone_or_immobilized_or_stunned",
+                  "after_boost_melee_attack",
+                  "first_ranged_attack_each_round",
+                  "attacks_from_owner",
+                  "attacks_within_range_3",
+                  "attacker_within_range_3_before_attack",
+                  "kinetic_attack_against_self_or_adjacent_ally",
+                  "launcher_attack_consumes_lock_on",
+                  "next_loading_attack",
+                  "next_ranged_attack",
+                  "ranged_attack_vs_marked_target_no_cover_outside_range_5",
+                  "ram_attack_vs_object",
+                  "ai_controlled_until_protocol_resume",
+                  "core_power_active",
+                  "core_power_full_action_mag_field",
+                  "protocol_ends",
+                  "stabilizer_attached",
+                  "structure_damage",
+                  "after_move_or_boost",
+                  "boost_speed_plus_2",
+                  "hover_no_landing_required",
+                  "must_move_max_speed_each_move",
+                  "no_move",
+                  "slipstream_jump",
+                  "exclusive_target",
+                  "from_triggering_attack",
+                  "half_damage",
+                  "melee_knockback_plus_2",
+                  "melee_attack_knockback_bonus",
+                  "melee_weapon_spend_charge",
+                  "first_turn",
+                  "gm_approved_non_combat_check",
+                  "no_attacks_or_forced_saves",
+                  "toward_self_stop_adjacent_if_possible",
+                  "deactivate_start_turn",
+                  "ranged_threat_minimum",
+                  "sekhmet_auto_pilot_melee_only",
+                  "snare_trap_immobilize",
+                  "charged_stake_immobilized",
+                  "charged_stake_immobilize",
+                  "willing_or_stunned_adjacent_target",
+                  "unwilling_adjacent_target",
+                  "enter_zone_metal_target",
+                  "in_zone_metal_target",
+                  "reaction_parry_kinetic_attack_against_self_or_adjacent_ally",
+                  "hull_checks_and_saves",
+                  "stabilize_singularity",
+                  "agility_checks_and_saves",
+                  "until_end_of_next_turn",
+                  "invisible_to_chosen_target_only",
+                  "benefiting_from_trail_cover",
+                  "source_is_chosen_target",
+                  "ally_other_than_self_hits_markerlight_target",
+                  "mimic_mesh_copy_active",
+                  "monitor_charge_accumulated",
+                  "cascade_status_spread",
+                  "damage_type_selectable",
+                  "weapon_profile_copied",
+                  "chain_to_secondary_target",
+                  "overwatch_reaction",
+                  "overwatch_attack",
+                  "limit_break_active",
+                  "apocalypse_rail_attack",
+                  "warp_shield_redirect",
+                  "teleport_on_hit",
+                  "gravity_well_pull",
+                  "plasma_gauntlet_active",
+                  "out_of_phase"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/SpatialCondition"
+              },
+              {
+                "$ref": "#/$defs/AttackContextCondition"
+              },
+              {
+                "$ref": "#/$defs/CheckContextCondition"
+              },
+              {
+                "$ref": "#/$defs/ReactionCondition"
+              },
+              {
+                "$ref": "#/$defs/SizeCondition"
+              },
+              {
+                "$ref": "#/$defs/ConditionGroup"
+              }
+            ]
+          },
+          "title": "All Of",
+          "type": "array"
+        },
+        "any_of": {
+          "items": {
+            "anyOf": [
+              {
+                "enum": [
+                  "target_prone",
+                  "target_immobilized",
+                  "target_below_half_hp",
+                  "target_below_max_hp",
+                  "target_has_lock_on",
+                  "target_larger",
+                  "target_smaller",
+                  "target_same_size",
+                  "from_smaller",
+                  "target_hidden",
+                  "target_jammed",
+                  "target_shredded",
+                  "target_impaired",
+                  "target_slowed",
+                  "target_stunned",
+                  "target_grappled",
+                  "target_biological",
+                  "target_exposed",
+                  "target_invisible",
+                  "target_engaged",
+                  "target_marked",
+                  "target_within_range_3",
+                  "covering_fire_target",
+                  "covering_fire_target_moves",
+                  "covering_fire_bracketing",
+                  "covering_fire_overwatch",
+                  "jackhammer_target_object",
+                  "jackhammer_adjacent_to_object",
+                  "cannon_collateral_burst",
+                  "different_target_in_threat",
+                  "threat_except_original_target",
+                  "exemplar_marked_target",
+                  "ally_attacks_exemplar_marked_target",
+                  "spotter_adjacent_ally_consumes_lock_on",
+                  "exemplar_marked_target_attacks_other_within_3",
+                  "exemplar_challenge_active",
+                  "exemplar_challenge_other_targets",
+                  "during_rest",
+                  "while_flying",
+                  "while_hidden",
+                  "hidden_at_turn_start",
+                  "hidden_end_turn",
+                  "after_boost",
+                  "juggernaut_supercharge",
+                  "juggernaut_supercharge_through_character",
+                  "juggernaut_supercharge_through_obstacle",
+                  "after_move_8_plus",
+                  "in_danger_zone",
+                  "hidden",
+                  "engaged",
+                  "exposed",
+                  "overheated",
+                  "stunned",
+                  "braced",
+                  "brace",
+                  "reserve_power_mode",
+                  "steady_aim",
+                  "steady_aim_rifle_attack",
+                  "steady_aim_rifle_attack_crit",
+                  "rifle_attack",
+                  "rifle_attack_crit",
+                  "bondmate_adjacent",
+                  "bondmate_adjacent_and_damaged",
+                  "bondmate_targeted",
+                  "cover_me_overwatch",
+                  "leadership_die",
+                  "steel_assassin_charge",
+                  "selected_mount",
+                  "selected_weapon",
+                  "exclude_integrated_mounts",
+                  "structure_1_or_less",
+                  "zero_hp",
+                  "ram_or_grapple",
+                  "melee_knockback",
+                  "flying_this_turn",
+                  "natural_20",
+                  "after_miss",
+                  "turn_only_move_hide_boost",
+                  "caused_by_self",
+                  "gain_stress",
+                  "stabilize_cool",
+                  "tech_attack_hit",
+                  "invade_action",
+                  "performed_tech_action",
+                  "lock_on_action",
+                  "hacker_jam_cockpit",
+                  "hacker_disable_life_support",
+                  "hacker_hack_slash",
+                  "shutdown_action",
+                  "burn_equals_current_heat",
+                  "on_turn",
+                  "next_melee_vs_tech_hit_target",
+                  "ally_engaged_with_target",
+                  "higher_elevation_than_target",
+                  "target_not_in_cover",
+                  "cqb_target_within_3",
+                  "cqb_target_within_3_with_los",
+                  "next_ranged_vs_target_after_melee_hit",
+                  "next_melee_vs_target_after_ranged_hit",
+                  "adjacent_to_engaged_self",
+                  "before_or_after_skirmish",
+                  "first_reaction_attack_against_self",
+                  "flank_overwatch",
+                  "cqb_overwatch",
+                  "nexus_weapon_crit",
+                  "lock_on_consumed_drone_or_nexus_attack",
+                  "lock_on_consumed_tech_attack",
+                  "chaff_soft_cover_break_on_attack_or_save",
+                  "stormbringer_concussive_action",
+                  "stormbringer_torrent_attack",
+                  "stormbringer_thunder_blast",
+                  "thrown_aux_melee_attack",
+                  "adjacent_to_target",
+                  "adjacent_to_self",
+                  "restricting_swarm_active",
+                  "target_grappled_by_self",
+                  "heavy_or_superheavy_melee_attack",
+                  "backswing_cut_followup",
+                  "melee_attack",
+                  "ranged_attack",
+                  "tech_attack",
+                  "ram_attack",
+                  "ram_attack_after_boost",
+                  "ram_knockback_into_character",
+                  "ram_knockback_into_obstacle",
+                  "improvised_attack",
+                  "main_melee_attack",
+                  "aux_ranged_attack",
+                  "aux_melee_attack",
+                  "launcher_attack",
+                  "lock_on_consumed_launcher_attack",
+                  "cannon_attack",
+                  "fuel_rod_gun_attack",
+                  "melee_attack_no_other_adjacent",
+                  "melee_crit",
+                  "attack_roll_1_or_2",
+                  "save_vs_knockback_or_prone",
+                  "adjacent",
+                  "adjacent_recover_charged_stake",
+                  "adjacent_start_or_move",
+                  "ally_target",
+                  "ally_target_range_5",
+                  "hostile_target_range_5",
+                  "target_empty_space",
+                  "target_destroyed",
+                  "target_is_object",
+                  "target_is_drone",
+                  "target_is_deployable",
+                  "target_prone_or_immobilized_or_stunned",
+                  "after_boost_melee_attack",
+                  "first_ranged_attack_each_round",
+                  "attacks_from_owner",
+                  "attacks_within_range_3",
+                  "attacker_within_range_3_before_attack",
+                  "kinetic_attack_against_self_or_adjacent_ally",
+                  "launcher_attack_consumes_lock_on",
+                  "next_loading_attack",
+                  "next_ranged_attack",
+                  "ranged_attack_vs_marked_target_no_cover_outside_range_5",
+                  "ram_attack_vs_object",
+                  "ai_controlled_until_protocol_resume",
+                  "core_power_active",
+                  "core_power_full_action_mag_field",
+                  "protocol_ends",
+                  "stabilizer_attached",
+                  "structure_damage",
+                  "after_move_or_boost",
+                  "boost_speed_plus_2",
+                  "hover_no_landing_required",
+                  "must_move_max_speed_each_move",
+                  "no_move",
+                  "slipstream_jump",
+                  "exclusive_target",
+                  "from_triggering_attack",
+                  "half_damage",
+                  "melee_knockback_plus_2",
+                  "melee_attack_knockback_bonus",
+                  "melee_weapon_spend_charge",
+                  "first_turn",
+                  "gm_approved_non_combat_check",
+                  "no_attacks_or_forced_saves",
+                  "toward_self_stop_adjacent_if_possible",
+                  "deactivate_start_turn",
+                  "ranged_threat_minimum",
+                  "sekhmet_auto_pilot_melee_only",
+                  "snare_trap_immobilize",
+                  "charged_stake_immobilized",
+                  "charged_stake_immobilize",
+                  "willing_or_stunned_adjacent_target",
+                  "unwilling_adjacent_target",
+                  "enter_zone_metal_target",
+                  "in_zone_metal_target",
+                  "reaction_parry_kinetic_attack_against_self_or_adjacent_ally",
+                  "hull_checks_and_saves",
+                  "stabilize_singularity",
+                  "agility_checks_and_saves",
+                  "until_end_of_next_turn",
+                  "invisible_to_chosen_target_only",
+                  "benefiting_from_trail_cover",
+                  "source_is_chosen_target",
+                  "ally_other_than_self_hits_markerlight_target",
+                  "mimic_mesh_copy_active",
+                  "monitor_charge_accumulated",
+                  "cascade_status_spread",
+                  "damage_type_selectable",
+                  "weapon_profile_copied",
+                  "chain_to_secondary_target",
+                  "overwatch_reaction",
+                  "overwatch_attack",
+                  "limit_break_active",
+                  "apocalypse_rail_attack",
+                  "warp_shield_redirect",
+                  "teleport_on_hit",
+                  "gravity_well_pull",
+                  "plasma_gauntlet_active",
+                  "out_of_phase"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/SpatialCondition"
+              },
+              {
+                "$ref": "#/$defs/AttackContextCondition"
+              },
+              {
+                "$ref": "#/$defs/CheckContextCondition"
+              },
+              {
+                "$ref": "#/$defs/ReactionCondition"
+              },
+              {
+                "$ref": "#/$defs/SizeCondition"
+              },
+              {
+                "$ref": "#/$defs/ConditionGroup"
+              }
+            ]
+          },
+          "title": "Any Of",
+          "type": "array"
+        },
+        "none_of": {
+          "items": {
+            "anyOf": [
+              {
+                "enum": [
+                  "target_prone",
+                  "target_immobilized",
+                  "target_below_half_hp",
+                  "target_below_max_hp",
+                  "target_has_lock_on",
+                  "target_larger",
+                  "target_smaller",
+                  "target_same_size",
+                  "from_smaller",
+                  "target_hidden",
+                  "target_jammed",
+                  "target_shredded",
+                  "target_impaired",
+                  "target_slowed",
+                  "target_stunned",
+                  "target_grappled",
+                  "target_biological",
+                  "target_exposed",
+                  "target_invisible",
+                  "target_engaged",
+                  "target_marked",
+                  "target_within_range_3",
+                  "covering_fire_target",
+                  "covering_fire_target_moves",
+                  "covering_fire_bracketing",
+                  "covering_fire_overwatch",
+                  "jackhammer_target_object",
+                  "jackhammer_adjacent_to_object",
+                  "cannon_collateral_burst",
+                  "different_target_in_threat",
+                  "threat_except_original_target",
+                  "exemplar_marked_target",
+                  "ally_attacks_exemplar_marked_target",
+                  "spotter_adjacent_ally_consumes_lock_on",
+                  "exemplar_marked_target_attacks_other_within_3",
+                  "exemplar_challenge_active",
+                  "exemplar_challenge_other_targets",
+                  "during_rest",
+                  "while_flying",
+                  "while_hidden",
+                  "hidden_at_turn_start",
+                  "hidden_end_turn",
+                  "after_boost",
+                  "juggernaut_supercharge",
+                  "juggernaut_supercharge_through_character",
+                  "juggernaut_supercharge_through_obstacle",
+                  "after_move_8_plus",
+                  "in_danger_zone",
+                  "hidden",
+                  "engaged",
+                  "exposed",
+                  "overheated",
+                  "stunned",
+                  "braced",
+                  "brace",
+                  "reserve_power_mode",
+                  "steady_aim",
+                  "steady_aim_rifle_attack",
+                  "steady_aim_rifle_attack_crit",
+                  "rifle_attack",
+                  "rifle_attack_crit",
+                  "bondmate_adjacent",
+                  "bondmate_adjacent_and_damaged",
+                  "bondmate_targeted",
+                  "cover_me_overwatch",
+                  "leadership_die",
+                  "steel_assassin_charge",
+                  "selected_mount",
+                  "selected_weapon",
+                  "exclude_integrated_mounts",
+                  "structure_1_or_less",
+                  "zero_hp",
+                  "ram_or_grapple",
+                  "melee_knockback",
+                  "flying_this_turn",
+                  "natural_20",
+                  "after_miss",
+                  "turn_only_move_hide_boost",
+                  "caused_by_self",
+                  "gain_stress",
+                  "stabilize_cool",
+                  "tech_attack_hit",
+                  "invade_action",
+                  "performed_tech_action",
+                  "lock_on_action",
+                  "hacker_jam_cockpit",
+                  "hacker_disable_life_support",
+                  "hacker_hack_slash",
+                  "shutdown_action",
+                  "burn_equals_current_heat",
+                  "on_turn",
+                  "next_melee_vs_tech_hit_target",
+                  "ally_engaged_with_target",
+                  "higher_elevation_than_target",
+                  "target_not_in_cover",
+                  "cqb_target_within_3",
+                  "cqb_target_within_3_with_los",
+                  "next_ranged_vs_target_after_melee_hit",
+                  "next_melee_vs_target_after_ranged_hit",
+                  "adjacent_to_engaged_self",
+                  "before_or_after_skirmish",
+                  "first_reaction_attack_against_self",
+                  "flank_overwatch",
+                  "cqb_overwatch",
+                  "nexus_weapon_crit",
+                  "lock_on_consumed_drone_or_nexus_attack",
+                  "lock_on_consumed_tech_attack",
+                  "chaff_soft_cover_break_on_attack_or_save",
+                  "stormbringer_concussive_action",
+                  "stormbringer_torrent_attack",
+                  "stormbringer_thunder_blast",
+                  "thrown_aux_melee_attack",
+                  "adjacent_to_target",
+                  "adjacent_to_self",
+                  "restricting_swarm_active",
+                  "target_grappled_by_self",
+                  "heavy_or_superheavy_melee_attack",
+                  "backswing_cut_followup",
+                  "melee_attack",
+                  "ranged_attack",
+                  "tech_attack",
+                  "ram_attack",
+                  "ram_attack_after_boost",
+                  "ram_knockback_into_character",
+                  "ram_knockback_into_obstacle",
+                  "improvised_attack",
+                  "main_melee_attack",
+                  "aux_ranged_attack",
+                  "aux_melee_attack",
+                  "launcher_attack",
+                  "lock_on_consumed_launcher_attack",
+                  "cannon_attack",
+                  "fuel_rod_gun_attack",
+                  "melee_attack_no_other_adjacent",
+                  "melee_crit",
+                  "attack_roll_1_or_2",
+                  "save_vs_knockback_or_prone",
+                  "adjacent",
+                  "adjacent_recover_charged_stake",
+                  "adjacent_start_or_move",
+                  "ally_target",
+                  "ally_target_range_5",
+                  "hostile_target_range_5",
+                  "target_empty_space",
+                  "target_destroyed",
+                  "target_is_object",
+                  "target_is_drone",
+                  "target_is_deployable",
+                  "target_prone_or_immobilized_or_stunned",
+                  "after_boost_melee_attack",
+                  "first_ranged_attack_each_round",
+                  "attacks_from_owner",
+                  "attacks_within_range_3",
+                  "attacker_within_range_3_before_attack",
+                  "kinetic_attack_against_self_or_adjacent_ally",
+                  "launcher_attack_consumes_lock_on",
+                  "next_loading_attack",
+                  "next_ranged_attack",
+                  "ranged_attack_vs_marked_target_no_cover_outside_range_5",
+                  "ram_attack_vs_object",
+                  "ai_controlled_until_protocol_resume",
+                  "core_power_active",
+                  "core_power_full_action_mag_field",
+                  "protocol_ends",
+                  "stabilizer_attached",
+                  "structure_damage",
+                  "after_move_or_boost",
+                  "boost_speed_plus_2",
+                  "hover_no_landing_required",
+                  "must_move_max_speed_each_move",
+                  "no_move",
+                  "slipstream_jump",
+                  "exclusive_target",
+                  "from_triggering_attack",
+                  "half_damage",
+                  "melee_knockback_plus_2",
+                  "melee_attack_knockback_bonus",
+                  "melee_weapon_spend_charge",
+                  "first_turn",
+                  "gm_approved_non_combat_check",
+                  "no_attacks_or_forced_saves",
+                  "toward_self_stop_adjacent_if_possible",
+                  "deactivate_start_turn",
+                  "ranged_threat_minimum",
+                  "sekhmet_auto_pilot_melee_only",
+                  "snare_trap_immobilize",
+                  "charged_stake_immobilized",
+                  "charged_stake_immobilize",
+                  "willing_or_stunned_adjacent_target",
+                  "unwilling_adjacent_target",
+                  "enter_zone_metal_target",
+                  "in_zone_metal_target",
+                  "reaction_parry_kinetic_attack_against_self_or_adjacent_ally",
+                  "hull_checks_and_saves",
+                  "stabilize_singularity",
+                  "agility_checks_and_saves",
+                  "until_end_of_next_turn",
+                  "invisible_to_chosen_target_only",
+                  "benefiting_from_trail_cover",
+                  "source_is_chosen_target",
+                  "ally_other_than_self_hits_markerlight_target",
+                  "mimic_mesh_copy_active",
+                  "monitor_charge_accumulated",
+                  "cascade_status_spread",
+                  "damage_type_selectable",
+                  "weapon_profile_copied",
+                  "chain_to_secondary_target",
+                  "overwatch_reaction",
+                  "overwatch_attack",
+                  "limit_break_active",
+                  "apocalypse_rail_attack",
+                  "warp_shield_redirect",
+                  "teleport_on_hit",
+                  "gravity_well_pull",
+                  "plasma_gauntlet_active",
+                  "out_of_phase"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/SpatialCondition"
+              },
+              {
+                "$ref": "#/$defs/AttackContextCondition"
+              },
+              {
+                "$ref": "#/$defs/CheckContextCondition"
+              },
+              {
+                "$ref": "#/$defs/ReactionCondition"
+              },
+              {
+                "$ref": "#/$defs/SizeCondition"
+              },
+              {
+                "$ref": "#/$defs/ConditionGroup"
+              }
+            ]
+          },
+          "title": "None Of",
+          "type": "array"
+        }
+      },
+      "title": "ConditionGroup",
+      "type": "object"
+    },
+    "ReactionCondition": {
+      "description": "Reaction-specific predicates (brace, overwatch).\n\nExamples:\n    ReactionCondition(reaction_id=\"brace\")\n    ReactionCondition(reaction_id=\"overwatch\", is_attack=True)",
+      "properties": {
+        "reaction_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reaction Id"
+        },
+        "is_attack": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Is Attack"
+        }
+      },
+      "title": "ReactionCondition",
+      "type": "object"
+    },
+    "SizeCondition": {
+      "description": "Size comparison predicates for source/target/self.\n\nExamples:\n    SizeCondition(subject=\"source\", comparator=\"lt\", size=\"size_5\")",
+      "properties": {
+        "subject": {
+          "default": "source",
+          "enum": [
+            "source",
+            "target",
+            "self"
+          ],
+          "title": "Subject",
+          "type": "string"
+        },
+        "comparator": {
+          "default": "lt",
+          "enum": [
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "eq"
+          ],
+          "title": "Comparator",
+          "type": "string"
+        },
+        "size": {
+          "enum": [
+            "size_half",
+            "size_1",
+            "size_2",
+            "size_3",
+            "size_4",
+            "size_5"
+          ],
+          "title": "Size",
+          "type": "string"
+        }
+      },
+      "required": [
+        "size"
+      ],
+      "title": "SizeCondition",
+      "type": "object"
+    },
+    "SpatialCondition": {
+      "description": "Spatial relationship predicates (adjacent, range, zone entry, cover sourcing).\n\nExamples:\n    SpatialCondition(relation=\"adjacent\", target=\"ally\")\n    SpatialCondition(relation=\"outside_range\", range=5, range_type=\"range\")",
+      "properties": {
+        "relation": {
+          "enum": [
+            "adjacent",
+            "within_range",
+            "outside_range",
+            "within_threat",
+            "enter_zone",
+            "line_of_attack",
+            "line_of_sight",
+            "using_cover_from_source"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "target": {
+          "default": "enemy",
+          "enum": [
+            "self",
+            "enemy",
+            "ally",
+            "adjacent",
+            "all"
+          ],
+          "title": "Target",
+          "type": "string"
+        },
+        "source": {
+          "default": "self",
+          "enum": [
+            "self",
+            "enemy",
+            "ally",
+            "adjacent"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "range": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Range"
+        },
+        "range_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "range",
+                "threat",
+                "thrown",
+                "line",
+                "cone",
+                "burst",
+                "blast",
+                "sensors"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Range Type"
+        },
+        "cover": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "soft",
+                "hard"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cover"
+        },
+        "requires_line_of_sight": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requires Line Of Sight"
+        },
+        "requires_free_space": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requires Free Space"
+        }
+      },
+      "required": [
+        "relation"
+      ],
+      "title": "SpatialCondition",
+      "type": "object"
+    }
+  },
+  "description": "Grants access to movement modes or improves traversal.\n\nExamples:\n    MovementModeAccessEffect(climb_at_full_speed=True, swim_at_full_speed=True)",
+  "properties": {
+    "target": {
+      "default": "self",
+      "enum": [
+        "self",
+        "enemy",
+        "ally",
+        "adjacent"
+      ],
+      "title": "Target",
+      "type": "string"
+    },
+    "climb_at_full_speed": {
+      "default": false,
+      "title": "Climb At Full Speed",
+      "type": "boolean"
+    },
+    "swim_at_full_speed": {
+      "default": false,
+      "title": "Swim At Full Speed",
+      "type": "boolean"
+    },
+    "condition": {
+      "anyOf": [
+        {
+          "enum": [
+            "target_prone",
+            "target_immobilized",
+            "target_below_half_hp",
+            "target_below_max_hp",
+            "target_has_lock_on",
+            "target_larger",
+            "target_smaller",
+            "target_same_size",
+            "from_smaller",
+            "target_hidden",
+            "target_jammed",
+            "target_shredded",
+            "target_impaired",
+            "target_slowed",
+            "target_stunned",
+            "target_grappled",
+            "target_biological",
+            "target_exposed",
+            "target_invisible",
+            "target_engaged",
+            "target_marked",
+            "target_within_range_3",
+            "covering_fire_target",
+            "covering_fire_target_moves",
+            "covering_fire_bracketing",
+            "covering_fire_overwatch",
+            "jackhammer_target_object",
+            "jackhammer_adjacent_to_object",
+            "cannon_collateral_burst",
+            "different_target_in_threat",
+            "threat_except_original_target",
+            "exemplar_marked_target",
+            "ally_attacks_exemplar_marked_target",
+            "spotter_adjacent_ally_consumes_lock_on",
+            "exemplar_marked_target_attacks_other_within_3",
+            "exemplar_challenge_active",
+            "exemplar_challenge_other_targets",
+            "during_rest",
+            "while_flying",
+            "while_hidden",
+            "hidden_at_turn_start",
+            "hidden_end_turn",
+            "after_boost",
+            "juggernaut_supercharge",
+            "juggernaut_supercharge_through_character",
+            "juggernaut_supercharge_through_obstacle",
+            "after_move_8_plus",
+            "in_danger_zone",
+            "hidden",
+            "engaged",
+            "exposed",
+            "overheated",
+            "stunned",
+            "braced",
+            "brace",
+            "reserve_power_mode",
+            "steady_aim",
+            "steady_aim_rifle_attack",
+            "steady_aim_rifle_attack_crit",
+            "rifle_attack",
+            "rifle_attack_crit",
+            "bondmate_adjacent",
+            "bondmate_adjacent_and_damaged",
+            "bondmate_targeted",
+            "cover_me_overwatch",
+            "leadership_die",
+            "steel_assassin_charge",
+            "selected_mount",
+            "selected_weapon",
+            "exclude_integrated_mounts",
+            "structure_1_or_less",
+            "zero_hp",
+            "ram_or_grapple",
+            "melee_knockback",
+            "flying_this_turn",
+            "natural_20",
+            "after_miss",
+            "turn_only_move_hide_boost",
+            "caused_by_self",
+            "gain_stress",
+            "stabilize_cool",
+            "tech_attack_hit",
+            "invade_action",
+            "performed_tech_action",
+            "lock_on_action",
+            "hacker_jam_cockpit",
+            "hacker_disable_life_support",
+            "hacker_hack_slash",
+            "shutdown_action",
+            "burn_equals_current_heat",
+            "on_turn",
+            "next_melee_vs_tech_hit_target",
+            "ally_engaged_with_target",
+            "higher_elevation_than_target",
+            "target_not_in_cover",
+            "cqb_target_within_3",
+            "cqb_target_within_3_with_los",
+            "next_ranged_vs_target_after_melee_hit",
+            "next_melee_vs_target_after_ranged_hit",
+            "adjacent_to_engaged_self",
+            "before_or_after_skirmish",
+            "first_reaction_attack_against_self",
+            "flank_overwatch",
+            "cqb_overwatch",
+            "nexus_weapon_crit",
+            "lock_on_consumed_drone_or_nexus_attack",
+            "lock_on_consumed_tech_attack",
+            "chaff_soft_cover_break_on_attack_or_save",
+            "stormbringer_concussive_action",
+            "stormbringer_torrent_attack",
+            "stormbringer_thunder_blast",
+            "thrown_aux_melee_attack",
+            "adjacent_to_target",
+            "adjacent_to_self",
+            "restricting_swarm_active",
+            "target_grappled_by_self",
+            "heavy_or_superheavy_melee_attack",
+            "backswing_cut_followup",
+            "melee_attack",
+            "ranged_attack",
+            "tech_attack",
+            "ram_attack",
+            "ram_attack_after_boost",
+            "ram_knockback_into_character",
+            "ram_knockback_into_obstacle",
+            "improvised_attack",
+            "main_melee_attack",
+            "aux_ranged_attack",
+            "aux_melee_attack",
+            "launcher_attack",
+            "lock_on_consumed_launcher_attack",
+            "cannon_attack",
+            "fuel_rod_gun_attack",
+            "melee_attack_no_other_adjacent",
+            "melee_crit",
+            "attack_roll_1_or_2",
+            "save_vs_knockback_or_prone",
+            "adjacent",
+            "adjacent_recover_charged_stake",
+            "adjacent_start_or_move",
+            "ally_target",
+            "ally_target_range_5",
+            "hostile_target_range_5",
+            "target_empty_space",
+            "target_destroyed",
+            "target_is_object",
+            "target_is_drone",
+            "target_is_deployable",
+            "target_prone_or_immobilized_or_stunned",
+            "after_boost_melee_attack",
+            "first_ranged_attack_each_round",
+            "attacks_from_owner",
+            "attacks_within_range_3",
+            "attacker_within_range_3_before_attack",
+            "kinetic_attack_against_self_or_adjacent_ally",
+            "launcher_attack_consumes_lock_on",
+            "next_loading_attack",
+            "next_ranged_attack",
+            "ranged_attack_vs_marked_target_no_cover_outside_range_5",
+            "ram_attack_vs_object",
+            "ai_controlled_until_protocol_resume",
+            "core_power_active",
+            "core_power_full_action_mag_field",
+            "protocol_ends",
+            "stabilizer_attached",
+            "structure_damage",
+            "after_move_or_boost",
+            "boost_speed_plus_2",
+            "hover_no_landing_required",
+            "must_move_max_speed_each_move",
+            "no_move",
+            "slipstream_jump",
+            "exclusive_target",
+            "from_triggering_attack",
+            "half_damage",
+            "melee_knockback_plus_2",
+            "melee_attack_knockback_bonus",
+            "melee_weapon_spend_charge",
+            "first_turn",
+            "gm_approved_non_combat_check",
+            "no_attacks_or_forced_saves",
+            "toward_self_stop_adjacent_if_possible",
+            "deactivate_start_turn",
+            "ranged_threat_minimum",
+            "sekhmet_auto_pilot_melee_only",
+            "snare_trap_immobilize",
+            "charged_stake_immobilized",
+            "charged_stake_immobilize",
+            "willing_or_stunned_adjacent_target",
+            "unwilling_adjacent_target",
+            "enter_zone_metal_target",
+            "in_zone_metal_target",
+            "reaction_parry_kinetic_attack_against_self_or_adjacent_ally",
+            "hull_checks_and_saves",
+            "stabilize_singularity",
+            "agility_checks_and_saves",
+            "until_end_of_next_turn",
+            "invisible_to_chosen_target_only",
+            "benefiting_from_trail_cover",
+            "source_is_chosen_target",
+            "ally_other_than_self_hits_markerlight_target",
+            "mimic_mesh_copy_active",
+            "monitor_charge_accumulated",
+            "cascade_status_spread",
+            "damage_type_selectable",
+            "weapon_profile_copied",
+            "chain_to_secondary_target",
+            "overwatch_reaction",
+            "overwatch_attack",
+            "limit_break_active",
+            "apocalypse_rail_attack",
+            "warp_shield_redirect",
+            "teleport_on_hit",
+            "gravity_well_pull",
+            "plasma_gauntlet_active",
+            "out_of_phase"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/SpatialCondition"
+        },
+        {
+          "$ref": "#/$defs/AttackContextCondition"
+        },
+        {
+          "$ref": "#/$defs/CheckContextCondition"
+        },
+        {
+          "$ref": "#/$defs/ReactionCondition"
+        },
+        {
+          "$ref": "#/$defs/SizeCondition"
+        },
+        {
+          "$ref": "#/$defs/ConditionGroup"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Condition"
+    }
+  },
+  "title": "MovementModeAccessEffect",
+  "type": "object"
+}

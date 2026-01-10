@@ -1,0 +1,67 @@
+{
+  "description": "Rule-of-thumb progression parameters used to build the level chart.",
+  "properties": {
+    "level_cap": {
+      "default": 12,
+      "title": "Level Cap",
+      "type": "integer"
+    },
+    "starting_trigger_points": {
+      "default": 8,
+      "title": "Starting Trigger Points",
+      "type": "integer"
+    },
+    "trigger_points_per_level": {
+      "default": 2,
+      "title": "Trigger Points Per Level",
+      "type": "integer"
+    },
+    "trigger_rank_min": {
+      "default": 2,
+      "title": "Trigger Rank Min",
+      "type": "integer"
+    },
+    "trigger_rank_max": {
+      "default": 6,
+      "title": "Trigger Rank Max",
+      "type": "integer"
+    },
+    "starting_mech_skill_points": {
+      "default": 2,
+      "title": "Starting Mech Skill Points",
+      "type": "integer"
+    },
+    "mech_skill_points_per_level": {
+      "default": 1,
+      "title": "Mech Skill Points Per Level",
+      "type": "integer"
+    },
+    "mech_skill_rank_max": {
+      "default": 6,
+      "title": "Mech Skill Rank Max",
+      "type": "integer"
+    },
+    "starting_talent_points": {
+      "default": 3,
+      "title": "Starting Talent Points",
+      "type": "integer"
+    },
+    "talent_points_per_level": {
+      "default": 1,
+      "title": "Talent Points Per Level",
+      "type": "integer"
+    },
+    "license_points_per_level": {
+      "default": 1,
+      "title": "License Points Per Level",
+      "type": "integer"
+    },
+    "core_bonus_every_levels": {
+      "default": 3,
+      "title": "Core Bonus Every Levels",
+      "type": "integer"
+    }
+  },
+  "title": "PilotProgressionRules",
+  "type": "object"
+}

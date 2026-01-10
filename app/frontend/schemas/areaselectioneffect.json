@@ -1,0 +1,131 @@
+{
+  "description": "Specifies how areas or spaces are selected for an effect.\n\nExamples:\n    AreaSelectionEffect(scope_options=[\"area\"], shape=\"blast\", size=1, count_options=[1, 2],\n                        non_overlapping=True, range=20)",
+  "properties": {
+    "scope_options": {
+      "items": {
+        "enum": [
+          "area",
+          "spaces",
+          "battlefield"
+        ],
+        "type": "string"
+      },
+      "title": "Scope Options",
+      "type": "array"
+    },
+    "shape": {
+      "anyOf": [
+        {
+          "enum": [
+            "burst",
+            "blast",
+            "line",
+            "cone",
+            "square"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Shape"
+    },
+    "size": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Size"
+    },
+    "count": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Count"
+    },
+    "count_options": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Count Options",
+      "type": "array"
+    },
+    "range": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Range"
+    },
+    "requires_line_of_sight": {
+      "default": true,
+      "title": "Requires Line Of Sight",
+      "type": "boolean"
+    },
+    "requires_free_space": {
+      "default": false,
+      "title": "Requires Free Space",
+      "type": "boolean"
+    },
+    "non_adjacent": {
+      "default": false,
+      "title": "Non Adjacent",
+      "type": "boolean"
+    },
+    "non_overlapping": {
+      "default": false,
+      "title": "Non Overlapping",
+      "type": "boolean"
+    },
+    "visible_to_all": {
+      "default": false,
+      "title": "Visible To All",
+      "type": "boolean"
+    },
+    "vertical_range": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Vertical Range"
+    },
+    "origin": {
+      "default": "self",
+      "enum": [
+        "self",
+        "point"
+      ],
+      "title": "Origin",
+      "type": "string"
+    }
+  },
+  "title": "AreaSelectionEffect",
+  "type": "object"
+}

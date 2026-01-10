@@ -99,22 +99,6 @@ async def client(async_engine: AsyncEngine) -> AsyncGenerator[AsyncClient, None]
 # Sample Data Factories
 # ============================================================================
 
-def make_pilot_data(
-    name: str = "Test Pilot",
-    callsign: str = "TESTER",
-    **kwargs,
-) -> dict:
-    """Create sample pilot data for tests."""
-    return {
-        "name": name,
-        "callsign": callsign,
-        "data": {
-            "name": name,
-            "callsign": callsign,
-            **kwargs,
-        },
-    }
-
 
 def make_mech_data(
     name: str = "Test Mech",

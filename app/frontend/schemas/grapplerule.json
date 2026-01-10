@@ -1,0 +1,47 @@
+{
+  "description": "Grapple-specific restrictions.",
+  "properties": {
+    "no_boost_or_reactions": {
+      "default": true,
+      "title": "No Boost Or Reactions",
+      "type": "boolean"
+    },
+    "immobilizes_smaller": {
+      "default": true,
+      "title": "Immobilizes Smaller",
+      "type": "boolean"
+    },
+    "smaller_moves_with_larger": {
+      "default": true,
+      "title": "Smaller Moves With Larger",
+      "type": "boolean"
+    },
+    "breaks_on_adjacency_loss": {
+      "default": true,
+      "title": "Breaks On Adjacency Loss",
+      "type": "boolean"
+    },
+    "attacker_end_free_action": {
+      "default": true,
+      "title": "Attacker End Free Action",
+      "type": "boolean"
+    },
+    "defender_end_quick_action": {
+      "default": true,
+      "title": "Defender End Quick Action",
+      "type": "boolean"
+    },
+    "defender_contested_hull": {
+      "default": true,
+      "title": "Defender Contested Hull",
+      "type": "boolean"
+    },
+    "equal_size_contested_hull_each_turn": {
+      "default": true,
+      "title": "Equal Size Contested Hull Each Turn",
+      "type": "boolean"
+    }
+  },
+  "title": "GrappleRule",
+  "type": "object"
+}

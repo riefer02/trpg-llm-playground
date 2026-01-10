@@ -1,0 +1,51 @@
+{
+  "$defs": {
+    "DowntimeIssue": {
+      "description": "A downtime validation issue.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "default": "error",
+          "enum": [
+            "error",
+            "warning"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "DowntimeIssue",
+      "type": "object"
+    }
+  },
+  "description": "Validation result for downtime planning.",
+  "properties": {
+    "valid": {
+      "title": "Valid",
+      "type": "boolean"
+    },
+    "issues": {
+      "items": {
+        "$ref": "#/$defs/DowntimeIssue"
+      },
+      "title": "Issues",
+      "type": "array"
+    }
+  },
+  "required": [
+    "valid"
+  ],
+  "title": "DowntimeValidation",
+  "type": "object"
+}

@@ -1,0 +1,71 @@
+{
+  "description": "Outcome resolution for a pilot's goal in narrative combat.",
+  "properties": {
+    "goal_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Goal identifier if tracked",
+      "title": "Goal Id"
+    },
+    "goal_description": {
+      "description": "What the pilot was trying to accomplish",
+      "title": "Goal Description",
+      "type": "string"
+    },
+    "success": {
+      "description": "Whether the goal was accomplished",
+      "title": "Success",
+      "type": "boolean"
+    },
+    "tier_attained": {
+      "default": "standard",
+      "description": "The tier at which success was achieved",
+      "enum": [
+        "standard",
+        "difficult",
+        "risky",
+        "heroic"
+      ],
+      "title": "Tier Attained",
+      "type": "string"
+    },
+    "harm_involved": {
+      "default": false,
+      "description": "Whether physical harm was part of the goal",
+      "title": "Harm Involved",
+      "type": "boolean"
+    },
+    "harm_suffered": {
+      "default": false,
+      "description": "Whether the pilot suffered harm as complication",
+      "title": "Harm Suffered",
+      "type": "boolean"
+    },
+    "complication_description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "If harm or other complication occurred",
+      "title": "Complication Description"
+    }
+  },
+  "required": [
+    "goal_description",
+    "success"
+  ],
+  "title": "NarrativeGoalOutcome",
+  "type": "object"
+}

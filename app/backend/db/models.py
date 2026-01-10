@@ -13,8 +13,8 @@ from sqlmodel import Field, SQLModel
 
 
 def utc_now() -> datetime:
-    """Get current UTC timestamp."""
-    return datetime.now(timezone.utc)
+    """Get current UTC timestamp (naive, for PostgreSQL TIMESTAMP WITHOUT TIME ZONE)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class TimestampMixin(SQLModel):

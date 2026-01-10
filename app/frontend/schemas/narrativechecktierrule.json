@@ -1,0 +1,45 @@
+{
+  "description": "Tier-specific narrative check behavior.",
+  "properties": {
+    "tier": {
+      "enum": [
+        "standard",
+        "difficult",
+        "risky",
+        "heroic"
+      ],
+      "title": "Tier",
+      "type": "string"
+    },
+    "success_threshold": {
+      "minimum": 0,
+      "title": "Success Threshold",
+      "type": "integer"
+    },
+    "consequence_threshold": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Roll needed to avoid consequences on success",
+      "title": "Consequence Threshold"
+    },
+    "allows_push": {
+      "default": true,
+      "title": "Allows Push",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "tier",
+    "success_threshold"
+  ],
+  "title": "NarrativeCheckTierRule",
+  "type": "object"
+}

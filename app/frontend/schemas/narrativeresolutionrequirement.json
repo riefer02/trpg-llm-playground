@@ -1,0 +1,81 @@
+{
+  "description": "Requirements for resolving a narrative complication.",
+  "properties": {
+    "requirement_type": {
+      "enum": [
+        "skill_check",
+        "time_passed",
+        "resource_spend",
+        "position_change",
+        "goal_completion",
+        "effect_reversal",
+        "other"
+      ],
+      "title": "Requirement Type",
+      "type": "string"
+    },
+    "description": {
+      "description": "What clears this complication",
+      "title": "Description",
+      "type": "string"
+    },
+    "required_tier": {
+      "anyOf": [
+        {
+          "enum": [
+            "standard",
+            "difficult",
+            "risky",
+            "heroic"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Narrative tier required (if resolution needs a check)",
+      "title": "Required Tier"
+    },
+    "required_skill": {
+      "anyOf": [
+        {
+          "enum": [
+            "hull",
+            "agility",
+            "systems",
+            "engineering"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Pilot skill used to resolve (if check-based)",
+      "title": "Required Skill"
+    },
+    "required_amount": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Quantity of time/resources/etc required",
+      "title": "Required Amount"
+    }
+  },
+  "required": [
+    "requirement_type",
+    "description"
+  ],
+  "title": "NarrativeResolutionRequirement",
+  "type": "object"
+}

@@ -1,0 +1,22 @@
+{
+  "description": "Zero-g or underwater movement rules.",
+  "properties": {
+    "slowed_without_propulsion": {
+      "default": true,
+      "title": "Slowed Without Propulsion",
+      "type": "boolean"
+    },
+    "can_fly_while_moving": {
+      "default": true,
+      "title": "Can Fly While Moving",
+      "type": "boolean"
+    },
+    "no_falling": {
+      "default": true,
+      "title": "No Falling",
+      "type": "boolean"
+    }
+  },
+  "title": "ZeroGRules",
+  "type": "object"
+}

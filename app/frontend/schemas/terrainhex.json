@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    }
+  },
+  "description": "Terrain entry for a single hex.",
+  "properties": {
+    "coord": {
+      "$ref": "#/$defs/HexCoord"
+    },
+    "elevation": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Elevation",
+      "type": "integer"
+    },
+    "blocks_line_of_sight": {
+      "default": false,
+      "title": "Blocks Line Of Sight",
+      "type": "boolean"
+    },
+    "provides_soft_cover": {
+      "default": false,
+      "title": "Provides Soft Cover",
+      "type": "boolean"
+    },
+    "provides_hard_cover": {
+      "default": false,
+      "title": "Provides Hard Cover",
+      "type": "boolean"
+    },
+    "hard_cover_size": {
+      "anyOf": [
+        {
+          "enum": [
+            "size_half",
+            "size_1",
+            "size_2",
+            "size_3",
+            "size_4",
+            "size_5"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hard Cover Size"
+    },
+    "difficult": {
+      "default": false,
+      "title": "Difficult",
+      "type": "boolean"
+    },
+    "dangerous": {
+      "default": false,
+      "title": "Dangerous",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "coord"
+  ],
+  "title": "TerrainHex",
+  "type": "object"
+}

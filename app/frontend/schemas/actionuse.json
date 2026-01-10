@@ -1,0 +1,621 @@
+{
+  "$defs": {
+    "AccuracyDifficulty": {
+      "description": "Accuracy and difficulty dice pool for a roll.",
+      "properties": {
+        "accuracy": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Accuracy",
+          "type": "integer"
+        },
+        "difficulty": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "net": {
+          "description": "Net accuracy (positive) or difficulty (negative).",
+          "readOnly": true,
+          "title": "Net",
+          "type": "integer"
+        },
+        "dice_count": {
+          "description": "Number of d6 rolled after canceling.",
+          "readOnly": true,
+          "title": "Dice Count",
+          "type": "integer"
+        },
+        "direction": {
+          "enum": [
+            "accuracy",
+            "difficulty",
+            "none"
+          ],
+          "readOnly": true,
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "net",
+        "dice_count",
+        "direction"
+      ],
+      "title": "AccuracyDifficulty",
+      "type": "object"
+    },
+    "AppliedPerTargetEffect": {
+      "description": "Applied per-target effect metadata for action resolution.",
+      "properties": {
+        "effect_id": {
+          "title": "Effect Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "count": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "max_count": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Count"
+        },
+        "reset_on": {
+          "anyOf": [
+            {
+              "enum": [
+                "scene_end",
+                "rest",
+                "full_repair",
+                "never"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reset On"
+        },
+        "source": {
+          "default": "direct",
+          "enum": [
+            "save_check",
+            "triggered_effect",
+            "direct"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "effect_id",
+        "target_id"
+      ],
+      "title": "AppliedPerTargetEffect",
+      "type": "object"
+    },
+    "AttackPatternDefinition": {
+      "description": "Definition for area attack patterns.",
+      "properties": {
+        "pattern": {
+          "enum": [
+            "line",
+            "cone",
+            "blast",
+            "burst"
+          ],
+          "title": "Pattern",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "cone_mode": {
+          "default": "wedge",
+          "enum": [
+            "wedge",
+            "axis"
+          ],
+          "title": "Cone Mode",
+          "type": "string"
+        },
+        "separate_attack_per_target": {
+          "default": true,
+          "title": "Separate Attack Per Target",
+          "type": "boolean"
+        },
+        "single_damage_roll": {
+          "default": true,
+          "title": "Single Damage Roll",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "pattern",
+        "size"
+      ],
+      "title": "AttackPatternDefinition",
+      "type": "object"
+    },
+    "ContestedCheck": {
+      "description": "Two opposed skill checks; ties go to the attacker.",
+      "properties": {
+        "attacker": {
+          "$ref": "#/$defs/SkillCheck"
+        },
+        "defender": {
+          "$ref": "#/$defs/SkillCheck"
+        },
+        "tie_breaker": {
+          "const": "attacker",
+          "default": "attacker",
+          "title": "Tie Breaker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attacker",
+        "defender"
+      ],
+      "title": "ContestedCheck",
+      "type": "object"
+    },
+    "FlatBonus": {
+      "description": "Flat bonus applied to a roll (one source at a time).",
+      "properties": {
+        "source": {
+          "enum": [
+            "trigger",
+            "mech_skill",
+            "grit"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Value",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "FlatBonus",
+      "type": "object"
+    },
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    },
+    "HexPosition": {
+      "description": "Hex position with optional elevation.",
+      "properties": {
+        "coord": {
+          "$ref": "#/$defs/HexCoord"
+        },
+        "elevation": {
+          "default": 0,
+          "description": "Vertical elevation in spaces",
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "coord"
+      ],
+      "title": "HexPosition",
+      "type": "object"
+    },
+    "RollModifiers": {
+      "description": "Combined modifiers for a roll.",
+      "properties": {
+        "accuracy_difficulty": {
+          "$ref": "#/$defs/AccuracyDifficulty"
+        },
+        "flat_bonus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlatBonus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "RollModifiers",
+      "type": "object"
+    },
+    "SkillCheck": {
+      "description": "A narrative skill check (target 10 by default).",
+      "properties": {
+        "roll_type": {
+          "const": "skill_check",
+          "default": "skill_check",
+          "title": "Roll Type",
+          "type": "string"
+        },
+        "target": {
+          "default": 10,
+          "minimum": 0,
+          "title": "Target",
+          "type": "integer"
+        },
+        "modifiers": {
+          "$ref": "#/$defs/RollModifiers"
+        },
+        "is_difficult": {
+          "default": false,
+          "description": "Adds +1 difficulty per PR2 rules",
+          "title": "Is Difficult",
+          "type": "boolean"
+        }
+      },
+      "title": "SkillCheck",
+      "type": "object"
+    }
+  },
+  "description": "An action taken during a combat turn.",
+  "properties": {
+    "action_id": {
+      "title": "Action Id",
+      "type": "string"
+    },
+    "action_type": {
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol",
+        "move"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "target_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Id"
+    },
+    "target_position": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HexPosition"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "target_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Target Ids",
+      "type": "array"
+    },
+    "target_positions": {
+      "items": {
+        "$ref": "#/$defs/HexPosition"
+      },
+      "title": "Target Positions",
+      "type": "array"
+    },
+    "range_spaces": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Range Spaces"
+    },
+    "attack_type_override": {
+      "anyOf": [
+        {
+          "enum": [
+            "melee",
+            "ranged",
+            "tech"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attack Type Override"
+    },
+    "weapon_tags": {
+      "items": {
+        "enum": [
+          "accurate",
+          "inaccurate",
+          "loading",
+          "ordnance",
+          "arcing",
+          "seeking",
+          "smart",
+          "ap",
+          "overkill",
+          "reliable",
+          "heat_self",
+          "heat_target",
+          "burn",
+          "knockback",
+          "limited",
+          "threat",
+          "thrown",
+          "line",
+          "cone",
+          "blast",
+          "burst"
+        ],
+        "type": "string"
+      },
+      "title": "Weapon Tags",
+      "type": "array"
+    },
+    "area_pattern": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AttackPatternDefinition"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "area_origin": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HexPosition"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "area_direction": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HexCoord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "area_affected": {
+      "items": {
+        "$ref": "#/$defs/HexCoord"
+      },
+      "title": "Area Affected",
+      "type": "array"
+    },
+    "weapon_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Weapon Count"
+    },
+    "uses_superheavy": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Uses Superheavy"
+    },
+    "uses_aux_bonus_attack": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Uses Aux Bonus Attack"
+    },
+    "stabilize_primary": {
+      "anyOf": [
+        {
+          "enum": [
+            "cool_heat",
+            "spend_repair_full_hp"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stabilize Primary"
+    },
+    "stabilize_secondary": {
+      "anyOf": [
+        {
+          "enum": [
+            "reload_loading",
+            "clear_burn",
+            "clear_condition"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stabilize Secondary"
+    },
+    "ignores_line_of_sight": {
+      "default": false,
+      "title": "Ignores Line Of Sight",
+      "type": "boolean"
+    },
+    "ignores_cover": {
+      "default": false,
+      "title": "Ignores Cover",
+      "type": "boolean"
+    },
+    "used_as_free_action": {
+      "default": false,
+      "title": "Used As Free Action",
+      "type": "boolean"
+    },
+    "used_as_reaction": {
+      "default": false,
+      "title": "Used As Reaction",
+      "type": "boolean"
+    },
+    "granted_by_overcharge": {
+      "default": false,
+      "title": "Granted By Overcharge",
+      "type": "boolean"
+    },
+    "heat_generated": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Heat Generated"
+    },
+    "reaction_trigger": {
+      "anyOf": [
+        {
+          "enum": [
+            "enemy_starts_movement_in_threat",
+            "enemy_enters_threat",
+            "enemy_leaves_threat",
+            "enemy_exits_threat",
+            "ally_hits_target",
+            "enemy_attacks_ally",
+            "covering_fire_target_moves"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reaction Trigger"
+    },
+    "contested_check": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ContestedCheck"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "consumes_lock_on": {
+      "default": false,
+      "title": "Consumes Lock On",
+      "type": "boolean"
+    },
+    "applied_per_target_effects": {
+      "items": {
+        "$ref": "#/$defs/AppliedPerTargetEffect"
+      },
+      "title": "Applied Per Target Effects",
+      "type": "array"
+    }
+  },
+  "required": [
+    "action_id",
+    "action_type"
+  ],
+  "title": "ActionUse",
+  "type": "object"
+}

@@ -1,0 +1,18 @@
+{
+  "description": "Engagement rules and penalties.",
+  "properties": {
+    "ranged_attack_difficulty": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Ranged Attack Difficulty",
+      "type": "integer"
+    },
+    "stop_on_engage_same_size_or_larger": {
+      "default": true,
+      "title": "Stop On Engage Same Size Or Larger",
+      "type": "boolean"
+    }
+  },
+  "title": "EngagementRules",
+  "type": "object"
+}

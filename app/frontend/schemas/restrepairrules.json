@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "RepairSpendOption": {
+      "description": "Repairs spend option during rest or stabilize.",
+      "properties": {
+        "repairs_spent": {
+          "minimum": 0,
+          "title": "Repairs Spent",
+          "type": "integer"
+        },
+        "effect": {
+          "enum": [
+            "full_hp",
+            "repair_weapon_or_system",
+            "repair_structure",
+            "repair_stress",
+            "repair_destroyed_mech"
+          ],
+          "title": "Effect",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repairs_spent",
+        "effect"
+      ],
+      "title": "RepairSpendOption",
+      "type": "object"
+    }
+  },
+  "description": "Rest and repair rules.",
+  "properties": {
+    "rest_hours": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Rest Hours",
+      "type": "integer"
+    },
+    "heal_pilot_fraction": {
+      "default": 0.5,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Heal Pilot Fraction",
+      "type": "number"
+    },
+    "cool_heat_on_rest": {
+      "default": true,
+      "title": "Cool Heat On Rest",
+      "type": "boolean"
+    },
+    "end_mech_conditions_on_rest": {
+      "default": true,
+      "title": "End Mech Conditions On Rest",
+      "type": "boolean"
+    },
+    "repair_options": {
+      "items": {
+        "$ref": "#/$defs/RepairSpendOption"
+      },
+      "title": "Repair Options",
+      "type": "array"
+    },
+    "destroyed_mech_becomes_cover": {
+      "default": true,
+      "title": "Destroyed Mech Becomes Cover",
+      "type": "boolean"
+    },
+    "destroyed_mech_difficult_terrain": {
+      "default": true,
+      "title": "Destroyed Mech Difficult Terrain",
+      "type": "boolean"
+    }
+  },
+  "title": "RestRepairRules",
+  "type": "object"
+}

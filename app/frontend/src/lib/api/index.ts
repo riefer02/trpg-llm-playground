@@ -17,6 +17,7 @@ export type { HealthResponse, DatabaseHealthResponse } from './health'
 export {
   usePilots,
   usePilot,
+  usePilotValidation,
   useCreatePilot,
   useUpdatePilot,
   useDeletePilot,
@@ -25,6 +26,13 @@ export {
 export type {
   PilotResponse,
   PilotListResponse,
-  PilotCreate,
-  PilotUpdate,
+  PilotCreateRequest,
+  PilotUpdateRequest,
+  PilotValidationResponse,
+  SkillSetInput,
+  TriggerInput,
+  TalentInput,
+  LicenseInput,
+  CoreBonusInput,
+  BackgroundInput,
 } from './pilots'

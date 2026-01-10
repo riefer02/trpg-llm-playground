@@ -1,0 +1,1619 @@
+{
+  "$defs": {
+    "ActionEconomyRules": {
+      "description": "Action economy rules for mech combat.",
+      "properties": {
+        "quick_actions_per_turn": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Quick Actions Per Turn",
+          "type": "integer"
+        },
+        "full_actions_per_turn": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Full Actions Per Turn",
+          "type": "integer"
+        },
+        "allows_duplicate_actions": {
+          "default": false,
+          "title": "Allows Duplicate Actions",
+          "type": "boolean"
+        },
+        "duplicate_requires_free_action": {
+          "default": true,
+          "title": "Duplicate Requires Free Action",
+          "type": "boolean"
+        }
+      },
+      "title": "ActionEconomyRules",
+      "type": "object"
+    },
+    "AttackRules": {
+      "description": "Attack targeting rules.",
+      "properties": {
+        "melee_target_stat": {
+          "const": "evasion",
+          "default": "evasion",
+          "title": "Melee Target Stat",
+          "type": "string"
+        },
+        "ranged_target_stat": {
+          "const": "evasion",
+          "default": "evasion",
+          "title": "Ranged Target Stat",
+          "type": "string"
+        },
+        "tech_target_stat": {
+          "const": "e_defense",
+          "default": "e_defense",
+          "title": "Tech Target Stat",
+          "type": "string"
+        },
+        "ranged_engaged_difficulty": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Ranged Engaged Difficulty",
+          "type": "integer"
+        }
+      },
+      "title": "AttackRules",
+      "type": "object"
+    },
+    "BonusDamageRules": {
+      "description": "Bonus damage limits and scaling.",
+      "properties": {
+        "allowed_types": {
+          "items": {
+            "enum": [
+              "kinetic",
+              "explosive",
+              "energy",
+              "burn"
+            ],
+            "type": "string"
+          },
+          "title": "Allowed Types",
+          "type": "array"
+        },
+        "halve_on_multi_target": {
+          "default": true,
+          "title": "Halve On Multi Target",
+          "type": "boolean"
+        }
+      },
+      "title": "BonusDamageRules",
+      "type": "object"
+    },
+    "BurnRules": {
+      "description": "Burn behavior for mechs.",
+      "properties": {
+        "immediate_damage_ignores_armor": {
+          "default": true,
+          "title": "Immediate Damage Ignores Armor",
+          "type": "boolean"
+        },
+        "end_turn_clear_on_success": {
+          "default": true,
+          "title": "End Turn Clear On Success",
+          "type": "boolean"
+        },
+        "end_turn_check_skill": {
+          "const": "engineering",
+          "default": "engineering",
+          "title": "End Turn Check Skill",
+          "type": "string"
+        },
+        "failure_damage_equals_burn_total": {
+          "default": true,
+          "title": "Failure Damage Equals Burn Total",
+          "type": "boolean"
+        }
+      },
+      "title": "BurnRules",
+      "type": "object"
+    },
+    "CoverRules": {
+      "description": "Cover modifiers for ranged attacks.",
+      "properties": {
+        "soft_cover_difficulty": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Soft Cover Difficulty",
+          "type": "integer"
+        },
+        "hard_cover_difficulty": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Hard Cover Difficulty",
+          "type": "integer"
+        },
+        "hard_cover_requires_adjacency": {
+          "default": true,
+          "title": "Hard Cover Requires Adjacency",
+          "type": "boolean"
+        },
+        "hard_cover_flanking_negates": {
+          "default": true,
+          "title": "Hard Cover Flanking Negates",
+          "type": "boolean"
+        },
+        "hard_cover_requires_size_match": {
+          "default": true,
+          "title": "Hard Cover Requires Size Match",
+          "type": "boolean"
+        },
+        "cover_types_do_not_stack": {
+          "default": true,
+          "title": "Cover Types Do Not Stack",
+          "type": "boolean"
+        },
+        "characters_provide_cover": {
+          "default": false,
+          "title": "Characters Provide Cover",
+          "type": "boolean"
+        }
+      },
+      "title": "CoverRules",
+      "type": "object"
+    },
+    "CriticalHitRules": {
+      "description": "Critical hit rules for attacks.",
+      "properties": {
+        "threshold": {
+          "default": 20,
+          "minimum": 0,
+          "title": "Threshold",
+          "type": "integer"
+        },
+        "applies_to": {
+          "items": {
+            "enum": [
+              "melee",
+              "ranged",
+              "tech"
+            ],
+            "type": "string"
+          },
+          "title": "Applies To",
+          "type": "array"
+        },
+        "roll_damage_twice_take_highest": {
+          "default": true,
+          "title": "Roll Damage Twice Take Highest",
+          "type": "boolean"
+        }
+      },
+      "title": "CriticalHitRules",
+      "type": "object"
+    },
+    "D6Range": {
+      "description": "Inclusive d6 roll range.",
+      "properties": {
+        "roll_min": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Min",
+          "type": "integer"
+        },
+        "roll_max": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Max",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "roll_min",
+        "roll_max"
+      ],
+      "title": "D6Range",
+      "type": "object"
+    },
+    "DamageResolutionRules": {
+      "description": "Damage resolution order and constraints.",
+      "properties": {
+        "armor_applies_to": {
+          "items": {
+            "enum": [
+              "kinetic",
+              "explosive",
+              "energy",
+              "burn"
+            ],
+            "type": "string"
+          },
+          "title": "Armor Applies To",
+          "type": "array"
+        },
+        "apply_armor_before_resistance": {
+          "default": true,
+          "title": "Apply Armor Before Resistance",
+          "type": "boolean"
+        },
+        "resistance_stacks": {
+          "default": false,
+          "title": "Resistance Stacks",
+          "type": "boolean"
+        },
+        "ap_ignores_armor": {
+          "default": true,
+          "title": "Ap Ignores Armor",
+          "type": "boolean"
+        },
+        "apply_multipliers_before_reduction": {
+          "default": true,
+          "title": "Apply Multipliers Before Reduction",
+          "type": "boolean"
+        }
+      },
+      "title": "DamageResolutionRules",
+      "type": "object"
+    },
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    },
+    "DirectHitOutcome": {
+      "description": "Direct hit outcome by remaining structure.",
+      "properties": {
+        "remaining_structure_min": {
+          "minimum": 0,
+          "title": "Remaining Structure Min",
+          "type": "integer"
+        },
+        "remaining_structure_max": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remaining Structure Max"
+        },
+        "outcome": {
+          "$ref": "#/$defs/StructureOutcomeType"
+        }
+      },
+      "required": [
+        "remaining_structure_min",
+        "outcome"
+      ],
+      "title": "DirectHitOutcome",
+      "type": "object"
+    },
+    "EngagementRules": {
+      "description": "Engagement rules and penalties.",
+      "properties": {
+        "ranged_attack_difficulty": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Ranged Attack Difficulty",
+          "type": "integer"
+        },
+        "stop_on_engage_same_size_or_larger": {
+          "default": true,
+          "title": "Stop On Engage Same Size Or Larger",
+          "type": "boolean"
+        }
+      },
+      "title": "EngagementRules",
+      "type": "object"
+    },
+    "FallingRules": {
+      "description": "Falling damage rules.",
+      "properties": {
+        "min_distance_for_damage": {
+          "default": 3,
+          "minimum": 0,
+          "title": "Min Distance For Damage",
+          "type": "integer"
+        },
+        "damage_per_3_spaces": {
+          "default": 3,
+          "minimum": 0,
+          "title": "Damage Per 3 Spaces",
+          "type": "integer"
+        },
+        "damage_type": {
+          "default": "kinetic",
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "title": "Damage Type",
+          "type": "string"
+        },
+        "armor_piercing": {
+          "default": true,
+          "title": "Armor Piercing",
+          "type": "boolean"
+        },
+        "max_damage": {
+          "default": 9,
+          "minimum": 0,
+          "title": "Max Damage",
+          "type": "integer"
+        },
+        "resolves_end_of_turn": {
+          "default": true,
+          "title": "Resolves End Of Turn",
+          "type": "boolean"
+        }
+      },
+      "title": "FallingRules",
+      "type": "object"
+    },
+    "FlightRules": {
+      "description": "Flight rules and restrictions.",
+      "properties": {
+        "must_move_min_spaces": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Must Move Min Spaces",
+          "type": "integer"
+        },
+        "straight_line_per_movement": {
+          "default": true,
+          "title": "Straight Line Per Movement",
+          "type": "boolean"
+        },
+        "falls_if_immobilized_or_stunned": {
+          "default": true,
+          "title": "Falls If Immobilized Or Stunned",
+          "type": "boolean"
+        },
+        "agility_save_on_structure_or_overheat": {
+          "default": true,
+          "title": "Agility Save On Structure Or Overheat",
+          "type": "boolean"
+        },
+        "combat_altitude_limit": {
+          "default": 10,
+          "minimum": 0,
+          "title": "Combat Altitude Limit",
+          "type": "integer"
+        },
+        "beyond_altitude_only_move_or_boost": {
+          "default": true,
+          "title": "Beyond Altitude Only Move Or Boost",
+          "type": "boolean"
+        },
+        "ignore_obstructions": {
+          "default": true,
+          "title": "Ignore Obstructions",
+          "type": "boolean"
+        },
+        "requires_physical_space": {
+          "default": true,
+          "title": "Requires Physical Space",
+          "type": "boolean"
+        },
+        "engage_only_on_adjacent": {
+          "default": true,
+          "title": "Engage Only On Adjacent",
+          "type": "boolean"
+        },
+        "cannot_be_prone": {
+          "default": true,
+          "title": "Cannot Be Prone",
+          "type": "boolean"
+        },
+        "hover_allows_stationary": {
+          "default": true,
+          "title": "Hover Allows Stationary",
+          "type": "boolean"
+        },
+        "hover_ignores_straight_line": {
+          "default": true,
+          "title": "Hover Ignores Straight Line",
+          "type": "boolean"
+        },
+        "carry_max_total_size": {
+          "default": 0.5,
+          "minimum": 0.0,
+          "title": "Carry Max Total Size",
+          "type": "number"
+        },
+        "carry_limit_ignored_in_zero_g": {
+          "default": true,
+          "title": "Carry Limit Ignored In Zero G",
+          "type": "boolean"
+        }
+      },
+      "title": "FlightRules",
+      "type": "object"
+    },
+    "GrappleRules": {
+      "description": "Grapple-specific rules per PR2 ~4157-4177.\n\n- Grapple is a quick action melee attack\n- On hit: both parties become engaged\n- Smaller party is immobilized, moves when larger moves\n- Same size = contested HULL check at start of turn\n- Grapple breaks if adjacency breaks (e.g., knockback)\n- Attacker ends free action, defender ends via quick action contested check",
+      "properties": {
+        "immobilized_for_smaller": {
+          "default": true,
+          "title": "Immobilized For Smaller",
+          "type": "boolean"
+        },
+        "contested_hull_check_for_same_size": {
+          "default": true,
+          "title": "Contested Hull Check For Same Size",
+          "type": "boolean"
+        },
+        "attacker_ends_free": {
+          "default": true,
+          "title": "Attacker Ends Free",
+          "type": "boolean"
+        },
+        "defender_ends_quick_action": {
+          "default": true,
+          "title": "Defender Ends Quick Action",
+          "type": "boolean"
+        },
+        "break_on_knockback": {
+          "default": true,
+          "title": "Break On Knockback",
+          "type": "boolean"
+        },
+        "break_on_loss_of_adjacency": {
+          "default": true,
+          "title": "Break On Loss Of Adjacency",
+          "type": "boolean"
+        },
+        "group_grapple_size_calculation": {
+          "default": true,
+          "title": "Group Grapple Size Calculation",
+          "type": "boolean"
+        },
+        "mount_required_for_grapple": {
+          "default": true,
+          "title": "Mount Required For Grapple",
+          "type": "boolean"
+        },
+        "disarm_on_grapple": {
+          "default": true,
+          "title": "Disarm On Grapple",
+          "type": "boolean"
+        }
+      },
+      "title": "GrappleRules",
+      "type": "object"
+    },
+    "HeatRules": {
+      "description": "Heat and overheat behavior.",
+      "properties": {
+        "heat_is_damage": {
+          "default": false,
+          "title": "Heat Is Damage",
+          "type": "boolean"
+        },
+        "heat_affected_by_resistance": {
+          "default": true,
+          "title": "Heat Affected By Resistance",
+          "type": "boolean"
+        },
+        "overheat_on_exceeding_cap": {
+          "default": true,
+          "title": "Overheat On Exceeding Cap",
+          "type": "boolean"
+        }
+      },
+      "title": "HeatRules",
+      "type": "object"
+    },
+    "InvisibilityRules": {
+      "description": "Invisibility targeting rules.",
+      "properties": {
+        "miss_chance": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Miss Chance",
+          "type": "number"
+        },
+        "can_always_hide": {
+          "default": true,
+          "title": "Can Always Hide",
+          "type": "boolean"
+        }
+      },
+      "title": "InvisibilityRules",
+      "type": "object"
+    },
+    "InvoluntaryMovementRules": {
+      "description": "Involuntary movement rules per PR2 ~3846-3849.\n\n- Push, pull, or shove forces movement in a direct line\n- Does NOT provoke reactions\n- Ignores engagement during movement\n- Must still obey obstructions",
+      "properties": {
+        "straight_line_movement": {
+          "default": true,
+          "title": "Straight Line Movement",
+          "type": "boolean"
+        },
+        "ignores_reactions": {
+          "default": true,
+          "title": "Ignores Reactions",
+          "type": "boolean"
+        },
+        "ignores_engagement": {
+          "default": true,
+          "title": "Ignores Engagement",
+          "type": "boolean"
+        },
+        "obeys_obstructions": {
+          "default": true,
+          "title": "Obeys Obstructions",
+          "type": "boolean"
+        },
+        "drag_max_size_multiplier": {
+          "default": 2,
+          "minimum": 1,
+          "title": "Drag Max Size Multiplier",
+          "type": "integer"
+        },
+        "lift_max_size_same": {
+          "default": true,
+          "title": "Lift Max Size Same",
+          "type": "boolean"
+        },
+        "cannot_react_while_dragging": {
+          "default": true,
+          "title": "Cannot React While Dragging",
+          "type": "boolean"
+        },
+        "cannot_react_while_lifting": {
+          "default": true,
+          "title": "Cannot React While Lifting",
+          "type": "boolean"
+        },
+        "knockback_stops_at_obstruction": {
+          "default": true,
+          "title": "Knockback Stops At Obstruction",
+          "type": "boolean"
+        },
+        "no_vertical_movement": {
+          "default": true,
+          "title": "No Vertical Movement",
+          "type": "boolean"
+        }
+      },
+      "title": "InvoluntaryMovementRules",
+      "type": "object"
+    },
+    "LiftDragRules": {
+      "description": "Lifting and dragging rules per PR2 ~3862-3865.\n\n- Drag: up to 2x size, becomes slowed\n- Lift: up to own size, becomes immobilized\n- Cannot take reactions while dragging/lifting\n- Pilots: cannot drag/lift > size 1/2",
+      "properties": {
+        "drag_size_multiplier": {
+          "default": 2,
+          "minimum": 1,
+          "title": "Drag Size Multiplier",
+          "type": "integer"
+        },
+        "lift_size_limit_same": {
+          "default": true,
+          "title": "Lift Size Limit Same",
+          "type": "boolean"
+        },
+        "pilot_drag_lift_max_size": {
+          "const": "size_half",
+          "default": "size_half",
+          "title": "Pilot Drag Lift Max Size",
+          "type": "string"
+        },
+        "cannot_react_while_dragging": {
+          "default": true,
+          "title": "Cannot React While Dragging",
+          "type": "boolean"
+        },
+        "cannot_react_while_lifting": {
+          "default": true,
+          "title": "Cannot React While Lifting",
+          "type": "boolean"
+        },
+        "slowed_while_dragging": {
+          "default": true,
+          "title": "Slowed While Dragging",
+          "type": "boolean"
+        },
+        "immobilized_while_lifting": {
+          "default": true,
+          "title": "Immobilized While Lifting",
+          "type": "boolean"
+        }
+      },
+      "title": "LiftDragRules",
+      "type": "object"
+    },
+    "LineOfSightRules": {
+      "description": "Line of sight interaction rules.",
+      "properties": {
+        "requires_line_of_sight": {
+          "default": true,
+          "title": "Requires Line Of Sight",
+          "type": "boolean"
+        },
+        "arcing_allows_no_los": {
+          "default": true,
+          "title": "Arcing Allows No Los",
+          "type": "boolean"
+        },
+        "seeking_ignores_cover": {
+          "default": true,
+          "title": "Seeking Ignores Cover",
+          "type": "boolean"
+        },
+        "seeking_ignores_los": {
+          "default": true,
+          "title": "Seeking Ignores Los",
+          "type": "boolean"
+        },
+        "arcing_requires_path_clear": {
+          "default": true,
+          "title": "Arcing Requires Path Clear",
+          "type": "boolean"
+        },
+        "seeking_requires_path_clear": {
+          "default": true,
+          "title": "Seeking Requires Path Clear",
+          "type": "boolean"
+        },
+        "adjacent_cover_does_not_block_los": {
+          "default": true,
+          "title": "Adjacent Cover Does Not Block Los",
+          "type": "boolean"
+        }
+      },
+      "title": "LineOfSightRules",
+      "type": "object"
+    },
+    "MeltdownOutcome": {
+      "description": "Meltdown outcome by remaining stress.",
+      "properties": {
+        "remaining_stress_min": {
+          "minimum": 0,
+          "title": "Remaining Stress Min",
+          "type": "integer"
+        },
+        "remaining_stress_max": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remaining Stress Max"
+        },
+        "outcome": {
+          "$ref": "#/$defs/OverheatOutcomeType"
+        }
+      },
+      "required": [
+        "remaining_stress_min",
+        "outcome"
+      ],
+      "title": "MeltdownOutcome",
+      "type": "object"
+    },
+    "ObjectRules": {
+      "description": "Defaults for objects in mech combat.",
+      "properties": {
+        "base_evasion": {
+          "default": 5,
+          "minimum": 0,
+          "title": "Base Evasion",
+          "type": "integer"
+        },
+        "hp_per_size": {
+          "default": 10,
+          "minimum": 0,
+          "title": "Hp Per Size",
+          "type": "integer"
+        },
+        "section_hp": {
+          "default": 10,
+          "minimum": 0,
+          "title": "Section Hp",
+          "type": "integer"
+        }
+      },
+      "title": "ObjectRules",
+      "type": "object"
+    },
+    "ObstructionRules": {
+      "description": "Obstruction and pass-through rules.",
+      "properties": {
+        "allies_obstruct": {
+          "default": false,
+          "title": "Allies Obstruct",
+          "type": "boolean"
+        },
+        "can_end_in_allied_space": {
+          "default": false,
+          "title": "Can End In Allied Space",
+          "type": "boolean"
+        },
+        "smaller_obstruct_larger": {
+          "default": false,
+          "title": "Smaller Obstruct Larger",
+          "type": "boolean"
+        },
+        "can_move_through_smaller": {
+          "default": true,
+          "title": "Can Move Through Smaller",
+          "type": "boolean"
+        },
+        "can_end_in_smaller_space": {
+          "default": false,
+          "title": "Can End In Smaller Space",
+          "type": "boolean"
+        }
+      },
+      "title": "ObstructionRules",
+      "type": "object"
+    },
+    "OverchargeRules": {
+      "description": "Overcharge heat escalation rules.",
+      "properties": {
+        "costs": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/$defs/DiceExpression"
+              }
+            ]
+          },
+          "title": "Costs",
+          "type": "array"
+        },
+        "resets_on_full_repair": {
+          "default": true,
+          "title": "Resets On Full Repair",
+          "type": "boolean"
+        }
+      },
+      "title": "OverchargeRules",
+      "type": "object"
+    },
+    "OverheatOutcomeType": {
+      "description": "Outcome detail for overheat checks.",
+      "properties": {
+        "name": {
+          "enum": [
+            "emergency_shunt",
+            "power_plant_destabilize",
+            "meltdown",
+            "irreversible_meltdown"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "impaired_until_end_next_turn": {
+          "default": false,
+          "title": "Impaired Until End Next Turn",
+          "type": "boolean"
+        },
+        "exposed_until_cleared": {
+          "default": false,
+          "title": "Exposed Until Cleared",
+          "type": "boolean"
+        },
+        "meltdown_immediate": {
+          "default": false,
+          "title": "Meltdown Immediate",
+          "type": "boolean"
+        },
+        "meltdown_countdown": {
+          "default": false,
+          "title": "Meltdown Countdown",
+          "type": "boolean"
+        },
+        "engineering_check_to_delay": {
+          "default": false,
+          "title": "Engineering Check To Delay",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "OverheatOutcomeType",
+      "type": "object"
+    },
+    "OverheatRules": {
+      "description": "Heat and overheat table rules.",
+      "properties": {
+        "stress_per_overheat": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Stress Per Overheat",
+          "type": "integer"
+        },
+        "roll_dice_per_stress": {
+          "default": true,
+          "title": "Roll Dice Per Stress",
+          "type": "boolean"
+        },
+        "choose_lowest": {
+          "default": true,
+          "title": "Choose Lowest",
+          "type": "boolean"
+        },
+        "reset_heat_after_overheat": {
+          "default": true,
+          "title": "Reset Heat After Overheat",
+          "type": "boolean"
+        },
+        "meltdown_at_zero_stress": {
+          "default": true,
+          "title": "Meltdown At Zero Stress",
+          "type": "boolean"
+        },
+        "danger_zone_fraction": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Danger Zone Fraction",
+          "type": "number"
+        },
+        "danger_zone_rounding": {
+          "default": "up",
+          "enum": [
+            "up",
+            "down"
+          ],
+          "title": "Danger Zone Rounding",
+          "type": "string"
+        },
+        "table": {
+          "items": {
+            "$ref": "#/$defs/OverheatTableEntry"
+          },
+          "title": "Table",
+          "type": "array"
+        },
+        "meltdown_outcomes": {
+          "items": {
+            "$ref": "#/$defs/MeltdownOutcome"
+          },
+          "title": "Meltdown Outcomes",
+          "type": "array"
+        },
+        "irreversible_meltdown_on_multiple_ones": {
+          "default": true,
+          "title": "Irreversible Meltdown On Multiple Ones",
+          "type": "boolean"
+        },
+        "irreversible_meltdown_outcome": {
+          "$ref": "#/$defs/OverheatOutcomeType"
+        }
+      },
+      "title": "OverheatRules",
+      "type": "object"
+    },
+    "OverheatTableEntry": {
+      "description": "Table entry for overheat results.",
+      "properties": {
+        "roll_min": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Min",
+          "type": "integer"
+        },
+        "roll_max": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Max",
+          "type": "integer"
+        },
+        "outcome": {
+          "$ref": "#/$defs/OverheatOutcomeType"
+        }
+      },
+      "required": [
+        "roll_min",
+        "roll_max",
+        "outcome"
+      ],
+      "title": "OverheatTableEntry",
+      "type": "object"
+    },
+    "RamRules": {
+      "description": "Ram-specific rules per PR2 ~4152-4155.\n\n- Ram is a quick action melee attack against adjacent target\n- On hit: target becomes prone, may knock back up to 1 space directly away",
+      "properties": {
+        "knockback_spaces_max": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Knockback Spaces Max",
+          "type": "integer"
+        },
+        "prone_on_hit": {
+          "default": true,
+          "title": "Prone On Hit",
+          "type": "boolean"
+        },
+        "requires_adjacency": {
+          "default": true,
+          "title": "Requires Adjacency",
+          "type": "boolean"
+        },
+        "mount_required_for_ram": {
+          "default": true,
+          "title": "Mount Required For Ram",
+          "type": "boolean"
+        },
+        "knockback_from_talents_stack": {
+          "default": true,
+          "title": "Knockback From Talents Stack",
+          "type": "boolean"
+        }
+      },
+      "title": "RamRules",
+      "type": "object"
+    },
+    "ReactionRules": {
+      "description": "Reaction limits and defaults.",
+      "properties": {
+        "max_reactions_per_turn": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Max Reactions Per Turn",
+          "type": "integer"
+        },
+        "default_reactions_per_round": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Default Reactions Per Round",
+          "type": "array"
+        }
+      },
+      "title": "ReactionRules",
+      "type": "object"
+    },
+    "ReactorMeltdownRules": {
+      "description": "Reactor meltdown resolution rules.",
+      "properties": {
+        "burst_radius": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Burst Radius",
+          "type": "integer"
+        },
+        "damage": {
+          "$ref": "#/$defs/DiceExpression"
+        },
+        "damage_type": {
+          "default": "explosive",
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "title": "Damage Type",
+          "type": "string"
+        },
+        "save_skill": {
+          "const": "agility",
+          "default": "agility",
+          "title": "Save Skill",
+          "type": "string"
+        },
+        "save_halves_damage": {
+          "default": true,
+          "title": "Save Halves Damage",
+          "type": "boolean"
+        },
+        "pilot_survival": {
+          "default": false,
+          "title": "Pilot Survival",
+          "type": "boolean"
+        }
+      },
+      "title": "ReactorMeltdownRules",
+      "type": "object"
+    },
+    "RepairSpendOption": {
+      "description": "Repairs spend option during rest or stabilize.",
+      "properties": {
+        "repairs_spent": {
+          "minimum": 0,
+          "title": "Repairs Spent",
+          "type": "integer"
+        },
+        "effect": {
+          "enum": [
+            "full_hp",
+            "repair_weapon_or_system",
+            "repair_structure",
+            "repair_stress",
+            "repair_destroyed_mech"
+          ],
+          "title": "Effect",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repairs_spent",
+        "effect"
+      ],
+      "title": "RepairSpendOption",
+      "type": "object"
+    },
+    "RestRepairRules": {
+      "description": "Rest and repair rules.",
+      "properties": {
+        "rest_hours": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Rest Hours",
+          "type": "integer"
+        },
+        "heal_pilot_fraction": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Heal Pilot Fraction",
+          "type": "number"
+        },
+        "cool_heat_on_rest": {
+          "default": true,
+          "title": "Cool Heat On Rest",
+          "type": "boolean"
+        },
+        "end_mech_conditions_on_rest": {
+          "default": true,
+          "title": "End Mech Conditions On Rest",
+          "type": "boolean"
+        },
+        "repair_options": {
+          "items": {
+            "$ref": "#/$defs/RepairSpendOption"
+          },
+          "title": "Repair Options",
+          "type": "array"
+        },
+        "destroyed_mech_becomes_cover": {
+          "default": true,
+          "title": "Destroyed Mech Becomes Cover",
+          "type": "boolean"
+        },
+        "destroyed_mech_difficult_terrain": {
+          "default": true,
+          "title": "Destroyed Mech Difficult Terrain",
+          "type": "boolean"
+        }
+      },
+      "title": "RestRepairRules",
+      "type": "object"
+    },
+    "StructureDamageRules": {
+      "description": "Structure damage and check rules.\n\nNPC structure is determined by tier:\n- Tier 1: 1 structure\n- Tier 2: 2 structures\n- Tier 3: 3 structures\n\nThe npc_tier_structure_map field allows customization of these defaults.",
+      "properties": {
+        "pc_structure": {
+          "default": 4,
+          "minimum": 0,
+          "title": "Pc Structure",
+          "type": "integer"
+        },
+        "npc_structure": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Npc Structure",
+          "type": "integer"
+        },
+        "npc_tier_structure_map": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Npc Tier Structure Map",
+          "type": "object"
+        },
+        "check_on_zero_hp": {
+          "default": true,
+          "title": "Check On Zero Hp",
+          "type": "boolean"
+        },
+        "reset_hp_on_structure": {
+          "default": true,
+          "title": "Reset Hp On Structure",
+          "type": "boolean"
+        },
+        "spillover_damage_applies": {
+          "default": true,
+          "title": "Spillover Damage Applies",
+          "type": "boolean"
+        },
+        "dice_per_structure_marked": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Dice Per Structure Marked",
+          "type": "integer"
+        },
+        "choose_lowest": {
+          "default": true,
+          "title": "Choose Lowest",
+          "type": "boolean"
+        },
+        "multiple_ones_crushing": {
+          "default": true,
+          "title": "Multiple Ones Crushing",
+          "type": "boolean"
+        },
+        "system_trauma_rules": {
+          "$ref": "#/$defs/SystemTraumaRules"
+        },
+        "crushing_hit_outcome": {
+          "$ref": "#/$defs/StructureOutcomeType"
+        },
+        "table": {
+          "items": {
+            "$ref": "#/$defs/StructureTableEntry"
+          },
+          "title": "Table",
+          "type": "array"
+        },
+        "direct_hit_outcomes": {
+          "items": {
+            "$ref": "#/$defs/DirectHitOutcome"
+          },
+          "title": "Direct Hit Outcomes",
+          "type": "array"
+        }
+      },
+      "title": "StructureDamageRules",
+      "type": "object"
+    },
+    "StructureOutcomeType": {
+      "description": "Outcome detail for structure damage.",
+      "properties": {
+        "name": {
+          "enum": [
+            "glancing_blow",
+            "system_trauma",
+            "direct_hit",
+            "crushing_hit"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "impaired_until_end_next_turn": {
+          "default": false,
+          "title": "Impaired Until End Next Turn",
+          "type": "boolean"
+        },
+        "destroy_mount": {
+          "default": false,
+          "title": "Destroy Mount",
+          "type": "boolean"
+        },
+        "destroy_system": {
+          "default": false,
+          "title": "Destroy System",
+          "type": "boolean"
+        },
+        "stunned_until_end_next_turn": {
+          "default": false,
+          "title": "Stunned Until End Next Turn",
+          "type": "boolean"
+        },
+        "hull_check_required": {
+          "default": false,
+          "title": "Hull Check Required",
+          "type": "boolean"
+        },
+        "destroyed": {
+          "default": false,
+          "title": "Destroyed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "StructureOutcomeType",
+      "type": "object"
+    },
+    "StructureTableEntry": {
+      "description": "Table entry for structure damage results.",
+      "properties": {
+        "roll_min": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Min",
+          "type": "integer"
+        },
+        "roll_max": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Max",
+          "type": "integer"
+        },
+        "outcome": {
+          "$ref": "#/$defs/StructureOutcomeType"
+        }
+      },
+      "required": [
+        "roll_min",
+        "roll_max",
+        "outcome"
+      ],
+      "title": "StructureTableEntry",
+      "type": "object"
+    },
+    "SystemTraumaRules": {
+      "description": "System trauma selection and fallback rules.",
+      "properties": {
+        "roll": {
+          "$ref": "#/$defs/DiceExpression"
+        },
+        "mount_on": {
+          "$ref": "#/$defs/D6Range"
+        },
+        "system_on": {
+          "$ref": "#/$defs/D6Range"
+        },
+        "choose_destroyed_by": {
+          "default": "target",
+          "enum": [
+            "target",
+            "attacker"
+          ],
+          "title": "Choose Destroyed By",
+          "type": "string"
+        },
+        "exclude_limited_no_charges": {
+          "default": true,
+          "title": "Exclude Limited No Charges",
+          "type": "boolean"
+        },
+        "fallback_to_other_if_none": {
+          "default": true,
+          "title": "Fallback To Other If None",
+          "type": "boolean"
+        },
+        "fallback_to_direct_hit_if_none": {
+          "default": true,
+          "title": "Fallback To Direct Hit If None",
+          "type": "boolean"
+        }
+      },
+      "title": "SystemTraumaRules",
+      "type": "object"
+    },
+    "TeleportRules": {
+      "description": "Teleport rules.",
+      "properties": {
+        "counts_as_movement_spaces": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Counts As Movement Spaces",
+          "type": "integer"
+        },
+        "requires_surface_start": {
+          "default": true,
+          "title": "Requires Surface Start",
+          "type": "boolean"
+        },
+        "requires_surface_end": {
+          "default": true,
+          "title": "Requires Surface End",
+          "type": "boolean"
+        },
+        "ignores_engagement": {
+          "default": true,
+          "title": "Ignores Engagement",
+          "type": "boolean"
+        },
+        "ignores_reactions": {
+          "default": true,
+          "title": "Ignores Reactions",
+          "type": "boolean"
+        },
+        "ignores_obstructions": {
+          "default": true,
+          "title": "Ignores Obstructions",
+          "type": "boolean"
+        },
+        "ignores_line_of_sight": {
+          "default": true,
+          "title": "Ignores Line Of Sight",
+          "type": "boolean"
+        },
+        "fails_if_destination_occupied": {
+          "default": true,
+          "title": "Fails If Destination Occupied",
+          "type": "boolean"
+        }
+      },
+      "title": "TeleportRules",
+      "type": "object"
+    },
+    "TerrainRules": {
+      "description": "Terrain interaction rules.",
+      "properties": {
+        "difficult_terrain_cost": {
+          "default": 2,
+          "minimum": 1,
+          "title": "Difficult Terrain Cost",
+          "type": "integer"
+        },
+        "dangerous_terrain_check_skill": {
+          "const": "engineering",
+          "default": "engineering",
+          "title": "Dangerous Terrain Check Skill",
+          "type": "string"
+        },
+        "dangerous_terrain_damage": {
+          "default": 5,
+          "minimum": 0,
+          "title": "Dangerous Terrain Damage",
+          "type": "integer"
+        },
+        "dangerous_terrain_damage_type": {
+          "default": "kinetic",
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "title": "Dangerous Terrain Damage Type",
+          "type": "string"
+        },
+        "dangerous_terrain_check_once_per_round": {
+          "default": true,
+          "title": "Dangerous Terrain Check Once Per Round",
+          "type": "boolean"
+        },
+        "climb_cost": {
+          "default": 2,
+          "minimum": 1,
+          "title": "Climb Cost",
+          "type": "integer"
+        }
+      },
+      "title": "TerrainRules",
+      "type": "object"
+    },
+    "TurnActionRules": {
+      "description": "Per-turn action economy rules.",
+      "properties": {
+        "move_per_turn": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Move Per Turn",
+          "type": "integer"
+        },
+        "action_economy": {
+          "$ref": "#/$defs/ActionEconomyRules"
+        },
+        "free_actions_on_turn_only": {
+          "default": true,
+          "title": "Free Actions On Turn Only",
+          "type": "boolean"
+        },
+        "overcharge_limit_per_turn": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Overcharge Limit Per Turn",
+          "type": "integer"
+        }
+      },
+      "title": "TurnActionRules",
+      "type": "object"
+    },
+    "TurnOrderRules": {
+      "description": "Turn order and round cadence rules.",
+      "properties": {
+        "players_act_first": {
+          "default": true,
+          "title": "Players Act First",
+          "type": "boolean"
+        },
+        "nomination_required": {
+          "default": true,
+          "title": "Nomination Required",
+          "type": "boolean"
+        },
+        "gm_chooses_if_no_nomination": {
+          "default": true,
+          "title": "Gm Chooses If No Nomination",
+          "type": "boolean"
+        },
+        "alternate_sides": {
+          "default": true,
+          "title": "Alternate Sides",
+          "type": "boolean"
+        },
+        "remaining_side_any_order": {
+          "default": true,
+          "title": "Remaining Side Any Order",
+          "type": "boolean"
+        },
+        "next_round_start_other_side": {
+          "default": true,
+          "title": "Next Round Start Other Side",
+          "type": "boolean"
+        }
+      },
+      "title": "TurnOrderRules",
+      "type": "object"
+    },
+    "ValidTargetRules": {
+      "description": "Target eligibility rules.",
+      "properties": {
+        "allow_characters": {
+          "default": true,
+          "title": "Allow Characters",
+          "type": "boolean"
+        },
+        "allow_objects": {
+          "default": true,
+          "title": "Allow Objects",
+          "type": "boolean"
+        },
+        "allow_points": {
+          "default": true,
+          "title": "Allow Points",
+          "type": "boolean"
+        },
+        "allow_self": {
+          "default": false,
+          "title": "Allow Self",
+          "type": "boolean"
+        }
+      },
+      "title": "ValidTargetRules",
+      "type": "object"
+    },
+    "ZeroGRules": {
+      "description": "Zero-g or underwater movement rules.",
+      "properties": {
+        "slowed_without_propulsion": {
+          "default": true,
+          "title": "Slowed Without Propulsion",
+          "type": "boolean"
+        },
+        "can_fly_while_moving": {
+          "default": true,
+          "title": "Can Fly While Moving",
+          "type": "boolean"
+        },
+        "no_falling": {
+          "default": true,
+          "title": "No Falling",
+          "type": "boolean"
+        }
+      },
+      "title": "ZeroGRules",
+      "type": "object"
+    }
+  },
+  "description": "Top-level combat rules bundle.",
+  "properties": {
+    "turn_order": {
+      "$ref": "#/$defs/TurnOrderRules"
+    },
+    "turn_actions": {
+      "$ref": "#/$defs/TurnActionRules"
+    },
+    "engagement": {
+      "$ref": "#/$defs/EngagementRules"
+    },
+    "obstructions": {
+      "$ref": "#/$defs/ObstructionRules"
+    },
+    "terrain": {
+      "$ref": "#/$defs/TerrainRules"
+    },
+    "falling": {
+      "$ref": "#/$defs/FallingRules"
+    },
+    "zero_g": {
+      "$ref": "#/$defs/ZeroGRules"
+    },
+    "teleport": {
+      "$ref": "#/$defs/TeleportRules"
+    },
+    "flight": {
+      "$ref": "#/$defs/FlightRules"
+    },
+    "attack_rules": {
+      "$ref": "#/$defs/AttackRules"
+    },
+    "cover_rules": {
+      "$ref": "#/$defs/CoverRules"
+    },
+    "line_of_sight_rules": {
+      "$ref": "#/$defs/LineOfSightRules"
+    },
+    "valid_target_rules": {
+      "$ref": "#/$defs/ValidTargetRules"
+    },
+    "critical_hit_rules": {
+      "$ref": "#/$defs/CriticalHitRules"
+    },
+    "bonus_damage_rules": {
+      "$ref": "#/$defs/BonusDamageRules"
+    },
+    "damage_resolution": {
+      "$ref": "#/$defs/DamageResolutionRules"
+    },
+    "heat_rules": {
+      "$ref": "#/$defs/HeatRules"
+    },
+    "burn_rules": {
+      "$ref": "#/$defs/BurnRules"
+    },
+    "overcharge_rules": {
+      "$ref": "#/$defs/OverchargeRules"
+    },
+    "overheat_rules": {
+      "$ref": "#/$defs/OverheatRules"
+    },
+    "structure_rules": {
+      "$ref": "#/$defs/StructureDamageRules"
+    },
+    "invisibility_rules": {
+      "$ref": "#/$defs/InvisibilityRules"
+    },
+    "object_rules": {
+      "$ref": "#/$defs/ObjectRules"
+    },
+    "reaction_rules": {
+      "$ref": "#/$defs/ReactionRules"
+    },
+    "reactor_meltdown": {
+      "$ref": "#/$defs/ReactorMeltdownRules"
+    },
+    "rest_repair_rules": {
+      "$ref": "#/$defs/RestRepairRules"
+    },
+    "grapple_rules": {
+      "$ref": "#/$defs/GrappleRules"
+    },
+    "ram_rules": {
+      "$ref": "#/$defs/RamRules"
+    },
+    "involuntary_movement_rules": {
+      "$ref": "#/$defs/InvoluntaryMovementRules"
+    },
+    "lift_drag_rules": {
+      "$ref": "#/$defs/LiftDragRules"
+    }
+  },
+  "title": "MechCombatRules",
+  "type": "object"
+}

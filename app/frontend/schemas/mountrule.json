@@ -1,0 +1,30 @@
+{
+  "description": "Mount/dismount/eject rules.",
+  "properties": {
+    "requires_adjacent": {
+      "default": true,
+      "title": "Requires Adjacent",
+      "type": "boolean"
+    },
+    "eject_distance": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Eject Distance"
+    },
+    "eject_causes_impaired_until_full_repair": {
+      "default": false,
+      "title": "Eject Causes Impaired Until Full Repair",
+      "type": "boolean"
+    }
+  },
+  "title": "MountRule",
+  "type": "object"
+}

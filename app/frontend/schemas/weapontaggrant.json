@@ -1,0 +1,26 @@
+{
+  "description": "Tag granted to a weapon.\n\nExamples:\n    WeaponTagGrant(tag=\"ordnance\")",
+  "properties": {
+    "tag": {
+      "title": "Tag",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value"
+    }
+  },
+  "required": [
+    "tag"
+  ],
+  "title": "WeaponTagGrant",
+  "type": "object"
+}

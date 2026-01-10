@@ -10,33 +10,63 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PilotsIndexRouteImport } from './routes/pilots/index'
+import { Route as PilotsNewRouteImport } from './routes/pilots/new'
+import { Route as PilotsPilotIdRouteImport } from './routes/pilots/$pilotId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PilotsIndexRoute = PilotsIndexRouteImport.update({
+  id: '/pilots/',
+  path: '/pilots/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PilotsNewRoute = PilotsNewRouteImport.update({
+  id: '/pilots/new',
+  path: '/pilots/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PilotsPilotIdRoute = PilotsPilotIdRouteImport.update({
+  id: '/pilots/$pilotId',
+  path: '/pilots/$pilotId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/pilots/$pilotId': typeof PilotsPilotIdRoute
+  '/pilots/new': typeof PilotsNewRoute
+  '/pilots': typeof PilotsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/pilots/$pilotId': typeof PilotsPilotIdRoute
+  '/pilots/new': typeof PilotsNewRoute
+  '/pilots': typeof PilotsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/pilots/$pilotId': typeof PilotsPilotIdRoute
+  '/pilots/new': typeof PilotsNewRoute
+  '/pilots/': typeof PilotsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/pilots/$pilotId' | '/pilots/new' | '/pilots'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/pilots/$pilotId' | '/pilots/new' | '/pilots'
+  id: '__root__' | '/' | '/pilots/$pilotId' | '/pilots/new' | '/pilots/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PilotsPilotIdRoute: typeof PilotsPilotIdRoute
+  PilotsNewRoute: typeof PilotsNewRoute
+  PilotsIndexRoute: typeof PilotsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +78,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pilots/': {
+      id: '/pilots/'
+      path: '/pilots'
+      fullPath: '/pilots'
+      preLoaderRoute: typeof PilotsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pilots/new': {
+      id: '/pilots/new'
+      path: '/pilots/new'
+      fullPath: '/pilots/new'
+      preLoaderRoute: typeof PilotsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pilots/$pilotId': {
+      id: '/pilots/$pilotId'
+      path: '/pilots/$pilotId'
+      fullPath: '/pilots/$pilotId'
+      preLoaderRoute: typeof PilotsPilotIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PilotsPilotIdRoute: PilotsPilotIdRoute,
+  PilotsNewRoute: PilotsNewRoute,
+  PilotsIndexRoute: PilotsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

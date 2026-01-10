@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "DiceRollResult": {
+      "description": "Raw dice roll outcome.",
+      "properties": {
+        "rolls": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Rolls",
+          "type": "array"
+        },
+        "chosen": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Chosen",
+          "type": "array"
+        }
+      },
+      "title": "DiceRollResult",
+      "type": "object"
+    },
+    "OverheatOutcomeType": {
+      "description": "Outcome detail for overheat checks.",
+      "properties": {
+        "name": {
+          "enum": [
+            "emergency_shunt",
+            "power_plant_destabilize",
+            "meltdown",
+            "irreversible_meltdown"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "impaired_until_end_next_turn": {
+          "default": false,
+          "title": "Impaired Until End Next Turn",
+          "type": "boolean"
+        },
+        "exposed_until_cleared": {
+          "default": false,
+          "title": "Exposed Until Cleared",
+          "type": "boolean"
+        },
+        "meltdown_immediate": {
+          "default": false,
+          "title": "Meltdown Immediate",
+          "type": "boolean"
+        },
+        "meltdown_countdown": {
+          "default": false,
+          "title": "Meltdown Countdown",
+          "type": "boolean"
+        },
+        "engineering_check_to_delay": {
+          "default": false,
+          "title": "Engineering Check To Delay",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "OverheatOutcomeType",
+      "type": "object"
+    }
+  },
+  "description": "Resolution result for overheat checks.\n\nPer PR2 4654-4706: Overheat checks determine stress damage and potential\nmeltdown when a mech's heat exceeds its threshold.",
+  "properties": {
+    "outcome": {
+      "$ref": "#/$defs/OverheatOutcomeType"
+    },
+    "dice": {
+      "$ref": "#/$defs/DiceRollResult"
+    },
+    "meltdown_outcome": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OverheatOutcomeType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "stress_damage": {
+      "default": 1,
+      "title": "Stress Damage",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "outcome",
+    "dice"
+  ],
+  "title": "OverheatResolution",
+  "type": "object"
+}

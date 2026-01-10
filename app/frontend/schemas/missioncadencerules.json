@@ -1,0 +1,60 @@
+{
+  "description": "Cadence and refresh rules for missions.",
+  "properties": {
+    "min_uptime_scenes": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Min Uptime Scenes",
+      "type": "integer"
+    },
+    "max_uptime_scenes": {
+      "default": 4,
+      "minimum": 0,
+      "title": "Max Uptime Scenes",
+      "type": "integer"
+    },
+    "downtime_actions_per_pilot": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Downtime Actions Per Pilot",
+      "type": "integer"
+    },
+    "downtime_actions_long_session": {
+      "default": 2,
+      "minimum": 0,
+      "title": "Downtime Actions Long Session",
+      "type": "integer"
+    },
+    "downtime_actions_repeatable": {
+      "default": true,
+      "title": "Downtime Actions Repeatable",
+      "type": "boolean"
+    },
+    "full_repair_on_mission_start": {
+      "default": true,
+      "title": "Full Repair On Mission Start",
+      "type": "boolean"
+    },
+    "core_power_refresh_on_mission_start": {
+      "default": true,
+      "title": "Core Power Refresh On Mission Start",
+      "type": "boolean"
+    },
+    "reserves_expire_on_mission_end": {
+      "default": true,
+      "title": "Reserves Expire On Mission End",
+      "type": "boolean"
+    },
+    "reserve_pool_scope": {
+      "default": "shared",
+      "enum": [
+        "shared",
+        "per_pilot"
+      ],
+      "title": "Reserve Pool Scope",
+      "type": "string"
+    }
+  },
+  "title": "MissionCadenceRules",
+  "type": "object"
+}

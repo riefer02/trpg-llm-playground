@@ -1,0 +1,26 @@
+{
+  "description": "Rest and recovery rules for pilots.",
+  "properties": {
+    "short_rest_hours": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Short Rest Hours",
+      "type": "integer"
+    },
+    "short_rest_hp_fraction": {
+      "default": 0.5,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Short Rest Hp Fraction",
+      "type": "number"
+    },
+    "full_rest_hours": {
+      "default": 10,
+      "minimum": 1,
+      "title": "Full Rest Hours",
+      "type": "integer"
+    }
+  },
+  "title": "PilotRestRule",
+  "type": "object"
+}

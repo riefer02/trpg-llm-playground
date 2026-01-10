@@ -1,0 +1,17 @@
+{
+  "description": "Pilot fight action rule.",
+  "properties": {
+    "uses_pilot_weapon": {
+      "default": true,
+      "title": "Uses Pilot Weapon",
+      "type": "boolean"
+    },
+    "sidearm_can_be_quick": {
+      "default": true,
+      "title": "Sidearm Can Be Quick",
+      "type": "boolean"
+    }
+  },
+  "title": "FightRule",
+  "type": "object"
+}

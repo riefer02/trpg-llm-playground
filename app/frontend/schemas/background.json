@@ -1,0 +1,32 @@
+{
+  "description": "A pilot's background - their life before becoming a lancer.\n\nBackgrounds provide 4 triggers that define what situations\nthe pilot is particularly skilled at handling based on their\npast experience.\n\nNote: The 'description' field has been intentionally removed\nto avoid including copyrighted flavor text. Users can provide\ntheir own descriptions if needed.",
+  "properties": {
+    "id": {
+      "description": "Unique identifier (e.g., 'background_nhp_specialist')",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "description": "Display name",
+      "title": "Name",
+      "type": "string"
+    },
+    "triggers": {
+      "description": "Four trigger IDs from this background",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "title": "Triggers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "triggers"
+  ],
+  "title": "Background",
+  "type": "object"
+}

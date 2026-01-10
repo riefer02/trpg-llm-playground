@@ -1,0 +1,278 @@
+{
+  "$defs": {
+    "D6Range": {
+      "description": "Inclusive d6 roll range.",
+      "properties": {
+        "roll_min": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Min",
+          "type": "integer"
+        },
+        "roll_max": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Max",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "roll_min",
+        "roll_max"
+      ],
+      "title": "D6Range",
+      "type": "object"
+    },
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    },
+    "DirectHitOutcome": {
+      "description": "Direct hit outcome by remaining structure.",
+      "properties": {
+        "remaining_structure_min": {
+          "minimum": 0,
+          "title": "Remaining Structure Min",
+          "type": "integer"
+        },
+        "remaining_structure_max": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remaining Structure Max"
+        },
+        "outcome": {
+          "$ref": "#/$defs/StructureOutcomeType"
+        }
+      },
+      "required": [
+        "remaining_structure_min",
+        "outcome"
+      ],
+      "title": "DirectHitOutcome",
+      "type": "object"
+    },
+    "StructureOutcomeType": {
+      "description": "Outcome detail for structure damage.",
+      "properties": {
+        "name": {
+          "enum": [
+            "glancing_blow",
+            "system_trauma",
+            "direct_hit",
+            "crushing_hit"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "impaired_until_end_next_turn": {
+          "default": false,
+          "title": "Impaired Until End Next Turn",
+          "type": "boolean"
+        },
+        "destroy_mount": {
+          "default": false,
+          "title": "Destroy Mount",
+          "type": "boolean"
+        },
+        "destroy_system": {
+          "default": false,
+          "title": "Destroy System",
+          "type": "boolean"
+        },
+        "stunned_until_end_next_turn": {
+          "default": false,
+          "title": "Stunned Until End Next Turn",
+          "type": "boolean"
+        },
+        "hull_check_required": {
+          "default": false,
+          "title": "Hull Check Required",
+          "type": "boolean"
+        },
+        "destroyed": {
+          "default": false,
+          "title": "Destroyed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "StructureOutcomeType",
+      "type": "object"
+    },
+    "StructureTableEntry": {
+      "description": "Table entry for structure damage results.",
+      "properties": {
+        "roll_min": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Min",
+          "type": "integer"
+        },
+        "roll_max": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Roll Max",
+          "type": "integer"
+        },
+        "outcome": {
+          "$ref": "#/$defs/StructureOutcomeType"
+        }
+      },
+      "required": [
+        "roll_min",
+        "roll_max",
+        "outcome"
+      ],
+      "title": "StructureTableEntry",
+      "type": "object"
+    },
+    "SystemTraumaRules": {
+      "description": "System trauma selection and fallback rules.",
+      "properties": {
+        "roll": {
+          "$ref": "#/$defs/DiceExpression"
+        },
+        "mount_on": {
+          "$ref": "#/$defs/D6Range"
+        },
+        "system_on": {
+          "$ref": "#/$defs/D6Range"
+        },
+        "choose_destroyed_by": {
+          "default": "target",
+          "enum": [
+            "target",
+            "attacker"
+          ],
+          "title": "Choose Destroyed By",
+          "type": "string"
+        },
+        "exclude_limited_no_charges": {
+          "default": true,
+          "title": "Exclude Limited No Charges",
+          "type": "boolean"
+        },
+        "fallback_to_other_if_none": {
+          "default": true,
+          "title": "Fallback To Other If None",
+          "type": "boolean"
+        },
+        "fallback_to_direct_hit_if_none": {
+          "default": true,
+          "title": "Fallback To Direct Hit If None",
+          "type": "boolean"
+        }
+      },
+      "title": "SystemTraumaRules",
+      "type": "object"
+    }
+  },
+  "description": "Structure damage and check rules.\n\nNPC structure is determined by tier:\n- Tier 1: 1 structure\n- Tier 2: 2 structures\n- Tier 3: 3 structures\n\nThe npc_tier_structure_map field allows customization of these defaults.",
+  "properties": {
+    "pc_structure": {
+      "default": 4,
+      "minimum": 0,
+      "title": "Pc Structure",
+      "type": "integer"
+    },
+    "npc_structure": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Npc Structure",
+      "type": "integer"
+    },
+    "npc_tier_structure_map": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Npc Tier Structure Map",
+      "type": "object"
+    },
+    "check_on_zero_hp": {
+      "default": true,
+      "title": "Check On Zero Hp",
+      "type": "boolean"
+    },
+    "reset_hp_on_structure": {
+      "default": true,
+      "title": "Reset Hp On Structure",
+      "type": "boolean"
+    },
+    "spillover_damage_applies": {
+      "default": true,
+      "title": "Spillover Damage Applies",
+      "type": "boolean"
+    },
+    "dice_per_structure_marked": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Dice Per Structure Marked",
+      "type": "integer"
+    },
+    "choose_lowest": {
+      "default": true,
+      "title": "Choose Lowest",
+      "type": "boolean"
+    },
+    "multiple_ones_crushing": {
+      "default": true,
+      "title": "Multiple Ones Crushing",
+      "type": "boolean"
+    },
+    "system_trauma_rules": {
+      "$ref": "#/$defs/SystemTraumaRules"
+    },
+    "crushing_hit_outcome": {
+      "$ref": "#/$defs/StructureOutcomeType"
+    },
+    "table": {
+      "items": {
+        "$ref": "#/$defs/StructureTableEntry"
+      },
+      "title": "Table",
+      "type": "array"
+    },
+    "direct_hit_outcomes": {
+      "items": {
+        "$ref": "#/$defs/DirectHitOutcome"
+      },
+      "title": "Direct Hit Outcomes",
+      "type": "array"
+    }
+  },
+  "title": "StructureDamageRules",
+  "type": "object"
+}

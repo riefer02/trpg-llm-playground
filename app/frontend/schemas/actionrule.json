@@ -1,0 +1,1271 @@
+{
+  "$defs": {
+    "AttackActionProfile": {
+      "description": "Attack profile for an action.",
+      "properties": {
+        "attack_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "melee",
+                "ranged",
+                "tech"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attack Type"
+        },
+        "attack_type_follows_weapon": {
+          "default": false,
+          "title": "Attack Type Follows Weapon",
+          "type": "boolean"
+        },
+        "uses_weapon": {
+          "default": true,
+          "title": "Uses Weapon",
+          "type": "boolean"
+        },
+        "weapon_count": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Weapon Count",
+          "type": "integer"
+        },
+        "allow_superheavy": {
+          "default": true,
+          "title": "Allow Superheavy",
+          "type": "boolean"
+        },
+        "allow_aux_bonus_attack": {
+          "default": false,
+          "title": "Allow Aux Bonus Attack",
+          "type": "boolean"
+        },
+        "aux_cannot_bonus_damage": {
+          "default": false,
+          "title": "Aux Cannot Bonus Damage",
+          "type": "boolean"
+        },
+        "ignores_cover": {
+          "default": false,
+          "title": "Ignores Cover",
+          "type": "boolean"
+        },
+        "fixed_damage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiceExpression"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "on_hit_statuses": {
+          "items": {
+            "enum": [
+              "braced",
+              "immobilized",
+              "impaired",
+              "jammed",
+              "lock_on",
+              "shredded",
+              "slowed",
+              "stunned",
+              "prone",
+              "hidden",
+              "invisible",
+              "shutdown",
+              "exposed",
+              "engaged",
+              "burn",
+              "unshackled"
+            ],
+            "type": "string"
+          },
+          "title": "On Hit Statuses",
+          "type": "array"
+        },
+        "knockback_spaces": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Knockback Spaces"
+        }
+      },
+      "title": "AttackActionProfile",
+      "type": "object"
+    },
+    "BootUpRule": {
+      "description": "Boot up action effect.",
+      "properties": {
+        "clears_status": {
+          "default": "shutdown",
+          "enum": [
+            "braced",
+            "immobilized",
+            "impaired",
+            "jammed",
+            "lock_on",
+            "shredded",
+            "slowed",
+            "stunned",
+            "prone",
+            "hidden",
+            "invisible",
+            "shutdown",
+            "exposed",
+            "engaged",
+            "burn",
+            "unshackled"
+          ],
+          "title": "Clears Status",
+          "type": "string"
+        }
+      },
+      "title": "BootUpRule",
+      "type": "object"
+    },
+    "BraceRule": {
+      "description": "Brace reaction effects.",
+      "properties": {
+        "grants_status": {
+          "default": "braced",
+          "enum": [
+            "braced",
+            "immobilized",
+            "impaired",
+            "jammed",
+            "lock_on",
+            "shredded",
+            "slowed",
+            "stunned",
+            "prone",
+            "hidden",
+            "invisible",
+            "shutdown",
+            "exposed",
+            "engaged",
+            "burn",
+            "unshackled"
+          ],
+          "title": "Grants Status",
+          "type": "string"
+        },
+        "resist_all_damage_from_trigger": {
+          "default": true,
+          "title": "Resist All Damage From Trigger",
+          "type": "boolean"
+        },
+        "resist_heat_from_trigger": {
+          "default": true,
+          "title": "Resist Heat From Trigger",
+          "type": "boolean"
+        },
+        "resist_burn_from_trigger": {
+          "default": true,
+          "title": "Resist Burn From Trigger",
+          "type": "boolean"
+        }
+      },
+      "title": "BraceRule",
+      "type": "object"
+    },
+    "ContestedCheckRule": {
+      "description": "Contested check definition for an action.",
+      "properties": {
+        "attacker_stat": {
+          "enum": [
+            "systems",
+            "agility",
+            "skill_check"
+          ],
+          "title": "Attacker Stat",
+          "type": "string"
+        },
+        "defender_stat": {
+          "enum": [
+            "systems",
+            "agility",
+            "skill_check"
+          ],
+          "title": "Defender Stat",
+          "type": "string"
+        },
+        "tie_breaker": {
+          "default": "attacker",
+          "enum": [
+            "attacker",
+            "defender"
+          ],
+          "title": "Tie Breaker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attacker_stat",
+        "defender_stat"
+      ],
+      "title": "ContestedCheckRule",
+      "type": "object"
+    },
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    },
+    "FightRule": {
+      "description": "Pilot fight action rule.",
+      "properties": {
+        "uses_pilot_weapon": {
+          "default": true,
+          "title": "Uses Pilot Weapon",
+          "type": "boolean"
+        },
+        "sidearm_can_be_quick": {
+          "default": true,
+          "title": "Sidearm Can Be Quick",
+          "type": "boolean"
+        }
+      },
+      "title": "FightRule",
+      "type": "object"
+    },
+    "GrappleRule": {
+      "description": "Grapple-specific restrictions.",
+      "properties": {
+        "no_boost_or_reactions": {
+          "default": true,
+          "title": "No Boost Or Reactions",
+          "type": "boolean"
+        },
+        "immobilizes_smaller": {
+          "default": true,
+          "title": "Immobilizes Smaller",
+          "type": "boolean"
+        },
+        "smaller_moves_with_larger": {
+          "default": true,
+          "title": "Smaller Moves With Larger",
+          "type": "boolean"
+        },
+        "breaks_on_adjacency_loss": {
+          "default": true,
+          "title": "Breaks On Adjacency Loss",
+          "type": "boolean"
+        },
+        "attacker_end_free_action": {
+          "default": true,
+          "title": "Attacker End Free Action",
+          "type": "boolean"
+        },
+        "defender_end_quick_action": {
+          "default": true,
+          "title": "Defender End Quick Action",
+          "type": "boolean"
+        },
+        "defender_contested_hull": {
+          "default": true,
+          "title": "Defender Contested Hull",
+          "type": "boolean"
+        },
+        "equal_size_contested_hull_each_turn": {
+          "default": true,
+          "title": "Equal Size Contested Hull Each Turn",
+          "type": "boolean"
+        }
+      },
+      "title": "GrappleRule",
+      "type": "object"
+    },
+    "HideRule": {
+      "description": "Hide action requirements.",
+      "properties": {
+        "grants_condition": {
+          "default": "hidden",
+          "enum": [
+            "braced",
+            "immobilized",
+            "impaired",
+            "jammed",
+            "lock_on",
+            "shredded",
+            "slowed",
+            "stunned",
+            "prone",
+            "hidden",
+            "invisible",
+            "shutdown",
+            "exposed",
+            "engaged",
+            "burn",
+            "unshackled"
+          ],
+          "title": "Grants Condition",
+          "type": "string"
+        },
+        "disallow_if_engaged": {
+          "default": true,
+          "title": "Disallow If Engaged",
+          "type": "boolean"
+        },
+        "requires_hard_or_area_soft_cover": {
+          "default": true,
+          "title": "Requires Hard Or Area Soft Cover",
+          "type": "boolean"
+        },
+        "cover_must_conceal_size": {
+          "default": true,
+          "title": "Cover Must Conceal Size",
+          "type": "boolean"
+        },
+        "allow_without_cover_if_no_los": {
+          "default": true,
+          "title": "Allow Without Cover If No Los",
+          "type": "boolean"
+        },
+        "allow_without_cover_if_invisible": {
+          "default": true,
+          "title": "Allow Without Cover If Invisible",
+          "type": "boolean"
+        }
+      },
+      "title": "HideRule",
+      "type": "object"
+    },
+    "JockeyOption": {
+      "description": "Jockey follow-up option.",
+      "properties": {
+        "name": {
+          "enum": [
+            "distract",
+            "shred",
+            "damage"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "inflicts_conditions": {
+          "items": {
+            "enum": [
+              "braced",
+              "immobilized",
+              "impaired",
+              "jammed",
+              "lock_on",
+              "shredded",
+              "slowed",
+              "stunned",
+              "prone",
+              "hidden",
+              "invisible",
+              "shutdown",
+              "exposed",
+              "engaged",
+              "burn",
+              "unshackled"
+            ],
+            "type": "string"
+          },
+          "title": "Inflicts Conditions",
+          "type": "array"
+        },
+        "heat": {
+          "default": 0,
+          "title": "Heat",
+          "type": "integer"
+        },
+        "damage": {
+          "default": 0,
+          "title": "Damage",
+          "type": "integer"
+        },
+        "damage_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "kinetic",
+                "explosive",
+                "energy",
+                "burn"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Damage Type"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "JockeyOption",
+      "type": "object"
+    },
+    "JockeyRule": {
+      "description": "Pilot jockey action rule.",
+      "properties": {
+        "contested_check": {
+          "const": "grit_vs_hull",
+          "default": "grit_vs_hull",
+          "title": "Contested Check",
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/JockeyOption"
+          },
+          "title": "Options",
+          "type": "array"
+        }
+      },
+      "title": "JockeyRule",
+      "type": "object"
+    },
+    "LockOnRule": {
+      "description": "Lock on action effect and consumption behavior.",
+      "properties": {
+        "condition": {
+          "default": "lock_on",
+          "enum": [
+            "braced",
+            "immobilized",
+            "impaired",
+            "jammed",
+            "lock_on",
+            "shredded",
+            "slowed",
+            "stunned",
+            "prone",
+            "hidden",
+            "invisible",
+            "shutdown",
+            "exposed",
+            "engaged",
+            "burn",
+            "unshackled"
+          ],
+          "title": "Condition",
+          "type": "string"
+        },
+        "duration": {
+          "default": "until_consumed",
+          "enum": [
+            "until_consumed",
+            "until_cleared",
+            "end_of_next_turn"
+          ],
+          "title": "Duration",
+          "type": "string"
+        },
+        "consumable": {
+          "default": true,
+          "title": "Consumable",
+          "type": "boolean"
+        },
+        "consumed_by": {
+          "const": "hostile_attack",
+          "default": "hostile_attack",
+          "title": "Consumed By",
+          "type": "string"
+        },
+        "accuracy_bonus": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Accuracy Bonus",
+          "type": "integer"
+        }
+      },
+      "title": "LockOnRule",
+      "type": "object"
+    },
+    "MountRule": {
+      "description": "Mount/dismount/eject rules.",
+      "properties": {
+        "requires_adjacent": {
+          "default": true,
+          "title": "Requires Adjacent",
+          "type": "boolean"
+        },
+        "eject_distance": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Eject Distance"
+        },
+        "eject_causes_impaired_until_full_repair": {
+          "default": false,
+          "title": "Eject Causes Impaired Until Full Repair",
+          "type": "boolean"
+        }
+      },
+      "title": "MountRule",
+      "type": "object"
+    },
+    "MovementActionProfile": {
+      "description": "Movement profile for an action.",
+      "properties": {
+        "distance_multiplier": {
+          "default": 1.0,
+          "minimum": 0.0,
+          "title": "Distance Multiplier",
+          "type": "number"
+        },
+        "ignore_engagement": {
+          "default": false,
+          "title": "Ignore Engagement",
+          "type": "boolean"
+        },
+        "ignore_reactions": {
+          "default": false,
+          "title": "Ignore Reactions",
+          "type": "boolean"
+        },
+        "counts_as_boost": {
+          "default": false,
+          "title": "Counts As Boost",
+          "type": "boolean"
+        }
+      },
+      "title": "MovementActionProfile",
+      "type": "object"
+    },
+    "OverchargeActionRule": {
+      "description": "Overcharge action effect.",
+      "properties": {
+        "grants_extra_quick_action": {
+          "default": true,
+          "title": "Grants Extra Quick Action",
+          "type": "boolean"
+        }
+      },
+      "title": "OverchargeActionRule",
+      "type": "object"
+    },
+    "OverwatchRule": {
+      "description": "Overwatch reaction trigger and behavior.",
+      "properties": {
+        "trigger": {
+          "const": "enemy_starts_movement_in_threat",
+          "default": "enemy_starts_movement_in_threat",
+          "title": "Trigger",
+          "type": "string"
+        },
+        "uses_weapon_threat": {
+          "default": true,
+          "title": "Uses Weapon Threat",
+          "type": "boolean"
+        },
+        "uses_skirmish_attack": {
+          "default": true,
+          "title": "Uses Skirmish Attack",
+          "type": "boolean"
+        },
+        "uses_per_round": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Uses Per Round",
+          "type": "integer"
+        }
+      },
+      "title": "OverwatchRule",
+      "type": "object"
+    },
+    "PrepareRule": {
+      "description": "Prepared action rule.",
+      "properties": {
+        "held_action_type": {
+          "default": "quick",
+          "enum": [
+            "free",
+            "quick",
+            "full",
+            "reaction",
+            "protocol",
+            "move"
+          ],
+          "title": "Held Action Type",
+          "type": "string"
+        },
+        "blocks_other_actions": {
+          "default": true,
+          "title": "Blocks Other Actions",
+          "type": "boolean"
+        },
+        "blocks_reactions": {
+          "default": true,
+          "title": "Blocks Reactions",
+          "type": "boolean"
+        },
+        "requires_trigger": {
+          "default": true,
+          "title": "Requires Trigger",
+          "type": "boolean"
+        },
+        "expires_start_next_turn": {
+          "default": true,
+          "title": "Expires Start Next Turn",
+          "type": "boolean"
+        }
+      },
+      "title": "PrepareRule",
+      "type": "object"
+    },
+    "SearchRule": {
+      "description": "Search contested check and targeting requirements.",
+      "properties": {
+        "requires_hidden_target": {
+          "default": true,
+          "title": "Requires Hidden Target",
+          "type": "boolean"
+        },
+        "contested_check": {
+          "$ref": "#/$defs/ContestedCheckRule"
+        },
+        "pilot_contested_check": {
+          "$ref": "#/$defs/ContestedCheckRule"
+        },
+        "pilot_range": {
+          "default": 5,
+          "minimum": 0,
+          "title": "Pilot Range",
+          "type": "integer"
+        },
+        "reveals_on_success": {
+          "default": true,
+          "title": "Reveals On Success",
+          "type": "boolean"
+        }
+      },
+      "title": "SearchRule",
+      "type": "object"
+    },
+    "SelfDestructRule": {
+      "description": "Self-destruct rules.",
+      "properties": {
+        "delay_turns_min": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Delay Turns Min",
+          "type": "integer"
+        },
+        "delay_turns_max": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Delay Turns Max",
+          "type": "integer"
+        },
+        "burst_radius": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Burst Radius",
+          "type": "integer"
+        },
+        "damage": {
+          "$ref": "#/$defs/DiceExpression"
+        },
+        "damage_type": {
+          "default": "explosive",
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "title": "Damage Type",
+          "type": "string"
+        },
+        "save_skill": {
+          "const": "agility",
+          "default": "agility",
+          "title": "Save Skill",
+          "type": "string"
+        },
+        "save_halves_damage": {
+          "default": true,
+          "title": "Save Halves Damage",
+          "type": "boolean"
+        }
+      },
+      "title": "SelfDestructRule",
+      "type": "object"
+    },
+    "ShutdownRule": {
+      "description": "Shutdown action effect.",
+      "properties": {
+        "applies_status": {
+          "default": "shutdown",
+          "enum": [
+            "braced",
+            "immobilized",
+            "impaired",
+            "jammed",
+            "lock_on",
+            "shredded",
+            "slowed",
+            "stunned",
+            "prone",
+            "hidden",
+            "invisible",
+            "shutdown",
+            "exposed",
+            "engaged",
+            "burn",
+            "unshackled"
+          ],
+          "title": "Applies Status",
+          "type": "string"
+        },
+        "clears_exposed": {
+          "default": true,
+          "title": "Clears Exposed",
+          "type": "boolean"
+        },
+        "cools_heat_to_zero": {
+          "default": true,
+          "title": "Cools Heat To Zero",
+          "type": "boolean"
+        },
+        "ends_tech_effects": {
+          "default": true,
+          "title": "Ends Tech Effects",
+          "type": "boolean"
+        },
+        "immune_to_tech": {
+          "default": true,
+          "title": "Immune To Tech",
+          "type": "boolean"
+        }
+      },
+      "title": "ShutdownRule",
+      "type": "object"
+    },
+    "StabilizeRule": {
+      "description": "Stabilize action options.",
+      "properties": {
+        "primary_options": {
+          "items": {
+            "enum": [
+              "cool_heat",
+              "spend_repair_full_hp"
+            ],
+            "type": "string"
+          },
+          "title": "Primary Options",
+          "type": "array"
+        },
+        "repair_cost": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Repair Cost",
+          "type": "integer"
+        },
+        "cool_heat_clears_exposed": {
+          "default": true,
+          "title": "Cool Heat Clears Exposed",
+          "type": "boolean"
+        },
+        "secondary_options": {
+          "items": {
+            "enum": [
+              "reload_loading",
+              "clear_burn",
+              "clear_condition"
+            ],
+            "type": "string"
+          },
+          "title": "Secondary Options",
+          "type": "array"
+        },
+        "condition_clear_allows_adjacent_ally": {
+          "default": true,
+          "title": "Condition Clear Allows Adjacent Ally",
+          "type": "boolean"
+        },
+        "condition_clear_disallow_self_sourced": {
+          "default": true,
+          "title": "Condition Clear Disallow Self Sourced",
+          "type": "boolean"
+        },
+        "clearable_conditions": {
+          "items": {
+            "enum": [
+              "braced",
+              "immobilized",
+              "impaired",
+              "jammed",
+              "lock_on",
+              "shredded",
+              "slowed",
+              "stunned",
+              "prone",
+              "hidden",
+              "invisible",
+              "shutdown",
+              "exposed",
+              "engaged",
+              "burn",
+              "unshackled"
+            ],
+            "type": "string"
+          },
+          "title": "Clearable Conditions",
+          "type": "array"
+        }
+      },
+      "title": "StabilizeRule",
+      "type": "object"
+    },
+    "TechActionProfile": {
+      "description": "Tech action profile.",
+      "properties": {
+        "is_attack": {
+          "default": false,
+          "title": "Is Attack",
+          "type": "boolean"
+        },
+        "heat_on_hit": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heat On Hit"
+        },
+        "grants_lock_on": {
+          "default": false,
+          "title": "Grants Lock On",
+          "type": "boolean"
+        },
+        "bolster_accuracy": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bolster Accuracy"
+        },
+        "scan_options": {
+          "items": {
+            "enum": [
+              "stats",
+              "hidden_info",
+              "public_info"
+            ],
+            "type": "string"
+          },
+          "title": "Scan Options",
+          "type": "array"
+        },
+        "inflicts_conditions": {
+          "items": {
+            "enum": [
+              "braced",
+              "immobilized",
+              "impaired",
+              "jammed",
+              "lock_on",
+              "shredded",
+              "slowed",
+              "stunned",
+              "prone",
+              "hidden",
+              "invisible",
+              "shutdown",
+              "exposed",
+              "engaged",
+              "burn",
+              "unshackled"
+            ],
+            "type": "string"
+          },
+          "title": "Inflicts Conditions",
+          "type": "array"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "enum": [
+                "end_of_next_turn",
+                "until_cleared"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "options_per_action": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options Per Action"
+        },
+        "repeat_same_option_allowed": {
+          "default": true,
+          "title": "Repeat Same Option Allowed",
+          "type": "boolean"
+        },
+        "repeat_same_option_requires_free_action": {
+          "default": false,
+          "title": "Repeat Same Option Requires Free Action",
+          "type": "boolean"
+        }
+      },
+      "title": "TechActionProfile",
+      "type": "object"
+    }
+  },
+  "description": "Rule definition for a combat action.",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "action_type": {
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol",
+        "move"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "alternate_action_types": {
+      "items": {
+        "enum": [
+          "free",
+          "quick",
+          "full",
+          "reaction",
+          "protocol",
+          "move"
+        ],
+        "type": "string"
+      },
+      "title": "Alternate Action Types",
+      "type": "array"
+    },
+    "scope": {
+      "default": "mech",
+      "enum": [
+        "mech",
+        "pilot",
+        "both"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "category": {
+      "enum": [
+        "attack",
+        "movement",
+        "tech",
+        "utility",
+        "defense",
+        "reaction",
+        "protocol"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "requires_target": {
+      "default": false,
+      "title": "Requires Target",
+      "type": "boolean"
+    },
+    "requires_adjacent_target": {
+      "default": false,
+      "title": "Requires Adjacent Target",
+      "type": "boolean"
+    },
+    "requires_line_of_sight": {
+      "default": true,
+      "title": "Requires Line Of Sight",
+      "type": "boolean"
+    },
+    "uses_sensor_range": {
+      "default": false,
+      "title": "Uses Sensor Range",
+      "type": "boolean"
+    },
+    "attack": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AttackActionProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "movement": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MovementActionProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "tech": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TechActionProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "grapple": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GrappleRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "stabilize": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StabilizeRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "prepare": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PrepareRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "shutdown": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShutdownRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "boot_up": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BootUpRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "mount": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MountRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "self_destruct": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SelfDestructRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "overcharge": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OverchargeActionRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "brace": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BraceRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "overwatch": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OverwatchRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "fight": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FightRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "jockey": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/JockeyRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "lock_on": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LockOnRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "hide": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HideRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "search": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SearchRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "action_type",
+    "category"
+  ],
+  "title": "ActionRule",
+  "type": "object"
+}

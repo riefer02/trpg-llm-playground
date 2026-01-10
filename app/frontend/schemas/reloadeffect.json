@@ -1,0 +1,50 @@
+{
+  "description": "Reloads one or more weapons, optionally filtered by tag.\n\nPer PR2 4332-4334: The Reload quick action reloads all loading weapons\non a mount or reloads a specific weapon.\n\nExamples:\n    ReloadEffect(target=\"ally\", count=1, requires_tag=\"loading\")\n    ReloadEffect(target=\"self\", count=\"all\", requires_tag=\"loading\")",
+  "properties": {
+    "target": {
+      "enum": [
+        "self",
+        "enemy",
+        "ally",
+        "adjacent"
+      ],
+      "title": "Target",
+      "type": "string"
+    },
+    "count": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "const": "all",
+          "type": "string"
+        }
+      ],
+      "default": 1,
+      "title": "Count"
+    },
+    "requires_tag": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "loading",
+      "title": "Requires Tag"
+    },
+    "consumes_source": {
+      "default": false,
+      "title": "Consumes Source",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "target"
+  ],
+  "title": "ReloadEffect",
+  "type": "object"
+}

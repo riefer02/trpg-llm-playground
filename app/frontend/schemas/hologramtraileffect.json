@@ -1,0 +1,161 @@
+{
+  "$defs": {
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    }
+  },
+  "description": "Trail of holograms that detonate and allow teleportation.\n\nExamples:\n    HologramTrailEffect(\n        trigger=\"move_or_boost\",\n        detonation_damage=DiceExpression.parse(\"1d6\"),\n        detonation_damage_type=\"energy\",\n        detonation_save=\"agility\",\n        teleport_action=\"quick\",\n        teleport_range=50,\n        detonate_all_burst=1,\n        suppress_new_until=\"start_of_next_turn\",\n    )",
+  "properties": {
+    "trigger": {
+      "enum": [
+        "move",
+        "boost",
+        "move_or_boost"
+      ],
+      "title": "Trigger",
+      "type": "string"
+    },
+    "hologram_size": {
+      "const": "match_self",
+      "default": "match_self",
+      "title": "Hologram Size",
+      "type": "string"
+    },
+    "detonation_triggers": {
+      "items": {
+        "enum": [
+          "start_turn",
+          "move_through",
+          "move_adjacent"
+        ],
+        "type": "string"
+      },
+      "title": "Detonation Triggers",
+      "type": "array"
+    },
+    "detonation_damage": {
+      "$ref": "#/$defs/DiceExpression"
+    },
+    "detonation_damage_type": {
+      "enum": [
+        "kinetic",
+        "explosive",
+        "energy",
+        "burn"
+      ],
+      "title": "Detonation Damage Type",
+      "type": "string"
+    },
+    "detonation_save": {
+      "enum": [
+        "hull",
+        "agility",
+        "systems",
+        "engineering"
+      ],
+      "title": "Detonation Save",
+      "type": "string"
+    },
+    "detonation_half_on_success": {
+      "default": true,
+      "title": "Detonation Half On Success",
+      "type": "boolean"
+    },
+    "detonation_targets_hostile_only": {
+      "default": true,
+      "title": "Detonation Targets Hostile Only",
+      "type": "boolean"
+    },
+    "teleport_action": {
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol",
+        "move"
+      ],
+      "title": "Teleport Action",
+      "type": "string"
+    },
+    "teleport_range": {
+      "minimum": 0,
+      "title": "Teleport Range",
+      "type": "integer"
+    },
+    "detonate_all_on_teleport": {
+      "default": true,
+      "title": "Detonate All On Teleport",
+      "type": "boolean"
+    },
+    "detonate_all_burst": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Detonate All Burst",
+      "type": "integer"
+    },
+    "suppress_new_until": {
+      "anyOf": [
+        {
+          "enum": [
+            "start_of_next_turn",
+            "end_of_next_turn"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Suppress New Until"
+    },
+    "duration": {
+      "default": "scene",
+      "enum": [
+        "end_of_turn",
+        "start_of_next_turn",
+        "end_of_next_turn",
+        "until_cleared",
+        "scene"
+      ],
+      "title": "Duration",
+      "type": "string"
+    }
+  },
+  "required": [
+    "trigger",
+    "detonation_triggers",
+    "detonation_damage",
+    "detonation_damage_type",
+    "detonation_save",
+    "teleport_action",
+    "teleport_range"
+  ],
+  "title": "HologramTrailEffect",
+  "type": "object"
+}

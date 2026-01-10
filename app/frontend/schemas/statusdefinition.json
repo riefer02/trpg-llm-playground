@@ -1,0 +1,363 @@
+{
+  "$defs": {
+    "ActionRestriction": {
+      "description": "Action limitations caused by a status or condition.",
+      "properties": {
+        "disallow_actions": {
+          "default": false,
+          "title": "Disallow Actions",
+          "type": "boolean"
+        },
+        "disallow_full_actions": {
+          "default": false,
+          "title": "Disallow Full Actions",
+          "type": "boolean"
+        },
+        "disallow_reactions": {
+          "default": false,
+          "title": "Disallow Reactions",
+          "type": "boolean"
+        },
+        "disallow_free_actions": {
+          "default": false,
+          "title": "Disallow Free Actions",
+          "type": "boolean"
+        },
+        "disallow_move": {
+          "default": false,
+          "title": "Disallow Move",
+          "type": "boolean"
+        },
+        "disallow_overcharge": {
+          "default": false,
+          "title": "Disallow Overcharge",
+          "type": "boolean"
+        },
+        "disallow_boost": {
+          "default": false,
+          "title": "Disallow Boost",
+          "type": "boolean"
+        },
+        "disallow_tech_actions": {
+          "default": false,
+          "title": "Disallow Tech Actions",
+          "type": "boolean"
+        },
+        "disallow_comms": {
+          "default": false,
+          "title": "Disallow Comms",
+          "type": "boolean"
+        },
+        "max_quick_actions": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Quick Actions"
+        },
+        "allowed_action_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Action Ids",
+          "type": "array"
+        },
+        "allowed_attack_action_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Attack Action Ids",
+          "type": "array"
+        }
+      },
+      "title": "ActionRestriction",
+      "type": "object"
+    },
+    "MovementRestriction": {
+      "description": "Movement limitations caused by a status or condition.",
+      "properties": {
+        "max_voluntary_speed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Voluntary Speed"
+        },
+        "only_regular_move": {
+          "default": false,
+          "title": "Only Regular Move",
+          "type": "boolean"
+        },
+        "counts_as_difficult_terrain": {
+          "default": false,
+          "title": "Counts As Difficult Terrain",
+          "type": "boolean"
+        }
+      },
+      "title": "MovementRestriction",
+      "type": "object"
+    },
+    "StatusEffect": {
+      "description": "Mechanical effects for a status or condition.",
+      "properties": {
+        "ranged_attack_difficulty": {
+          "default": 0,
+          "title": "Ranged Attack Difficulty",
+          "type": "integer"
+        },
+        "all_attack_difficulty": {
+          "default": 0,
+          "title": "All Attack Difficulty",
+          "type": "integer"
+        },
+        "save_difficulty": {
+          "default": 0,
+          "title": "Save Difficulty",
+          "type": "integer"
+        },
+        "skill_check_difficulty": {
+          "default": 0,
+          "title": "Skill Check Difficulty",
+          "type": "integer"
+        },
+        "attackers_accuracy_bonus": {
+          "default": 0,
+          "title": "Attackers Accuracy Bonus",
+          "type": "integer"
+        },
+        "damage_multiplier": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Damage Multiplier"
+        },
+        "ignore_armor": {
+          "default": false,
+          "title": "Ignore Armor",
+          "type": "boolean"
+        },
+        "ignore_resistance": {
+          "default": false,
+          "title": "Ignore Resistance",
+          "type": "boolean"
+        },
+        "immune_to_tech": {
+          "default": false,
+          "title": "Immune To Tech",
+          "type": "boolean"
+        },
+        "end_tech_effects": {
+          "default": false,
+          "title": "End Tech Effects",
+          "type": "boolean"
+        },
+        "cool_heat_to_zero": {
+          "default": false,
+          "title": "Cool Heat To Zero",
+          "type": "boolean"
+        },
+        "end_exposed": {
+          "default": false,
+          "title": "End Exposed",
+          "type": "boolean"
+        },
+        "max_evasion": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Evasion"
+        },
+        "auto_fail_hull_checks": {
+          "default": false,
+          "title": "Auto Fail Hull Checks",
+          "type": "boolean"
+        },
+        "auto_fail_agility_checks": {
+          "default": false,
+          "title": "Auto Fail Agility Checks",
+          "type": "boolean"
+        },
+        "auto_fail_hull_saves": {
+          "default": false,
+          "title": "Auto Fail Hull Saves",
+          "type": "boolean"
+        },
+        "auto_fail_agility_saves": {
+          "default": false,
+          "title": "Auto Fail Agility Saves",
+          "type": "boolean"
+        },
+        "consumable_accuracy_bonus": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consumable Accuracy Bonus"
+        },
+        "grants_conditions": {
+          "items": {
+            "enum": [
+              "braced",
+              "immobilized",
+              "impaired",
+              "jammed",
+              "lock_on",
+              "shredded",
+              "slowed",
+              "stunned",
+              "prone",
+              "hidden",
+              "invisible",
+              "shutdown",
+              "exposed",
+              "engaged",
+              "burn",
+              "unshackled"
+            ],
+            "type": "string"
+          },
+          "title": "Grants Conditions",
+          "type": "array"
+        },
+        "action_restrictions": {
+          "$ref": "#/$defs/ActionRestriction"
+        },
+        "movement_restrictions": {
+          "$ref": "#/$defs/MovementRestriction"
+        },
+        "targeting_restrictions": {
+          "$ref": "#/$defs/TargetingRestriction"
+        }
+      },
+      "title": "StatusEffect",
+      "type": "object"
+    },
+    "TargetingRestriction": {
+      "description": "Targeting limitations caused by a status or condition.",
+      "properties": {
+        "cannot_be_targeted": {
+          "default": false,
+          "title": "Cannot Be Targeted",
+          "type": "boolean"
+        },
+        "area_attacks_can_target": {
+          "default": true,
+          "title": "Area Attacks Can Target",
+          "type": "boolean"
+        },
+        "miss_chance": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Miss Chance"
+        }
+      },
+      "title": "TargetingRestriction",
+      "type": "object"
+    }
+  },
+  "description": "Definition for a combat status or condition.",
+  "properties": {
+    "status": {
+      "enum": [
+        "braced",
+        "immobilized",
+        "impaired",
+        "jammed",
+        "lock_on",
+        "shredded",
+        "slowed",
+        "stunned",
+        "prone",
+        "hidden",
+        "invisible",
+        "shutdown",
+        "exposed",
+        "engaged",
+        "burn",
+        "unshackled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "category": {
+      "enum": [
+        "status",
+        "condition"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "effects": {
+      "$ref": "#/$defs/StatusEffect"
+    },
+    "clear_triggers": {
+      "items": {
+        "enum": [
+          "end_of_turn",
+          "end_of_next_turn",
+          "stabilize",
+          "rest",
+          "full_repair",
+          "boot_up",
+          "search_success",
+          "cover_lost",
+          "attack",
+          "boost",
+          "reaction",
+          "invisibility_lost",
+          "stand_up"
+        ],
+        "type": "string"
+      },
+      "title": "Clear Triggers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "category"
+  ],
+  "title": "StatusDefinition",
+  "type": "object"
+}

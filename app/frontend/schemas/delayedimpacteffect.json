@@ -1,0 +1,114 @@
+{
+  "$defs": {
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    }
+  },
+  "description": "Optional delayed impact behavior for weapon attacks.\n\nExamples:\n    DelayedImpactEffect(\n        delay_timing=\"end_of_next_round\",\n        delayed_damage=DiceExpression.parse(\"3d6\"),\n        delayed_damage_type=\"explosive\",\n        self_slow_duration=\"end_of_next_turn\",\n        reveal_area=True,\n    )",
+  "properties": {
+    "delay_optional": {
+      "default": true,
+      "title": "Delay Optional",
+      "type": "boolean"
+    },
+    "delay_timing": {
+      "default": "end_of_next_round",
+      "enum": [
+        "end_of_next_round",
+        "end_of_next_turn",
+        "start_of_next_turn"
+      ],
+      "title": "Delay Timing",
+      "type": "string"
+    },
+    "delayed_damage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DiceExpression"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "delayed_damage_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Delayed Damage Type"
+    },
+    "self_slow_duration": {
+      "anyOf": [
+        {
+          "enum": [
+            "end_of_turn",
+            "start_of_next_turn",
+            "end_of_next_turn",
+            "until_cleared",
+            "scene"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Self Slow Duration"
+    },
+    "reveal_area": {
+      "default": false,
+      "title": "Reveal Area",
+      "type": "boolean"
+    },
+    "reveal_audience": {
+      "default": "all",
+      "enum": [
+        "self",
+        "allies",
+        "all"
+      ],
+      "title": "Reveal Audience",
+      "type": "string"
+    }
+  },
+  "title": "DelayedImpactEffect",
+  "type": "object"
+}

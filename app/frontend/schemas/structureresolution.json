@@ -1,0 +1,377 @@
+{
+  "$defs": {
+    "DiceRollResult": {
+      "description": "Raw dice roll outcome.",
+      "properties": {
+        "rolls": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Rolls",
+          "type": "array"
+        },
+        "chosen": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Chosen",
+          "type": "array"
+        }
+      },
+      "title": "DiceRollResult",
+      "type": "object"
+    },
+    "MechInventory": {
+      "description": "Inventory state for mounts and systems.",
+      "properties": {
+        "mounts": {
+          "items": {
+            "$ref": "#/$defs/WeaponMountState"
+          },
+          "title": "Mounts",
+          "type": "array"
+        },
+        "systems": {
+          "items": {
+            "$ref": "#/$defs/MechSystemState"
+          },
+          "title": "Systems",
+          "type": "array"
+        }
+      },
+      "title": "MechInventory",
+      "type": "object"
+    },
+    "MechSystemState": {
+      "description": "System state for a mech.",
+      "properties": {
+        "system_id": {
+          "title": "System Id",
+          "type": "string"
+        },
+        "destroyed": {
+          "default": false,
+          "title": "Destroyed",
+          "type": "boolean"
+        },
+        "limited_charges_remaining": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limited Charges Remaining"
+        }
+      },
+      "required": [
+        "system_id"
+      ],
+      "title": "MechSystemState",
+      "type": "object"
+    },
+    "StructureOutcomeType": {
+      "description": "Outcome detail for structure damage.",
+      "properties": {
+        "name": {
+          "enum": [
+            "glancing_blow",
+            "system_trauma",
+            "direct_hit",
+            "crushing_hit"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "impaired_until_end_next_turn": {
+          "default": false,
+          "title": "Impaired Until End Next Turn",
+          "type": "boolean"
+        },
+        "destroy_mount": {
+          "default": false,
+          "title": "Destroy Mount",
+          "type": "boolean"
+        },
+        "destroy_system": {
+          "default": false,
+          "title": "Destroy System",
+          "type": "boolean"
+        },
+        "stunned_until_end_next_turn": {
+          "default": false,
+          "title": "Stunned Until End Next Turn",
+          "type": "boolean"
+        },
+        "hull_check_required": {
+          "default": false,
+          "title": "Hull Check Required",
+          "type": "boolean"
+        },
+        "destroyed": {
+          "default": false,
+          "title": "Destroyed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "StructureOutcomeType",
+      "type": "object"
+    },
+    "SystemTraumaSelection": {
+      "description": "Resolved selection for system trauma results.",
+      "properties": {
+        "roll": {
+          "title": "Roll",
+          "type": "integer"
+        },
+        "initial_target": {
+          "enum": [
+            "mount",
+            "system"
+          ],
+          "title": "Initial Target",
+          "type": "string"
+        },
+        "resolved_target": {
+          "enum": [
+            "mount",
+            "system",
+            "direct_hit"
+          ],
+          "title": "Resolved Target",
+          "type": "string"
+        },
+        "eligible_mounts": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Eligible Mounts",
+          "type": "array"
+        },
+        "eligible_systems": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Eligible Systems",
+          "type": "array"
+        },
+        "destroyed_mount_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Destroyed Mount Index"
+        },
+        "destroyed_system_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Destroyed System Id"
+        },
+        "fallback_reason": {
+          "default": "none",
+          "enum": [
+            "none",
+            "no_mounts",
+            "no_systems",
+            "none_available"
+          ],
+          "title": "Fallback Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roll",
+        "initial_target",
+        "resolved_target"
+      ],
+      "title": "SystemTraumaSelection",
+      "type": "object"
+    },
+    "WeaponMountState": {
+      "description": "Mount slot state and installed weapons.",
+      "properties": {
+        "mount_index": {
+          "minimum": 0,
+          "title": "Mount Index",
+          "type": "integer"
+        },
+        "slot_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "main",
+                "heavy",
+                "aux_aux",
+                "main_aux",
+                "flexible",
+                "integrated"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Slot Type"
+        },
+        "weapons": {
+          "items": {
+            "$ref": "#/$defs/WeaponState"
+          },
+          "title": "Weapons",
+          "type": "array"
+        },
+        "destroyed": {
+          "default": false,
+          "title": "Destroyed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "mount_index"
+      ],
+      "title": "WeaponMountState",
+      "type": "object"
+    },
+    "WeaponState": {
+      "description": "Weapon state for a mounted weapon.",
+      "properties": {
+        "weapon_id": {
+          "title": "Weapon Id",
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "enum": [
+              "accurate",
+              "inaccurate",
+              "loading",
+              "ordnance",
+              "arcing",
+              "seeking",
+              "smart",
+              "ap",
+              "overkill",
+              "reliable",
+              "heat_self",
+              "heat_target",
+              "burn",
+              "knockback",
+              "limited",
+              "threat",
+              "thrown",
+              "line",
+              "cone",
+              "blast",
+              "burst"
+            ],
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "destroyed": {
+          "default": false,
+          "title": "Destroyed",
+          "type": "boolean"
+        },
+        "limited_charges_remaining": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limited Charges Remaining"
+        }
+      },
+      "required": [
+        "weapon_id"
+      ],
+      "title": "WeaponState",
+      "type": "object"
+    }
+  },
+  "description": "Resolution result for structure damage.\n\nPer PR2 4618-4636: Structure checks determine damage to systems and mounts\nwhen a mech takes damage that exceeds its remaining HP.",
+  "properties": {
+    "outcome": {
+      "$ref": "#/$defs/StructureOutcomeType"
+    },
+    "dice": {
+      "$ref": "#/$defs/DiceRollResult"
+    },
+    "direct_hit_outcome": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StructureOutcomeType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "system_trauma": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SystemTraumaSelection"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "updated_inventory": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MechInventory"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "structure_damage": {
+      "default": 1,
+      "title": "Structure Damage",
+      "type": "integer"
+    },
+    "spillover_damage": {
+      "default": 0,
+      "title": "Spillover Damage",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "outcome",
+    "dice"
+  ],
+  "title": "StructureResolution",
+  "type": "object"
+}

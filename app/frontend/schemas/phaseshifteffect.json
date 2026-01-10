@@ -1,0 +1,187 @@
+{
+  "$defs": {
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    }
+  },
+  "description": "Phase/intangible state changes with periodic checks.\n\nExamples:\n    PhaseShiftEffect(\n        activation_action=\"quick\",\n        roll=DiceExpression.parse(\"1d6\"),\n        success_threshold=4,\n        out_of_phase_duration=\"start_of_next_turn\",\n        duration=\"scene\",\n    )",
+  "properties": {
+    "activation_action": {
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol",
+        "move"
+      ],
+      "title": "Activation Action",
+      "type": "string"
+    },
+    "starts_out_of_phase": {
+      "default": true,
+      "title": "Starts Out Of Phase",
+      "type": "boolean"
+    },
+    "roll_trigger": {
+      "default": "on_turn_start",
+      "enum": [
+        "on_hit",
+        "on_miss",
+        "on_reload",
+        "on_first_attack",
+        "on_overkill",
+        "on_crit",
+        "on_kill",
+        "on_activation",
+        "on_attack_roll",
+        "on_detonate",
+        "on_move",
+        "on_reaction",
+        "on_action",
+        "on_take_damage",
+        "on_hide",
+        "on_overheat",
+        "on_ally_hit",
+        "on_ally_miss",
+        "on_ally_damaged",
+        "on_ally_targeted",
+        "on_turn_start",
+        "on_turn_end",
+        "on_overcharge",
+        "on_core_power_spent",
+        "on_structure_loss",
+        "on_heat_gain",
+        "on_target_failed_save",
+        "on_tech_attack_hit",
+        "on_ally_turn_start",
+        "on_stabilize",
+        "on_skirmish",
+        "on_enter",
+        "on_inflict",
+        "on_brace",
+        "on_move_or_boost",
+        "on_slipstream_jump",
+        "on_extra_overwatch",
+        "on_ally_hit_target_within_range",
+        "on_lock_on_consumed",
+        "on_deploy",
+        "on_destroyed",
+        "on_adjacent",
+        "on_attacked",
+        "on_ally_killed",
+        "on_hp_below_half",
+        "on_damage_dealt",
+        "on_first_adjacent_turn",
+        "on_any_damage"
+      ],
+      "title": "Roll Trigger",
+      "type": "string"
+    },
+    "roll": {
+      "$ref": "#/$defs/DiceExpression"
+    },
+    "success_threshold": {
+      "minimum": 1,
+      "title": "Success Threshold",
+      "type": "integer"
+    },
+    "out_of_phase_duration": {
+      "default": "start_of_next_turn",
+      "enum": [
+        "start_of_next_turn",
+        "end_of_turn"
+      ],
+      "title": "Out Of Phase Duration",
+      "type": "string"
+    },
+    "duration": {
+      "default": "scene",
+      "enum": [
+        "end_of_turn",
+        "start_of_next_turn",
+        "end_of_next_turn",
+        "until_cleared",
+        "scene"
+      ],
+      "title": "Duration",
+      "type": "string"
+    },
+    "deactivation_action": {
+      "anyOf": [
+        {
+          "enum": [
+            "free",
+            "quick",
+            "full",
+            "reaction",
+            "protocol",
+            "move"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deactivation Action"
+    },
+    "intangible": {
+      "default": true,
+      "title": "Intangible",
+      "type": "boolean"
+    },
+    "ignore_obstructions": {
+      "default": true,
+      "title": "Ignore Obstructions",
+      "type": "boolean"
+    },
+    "cannot_end_in_obstruction": {
+      "default": true,
+      "title": "Cannot End In Obstruction",
+      "type": "boolean"
+    },
+    "cannot_interact": {
+      "default": true,
+      "title": "Cannot Interact",
+      "type": "boolean"
+    },
+    "immune_to_damage": {
+      "default": true,
+      "title": "Immune To Damage",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "activation_action",
+    "roll",
+    "success_threshold"
+  ],
+  "title": "PhaseShiftEffect",
+  "type": "object"
+}

@@ -1,0 +1,183 @@
+{
+  "$defs": {
+    "NarrativeResolutionRequirement": {
+      "description": "Requirements for resolving a narrative complication.",
+      "properties": {
+        "requirement_type": {
+          "enum": [
+            "skill_check",
+            "time_passed",
+            "resource_spend",
+            "position_change",
+            "goal_completion",
+            "effect_reversal",
+            "other"
+          ],
+          "title": "Requirement Type",
+          "type": "string"
+        },
+        "description": {
+          "description": "What clears this complication",
+          "title": "Description",
+          "type": "string"
+        },
+        "required_tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "standard",
+                "difficult",
+                "risky",
+                "heroic"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Narrative tier required (if resolution needs a check)",
+          "title": "Required Tier"
+        },
+        "required_skill": {
+          "anyOf": [
+            {
+              "enum": [
+                "hull",
+                "agility",
+                "systems",
+                "engineering"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pilot skill used to resolve (if check-based)",
+          "title": "Required Skill"
+        },
+        "required_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Quantity of time/resources/etc required",
+          "title": "Required Amount"
+        }
+      },
+      "required": [
+        "requirement_type",
+        "description"
+      ],
+      "title": "NarrativeResolutionRequirement",
+      "type": "object"
+    }
+  },
+  "description": "Complication that persists in narrative combat until resolved.",
+  "properties": {
+    "id": {
+      "description": "Unique complication identifier",
+      "title": "Id",
+      "type": "string"
+    },
+    "complication_type": {
+      "enum": [
+        "harm",
+        "time",
+        "resources",
+        "collateral",
+        "position",
+        "effect"
+      ],
+      "title": "Complication Type",
+      "type": "string"
+    },
+    "description": {
+      "description": "What is going wrong",
+      "title": "Description",
+      "type": "string"
+    },
+    "severity": {
+      "default": "minor",
+      "description": "Severity of the complication",
+      "enum": [
+        "minor",
+        "major",
+        "lethal"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "established_before_roll": {
+      "default": true,
+      "description": "Whether the complication was established before the roll",
+      "title": "Established Before Roll",
+      "type": "boolean"
+    },
+    "trigger": {
+      "anyOf": [
+        {
+          "enum": [
+            "failure",
+            "risky_success",
+            "heroic_success",
+            "other"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "What triggered the complication",
+      "title": "Trigger"
+    },
+    "target_ids": {
+      "description": "IDs of pilots or targets affected",
+      "items": {
+        "type": "string"
+      },
+      "title": "Target Ids",
+      "type": "array"
+    },
+    "resolution_requirements": {
+      "description": "Requirements to resolve the complication",
+      "items": {
+        "$ref": "#/$defs/NarrativeResolutionRequirement"
+      },
+      "title": "Resolution Requirements",
+      "type": "array"
+    },
+    "harm_damage": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Damage amount if this is a harm complication",
+      "title": "Harm Damage"
+    }
+  },
+  "required": [
+    "id",
+    "complication_type",
+    "description"
+  ],
+  "title": "NarrativeComplication",
+  "type": "object"
+}

@@ -1,0 +1,47 @@
+{
+  "description": "Terrain interaction rules.",
+  "properties": {
+    "difficult_terrain_cost": {
+      "default": 2,
+      "minimum": 1,
+      "title": "Difficult Terrain Cost",
+      "type": "integer"
+    },
+    "dangerous_terrain_check_skill": {
+      "const": "engineering",
+      "default": "engineering",
+      "title": "Dangerous Terrain Check Skill",
+      "type": "string"
+    },
+    "dangerous_terrain_damage": {
+      "default": 5,
+      "minimum": 0,
+      "title": "Dangerous Terrain Damage",
+      "type": "integer"
+    },
+    "dangerous_terrain_damage_type": {
+      "default": "kinetic",
+      "enum": [
+        "kinetic",
+        "explosive",
+        "energy",
+        "burn"
+      ],
+      "title": "Dangerous Terrain Damage Type",
+      "type": "string"
+    },
+    "dangerous_terrain_check_once_per_round": {
+      "default": true,
+      "title": "Dangerous Terrain Check Once Per Round",
+      "type": "boolean"
+    },
+    "climb_cost": {
+      "default": 2,
+      "minimum": 1,
+      "title": "Climb Cost",
+      "type": "integer"
+    }
+  },
+  "title": "TerrainRules",
+  "type": "object"
+}

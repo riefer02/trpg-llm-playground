@@ -1,0 +1,469 @@
+{
+  "$defs": {
+    "NarrativeGoal": {
+      "description": "Goal definition for narrative combat.",
+      "properties": {
+        "id": {
+          "description": "Unique goal identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "description": "Pilot's stated goal",
+          "title": "Description",
+          "type": "string"
+        },
+        "success_conditions": {
+          "description": "Conditions that represent success",
+          "items": {
+            "$ref": "#/$defs/NarrativeGoalCondition"
+          },
+          "title": "Success Conditions",
+          "type": "array"
+        },
+        "successes_required": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Successful checks required to complete the goal",
+          "title": "Successes Required"
+        },
+        "failure_limit": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Failures allowed before the goal fails",
+          "title": "Failure Limit"
+        },
+        "harm_involved": {
+          "default": false,
+          "description": "Whether the goal involves physical harm",
+          "title": "Harm Involved",
+          "type": "boolean"
+        },
+        "repeat_requires_change": {
+          "default": true,
+          "description": "Checks cannot repeat until circumstances change",
+          "title": "Repeat Requires Change",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "description"
+      ],
+      "title": "NarrativeGoal",
+      "type": "object"
+    },
+    "NarrativeGoalAttempt": {
+      "description": "Resolution details for a single narrative goal attempt.",
+      "properties": {
+        "roll_result": {
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Roll Result",
+          "type": "integer"
+        },
+        "target": {
+          "default": 10,
+          "minimum": 0,
+          "title": "Target",
+          "type": "integer"
+        },
+        "modifiers": {
+          "default": 0,
+          "title": "Modifiers",
+          "type": "integer"
+        },
+        "difficulty_modifier": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Difficulty Modifier",
+          "type": "integer"
+        },
+        "tier": {
+          "default": "standard",
+          "enum": [
+            "standard",
+            "difficult",
+            "risky",
+            "heroic"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "total_result": {
+          "description": "Final total after modifiers",
+          "title": "Total Result",
+          "type": "integer"
+        },
+        "success": {
+          "description": "Whether the goal check succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "consequence_suffered": {
+          "default": false,
+          "description": "Whether consequences apply (risky/heroic)",
+          "title": "Consequence Suffered",
+          "type": "boolean"
+        },
+        "complication_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "harm",
+                "time",
+                "resources",
+                "collateral",
+                "position",
+                "effect"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type of complication suffered, if any",
+          "title": "Complication Type"
+        },
+        "complication_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Complication details if any",
+          "title": "Complication Description"
+        },
+        "pilot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pilot taking the action",
+          "title": "Pilot Id"
+        },
+        "skill_used": {
+          "anyOf": [
+            {
+              "enum": [
+                "hull",
+                "agility",
+                "systems",
+                "engineering"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pilot skill used for the check",
+          "title": "Skill Used"
+        },
+        "action_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Action identifier tied to the attempt",
+          "title": "Action Id"
+        },
+        "action_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Narrative description of the action",
+          "title": "Action Description"
+        }
+      },
+      "required": [
+        "roll_result",
+        "total_result",
+        "success"
+      ],
+      "title": "NarrativeGoalAttempt",
+      "type": "object"
+    },
+    "NarrativeGoalCondition": {
+      "description": "Condition that must be met to complete a narrative goal.",
+      "properties": {
+        "id": {
+          "description": "Unique condition identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "condition_type": {
+          "enum": [
+            "skill_check",
+            "position_reached",
+            "target_removed",
+            "resource_spend",
+            "time_elapsed",
+            "complication_resolved",
+            "other"
+          ],
+          "title": "Condition Type",
+          "type": "string"
+        },
+        "description": {
+          "description": "What must be true for this condition",
+          "title": "Description",
+          "type": "string"
+        },
+        "required_tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "standard",
+                "difficult",
+                "risky",
+                "heroic"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tier needed if condition is check-based",
+          "title": "Required Tier"
+        },
+        "required_skill": {
+          "anyOf": [
+            {
+              "enum": [
+                "hull",
+                "agility",
+                "systems",
+                "engineering"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Skill used if condition is check-based",
+          "title": "Required Skill"
+        },
+        "required_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Quantity needed (time/resources/etc)",
+          "title": "Required Amount"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target or object tied to this condition",
+          "title": "Target Id"
+        }
+      },
+      "required": [
+        "id",
+        "condition_type",
+        "description"
+      ],
+      "title": "NarrativeGoalCondition",
+      "type": "object"
+    },
+    "NarrativeGoalOutcome": {
+      "description": "Outcome resolution for a pilot's goal in narrative combat.",
+      "properties": {
+        "goal_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Goal identifier if tracked",
+          "title": "Goal Id"
+        },
+        "goal_description": {
+          "description": "What the pilot was trying to accomplish",
+          "title": "Goal Description",
+          "type": "string"
+        },
+        "success": {
+          "description": "Whether the goal was accomplished",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "tier_attained": {
+          "default": "standard",
+          "description": "The tier at which success was achieved",
+          "enum": [
+            "standard",
+            "difficult",
+            "risky",
+            "heroic"
+          ],
+          "title": "Tier Attained",
+          "type": "string"
+        },
+        "harm_involved": {
+          "default": false,
+          "description": "Whether physical harm was part of the goal",
+          "title": "Harm Involved",
+          "type": "boolean"
+        },
+        "harm_suffered": {
+          "default": false,
+          "description": "Whether the pilot suffered harm as complication",
+          "title": "Harm Suffered",
+          "type": "boolean"
+        },
+        "complication_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If harm or other complication occurred",
+          "title": "Complication Description"
+        }
+      },
+      "required": [
+        "goal_description",
+        "success"
+      ],
+      "title": "NarrativeGoalOutcome",
+      "type": "object"
+    }
+  },
+  "description": "State wrapper for a narrative goal.",
+  "properties": {
+    "goal": {
+      "$ref": "#/$defs/NarrativeGoal"
+    },
+    "status": {
+      "default": "active",
+      "enum": [
+        "active",
+        "completed",
+        "failed",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "successes": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Successes",
+      "type": "integer"
+    },
+    "failures": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Failures",
+      "type": "integer"
+    },
+    "attempts": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Attempts",
+      "type": "integer"
+    },
+    "last_outcome": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NarrativeGoalOutcome"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Most recent goal outcome"
+    },
+    "last_attempt": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NarrativeGoalAttempt"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Most recent goal attempt details"
+    },
+    "attempt_history": {
+      "items": {
+        "$ref": "#/$defs/NarrativeGoalAttempt"
+      },
+      "title": "Attempt History",
+      "type": "array"
+    }
+  },
+  "required": [
+    "goal"
+  ],
+  "title": "NarrativeGoalState",
+  "type": "object"
+}

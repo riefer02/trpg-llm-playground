@@ -1,0 +1,88 @@
+{
+  "description": "Base statistics provided by a frame before pilot bonuses.",
+  "properties": {
+    "size": {
+      "enum": [
+        "size_half",
+        "size_1",
+        "size_2",
+        "size_3",
+        "size_4",
+        "size_5"
+      ],
+      "title": "Size",
+      "type": "string"
+    },
+    "armor": {
+      "default": 0,
+      "maximum": 4,
+      "minimum": 0,
+      "title": "Armor",
+      "type": "integer"
+    },
+    "hp": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Hp",
+      "type": "integer"
+    },
+    "evasion": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Evasion",
+      "type": "integer"
+    },
+    "e_defense": {
+      "default": 0,
+      "minimum": 0,
+      "title": "E Defense",
+      "type": "integer"
+    },
+    "speed": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Speed",
+      "type": "integer"
+    },
+    "sensor_range": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Sensor Range",
+      "type": "integer"
+    },
+    "tech_attack": {
+      "default": 0,
+      "title": "Tech Attack",
+      "type": "integer"
+    },
+    "heat_cap": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Heat Cap",
+      "type": "integer"
+    },
+    "repair_cap": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Repair Cap",
+      "type": "integer"
+    },
+    "save_target": {
+      "default": 10,
+      "minimum": 0,
+      "title": "Save Target",
+      "type": "integer"
+    },
+    "structure": {
+      "default": 4,
+      "minimum": 0,
+      "title": "Structure",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "size"
+  ],
+  "title": "MechFrameBaseStats",
+  "type": "object"
+}

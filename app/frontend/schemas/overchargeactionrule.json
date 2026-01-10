@@ -1,0 +1,12 @@
+{
+  "description": "Overcharge action effect.",
+  "properties": {
+    "grants_extra_quick_action": {
+      "default": true,
+      "title": "Grants Extra Quick Action",
+      "type": "boolean"
+    }
+  },
+  "title": "OverchargeActionRule",
+  "type": "object"
+}

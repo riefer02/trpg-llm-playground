@@ -1,0 +1,51 @@
+{
+  "description": "Pilot gear selection for a mission.",
+  "properties": {
+    "clothing": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Clothing item ID",
+      "title": "Clothing"
+    },
+    "armor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Armor item ID",
+      "title": "Armor"
+    },
+    "weapons": {
+      "description": "Weapon item IDs",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 2,
+      "title": "Weapons",
+      "type": "array"
+    },
+    "gear": {
+      "description": "Other gear item IDs",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 3,
+      "title": "Gear",
+      "type": "array"
+    }
+  },
+  "title": "PilotLoadout",
+  "type": "object"
+}

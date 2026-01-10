@@ -1,0 +1,35 @@
+{
+  "description": "A mount slot on a mech frame.",
+  "properties": {
+    "slot_type": {
+      "enum": [
+        "main",
+        "heavy",
+        "aux_aux",
+        "main_aux",
+        "flexible",
+        "integrated"
+      ],
+      "title": "Slot Type",
+      "type": "string"
+    },
+    "integrated_weapon_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Integrated weapon ID (only for integrated mounts)",
+      "title": "Integrated Weapon Id"
+    }
+  },
+  "required": [
+    "slot_type"
+  ],
+  "title": "MountSlot",
+  "type": "object"
+}

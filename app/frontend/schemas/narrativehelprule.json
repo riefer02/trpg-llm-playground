@@ -1,0 +1,18 @@
+{
+  "description": "Rules for helping on a narrative check.",
+  "properties": {
+    "accuracy_bonus": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Accuracy Bonus",
+      "type": "integer"
+    },
+    "helpers_share_consequences": {
+      "default": true,
+      "title": "Helpers Share Consequences",
+      "type": "boolean"
+    }
+  },
+  "title": "NarrativeHelpRule",
+  "type": "object"
+}

@@ -1,0 +1,21 @@
+{
+  "description": "Raw dice roll outcome.",
+  "properties": {
+    "rolls": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Rolls",
+      "type": "array"
+    },
+    "chosen": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Chosen",
+      "type": "array"
+    }
+  },
+  "title": "DiceRollResult",
+  "type": "object"
+}

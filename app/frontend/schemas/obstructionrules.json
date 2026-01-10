@@ -1,0 +1,32 @@
+{
+  "description": "Obstruction and pass-through rules.",
+  "properties": {
+    "allies_obstruct": {
+      "default": false,
+      "title": "Allies Obstruct",
+      "type": "boolean"
+    },
+    "can_end_in_allied_space": {
+      "default": false,
+      "title": "Can End In Allied Space",
+      "type": "boolean"
+    },
+    "smaller_obstruct_larger": {
+      "default": false,
+      "title": "Smaller Obstruct Larger",
+      "type": "boolean"
+    },
+    "can_move_through_smaller": {
+      "default": true,
+      "title": "Can Move Through Smaller",
+      "type": "boolean"
+    },
+    "can_end_in_smaller_space": {
+      "default": false,
+      "title": "Can End In Smaller Space",
+      "type": "boolean"
+    }
+  },
+  "title": "ObstructionRules",
+  "type": "object"
+}

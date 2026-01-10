@@ -1,0 +1,30 @@
+{
+  "description": "Range entry for a granted weapon profile.\n\nExamples:\n    WeaponRangeSpec(range_type=\"range\", value=8)",
+  "properties": {
+    "range_type": {
+      "enum": [
+        "range",
+        "threat",
+        "thrown",
+        "line",
+        "cone",
+        "burst",
+        "blast",
+        "sensors"
+      ],
+      "title": "Range Type",
+      "type": "string"
+    },
+    "value": {
+      "minimum": 0,
+      "title": "Value",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "range_type",
+    "value"
+  ],
+  "title": "WeaponRangeSpec",
+  "type": "object"
+}

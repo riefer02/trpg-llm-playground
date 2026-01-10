@@ -1,0 +1,50 @@
+{
+  "description": "Shutdown action effect.",
+  "properties": {
+    "applies_status": {
+      "default": "shutdown",
+      "enum": [
+        "braced",
+        "immobilized",
+        "impaired",
+        "jammed",
+        "lock_on",
+        "shredded",
+        "slowed",
+        "stunned",
+        "prone",
+        "hidden",
+        "invisible",
+        "shutdown",
+        "exposed",
+        "engaged",
+        "burn",
+        "unshackled"
+      ],
+      "title": "Applies Status",
+      "type": "string"
+    },
+    "clears_exposed": {
+      "default": true,
+      "title": "Clears Exposed",
+      "type": "boolean"
+    },
+    "cools_heat_to_zero": {
+      "default": true,
+      "title": "Cools Heat To Zero",
+      "type": "boolean"
+    },
+    "ends_tech_effects": {
+      "default": true,
+      "title": "Ends Tech Effects",
+      "type": "boolean"
+    },
+    "immune_to_tech": {
+      "default": true,
+      "title": "Immune To Tech",
+      "type": "boolean"
+    }
+  },
+  "title": "ShutdownRule",
+  "type": "object"
+}

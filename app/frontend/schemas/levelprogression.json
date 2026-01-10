@@ -1,0 +1,52 @@
+{
+  "description": "Progression values for a given license level.",
+  "properties": {
+    "level": {
+      "maximum": 12,
+      "minimum": 0,
+      "title": "Level",
+      "type": "integer"
+    },
+    "grit": {
+      "minimum": 0,
+      "title": "Grit",
+      "type": "integer"
+    },
+    "license_points": {
+      "minimum": 0,
+      "title": "License Points",
+      "type": "integer"
+    },
+    "total_mech_skill_points": {
+      "minimum": 0,
+      "title": "Total Mech Skill Points",
+      "type": "integer"
+    },
+    "total_talent_points": {
+      "minimum": 0,
+      "title": "Total Talent Points",
+      "type": "integer"
+    },
+    "core_bonuses": {
+      "minimum": 0,
+      "title": "Core Bonuses",
+      "type": "integer"
+    },
+    "pilot_trigger_points": {
+      "minimum": 0,
+      "title": "Pilot Trigger Points",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "level",
+    "grit",
+    "license_points",
+    "total_mech_skill_points",
+    "total_talent_points",
+    "core_bonuses",
+    "pilot_trigger_points"
+  ],
+  "title": "LevelProgression",
+  "type": "object"
+}

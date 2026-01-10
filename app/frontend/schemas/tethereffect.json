@@ -1,0 +1,103 @@
+{
+  "description": "Represents a tether/drag connection between two entities.\n\nExamples:\n    TetherEffect(action_type=\"quick\", range=1, max_distance=5, tow_slowed=True)",
+  "properties": {
+    "action_type": {
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol",
+        "move"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "range": {
+      "minimum": 0,
+      "title": "Range",
+      "type": "integer"
+    },
+    "max_distance": {
+      "minimum": 0,
+      "title": "Max Distance",
+      "type": "integer"
+    },
+    "tow_slowed": {
+      "default": false,
+      "title": "Tow Slowed",
+      "type": "boolean"
+    },
+    "auto_attach_if_willing": {
+      "default": false,
+      "title": "Auto Attach If Willing",
+      "type": "boolean"
+    },
+    "auto_attach_if_stunned": {
+      "default": false,
+      "title": "Auto Attach If Stunned",
+      "type": "boolean"
+    },
+    "detach_on_hit": {
+      "default": true,
+      "title": "Detach On Hit",
+      "type": "boolean"
+    },
+    "detach_attack_evasion": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detach Attack Evasion"
+    },
+    "can_attach_to_objects": {
+      "default": false,
+      "title": "Can Attach To Objects",
+      "type": "boolean"
+    },
+    "object_attach_range": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Object Attach Range"
+    },
+    "object_strain_capacity": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Object Strain Capacity"
+    },
+    "climb_no_speed_penalty": {
+      "default": false,
+      "title": "Climb No Speed Penalty",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "action_type",
+    "range",
+    "max_distance"
+  ],
+  "title": "TetherEffect",
+  "type": "object"
+}

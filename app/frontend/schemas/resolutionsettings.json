@@ -1,0 +1,36 @@
+{
+  "description": "Settings for deterministic or forced resolution.",
+  "properties": {
+    "forced_rolls": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Forced Rolls"
+    },
+    "forced_system_trauma_roll": {
+      "anyOf": [
+        {
+          "maximum": 6,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Forced System Trauma Roll"
+    }
+  },
+  "title": "ResolutionSettings",
+  "type": "object"
+}

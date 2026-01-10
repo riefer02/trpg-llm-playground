@@ -1,0 +1,44 @@
+{
+  "description": "Base combat stats for a pilot.",
+  "properties": {
+    "size": {
+      "default": "size_half",
+      "enum": [
+        "size_half",
+        "size_1",
+        "size_2",
+        "size_3",
+        "size_4",
+        "size_5"
+      ],
+      "title": "Size",
+      "type": "string"
+    },
+    "hp": {
+      "default": 6,
+      "minimum": 0,
+      "title": "Hp",
+      "type": "integer"
+    },
+    "evasion": {
+      "default": 10,
+      "minimum": 0,
+      "title": "Evasion",
+      "type": "integer"
+    },
+    "e_defense": {
+      "default": 10,
+      "minimum": 0,
+      "title": "E Defense",
+      "type": "integer"
+    },
+    "speed": {
+      "default": 4,
+      "minimum": 0,
+      "title": "Speed",
+      "type": "integer"
+    }
+  },
+  "title": "PilotCombatBaseStats",
+  "type": "object"
+}

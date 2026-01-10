@@ -1,61 +1,161 @@
 /**
- * Pilot API hooks.
- * 
+ * Pilot API hooks using generated types from core models.
+ *
  * Usage:
  *   const { data: pilots } = usePilots()
  *   const { data: pilot } = usePilot('pilot_123')
  *   const createMutation = useCreatePilot()
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from './client'
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "./client";
+import type {
+  PilotTrigger,
+  Talent,
+  License,
+  CoreBonus,
+  Background,
+} from "../types/lancer";
 
-// Response types (will be replaced by generated types)
+// =============================================================================
+// Request Types (match backend API schemas)
+// =============================================================================
+
+export interface SkillSetInput {
+  hull?: number;
+  agility?: number;
+  systems?: number;
+  engineering?: number;
+}
+
+export interface TriggerInput {
+  trigger_id: string;
+  rank?: number;
+}
+
+export interface TalentInput {
+  talent_id: string;
+  rank?: number;
+}
+
+export interface LicenseInput {
+  license_id: string;
+  rank?: number;
+}
+
+export interface CoreBonusInput {
+  core_bonus_id: string;
+}
+
+export interface BackgroundInput {
+  id: string;
+  name: string;
+}
+
+export interface PilotCreateRequest {
+  callsign: string;
+  name?: string;
+  level?: number;
+  skills?: SkillSetInput;
+  triggers?: TriggerInput[];
+  talents?: TalentInput[];
+  licenses?: LicenseInput[];
+  core_bonuses?: CoreBonusInput[];
+  background?: BackgroundInput | null;
+  notes?: string;
+}
+
+export interface PilotUpdateRequest {
+  callsign?: string;
+  name?: string;
+  level?: number;
+  skills?: SkillSetInput;
+  triggers?: TriggerInput[];
+  talents?: TalentInput[];
+  licenses?: LicenseInput[];
+  core_bonuses?: CoreBonusInput[];
+  background?: BackgroundInput | null;
+  notes?: string;
+}
+
+// =============================================================================
+// Response Types (backend returns hydrated Pilot with DB metadata)
+// =============================================================================
+
 export interface PilotResponse {
-  id: string
-  name: string
-  data: Record<string, unknown>
-  user_id: string
-  campaign_id: string | null
+  // Database metadata
+  id: string;
+  user_id: string;
+  campaign_id: string | null;
+  created_at: string;
+  updated_at: string;
+
+  // Core pilot data
+  callsign: string;
+  name: string;
+  level: number;
+  skills: Record<string, number>;
+  triggers: PilotTrigger[];
+  talents: Talent[];
+  licenses: License[];
+  core_bonuses: CoreBonus[];
+  background: Background | null;
+  notes: string;
+
+  // Computed fields from core Pilot
+  grit: number;
+  hp: number;
+  armor: number;
+  evasion: number;
+  e_defense: number;
+  speed: number;
+  save_target: number;
+  attack_bonus: number;
 }
 
 export interface PilotListResponse {
-  items: PilotResponse[]
-  total: number
+  items: PilotResponse[];
+  total: number;
 }
 
-export interface PilotCreate {
-  name: string
-  callsign?: string
-  data?: Record<string, unknown>
+export interface PilotValidationResponse {
+  valid: boolean;
+  issues: Array<{
+    field: string;
+    message: string;
+    severity: string;
+  }>;
 }
 
-export interface PilotUpdate {
-  name?: string
-  callsign?: string
-  data?: Record<string, unknown>
-}
+// =============================================================================
+// Query Keys
+// =============================================================================
 
-// Query keys for cache management
 export const pilotKeys = {
-  all: ['pilots'] as const,
-  lists: () => [...pilotKeys.all, 'list'] as const,
-  list: (filters: Record<string, string>) => [...pilotKeys.lists(), filters] as const,
-  details: () => [...pilotKeys.all, 'detail'] as const,
+  all: ["pilots"] as const,
+  lists: () => [...pilotKeys.all, "list"] as const,
+  list: (filters: Record<string, string>) =>
+    [...pilotKeys.lists(), filters] as const,
+  details: () => [...pilotKeys.all, "detail"] as const,
   detail: (id: string) => [...pilotKeys.details(), id] as const,
-}
+  validation: (id: string) => [...pilotKeys.detail(id), "validation"] as const,
+};
+
+// =============================================================================
+// Query Hooks
+// =============================================================================
 
 /**
  * Hook for fetching all pilots.
  */
 export function usePilots(campaignId?: string) {
   return useQuery({
-    queryKey: pilotKeys.list({ campaign_id: campaignId || '' }),
+    queryKey: pilotKeys.list({ campaign_id: campaignId || "" }),
     queryFn: () => {
-      const params = campaignId ? `?campaign_id=${campaignId}` : ''
-      return api.get<PilotListResponse>(`/pilots${params}`)
+      const params = campaignId ? `?campaign_id=${campaignId}` : "";
+      return api.get<PilotListResponse>(`/pilots${params}`);
     },
-  })
+  });
 }
 
 /**
@@ -66,57 +166,67 @@ export function usePilot(id: string) {
     queryKey: pilotKeys.detail(id),
     queryFn: () => api.get<PilotResponse>(`/pilots/${id}`),
     enabled: !!id,
-  })
+  });
 }
+
+/**
+ * Hook for validating a pilot against progression rules.
+ */
+export function usePilotValidation(id: string) {
+  return useQuery({
+    queryKey: pilotKeys.validation(id),
+    queryFn: () => api.get<PilotValidationResponse>(`/pilots/${id}/validate`),
+    enabled: !!id,
+  });
+}
+
+// =============================================================================
+// Mutation Hooks
+// =============================================================================
 
 /**
  * Hook for creating a new pilot.
  */
 export function useCreatePilot() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: PilotCreate) => api.post<PilotResponse>('/pilots', data),
+    mutationFn: (data: PilotCreateRequest) =>
+      api.post<PilotResponse>("/pilots", data),
     onSuccess: (newPilot) => {
-      // Invalidate list queries to refetch
-      queryClient.invalidateQueries({ queryKey: pilotKeys.lists() })
-      // Pre-populate the detail cache
-      queryClient.setQueryData(pilotKeys.detail(newPilot.id), newPilot)
+      queryClient.invalidateQueries({ queryKey: pilotKeys.lists() });
+      queryClient.setQueryData(pilotKeys.detail(newPilot.id), newPilot);
     },
-  })
+  });
 }
 
 /**
  * Hook for updating a pilot.
  */
 export function useUpdatePilot() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: PilotUpdate }) =>
+    mutationFn: ({ id, data }: { id: string; data: PilotUpdateRequest }) =>
       api.put<PilotResponse>(`/pilots/${id}`, data),
     onSuccess: (updatedPilot) => {
-      // Update the detail cache
-      queryClient.setQueryData(pilotKeys.detail(updatedPilot.id), updatedPilot)
-      // Invalidate list to refetch
-      queryClient.invalidateQueries({ queryKey: pilotKeys.lists() })
+      queryClient.setQueryData(pilotKeys.detail(updatedPilot.id), updatedPilot);
+      queryClient.invalidateQueries({ queryKey: pilotKeys.lists() });
     },
-  })
+  });
 }
 
 /**
  * Hook for deleting a pilot.
  */
 export function useDeletePilot() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: string) => api.delete(`/pilots/${id}`),
     onSuccess: (_, id) => {
-      // Remove from detail cache
-      queryClient.removeQueries({ queryKey: pilotKeys.detail(id) })
-      // Invalidate list to refetch
-      queryClient.invalidateQueries({ queryKey: pilotKeys.lists() })
+      queryClient.removeQueries({ queryKey: pilotKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: pilotKeys.lists() });
     },
-  })
+  });
 }

@@ -1,0 +1,21 @@
+{
+  "description": "A trigger definition usable for pilot skill checks.",
+  "properties": {
+    "id": {
+      "description": "Unique trigger identifier",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "description": "Display name",
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name"
+  ],
+  "title": "TriggerDefinition",
+  "type": "object"
+}

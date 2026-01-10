@@ -1,0 +1,154 @@
+{
+  "description": "Resolution details for a single narrative goal attempt.",
+  "properties": {
+    "roll_result": {
+      "maximum": 20,
+      "minimum": 1,
+      "title": "Roll Result",
+      "type": "integer"
+    },
+    "target": {
+      "default": 10,
+      "minimum": 0,
+      "title": "Target",
+      "type": "integer"
+    },
+    "modifiers": {
+      "default": 0,
+      "title": "Modifiers",
+      "type": "integer"
+    },
+    "difficulty_modifier": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Difficulty Modifier",
+      "type": "integer"
+    },
+    "tier": {
+      "default": "standard",
+      "enum": [
+        "standard",
+        "difficult",
+        "risky",
+        "heroic"
+      ],
+      "title": "Tier",
+      "type": "string"
+    },
+    "total_result": {
+      "description": "Final total after modifiers",
+      "title": "Total Result",
+      "type": "integer"
+    },
+    "success": {
+      "description": "Whether the goal check succeeded",
+      "title": "Success",
+      "type": "boolean"
+    },
+    "consequence_suffered": {
+      "default": false,
+      "description": "Whether consequences apply (risky/heroic)",
+      "title": "Consequence Suffered",
+      "type": "boolean"
+    },
+    "complication_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "harm",
+            "time",
+            "resources",
+            "collateral",
+            "position",
+            "effect"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Type of complication suffered, if any",
+      "title": "Complication Type"
+    },
+    "complication_description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Complication details if any",
+      "title": "Complication Description"
+    },
+    "pilot_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Pilot taking the action",
+      "title": "Pilot Id"
+    },
+    "skill_used": {
+      "anyOf": [
+        {
+          "enum": [
+            "hull",
+            "agility",
+            "systems",
+            "engineering"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Pilot skill used for the check",
+      "title": "Skill Used"
+    },
+    "action_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Action identifier tied to the attempt",
+      "title": "Action Id"
+    },
+    "action_description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Narrative description of the action",
+      "title": "Action Description"
+    }
+  },
+  "required": [
+    "roll_result",
+    "total_result",
+    "success"
+  ],
+  "title": "NarrativeGoalAttempt",
+  "type": "object"
+}
