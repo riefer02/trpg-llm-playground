@@ -1,0 +1,32 @@
+{
+  "description": "A trigger definition usable for pilot skill checks.",
+  "properties": {
+    "id": {
+      "description": "Unique trigger identifier",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "description": "Display name",
+      "title": "Name",
+      "type": "string"
+    },
+    "skill_type": {
+      "enum": [
+        "hull",
+        "agility",
+        "systems",
+        "engineering"
+      ],
+      "title": "Skill Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "skill_type"
+  ],
+  "title": "TriggerDefinition",
+  "type": "object"
+}

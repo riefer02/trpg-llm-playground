@@ -1,0 +1,30 @@
+{
+  "description": "Rule for invoking a background during narrative play.\n\nInvoking a background grants either +1 accuracy or +1 difficulty\non a pilot skill check, depending on the situation.",
+  "properties": {
+    "bonus": {
+      "default": 1,
+      "maximum": 1,
+      "minimum": 1,
+      "title": "Bonus",
+      "type": "integer"
+    },
+    "modifier_type": {
+      "default": "either",
+      "enum": [
+        "accuracy",
+        "difficulty",
+        "either"
+      ],
+      "title": "Modifier Type",
+      "type": "string"
+    },
+    "applies_to": {
+      "const": "skill_check",
+      "default": "skill_check",
+      "title": "Applies To",
+      "type": "string"
+    }
+  },
+  "title": "BackgroundInvokeRule",
+  "type": "object"
+}

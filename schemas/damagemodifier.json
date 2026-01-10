@@ -1,0 +1,72 @@
+{
+  "description": "Bonus damage under specific conditions.\n\nExamples:\n    DamageModifier(flat=1, condition=\"melee_attack\")  # +1 melee damage\n    DamageModifier(dice=\"1d6\", damage_type=\"kinetic\")  # +1d6 kinetic",
+  "properties": {
+    "dice": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Bonus dice (e.g., '1d6')",
+      "title": "Dice"
+    },
+    "flat": {
+      "default": 0,
+      "description": "Flat bonus damage",
+      "title": "Flat",
+      "type": "integer"
+    },
+    "damage_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Damage Type"
+    },
+    "condition": {
+      "anyOf": [
+        {
+          "enum": [
+            "target_prone",
+            "target_immobilized",
+            "target_below_half_hp",
+            "target_has_lock_on",
+            "target_larger",
+            "target_smaller",
+            "target_same_size",
+            "after_boost",
+            "after_move_8_plus",
+            "in_danger_zone",
+            "hidden",
+            "melee_attack",
+            "ranged_attack",
+            "tech_attack"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Condition"
+    }
+  },
+  "title": "DamageModifier",
+  "type": "object"
+}

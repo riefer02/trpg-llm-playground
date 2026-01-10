@@ -1,0 +1,23 @@
+{
+  "description": "A pilot's trigger rank (+2 to +6).",
+  "properties": {
+    "trigger_id": {
+      "description": "ID of the trigger definition",
+      "title": "Trigger Id",
+      "type": "string"
+    },
+    "rank": {
+      "default": 2,
+      "description": "Trigger bonus (+2 to +6)",
+      "maximum": 6,
+      "minimum": 2,
+      "title": "Rank",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "trigger_id"
+  ],
+  "title": "PilotTrigger",
+  "type": "object"
+}

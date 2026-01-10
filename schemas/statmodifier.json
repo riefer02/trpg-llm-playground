@@ -1,0 +1,33 @@
+{
+  "description": "Numeric modifier to a stat.\n\nExamples:\n    StatModifier(stat=\"hp\", value=5)  # +5 HP\n    StatModifier(stat=\"size\", value=1)  # +1 Size",
+  "properties": {
+    "stat": {
+      "enum": [
+        "hp",
+        "armor",
+        "evasion",
+        "e_defense",
+        "speed",
+        "heat_cap",
+        "repair_cap",
+        "tech_attack",
+        "save_target",
+        "sensor_range",
+        "size",
+        "limited_bonus"
+      ],
+      "title": "Stat",
+      "type": "string"
+    },
+    "value": {
+      "title": "Value",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "stat",
+    "value"
+  ],
+  "title": "StatModifier",
+  "type": "object"
+}

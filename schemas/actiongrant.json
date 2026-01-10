@@ -1,0 +1,50 @@
+{
+  "description": "Grants a new action or ability.\n\nExamples:\n    ActionGrant(action_type=\"quick\", name=\"Afterburner\", trigger=\"after_boost\")\n    ActionGrant(action_type=\"reaction\", name=\"Juke\", trigger=\"on_successful_agility_save\")",
+  "properties": {
+    "action_type": {
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "trigger": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "When this action can be used",
+      "title": "Trigger"
+    },
+    "uses_per": {
+      "default": "unlimited",
+      "enum": [
+        "unlimited",
+        "round",
+        "scene",
+        "mission"
+      ],
+      "title": "Uses Per",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action_type",
+    "name"
+  ],
+  "title": "ActionGrant",
+  "type": "object"
+}

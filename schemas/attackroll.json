@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "AccuracyDifficulty": {
+      "description": "Accuracy and difficulty dice pool for a roll.",
+      "properties": {
+        "accuracy": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Accuracy",
+          "type": "integer"
+        },
+        "difficulty": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "net": {
+          "description": "Net accuracy (positive) or difficulty (negative).",
+          "readOnly": true,
+          "title": "Net",
+          "type": "integer"
+        },
+        "dice_count": {
+          "description": "Number of d6 rolled after canceling.",
+          "readOnly": true,
+          "title": "Dice Count",
+          "type": "integer"
+        },
+        "direction": {
+          "enum": [
+            "accuracy",
+            "difficulty",
+            "none"
+          ],
+          "readOnly": true,
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "net",
+        "dice_count",
+        "direction"
+      ],
+      "title": "AccuracyDifficulty",
+      "type": "object"
+    },
+    "FlatBonus": {
+      "description": "Flat bonus applied to a roll (one source at a time).",
+      "properties": {
+        "source": {
+          "enum": [
+            "trigger",
+            "mech_skill",
+            "grit"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Value",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "FlatBonus",
+      "type": "object"
+    },
+    "RollModifiers": {
+      "description": "Combined modifiers for a roll.",
+      "properties": {
+        "accuracy_difficulty": {
+          "$ref": "#/$defs/AccuracyDifficulty"
+        },
+        "flat_bonus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlatBonus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "RollModifiers",
+      "type": "object"
+    }
+  },
+  "description": "An attack roll against a defense value.",
+  "properties": {
+    "roll_type": {
+      "const": "attack",
+      "default": "attack",
+      "title": "Roll Type",
+      "type": "string"
+    },
+    "target": {
+      "description": "Target defense value",
+      "minimum": 0,
+      "title": "Target",
+      "type": "integer"
+    },
+    "modifiers": {
+      "$ref": "#/$defs/RollModifiers"
+    }
+  },
+  "required": [
+    "target"
+  ],
+  "title": "AttackRoll",
+  "type": "object"
+}

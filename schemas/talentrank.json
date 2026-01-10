@@ -1,0 +1,524 @@
+{
+  "$defs": {
+    "AccuracyModifier": {
+      "description": "Modifier to accuracy/difficulty on rolls.\n\nExamples:\n    AccuracyModifier(value=1, condition=\"target_has_lock_on\")  # +1 Accuracy vs Lock On\n    AccuracyModifier(value=-1)  # -1 Accuracy (difficulty)",
+      "properties": {
+        "value": {
+          "description": "Positive = accuracy, negative = difficulty",
+          "title": "Value",
+          "type": "integer"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "enum": [
+                "target_prone",
+                "target_immobilized",
+                "target_below_half_hp",
+                "target_has_lock_on",
+                "target_larger",
+                "target_smaller",
+                "target_same_size",
+                "after_boost",
+                "after_move_8_plus",
+                "in_danger_zone",
+                "hidden",
+                "melee_attack",
+                "ranged_attack",
+                "tech_attack"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        },
+        "applies_to": {
+          "default": "all",
+          "enum": [
+            "all",
+            "melee",
+            "ranged",
+            "tech"
+          ],
+          "title": "Applies To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "AccuracyModifier",
+      "type": "object"
+    },
+    "ActionGrant": {
+      "description": "Grants a new action or ability.\n\nExamples:\n    ActionGrant(action_type=\"quick\", name=\"Afterburner\", trigger=\"after_boost\")\n    ActionGrant(action_type=\"reaction\", name=\"Juke\", trigger=\"on_successful_agility_save\")",
+      "properties": {
+        "action_type": {
+          "enum": [
+            "free",
+            "quick",
+            "full",
+            "reaction",
+            "protocol"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When this action can be used",
+          "title": "Trigger"
+        },
+        "uses_per": {
+          "default": "unlimited",
+          "enum": [
+            "unlimited",
+            "round",
+            "scene",
+            "mission"
+          ],
+          "title": "Uses Per",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_type",
+        "name"
+      ],
+      "title": "ActionGrant",
+      "type": "object"
+    },
+    "DamageModifier": {
+      "description": "Bonus damage under specific conditions.\n\nExamples:\n    DamageModifier(flat=1, condition=\"melee_attack\")  # +1 melee damage\n    DamageModifier(dice=\"1d6\", damage_type=\"kinetic\")  # +1d6 kinetic",
+      "properties": {
+        "dice": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Bonus dice (e.g., '1d6')",
+          "title": "Dice"
+        },
+        "flat": {
+          "default": 0,
+          "description": "Flat bonus damage",
+          "title": "Flat",
+          "type": "integer"
+        },
+        "damage_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "kinetic",
+                "explosive",
+                "energy",
+                "burn"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Damage Type"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "enum": [
+                "target_prone",
+                "target_immobilized",
+                "target_below_half_hp",
+                "target_has_lock_on",
+                "target_larger",
+                "target_smaller",
+                "target_same_size",
+                "after_boost",
+                "after_move_8_plus",
+                "in_danger_zone",
+                "hidden",
+                "melee_attack",
+                "ranged_attack",
+                "tech_attack"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        }
+      },
+      "title": "DamageModifier",
+      "type": "object"
+    },
+    "Immunity": {
+      "description": "Immunity to a condition, damage type, or effect.\n\nExamples:\n    Immunity(target=\"burn\")  # Immune to Burn\n    Immunity(target=\"knockback\", condition=\"from_smaller\")  # Immune to knockback from smaller",
+      "properties": {
+        "target": {
+          "description": "What you're immune to (condition, damage type, or effect)",
+          "title": "Target",
+          "type": "string"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Conditional immunity",
+          "title": "Condition"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "Immunity",
+      "type": "object"
+    },
+    "MechanicalEffect": {
+      "description": "Composable mechanical effect for talents, core bonuses, systems, etc.\n\nThis is the primary building block for encoding game mechanics\nwithout relying on natural language descriptions.\n\nExample:\n    MechanicalEffect(\n        stat_mods=[StatModifier(stat=\"hp\", value=5)],\n        immunities=[Immunity(target=\"burn\")],\n    )",
+      "properties": {
+        "stat_mods": {
+          "items": {
+            "$ref": "#/$defs/StatModifier"
+          },
+          "title": "Stat Mods",
+          "type": "array"
+        },
+        "accuracy_mods": {
+          "items": {
+            "$ref": "#/$defs/AccuracyModifier"
+          },
+          "title": "Accuracy Mods",
+          "type": "array"
+        },
+        "damage_mods": {
+          "items": {
+            "$ref": "#/$defs/DamageModifier"
+          },
+          "title": "Damage Mods",
+          "type": "array"
+        },
+        "range_mods": {
+          "items": {
+            "$ref": "#/$defs/RangeModifier"
+          },
+          "title": "Range Mods",
+          "type": "array"
+        },
+        "action_grants": {
+          "items": {
+            "$ref": "#/$defs/ActionGrant"
+          },
+          "title": "Action Grants",
+          "type": "array"
+        },
+        "movement_grants": {
+          "items": {
+            "$ref": "#/$defs/MovementGrant"
+          },
+          "title": "Movement Grants",
+          "type": "array"
+        },
+        "status_grants": {
+          "items": {
+            "$ref": "#/$defs/StatusGrant"
+          },
+          "title": "Status Grants",
+          "type": "array"
+        },
+        "immunities": {
+          "items": {
+            "$ref": "#/$defs/Immunity"
+          },
+          "title": "Immunities",
+          "type": "array"
+        },
+        "resistances": {
+          "items": {
+            "$ref": "#/$defs/Resistance"
+          },
+          "title": "Resistances",
+          "type": "array"
+        },
+        "special": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Brief mechanical note for effects not yet modeled (e.g., 'grapple_pull_5')",
+          "title": "Special"
+        }
+      },
+      "title": "MechanicalEffect",
+      "type": "object"
+    },
+    "MovementGrant": {
+      "description": "Grants movement or teleportation.\n\nExamples:\n    MovementGrant(spaces=2, movement_type=\"fly\", trigger=\"on_successful_save\")\n    MovementGrant(spaces=3, movement_type=\"teleport\", trigger=\"after_boost\")",
+      "properties": {
+        "spaces": {
+          "title": "Spaces",
+          "type": "integer"
+        },
+        "movement_type": {
+          "default": "walk",
+          "enum": [
+            "walk",
+            "fly",
+            "teleport"
+          ],
+          "title": "Movement Type",
+          "type": "string"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trigger"
+        }
+      },
+      "required": [
+        "spaces"
+      ],
+      "title": "MovementGrant",
+      "type": "object"
+    },
+    "RangeModifier": {
+      "description": "Modifier to range or threat.\n\nExamples:\n    RangeModifier(range_type=\"threat\", value=1)  # +1 Threat\n    RangeModifier(range_type=\"range\", value=5)  # +5 Range",
+      "properties": {
+        "range_type": {
+          "enum": [
+            "range",
+            "threat",
+            "sensors"
+          ],
+          "title": "Range Type",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "range_type",
+        "value"
+      ],
+      "title": "RangeModifier",
+      "type": "object"
+    },
+    "Resistance": {
+      "description": "Resistance (half damage) to a damage type.\n\nExamples:\n    Resistance(damage_type=\"energy\")\n    Resistance(damage_type=\"all\", condition=\"can_see_bondmate\")",
+      "properties": {
+        "damage_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "kinetic",
+                "explosive",
+                "energy",
+                "burn"
+              ],
+              "type": "string"
+            },
+            {
+              "const": "all",
+              "type": "string"
+            }
+          ],
+          "title": "Damage Type"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        }
+      },
+      "required": [
+        "damage_type"
+      ],
+      "title": "Resistance",
+      "type": "object"
+    },
+    "StatModifier": {
+      "description": "Numeric modifier to a stat.\n\nExamples:\n    StatModifier(stat=\"hp\", value=5)  # +5 HP\n    StatModifier(stat=\"size\", value=1)  # +1 Size",
+      "properties": {
+        "stat": {
+          "enum": [
+            "hp",
+            "armor",
+            "evasion",
+            "e_defense",
+            "speed",
+            "heat_cap",
+            "repair_cap",
+            "tech_attack",
+            "save_target",
+            "sensor_range",
+            "size",
+            "limited_bonus"
+          ],
+          "title": "Stat",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stat",
+        "value"
+      ],
+      "title": "StatModifier",
+      "type": "object"
+    },
+    "StatusGrant": {
+      "description": "Grants or inflicts a status condition.\n\nExamples:\n    StatusGrant(status=\"invisible\", target=\"self\", trigger=\"after_move_8_plus\")\n    StatusGrant(status=\"prone\", target=\"enemy\", trigger=\"on_hit\")",
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "immobilized",
+                "impaired",
+                "jammed",
+                "lock_on",
+                "shredded",
+                "slowed",
+                "stunned",
+                "prone",
+                "hidden",
+                "invisible",
+                "shutdown",
+                "exposed",
+                "engaged"
+              ],
+              "type": "string"
+            },
+            {
+              "enum": [
+                "invisible",
+                "flying"
+              ],
+              "type": "string"
+            }
+          ],
+          "title": "Status"
+        },
+        "target": {
+          "enum": [
+            "self",
+            "enemy",
+            "ally",
+            "adjacent"
+          ],
+          "title": "Target",
+          "type": "string"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trigger"
+        },
+        "duration": {
+          "default": "end_of_turn",
+          "enum": [
+            "end_of_turn",
+            "start_of_next_turn",
+            "until_attack",
+            "scene"
+          ],
+          "title": "Duration",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "target"
+      ],
+      "title": "StatusGrant",
+      "type": "object"
+    }
+  },
+  "description": "A single rank of a talent (1, 2, or 3).\n\nEach rank provides specific mechanical effects.",
+  "properties": {
+    "rank": {
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Rank",
+      "type": "integer"
+    },
+    "name": {
+      "description": "Name of this rank's ability",
+      "title": "Name",
+      "type": "string"
+    },
+    "effects": {
+      "$ref": "#/$defs/MechanicalEffect"
+    }
+  },
+  "required": [
+    "rank",
+    "name"
+  ],
+  "title": "TalentRank",
+  "type": "object"
+}

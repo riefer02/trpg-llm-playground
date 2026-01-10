@@ -1,0 +1,24 @@
+{
+  "description": "Modifier to range or threat.\n\nExamples:\n    RangeModifier(range_type=\"threat\", value=1)  # +1 Threat\n    RangeModifier(range_type=\"range\", value=5)  # +5 Range",
+  "properties": {
+    "range_type": {
+      "enum": [
+        "range",
+        "threat",
+        "sensors"
+      ],
+      "title": "Range Type",
+      "type": "string"
+    },
+    "value": {
+      "title": "Value",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "range_type",
+    "value"
+  ],
+  "title": "RangeModifier",
+  "type": "object"
+}

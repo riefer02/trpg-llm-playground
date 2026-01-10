@@ -1,0 +1,28 @@
+{
+  "description": "Immunity to a condition, damage type, or effect.\n\nExamples:\n    Immunity(target=\"burn\")  # Immune to Burn\n    Immunity(target=\"knockback\", condition=\"from_smaller\")  # Immune to knockback from smaller",
+  "properties": {
+    "target": {
+      "description": "What you're immune to (condition, damage type, or effect)",
+      "title": "Target",
+      "type": "string"
+    },
+    "condition": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Conditional immunity",
+      "title": "Condition"
+    }
+  },
+  "required": [
+    "target"
+  ],
+  "title": "Immunity",
+  "type": "object"
+}

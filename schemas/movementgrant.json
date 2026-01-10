@@ -1,0 +1,36 @@
+{
+  "description": "Grants movement or teleportation.\n\nExamples:\n    MovementGrant(spaces=2, movement_type=\"fly\", trigger=\"on_successful_save\")\n    MovementGrant(spaces=3, movement_type=\"teleport\", trigger=\"after_boost\")",
+  "properties": {
+    "spaces": {
+      "title": "Spaces",
+      "type": "integer"
+    },
+    "movement_type": {
+      "default": "walk",
+      "enum": [
+        "walk",
+        "fly",
+        "teleport"
+      ],
+      "title": "Movement Type",
+      "type": "string"
+    },
+    "trigger": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Trigger"
+    }
+  },
+  "required": [
+    "spaces"
+  ],
+  "title": "MovementGrant",
+  "type": "object"
+}

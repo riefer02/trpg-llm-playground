@@ -2,13 +2,17 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
 
 # Data
 dataset/
 outputs/
 *.pdf
 *.jsonl
-*.json
+
+# LLM output JSON (but not package.json, tsconfig.json, etc.)
+llm/**/*.json
+!llm/**/config/*.json
 
 # Models (local GGUF files - too large for git)
 models/*.gguf
@@ -16,14 +20,25 @@ models/*.bin
 
 # Env
 .env
+!.env.example
 .venv
 env/
 venv/
 
 # IDE
-.vscode
-.idea
+.vscode/
+.idea/
+*.swp
+*.swo
 
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (frontend)
+node_modules/
+
+# Books source material
 books/
 
 # Planning notes (local only)

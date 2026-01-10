@@ -1,0 +1,1520 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lancer.schema/combined",
+  "title": "Lancer TTRPG Schema",
+  "description": "Combined JSON Schema for Lancer TTRPG type definitions",
+  "$defs": {
+    "Background": {
+      "description": "A pilot's background - their life before becoming a lancer.\n\nBackgrounds provide 4 triggers that define what situations\nthe pilot is particularly skilled at handling based on their\npast experience.\n\nNote: The 'description' field has been intentionally removed\nto avoid including copyrighted flavor text. Users can provide\ntheir own descriptions if needed.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier (e.g., 'background_1')",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "triggers": {
+          "description": "Four trigger IDs from this background",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "title": "Triggers",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "triggers"
+      ],
+      "title": "Background",
+      "type": "object"
+    },
+    "CoreBonus": {
+      "description": "A core bonus that a pilot has earned.",
+      "properties": {
+        "core_bonus_id": {
+          "description": "ID of the core bonus definition",
+          "title": "Core Bonus Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "core_bonus_id"
+      ],
+      "title": "CoreBonus",
+      "type": "object"
+    },
+    "License": {
+      "description": "A license that a pilot has ranks in.\n\nPilots gain 1 license level per level up (starting at LL1).\nThey can put this into a new license or increase an existing one.",
+      "properties": {
+        "license_id": {
+          "description": "ID of the license definition",
+          "title": "License Id",
+          "type": "string"
+        },
+        "rank": {
+          "default": 1,
+          "description": "Current rank (1-3)",
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "license_id"
+      ],
+      "title": "License",
+      "type": "object"
+    },
+    "PilotTrigger": {
+      "description": "A pilot's trigger rank (+2 to +6).",
+      "properties": {
+        "trigger_id": {
+          "description": "ID of the trigger definition",
+          "title": "Trigger Id",
+          "type": "string"
+        },
+        "rank": {
+          "default": 2,
+          "description": "Trigger bonus (+2 to +6)",
+          "maximum": 6,
+          "minimum": 2,
+          "title": "Rank",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "trigger_id"
+      ],
+      "title": "PilotTrigger",
+      "type": "object"
+    },
+    "SkillSet": {
+      "description": "A complete set of pilot skills.\n\nAt LL0, pilots have +2 to distribute among their 4 skills.\nThey gain +1 more at each level up.",
+      "properties": {
+        "hull": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Hull",
+          "type": "integer"
+        },
+        "agility": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Agility",
+          "type": "integer"
+        },
+        "systems": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Systems",
+          "type": "integer"
+        },
+        "engineering": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Engineering",
+          "type": "integer"
+        }
+      },
+      "title": "SkillSet",
+      "type": "object"
+    },
+    "Talent": {
+      "description": "A talent that a pilot has learned.\n\nThis represents a pilot's progress in a specific talent,\ntracking which ranks they have unlocked.",
+      "properties": {
+        "talent_id": {
+          "description": "ID of the talent definition",
+          "title": "Talent Id",
+          "type": "string"
+        },
+        "rank": {
+          "default": 1,
+          "description": "Current rank (1-3)",
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "talent_id"
+      ],
+      "title": "Talent",
+      "type": "object"
+    },
+    "Pilot": {
+      "description": "A Lancer pilot character.\n\nPilots progress from License Level 0 (LL0) to LL12.\nAt each level, they gain:\n- +1 mech skill point\n- +1 license point\n- +1 talent point\n- +2 trigger points\n\nEvery 3 license levels with a manufacturer unlocks a core bonus.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "callsign": {
+          "description": "The pilot's callsign",
+          "minLength": 1,
+          "title": "Callsign",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "description": "The pilot's real name (optional)",
+          "title": "Name",
+          "type": "string"
+        },
+        "background": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Background"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "notes": {
+          "default": "",
+          "description": "Player notes about the character",
+          "title": "Notes",
+          "type": "string"
+        },
+        "level": {
+          "default": 0,
+          "description": "License Level (LL0-LL12)",
+          "maximum": 12,
+          "minimum": 0,
+          "title": "Level",
+          "type": "integer"
+        },
+        "skills": {
+          "$ref": "#/$defs/SkillSet"
+        },
+        "triggers": {
+          "items": {
+            "$ref": "#/$defs/PilotTrigger"
+          },
+          "title": "Triggers",
+          "type": "array"
+        },
+        "talents": {
+          "items": {
+            "$ref": "#/$defs/Talent"
+          },
+          "title": "Talents",
+          "type": "array"
+        },
+        "licenses": {
+          "items": {
+            "$ref": "#/$defs/License"
+          },
+          "title": "Licenses",
+          "type": "array"
+        },
+        "core_bonuses": {
+          "items": {
+            "$ref": "#/$defs/CoreBonus"
+          },
+          "title": "Core Bonuses",
+          "type": "array"
+        },
+        "hp_bonus": {
+          "default": 0,
+          "description": "Bonus HP from talents/gear",
+          "title": "Hp Bonus",
+          "type": "integer"
+        },
+        "armor_bonus": {
+          "default": 0,
+          "description": "Bonus armor from gear",
+          "title": "Armor Bonus",
+          "type": "integer"
+        },
+        "grit": {
+          "description": "Grit is half of level (rounded up), minimum 0.\nUsed for various bonuses and HP calculation.",
+          "readOnly": true,
+          "title": "Grit",
+          "type": "integer"
+        },
+        "hp": {
+          "description": "Pilot HP = 6 + Grit + any bonuses.\nThis is for when the pilot is out of the mech.",
+          "readOnly": true,
+          "title": "Hp",
+          "type": "integer"
+        },
+        "armor": {
+          "description": "Pilot armor (usually 0 unless wearing hardsuit).",
+          "readOnly": true,
+          "title": "Armor",
+          "type": "integer"
+        },
+        "evasion": {
+          "description": "Pilot evasion = 10 by default.",
+          "readOnly": true,
+          "title": "Evasion",
+          "type": "integer"
+        },
+        "e_defense": {
+          "description": "Pilot e-defense = 10 by default.",
+          "readOnly": true,
+          "title": "E Defense",
+          "type": "integer"
+        },
+        "speed": {
+          "description": "Pilot speed = 4 by default.",
+          "readOnly": true,
+          "title": "Speed",
+          "type": "integer"
+        },
+        "save_target": {
+          "description": "Pilot save target = 10 + grit.",
+          "readOnly": true,
+          "title": "Save Target",
+          "type": "integer"
+        },
+        "attack_bonus": {
+          "description": "Base attack bonus from grit.",
+          "readOnly": true,
+          "title": "Attack Bonus",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "callsign",
+        "grit",
+        "hp",
+        "armor",
+        "evasion",
+        "e_defense",
+        "speed",
+        "save_target",
+        "attack_bonus"
+      ],
+      "title": "Pilot",
+      "type": "object"
+    },
+    "Skill": {
+      "description": "A pilot skill with a rank.\n\nIn Lancer, pilots have 4 mech skills (HULL, AGI, SYS, ENG)\nthat determine their mech's base stats. Pilot skill checks\ninstead use triggers for flat bonuses.",
+      "properties": {
+        "skill_type": {
+          "enum": [
+            "hull",
+            "agility",
+            "systems",
+            "engineering"
+          ],
+          "title": "Skill Type",
+          "type": "string"
+        },
+        "rank": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Rank",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "skill_type"
+      ],
+      "title": "Skill",
+      "type": "object"
+    },
+    "BackgroundInvokeRule": {
+      "description": "Rule for invoking a background during narrative play.\n\nInvoking a background grants either +1 accuracy or +1 difficulty\non a pilot skill check, depending on the situation.",
+      "properties": {
+        "bonus": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 1,
+          "title": "Bonus",
+          "type": "integer"
+        },
+        "modifier_type": {
+          "default": "either",
+          "enum": [
+            "accuracy",
+            "difficulty",
+            "either"
+          ],
+          "title": "Modifier Type",
+          "type": "string"
+        },
+        "applies_to": {
+          "const": "skill_check",
+          "default": "skill_check",
+          "title": "Applies To",
+          "type": "string"
+        }
+      },
+      "title": "BackgroundInvokeRule",
+      "type": "object"
+    },
+    "AccuracyModifier": {
+      "description": "Modifier to accuracy/difficulty on rolls.\n\nExamples:\n    AccuracyModifier(value=1, condition=\"target_has_lock_on\")  # +1 Accuracy vs Lock On\n    AccuracyModifier(value=-1)  # -1 Accuracy (difficulty)",
+      "properties": {
+        "value": {
+          "description": "Positive = accuracy, negative = difficulty",
+          "title": "Value",
+          "type": "integer"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "enum": [
+                "target_prone",
+                "target_immobilized",
+                "target_below_half_hp",
+                "target_has_lock_on",
+                "target_larger",
+                "target_smaller",
+                "target_same_size",
+                "after_boost",
+                "after_move_8_plus",
+                "in_danger_zone",
+                "hidden",
+                "melee_attack",
+                "ranged_attack",
+                "tech_attack"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        },
+        "applies_to": {
+          "default": "all",
+          "enum": [
+            "all",
+            "melee",
+            "ranged",
+            "tech"
+          ],
+          "title": "Applies To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "AccuracyModifier",
+      "type": "object"
+    },
+    "ActionGrant": {
+      "description": "Grants a new action or ability.\n\nExamples:\n    ActionGrant(action_type=\"quick\", name=\"Afterburner\", trigger=\"after_boost\")\n    ActionGrant(action_type=\"reaction\", name=\"Juke\", trigger=\"on_successful_agility_save\")",
+      "properties": {
+        "action_type": {
+          "enum": [
+            "free",
+            "quick",
+            "full",
+            "reaction",
+            "protocol"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When this action can be used",
+          "title": "Trigger"
+        },
+        "uses_per": {
+          "default": "unlimited",
+          "enum": [
+            "unlimited",
+            "round",
+            "scene",
+            "mission"
+          ],
+          "title": "Uses Per",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_type",
+        "name"
+      ],
+      "title": "ActionGrant",
+      "type": "object"
+    },
+    "DamageModifier": {
+      "description": "Bonus damage under specific conditions.\n\nExamples:\n    DamageModifier(flat=1, condition=\"melee_attack\")  # +1 melee damage\n    DamageModifier(dice=\"1d6\", damage_type=\"kinetic\")  # +1d6 kinetic",
+      "properties": {
+        "dice": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Bonus dice (e.g., '1d6')",
+          "title": "Dice"
+        },
+        "flat": {
+          "default": 0,
+          "description": "Flat bonus damage",
+          "title": "Flat",
+          "type": "integer"
+        },
+        "damage_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "kinetic",
+                "explosive",
+                "energy",
+                "burn"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Damage Type"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "enum": [
+                "target_prone",
+                "target_immobilized",
+                "target_below_half_hp",
+                "target_has_lock_on",
+                "target_larger",
+                "target_smaller",
+                "target_same_size",
+                "after_boost",
+                "after_move_8_plus",
+                "in_danger_zone",
+                "hidden",
+                "melee_attack",
+                "ranged_attack",
+                "tech_attack"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        }
+      },
+      "title": "DamageModifier",
+      "type": "object"
+    },
+    "Immunity": {
+      "description": "Immunity to a condition, damage type, or effect.\n\nExamples:\n    Immunity(target=\"burn\")  # Immune to Burn\n    Immunity(target=\"knockback\", condition=\"from_smaller\")  # Immune to knockback from smaller",
+      "properties": {
+        "target": {
+          "description": "What you're immune to (condition, damage type, or effect)",
+          "title": "Target",
+          "type": "string"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Conditional immunity",
+          "title": "Condition"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "Immunity",
+      "type": "object"
+    },
+    "MechanicalEffect": {
+      "description": "Composable mechanical effect for talents, core bonuses, systems, etc.\n\nThis is the primary building block for encoding game mechanics\nwithout relying on natural language descriptions.\n\nExample:\n    MechanicalEffect(\n        stat_mods=[StatModifier(stat=\"hp\", value=5)],\n        immunities=[Immunity(target=\"burn\")],\n    )",
+      "properties": {
+        "stat_mods": {
+          "items": {
+            "$ref": "#/$defs/StatModifier"
+          },
+          "title": "Stat Mods",
+          "type": "array"
+        },
+        "accuracy_mods": {
+          "items": {
+            "$ref": "#/$defs/AccuracyModifier"
+          },
+          "title": "Accuracy Mods",
+          "type": "array"
+        },
+        "damage_mods": {
+          "items": {
+            "$ref": "#/$defs/DamageModifier"
+          },
+          "title": "Damage Mods",
+          "type": "array"
+        },
+        "range_mods": {
+          "items": {
+            "$ref": "#/$defs/RangeModifier"
+          },
+          "title": "Range Mods",
+          "type": "array"
+        },
+        "action_grants": {
+          "items": {
+            "$ref": "#/$defs/ActionGrant"
+          },
+          "title": "Action Grants",
+          "type": "array"
+        },
+        "movement_grants": {
+          "items": {
+            "$ref": "#/$defs/MovementGrant"
+          },
+          "title": "Movement Grants",
+          "type": "array"
+        },
+        "status_grants": {
+          "items": {
+            "$ref": "#/$defs/StatusGrant"
+          },
+          "title": "Status Grants",
+          "type": "array"
+        },
+        "immunities": {
+          "items": {
+            "$ref": "#/$defs/Immunity"
+          },
+          "title": "Immunities",
+          "type": "array"
+        },
+        "resistances": {
+          "items": {
+            "$ref": "#/$defs/Resistance"
+          },
+          "title": "Resistances",
+          "type": "array"
+        },
+        "special": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Brief mechanical note for effects not yet modeled (e.g., 'grapple_pull_5')",
+          "title": "Special"
+        }
+      },
+      "title": "MechanicalEffect",
+      "type": "object"
+    },
+    "MovementGrant": {
+      "description": "Grants movement or teleportation.\n\nExamples:\n    MovementGrant(spaces=2, movement_type=\"fly\", trigger=\"on_successful_save\")\n    MovementGrant(spaces=3, movement_type=\"teleport\", trigger=\"after_boost\")",
+      "properties": {
+        "spaces": {
+          "title": "Spaces",
+          "type": "integer"
+        },
+        "movement_type": {
+          "default": "walk",
+          "enum": [
+            "walk",
+            "fly",
+            "teleport"
+          ],
+          "title": "Movement Type",
+          "type": "string"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trigger"
+        }
+      },
+      "required": [
+        "spaces"
+      ],
+      "title": "MovementGrant",
+      "type": "object"
+    },
+    "RangeModifier": {
+      "description": "Modifier to range or threat.\n\nExamples:\n    RangeModifier(range_type=\"threat\", value=1)  # +1 Threat\n    RangeModifier(range_type=\"range\", value=5)  # +5 Range",
+      "properties": {
+        "range_type": {
+          "enum": [
+            "range",
+            "threat",
+            "sensors"
+          ],
+          "title": "Range Type",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "range_type",
+        "value"
+      ],
+      "title": "RangeModifier",
+      "type": "object"
+    },
+    "Resistance": {
+      "description": "Resistance (half damage) to a damage type.\n\nExamples:\n    Resistance(damage_type=\"energy\")\n    Resistance(damage_type=\"all\", condition=\"can_see_bondmate\")",
+      "properties": {
+        "damage_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "kinetic",
+                "explosive",
+                "energy",
+                "burn"
+              ],
+              "type": "string"
+            },
+            {
+              "const": "all",
+              "type": "string"
+            }
+          ],
+          "title": "Damage Type"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        }
+      },
+      "required": [
+        "damage_type"
+      ],
+      "title": "Resistance",
+      "type": "object"
+    },
+    "StatModifier": {
+      "description": "Numeric modifier to a stat.\n\nExamples:\n    StatModifier(stat=\"hp\", value=5)  # +5 HP\n    StatModifier(stat=\"size\", value=1)  # +1 Size",
+      "properties": {
+        "stat": {
+          "enum": [
+            "hp",
+            "armor",
+            "evasion",
+            "e_defense",
+            "speed",
+            "heat_cap",
+            "repair_cap",
+            "tech_attack",
+            "save_target",
+            "sensor_range",
+            "size",
+            "limited_bonus"
+          ],
+          "title": "Stat",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stat",
+        "value"
+      ],
+      "title": "StatModifier",
+      "type": "object"
+    },
+    "StatusGrant": {
+      "description": "Grants or inflicts a status condition.\n\nExamples:\n    StatusGrant(status=\"invisible\", target=\"self\", trigger=\"after_move_8_plus\")\n    StatusGrant(status=\"prone\", target=\"enemy\", trigger=\"on_hit\")",
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "immobilized",
+                "impaired",
+                "jammed",
+                "lock_on",
+                "shredded",
+                "slowed",
+                "stunned",
+                "prone",
+                "hidden",
+                "invisible",
+                "shutdown",
+                "exposed",
+                "engaged"
+              ],
+              "type": "string"
+            },
+            {
+              "enum": [
+                "invisible",
+                "flying"
+              ],
+              "type": "string"
+            }
+          ],
+          "title": "Status"
+        },
+        "target": {
+          "enum": [
+            "self",
+            "enemy",
+            "ally",
+            "adjacent"
+          ],
+          "title": "Target",
+          "type": "string"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trigger"
+        },
+        "duration": {
+          "default": "end_of_turn",
+          "enum": [
+            "end_of_turn",
+            "start_of_next_turn",
+            "until_attack",
+            "scene"
+          ],
+          "title": "Duration",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "target"
+      ],
+      "title": "StatusGrant",
+      "type": "object"
+    },
+    "TalentRank": {
+      "description": "A single rank of a talent (1, 2, or 3).\n\nEach rank provides specific mechanical effects.",
+      "properties": {
+        "rank": {
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of this rank's ability",
+          "title": "Name",
+          "type": "string"
+        },
+        "effects": {
+          "$ref": "#/$defs/MechanicalEffect"
+        }
+      },
+      "required": [
+        "rank",
+        "name"
+      ],
+      "title": "TalentRank",
+      "type": "object"
+    },
+    "TalentDefinition": {
+      "description": "A talent definition - the template for a learnable talent.\n\nThis is the \"type\" of talent (e.g., ACE, BONDED, etc.)\nthat defines what each rank provides.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier (e.g., 'ace', 'bonded')",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "ranks": {
+          "description": "The three ranks of this talent",
+          "items": {
+            "$ref": "#/$defs/TalentRank"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Ranks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "ranks"
+      ],
+      "title": "TalentDefinition",
+      "type": "object"
+    },
+    "LicenseDefinition": {
+      "description": "A license definition - the template for a manufacturer license.\n\nEach license corresponds to a frame and unlocks:\n- Rank 1: Basic frame systems and weapons\n- Rank 2: Advanced systems\n- Rank 3: The frame itself plus signature gear\n\nNote: The 'description' field has been intentionally removed\nto avoid including copyrighted flavor text.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier (e.g., 'blackbeard', 'nelson')",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name (usually the frame name)",
+          "title": "Name",
+          "type": "string"
+        },
+        "manufacturer": {
+          "enum": [
+            "GMS",
+            "IPS-N",
+            "SSC",
+            "HORUS",
+            "HA"
+          ],
+          "title": "Manufacturer",
+          "type": "string"
+        },
+        "frame_id": {
+          "description": "ID of the frame this license provides",
+          "title": "Frame Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "manufacturer",
+        "frame_id"
+      ],
+      "title": "LicenseDefinition",
+      "type": "object"
+    },
+    "CoreBonusDefinition": {
+      "description": "A core bonus definition - the template for a learnable core bonus.\n\nCore bonuses are powerful, permanent upgrades to a pilot's mech.\nThey're earned by reaching LL3 in any manufacturer's licenses\n(3 total license levels with that manufacturer).",
+      "properties": {
+        "id": {
+          "description": "Unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "manufacturer": {
+          "enum": [
+            "GMS",
+            "IPS-N",
+            "SSC",
+            "HORUS",
+            "HA"
+          ],
+          "title": "Manufacturer",
+          "type": "string"
+        },
+        "effects": {
+          "$ref": "#/$defs/MechanicalEffect"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "manufacturer"
+      ],
+      "title": "CoreBonusDefinition",
+      "type": "object"
+    },
+    "TriggerDefinition": {
+      "description": "A trigger definition usable for pilot skill checks.",
+      "properties": {
+        "id": {
+          "description": "Unique trigger identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "skill_type": {
+          "enum": [
+            "hull",
+            "agility",
+            "systems",
+            "engineering"
+          ],
+          "title": "Skill Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "skill_type"
+      ],
+      "title": "TriggerDefinition",
+      "type": "object"
+    },
+    "LevelProgression": {
+      "description": "Progression values for a given license level.",
+      "properties": {
+        "level": {
+          "maximum": 12,
+          "minimum": 0,
+          "title": "Level",
+          "type": "integer"
+        },
+        "grit": {
+          "minimum": 0,
+          "title": "Grit",
+          "type": "integer"
+        },
+        "license_points": {
+          "minimum": 0,
+          "title": "License Points",
+          "type": "integer"
+        },
+        "total_mech_skill_points": {
+          "minimum": 0,
+          "title": "Total Mech Skill Points",
+          "type": "integer"
+        },
+        "total_talent_points": {
+          "minimum": 0,
+          "title": "Total Talent Points",
+          "type": "integer"
+        },
+        "core_bonuses": {
+          "minimum": 0,
+          "title": "Core Bonuses",
+          "type": "integer"
+        },
+        "pilot_trigger_points": {
+          "minimum": 0,
+          "title": "Pilot Trigger Points",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "level",
+        "grit",
+        "license_points",
+        "total_mech_skill_points",
+        "total_talent_points",
+        "core_bonuses",
+        "pilot_trigger_points"
+      ],
+      "title": "LevelProgression",
+      "type": "object"
+    },
+    "PilotProgressionRules": {
+      "description": "Rule-of-thumb progression parameters used to build the level chart.",
+      "properties": {
+        "level_cap": {
+          "default": 12,
+          "title": "Level Cap",
+          "type": "integer"
+        },
+        "starting_trigger_points": {
+          "default": 8,
+          "title": "Starting Trigger Points",
+          "type": "integer"
+        },
+        "trigger_points_per_level": {
+          "default": 2,
+          "title": "Trigger Points Per Level",
+          "type": "integer"
+        },
+        "trigger_rank_min": {
+          "default": 2,
+          "title": "Trigger Rank Min",
+          "type": "integer"
+        },
+        "trigger_rank_max": {
+          "default": 6,
+          "title": "Trigger Rank Max",
+          "type": "integer"
+        },
+        "starting_mech_skill_points": {
+          "default": 2,
+          "title": "Starting Mech Skill Points",
+          "type": "integer"
+        },
+        "mech_skill_points_per_level": {
+          "default": 1,
+          "title": "Mech Skill Points Per Level",
+          "type": "integer"
+        },
+        "mech_skill_rank_max": {
+          "default": 6,
+          "title": "Mech Skill Rank Max",
+          "type": "integer"
+        },
+        "starting_talent_points": {
+          "default": 3,
+          "title": "Starting Talent Points",
+          "type": "integer"
+        },
+        "talent_points_per_level": {
+          "default": 1,
+          "title": "Talent Points Per Level",
+          "type": "integer"
+        },
+        "license_points_per_level": {
+          "default": 1,
+          "title": "License Points Per Level",
+          "type": "integer"
+        },
+        "core_bonus_every_levels": {
+          "default": 3,
+          "title": "Core Bonus Every Levels",
+          "type": "integer"
+        }
+      },
+      "title": "PilotProgressionRules",
+      "type": "object"
+    },
+    "ProgressionIssue": {
+      "description": "A progression validation issue.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "default": "error",
+          "enum": [
+            "error",
+            "warning"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ProgressionIssue",
+      "type": "object"
+    },
+    "ProgressionValidation": {
+      "description": "Validation result for pilot progression.",
+      "properties": {
+        "valid": {
+          "title": "Valid",
+          "type": "boolean"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/ProgressionIssue"
+          },
+          "title": "Issues",
+          "type": "array"
+        }
+      },
+      "required": [
+        "valid"
+      ],
+      "title": "ProgressionValidation",
+      "type": "object"
+    },
+    "DiceExpression": {
+      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
+      "properties": {
+        "count": {
+          "default": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "size": {
+          "default": 6,
+          "enum": [
+            3,
+            6,
+            20
+          ],
+          "title": "Size",
+          "type": "integer"
+        },
+        "modifier": {
+          "default": 0,
+          "title": "Modifier",
+          "type": "integer"
+        }
+      },
+      "title": "DiceExpression",
+      "type": "object"
+    },
+    "AccuracyDifficulty": {
+      "description": "Accuracy and difficulty dice pool for a roll.",
+      "properties": {
+        "accuracy": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Accuracy",
+          "type": "integer"
+        },
+        "difficulty": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "net": {
+          "description": "Net accuracy (positive) or difficulty (negative).",
+          "readOnly": true,
+          "title": "Net",
+          "type": "integer"
+        },
+        "dice_count": {
+          "description": "Number of d6 rolled after canceling.",
+          "readOnly": true,
+          "title": "Dice Count",
+          "type": "integer"
+        },
+        "direction": {
+          "enum": [
+            "accuracy",
+            "difficulty",
+            "none"
+          ],
+          "readOnly": true,
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "net",
+        "dice_count",
+        "direction"
+      ],
+      "title": "AccuracyDifficulty",
+      "type": "object"
+    },
+    "FlatBonus": {
+      "description": "Flat bonus applied to a roll (one source at a time).",
+      "properties": {
+        "source": {
+          "enum": [
+            "trigger",
+            "mech_skill",
+            "grit"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Value",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "FlatBonus",
+      "type": "object"
+    },
+    "RollModifiers": {
+      "description": "Combined modifiers for a roll.",
+      "properties": {
+        "accuracy_difficulty": {
+          "$ref": "#/$defs/AccuracyDifficulty"
+        },
+        "flat_bonus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlatBonus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "RollModifiers",
+      "type": "object"
+    },
+    "SkillCheck": {
+      "description": "A narrative skill check (target 10 by default).",
+      "properties": {
+        "roll_type": {
+          "const": "skill_check",
+          "default": "skill_check",
+          "title": "Roll Type",
+          "type": "string"
+        },
+        "target": {
+          "default": 10,
+          "minimum": 0,
+          "title": "Target",
+          "type": "integer"
+        },
+        "modifiers": {
+          "$ref": "#/$defs/RollModifiers"
+        }
+      },
+      "title": "SkillCheck",
+      "type": "object"
+    },
+    "AttackRoll": {
+      "description": "An attack roll against a defense value.",
+      "properties": {
+        "roll_type": {
+          "const": "attack",
+          "default": "attack",
+          "title": "Roll Type",
+          "type": "string"
+        },
+        "target": {
+          "description": "Target defense value",
+          "minimum": 0,
+          "title": "Target",
+          "type": "integer"
+        },
+        "modifiers": {
+          "$ref": "#/$defs/RollModifiers"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "AttackRoll",
+      "type": "object"
+    },
+    "SaveRoll": {
+      "description": "A save roll against an attacker's save target.",
+      "properties": {
+        "roll_type": {
+          "const": "save",
+          "default": "save",
+          "title": "Roll Type",
+          "type": "string"
+        },
+        "target": {
+          "description": "Attacker save target",
+          "minimum": 0,
+          "title": "Target",
+          "type": "integer"
+        },
+        "modifiers": {
+          "$ref": "#/$defs/RollModifiers"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "SaveRoll",
+      "type": "object"
+    },
+    "ContestedCheck": {
+      "description": "Two opposed skill checks; ties go to the attacker.",
+      "properties": {
+        "attacker": {
+          "$ref": "#/$defs/SkillCheck"
+        },
+        "defender": {
+          "$ref": "#/$defs/SkillCheck"
+        },
+        "tie_breaker": {
+          "const": "attacker",
+          "default": "attacker",
+          "title": "Tie Breaker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attacker",
+        "defender"
+      ],
+      "title": "ContestedCheck",
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Pilot"
+    },
+    {
+      "$ref": "#/$defs/Skill"
+    },
+    {
+      "$ref": "#/$defs/SkillSet"
+    },
+    {
+      "$ref": "#/$defs/Background"
+    },
+    {
+      "$ref": "#/$defs/BackgroundInvokeRule"
+    },
+    {
+      "$ref": "#/$defs/Talent"
+    },
+    {
+      "$ref": "#/$defs/TalentDefinition"
+    },
+    {
+      "$ref": "#/$defs/TalentRank"
+    },
+    {
+      "$ref": "#/$defs/License"
+    },
+    {
+      "$ref": "#/$defs/LicenseDefinition"
+    },
+    {
+      "$ref": "#/$defs/CoreBonus"
+    },
+    {
+      "$ref": "#/$defs/CoreBonusDefinition"
+    },
+    {
+      "$ref": "#/$defs/PilotTrigger"
+    },
+    {
+      "$ref": "#/$defs/TriggerDefinition"
+    },
+    {
+      "$ref": "#/$defs/LevelProgression"
+    },
+    {
+      "$ref": "#/$defs/PilotProgressionRules"
+    },
+    {
+      "$ref": "#/$defs/ProgressionIssue"
+    },
+    {
+      "$ref": "#/$defs/ProgressionValidation"
+    },
+    {
+      "$ref": "#/$defs/DiceExpression"
+    },
+    {
+      "$ref": "#/$defs/MechanicalEffect"
+    },
+    {
+      "$ref": "#/$defs/StatModifier"
+    },
+    {
+      "$ref": "#/$defs/DamageModifier"
+    },
+    {
+      "$ref": "#/$defs/RangeModifier"
+    },
+    {
+      "$ref": "#/$defs/ActionGrant"
+    },
+    {
+      "$ref": "#/$defs/Immunity"
+    },
+    {
+      "$ref": "#/$defs/Resistance"
+    },
+    {
+      "$ref": "#/$defs/AccuracyModifier"
+    },
+    {
+      "$ref": "#/$defs/MovementGrant"
+    },
+    {
+      "$ref": "#/$defs/StatusGrant"
+    },
+    {
+      "$ref": "#/$defs/AccuracyDifficulty"
+    },
+    {
+      "$ref": "#/$defs/FlatBonus"
+    },
+    {
+      "$ref": "#/$defs/RollModifiers"
+    },
+    {
+      "$ref": "#/$defs/SkillCheck"
+    },
+    {
+      "$ref": "#/$defs/AttackRoll"
+    },
+    {
+      "$ref": "#/$defs/SaveRoll"
+    },
+    {
+      "$ref": "#/$defs/ContestedCheck"
+    }
+  ]
+}

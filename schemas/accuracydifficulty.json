@@ -1,0 +1,46 @@
+{
+  "description": "Accuracy and difficulty dice pool for a roll.",
+  "properties": {
+    "accuracy": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Accuracy",
+      "type": "integer"
+    },
+    "difficulty": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Difficulty",
+      "type": "integer"
+    },
+    "net": {
+      "description": "Net accuracy (positive) or difficulty (negative).",
+      "readOnly": true,
+      "title": "Net",
+      "type": "integer"
+    },
+    "dice_count": {
+      "description": "Number of d6 rolled after canceling.",
+      "readOnly": true,
+      "title": "Dice Count",
+      "type": "integer"
+    },
+    "direction": {
+      "enum": [
+        "accuracy",
+        "difficulty",
+        "none"
+      ],
+      "readOnly": true,
+      "title": "Direction",
+      "type": "string"
+    }
+  },
+  "required": [
+    "net",
+    "dice_count",
+    "direction"
+  ],
+  "title": "AccuracyDifficulty",
+  "type": "object"
+}

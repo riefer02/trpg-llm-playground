@@ -1,0 +1,35 @@
+{
+  "description": "A complete set of pilot skills.\n\nAt LL0, pilots have +2 to distribute among their 4 skills.\nThey gain +1 more at each level up.",
+  "properties": {
+    "hull": {
+      "default": 0,
+      "maximum": 6,
+      "minimum": 0,
+      "title": "Hull",
+      "type": "integer"
+    },
+    "agility": {
+      "default": 0,
+      "maximum": 6,
+      "minimum": 0,
+      "title": "Agility",
+      "type": "integer"
+    },
+    "systems": {
+      "default": 0,
+      "maximum": 6,
+      "minimum": 0,
+      "title": "Systems",
+      "type": "integer"
+    },
+    "engineering": {
+      "default": 0,
+      "maximum": 6,
+      "minimum": 0,
+      "title": "Engineering",
+      "type": "integer"
+    }
+  },
+  "title": "SkillSet",
+  "type": "object"
+}

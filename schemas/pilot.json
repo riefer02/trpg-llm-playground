@@ -1,0 +1,303 @@
+{
+  "$defs": {
+    "Background": {
+      "description": "A pilot's background - their life before becoming a lancer.\n\nBackgrounds provide 4 triggers that define what situations\nthe pilot is particularly skilled at handling based on their\npast experience.\n\nNote: The 'description' field has been intentionally removed\nto avoid including copyrighted flavor text. Users can provide\ntheir own descriptions if needed.",
+      "properties": {
+        "id": {
+          "description": "Unique identifier (e.g., 'background_1')",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "triggers": {
+          "description": "Four trigger IDs from this background",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "title": "Triggers",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "triggers"
+      ],
+      "title": "Background",
+      "type": "object"
+    },
+    "CoreBonus": {
+      "description": "A core bonus that a pilot has earned.",
+      "properties": {
+        "core_bonus_id": {
+          "description": "ID of the core bonus definition",
+          "title": "Core Bonus Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "core_bonus_id"
+      ],
+      "title": "CoreBonus",
+      "type": "object"
+    },
+    "License": {
+      "description": "A license that a pilot has ranks in.\n\nPilots gain 1 license level per level up (starting at LL1).\nThey can put this into a new license or increase an existing one.",
+      "properties": {
+        "license_id": {
+          "description": "ID of the license definition",
+          "title": "License Id",
+          "type": "string"
+        },
+        "rank": {
+          "default": 1,
+          "description": "Current rank (1-3)",
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "license_id"
+      ],
+      "title": "License",
+      "type": "object"
+    },
+    "PilotTrigger": {
+      "description": "A pilot's trigger rank (+2 to +6).",
+      "properties": {
+        "trigger_id": {
+          "description": "ID of the trigger definition",
+          "title": "Trigger Id",
+          "type": "string"
+        },
+        "rank": {
+          "default": 2,
+          "description": "Trigger bonus (+2 to +6)",
+          "maximum": 6,
+          "minimum": 2,
+          "title": "Rank",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "trigger_id"
+      ],
+      "title": "PilotTrigger",
+      "type": "object"
+    },
+    "SkillSet": {
+      "description": "A complete set of pilot skills.\n\nAt LL0, pilots have +2 to distribute among their 4 skills.\nThey gain +1 more at each level up.",
+      "properties": {
+        "hull": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Hull",
+          "type": "integer"
+        },
+        "agility": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Agility",
+          "type": "integer"
+        },
+        "systems": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Systems",
+          "type": "integer"
+        },
+        "engineering": {
+          "default": 0,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Engineering",
+          "type": "integer"
+        }
+      },
+      "title": "SkillSet",
+      "type": "object"
+    },
+    "Talent": {
+      "description": "A talent that a pilot has learned.\n\nThis represents a pilot's progress in a specific talent,\ntracking which ranks they have unlocked.",
+      "properties": {
+        "talent_id": {
+          "description": "ID of the talent definition",
+          "title": "Talent Id",
+          "type": "string"
+        },
+        "rank": {
+          "default": 1,
+          "description": "Current rank (1-3)",
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "talent_id"
+      ],
+      "title": "Talent",
+      "type": "object"
+    }
+  },
+  "description": "A Lancer pilot character.\n\nPilots progress from License Level 0 (LL0) to LL12.\nAt each level, they gain:\n- +1 mech skill point\n- +1 license point\n- +1 talent point\n- +2 trigger points\n\nEvery 3 license levels with a manufacturer unlocks a core bonus.",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "callsign": {
+      "description": "The pilot's callsign",
+      "minLength": 1,
+      "title": "Callsign",
+      "type": "string"
+    },
+    "name": {
+      "default": "",
+      "description": "The pilot's real name (optional)",
+      "title": "Name",
+      "type": "string"
+    },
+    "background": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Background"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "notes": {
+      "default": "",
+      "description": "Player notes about the character",
+      "title": "Notes",
+      "type": "string"
+    },
+    "level": {
+      "default": 0,
+      "description": "License Level (LL0-LL12)",
+      "maximum": 12,
+      "minimum": 0,
+      "title": "Level",
+      "type": "integer"
+    },
+    "skills": {
+      "$ref": "#/$defs/SkillSet"
+    },
+    "triggers": {
+      "items": {
+        "$ref": "#/$defs/PilotTrigger"
+      },
+      "title": "Triggers",
+      "type": "array"
+    },
+    "talents": {
+      "items": {
+        "$ref": "#/$defs/Talent"
+      },
+      "title": "Talents",
+      "type": "array"
+    },
+    "licenses": {
+      "items": {
+        "$ref": "#/$defs/License"
+      },
+      "title": "Licenses",
+      "type": "array"
+    },
+    "core_bonuses": {
+      "items": {
+        "$ref": "#/$defs/CoreBonus"
+      },
+      "title": "Core Bonuses",
+      "type": "array"
+    },
+    "hp_bonus": {
+      "default": 0,
+      "description": "Bonus HP from talents/gear",
+      "title": "Hp Bonus",
+      "type": "integer"
+    },
+    "armor_bonus": {
+      "default": 0,
+      "description": "Bonus armor from gear",
+      "title": "Armor Bonus",
+      "type": "integer"
+    },
+    "grit": {
+      "description": "Grit is half of level (rounded up), minimum 0.\nUsed for various bonuses and HP calculation.",
+      "readOnly": true,
+      "title": "Grit",
+      "type": "integer"
+    },
+    "hp": {
+      "description": "Pilot HP = 6 + Grit + any bonuses.\nThis is for when the pilot is out of the mech.",
+      "readOnly": true,
+      "title": "Hp",
+      "type": "integer"
+    },
+    "armor": {
+      "description": "Pilot armor (usually 0 unless wearing hardsuit).",
+      "readOnly": true,
+      "title": "Armor",
+      "type": "integer"
+    },
+    "evasion": {
+      "description": "Pilot evasion = 10 by default.",
+      "readOnly": true,
+      "title": "Evasion",
+      "type": "integer"
+    },
+    "e_defense": {
+      "description": "Pilot e-defense = 10 by default.",
+      "readOnly": true,
+      "title": "E Defense",
+      "type": "integer"
+    },
+    "speed": {
+      "description": "Pilot speed = 4 by default.",
+      "readOnly": true,
+      "title": "Speed",
+      "type": "integer"
+    },
+    "save_target": {
+      "description": "Pilot save target = 10 + grit.",
+      "readOnly": true,
+      "title": "Save Target",
+      "type": "integer"
+    },
+    "attack_bonus": {
+      "description": "Base attack bonus from grit.",
+      "readOnly": true,
+      "title": "Attack Bonus",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "callsign",
+    "grit",
+    "hp",
+    "armor",
+    "evasion",
+    "e_defense",
+    "speed",
+    "save_target",
+    "attack_bonus"
+  ],
+  "title": "Pilot",
+  "type": "object"
+}

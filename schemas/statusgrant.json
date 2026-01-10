@@ -1,0 +1,74 @@
+{
+  "description": "Grants or inflicts a status condition.\n\nExamples:\n    StatusGrant(status=\"invisible\", target=\"self\", trigger=\"after_move_8_plus\")\n    StatusGrant(status=\"prone\", target=\"enemy\", trigger=\"on_hit\")",
+  "properties": {
+    "status": {
+      "anyOf": [
+        {
+          "enum": [
+            "immobilized",
+            "impaired",
+            "jammed",
+            "lock_on",
+            "shredded",
+            "slowed",
+            "stunned",
+            "prone",
+            "hidden",
+            "invisible",
+            "shutdown",
+            "exposed",
+            "engaged"
+          ],
+          "type": "string"
+        },
+        {
+          "enum": [
+            "invisible",
+            "flying"
+          ],
+          "type": "string"
+        }
+      ],
+      "title": "Status"
+    },
+    "target": {
+      "enum": [
+        "self",
+        "enemy",
+        "ally",
+        "adjacent"
+      ],
+      "title": "Target",
+      "type": "string"
+    },
+    "trigger": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Trigger"
+    },
+    "duration": {
+      "default": "end_of_turn",
+      "enum": [
+        "end_of_turn",
+        "start_of_next_turn",
+        "until_attack",
+        "scene"
+      ],
+      "title": "Duration",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "target"
+  ],
+  "title": "StatusGrant",
+  "type": "object"
+}

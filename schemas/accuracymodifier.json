@@ -1,0 +1,57 @@
+{
+  "description": "Modifier to accuracy/difficulty on rolls.\n\nExamples:\n    AccuracyModifier(value=1, condition=\"target_has_lock_on\")  # +1 Accuracy vs Lock On\n    AccuracyModifier(value=-1)  # -1 Accuracy (difficulty)",
+  "properties": {
+    "value": {
+      "description": "Positive = accuracy, negative = difficulty",
+      "title": "Value",
+      "type": "integer"
+    },
+    "condition": {
+      "anyOf": [
+        {
+          "enum": [
+            "target_prone",
+            "target_immobilized",
+            "target_below_half_hp",
+            "target_has_lock_on",
+            "target_larger",
+            "target_smaller",
+            "target_same_size",
+            "after_boost",
+            "after_move_8_plus",
+            "in_danger_zone",
+            "hidden",
+            "melee_attack",
+            "ranged_attack",
+            "tech_attack"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Condition"
+    },
+    "applies_to": {
+      "default": "all",
+      "enum": [
+        "all",
+        "melee",
+        "ranged",
+        "tech"
+      ],
+      "title": "Applies To",
+      "type": "string"
+    }
+  },
+  "required": [
+    "value"
+  ],
+  "title": "AccuracyModifier",
+  "type": "object"
+}

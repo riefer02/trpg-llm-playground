@@ -312,389 +312,58 @@ from core.shared.effects.types import (
 # They are imported above and re-exported for backward compatibility.
 # The original definitions have been removed from this file.
 
-
-# Structured condition primitives - kept here as they reference FrozenModel
-# TODO: These should eventually move to effects/conditions.py
-
-
-# Type aliases moved to core.shared.effects.types - imported above
-
-
-class SpatialCondition(FrozenModel):
-    """
-    Spatial relationship predicates (adjacent, range, zone entry, cover sourcing).
-
-    Examples:
-        SpatialCondition(relation="adjacent", target="ally")
-        SpatialCondition(relation="outside_range", range=5, range_type="range")
-    """
-
-    relation: SpatialRelation
-    target: EffectTarget = "enemy"
-    source: EffectTargetNoAll = "self"
-    range: int | None = Field(default=None, ge=0)
-    range_type: RangeType | None = None
-    cover: CoverType | None = None
-    requires_line_of_sight: bool | None = None
-    requires_free_space: bool | None = None
-
-
-class AttackContextCondition(FrozenModel):
-    """
-    Attack context predicates (attack types, ranges, targeting scope).
-
-    Examples:
-        AttackContextCondition(attack_types=["ranged"], applies_to="incoming")
-        AttackContextCondition(range_comparator="gt", range=5, applies_to="outgoing")
-    """
-
-    attack_types: list[AttackType] = Field(default_factory=list)
-    area_shapes: list[AttackAreaShape] = Field(default_factory=list)
-    weapon_ids: list[str] = Field(default_factory=list)
-    applies_to: Literal["incoming", "outgoing", "mutual"] = "incoming"
-    target: EffectTarget = "enemy"
-    range_comparator: Literal["gt", "lt", "within"] | None = None
-    range: int | None = Field(default=None, ge=0)
-    range_type: RangeType | None = None
-    requires_line_of_sight: bool | None = None
-    requires_line_of_effect_crossing_zone: bool | None = None
-
-
-class SizeCondition(FrozenModel):
-    """
-    Size comparison predicates for source/target/self.
-
-    Examples:
-        SizeCondition(subject="source", comparator="lt", size="size_5")
-    """
-
-    subject: Literal["source", "target", "self"] = "source"
-    comparator: Literal["lt", "lte", "gt", "gte", "eq"] = "lt"
-    size: SizeClass
-
-
-class CheckContextCondition(FrozenModel):
-    """
-    Non-attack check/save predicates and equipment gating.
-
-    Examples:
-        CheckContextCondition(check_kinds=["save"], saves=["hull"])
-        CheckContextCondition(equipment_materials=["metal"])
-    """
-
-    check_kinds: list[Literal["check", "save", "contested", "search"]] = Field(
-        default_factory=list
-    )
-    saves: list[SaveType] = Field(default_factory=list)
-    target: EffectTarget = "self"
-    requires_line_of_sight: bool | None = None
-    equipment_materials: list[str] = Field(default_factory=list)
-    equipment_tags: list[str] = Field(default_factory=list)
-
-
-class ReactionCondition(FrozenModel):
-    """
-    Reaction-specific predicates (brace, overwatch).
-
-    Examples:
-        ReactionCondition(reaction_id="brace")
-        ReactionCondition(reaction_id="overwatch", is_attack=True)
-    """
-
-    reaction_id: ReactionIdField | None = None
-    is_attack: bool | None = None
-
-    @model_validator(mode="after")
-    def _validate_reaction_condition(self) -> "ReactionCondition":
-        """Ensure at least one condition parameter is set.
-
-        Raises:
-            ValueError: If both reaction_id and is_attack are None.
-        """
-        if self.reaction_id is None and self.is_attack is None:
-            raise ValueError(
-                "ReactionCondition must define 'reaction_id' or 'is_attack'"
-            )
-        return self
-
-
-class ConditionGroup(FrozenModel):
-    """
-    Combine multiple conditions with AND/OR/NOT semantics.
-
-    Examples:
-        ConditionGroup(all_of=[SpatialCondition(relation="adjacent", target="ally")])
-        ConditionGroup(
-            all_of=[SpatialCondition(relation="using_cover_from_source", cover="hard")],
-            any_of=[AttackContextCondition(area_shapes=["blast", "line", "cone"])],
-        )
-    """
-
-    all_of: list["EffectCondition"] = Field(default_factory=list)
-    any_of: list["EffectCondition"] = Field(default_factory=list)
-    none_of: list["EffectCondition"] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def _validate_group(self) -> "ConditionGroup":
-        """Ensure at least one condition list is defined.
-
-        Raises:
-            ValueError: If all_of, any_of, and none_of are all empty.
-        """
-        if not self.all_of and not self.any_of and not self.none_of:
-            raise ValueError("ConditionGroup must define at least one condition list")
-        return self
-
-
-EffectCondition = (
-    ConditionType
-    | str
-    | SpatialCondition
-    | AttackContextCondition
-    | CheckContextCondition
-    | ReactionCondition
-    | SizeCondition
-    | ConditionGroup
+# Condition classes moved to core.shared.effects.conditions
+from core.shared.effects.conditions import (
+    SpatialCondition,
+    AttackContextCondition,
+    SizeCondition,
+    CheckContextCondition,
+    ReactionCondition,
+    ConditionGroup,
+    EffectCondition,
 )
 
 # Additional type aliases moved to core.shared.effects.types
 
-
-class StatModifier(FrozenModel):
-    """
-    Numeric modifier to a stat.
-
-    Examples:
-        StatModifier(stat="hp", value=5)  # +5 HP
-        StatModifier(stat="size", value=1)  # +1 Size
-    """
-
-    stat: StatType
-    value: int
+# Stat/mount classes moved to core.shared.effects.stat_mount
+from core.shared.effects.stat_mount import (
+    StatModifier,
+    CompanionStatModifierEffect,
+    StatOverrideEffect,
+    MountSlotGrant,
+    MountSlotReplacement,
+    MountSizeUpgradeEffect,
+    IntegratedWeaponEffect,
+)
 
 
-class CompanionStatModifierEffect(FrozenModel):
-    """
-    Stat modifiers that apply to deployables, drones, or other companion entities.
-
-    Examples:
-        CompanionStatModifierEffect(stat="hp", value=5, applies_to=["drone", "deployable"])
-    """
-
-    stat: StatType
-    value: int
-    applies_to: list[Literal["drone", "deployable", "object"]] = Field(
-        default_factory=list
-    )
-    duration: EffectDuration | None = None
-    condition: EffectCondition | None = None
+# Damage classes moved to core.shared.effects.damage
+from core.shared.effects.damage import (
+    DamageModifier,
+    DamageMultiplierEffect,
+    RangeModifier,
+    DirectDamage,
+    DamageReduction,
+    DamageReductionRollEffect,
+    DamageShareEffect,
+    DamageNegationEffect,
+    DamageAbsorption,
+)
 
 
-class StatOverrideEffect(FrozenModel):
-    """
-    Sets a stat to a specific value while a condition is met.
-
-    Examples:
-        StatOverrideEffect(stat="evasion", value=5, condition="reserve_power_mode")
-    """
-
-    stat: StatType
-    value: int
-    target: EffectTargetNoAll = "self"
-    duration: EffectDuration | None = None
-    condition: EffectCondition | None = None
-
-
-class MountSlotGrant(FrozenModel):
-    """
-    Adds one or more mount slots.
-
-    Examples:
-        MountSlotGrant(slot_type="flexible", count=1, requires_mount_count_lt=3)
-    """
-
-    slot_type: MountSlotType
-    count: int = Field(default=1, ge=1)
-    requires_mount_count_lt: int | None = Field(default=None, ge=0)
-    target: EffectTargetNoAll = "self"
-    condition: EffectCondition | None = None
-
-
-class MountSlotReplacement(FrozenModel):
-    """
-    Replaces existing mount slots with a new slot type.
-
-    Examples:
-        MountSlotReplacement(new_slot_type="main_aux", count=1)
-    """
-
-    new_slot_type: MountSlotType
-    count: int = Field(default=1, ge=1)
-    target: EffectTargetNoAll = "self"
-    condition: EffectCondition | None = None
-
-
-class MountSizeUpgradeEffect(FrozenModel):
-    """
-    Increases the weapon size that a mount can accept.
-
-    Examples:
-        MountSizeUpgradeEffect(increase_by=1, count=1)
-    """
-
-    increase_by: int = Field(default=1, ge=1)
-    count: int = Field(default=1, ge=1)
-    max_size: WeaponSizeType | None = None
-    target: EffectTargetNoAll = "self"
-    condition: EffectCondition | None = None
-
-
-class IntegratedWeaponEffect(FrozenModel):
-    """
-    Grants an integrated weapon mount with linked free-fire rules.
-
-    Examples:
-        IntegratedWeaponEffect(weapon_size="aux", free_attack_uses_per="round")
-    """
-
-    weapon_size: WeaponSizeType = "aux"
-    free_attack_action_type: ActionType = "free"
-    free_attack_uses_per: UsesPer = "round"
-    free_attack_trigger: TriggerType = "on_attack_roll"
-    requires_other_weapon_attack: bool = True
-    cannot_be_modified: bool = True
-    target: EffectTargetNoAll = "self"
-    condition: EffectCondition | None = None
-
-
-class DamageModifier(FrozenModel):
-    """
-    Bonus damage under specific conditions.
-
-    Examples:
-        DamageModifier(flat=1, condition="melee_attack")  # +1 melee damage
-        DamageModifier(dice=DiceExpression.parse("1d6"), damage_type="kinetic")  # +1d6 kinetic
-    """
-
-    dice: DiceExpression | None = Field(
-        default=None, description="Bonus dice (e.g., DiceExpression.parse('1d6'))"
-    )
-    flat: int = Field(default=0, description="Flat bonus damage")
-    damage_type: DamageType | None = Field(default=None)
-    condition: EffectCondition | None = Field(default=None)
-
-
-class DamageMultiplierEffect(FrozenModel):
-    """
-    Multiplies damage, heat, or burn dealt or taken.
-
-    Examples:
-        DamageMultiplierEffect(multiplier=0.5, applies_to="outgoing", condition="target_range_gt_5")
-    """
-
-    multiplier: float = Field(..., ge=0)
-    damage_types: list[DamageTypeScope] = Field(default_factory=list)
-    applies_to: Literal["outgoing", "incoming"] = "outgoing"
-    target: EffectTarget = "enemy"
-    condition: EffectCondition | None = None
-
-
-class RangeModifier(FrozenModel):
-    """
-    Modifier to range or threat.
-
-    Examples:
-        RangeModifier(range_type="threat", value=1)  # +1 Threat
-        RangeModifier(range_type="range", value=5)  # +5 Range
-    """
-
-    range_type: Literal["range", "threat", "sensors"]
-    value: int
-    condition: EffectCondition | None = None
-
-
-class DirectDamage(FrozenModel):
-    """Direct damage not tied to a standard weapon attack.
-
-    Per PR2 3960-3964: Damage is calculated from dice and flat modifiers,
-    then reduced by armor and resistance. AP ignores armor.
-
-    Examples:
-        DirectDamage(damage_type="explosive", dice=DiceExpression.parse("1d3"), ap=True)
-    """
-
-    damage_type: DirectDamageType
-    dice: DiceExpression | None = None
-    flat: int = 0
-    multiplier: float = Field(default=1.0, ge=0)
-    ap: bool = False
-    target: EffectTargetWithObject = "enemy"
-    condition: EffectCondition | None = None
-
-
-class ActionGrant(FrozenModel):
-    """
-    Grants a new action or ability.
-
-    Examples:
-        ActionGrant(action_type="quick", name="Afterburner", trigger="after_boost")
-        ActionGrant(action_type="reaction", name="Juke", trigger="on_successful_agility_save")
-    """
-
-    action_type: ActionType
-    name: str
-    trigger: TriggerType | str | None = Field(
-        default=None, description="When this action can be used"
-    )
-    uses_per: UsesPer = "unlimited"
-
-
-class ReactionLimitEffect(FrozenModel):
-    """
-    Adjusts the maximum number of reactions per turn.
-
-    Examples:
-        ReactionLimitEffect(max_reactions_per_turn=2)
-    """
-
-    max_reactions_per_turn: int | None = Field(default=None, ge=1)
-    bonus_reactions_per_turn: int | None = Field(default=None, ge=1)
-    target: EffectTargetNoAll = "self"
-    condition: EffectCondition | None = None
-
-
-class ReactionTriggerEffect(FrozenModel):
-    """
-    Grants or extends reaction triggers for a specific reaction action.
-
-    Examples:
-        ReactionTriggerEffect(reaction_id="overwatch", trigger_events=["enemy_enters_threat"])
-    """
-
-    reaction_id: ReactionIdField
-    trigger_events: list[ReactionTriggerEvent] = Field(default_factory=list)
-    uses_per: UsesPer = "unlimited"
-    condition: EffectCondition | None = None
-
-
-class NonCombatCapacityEffect(FrozenModel):
-    """
-    Non-combat capabilities such as extra limbs or passenger space.
-
-    Examples:
-        NonCombatCapacityEffect(extra_limb_pairs=1, interaction_scope="pilot_scale")
-        NonCombatCapacityEffect(extra_passenger_slots=1, max_passenger_size="size_half")
-    """
-
-    non_combat_only: bool = True
-    interaction_scope: NonCombatInteractionScope | None = None
-    extra_limb_pairs: int | None = Field(default=None, ge=1)
-    extra_passenger_slots: int | None = Field(default=None, ge=1)
-    max_passenger_size: SizeClass | None = None
-    passenger_location: PassengerLocation = "cockpit"
-    passenger_protected_from_external_effects: bool = True
-    statuses_if_unlicensed_pilot: list[StatusType] = Field(default_factory=list)
-    condition: EffectCondition | None = None
+# Resource classes moved to core.shared.effects.resources
+from core.shared.effects.resources import (
+    ActionGrant,
+    ActionRestriction,
+    ReactionLimitEffect,
+    ReactionTriggerEffect,
+    NonCombatCapacityEffect,
+    ResourceChange,
+    ScaledResourceChange,
+    OverchargeCostCapEffect,
+    LimitedUseBonusEffect,
+    LimitedUseRechargeEffect,
+)
 
 
 class BondmateEffect(FrozenModel):
@@ -742,89 +411,14 @@ class TargetMarkEffect(FrozenModel):
     condition: EffectCondition | None = None
 
 
-class TechRange(FrozenModel):
-    """
-    Range descriptor for tech actions.
-
-    Examples:
-        TechRange(range_type="sensors")  # Within sensors
-        TechRange(range_type="range", value=10)  # Range 10
-    """
-
-    range_type: TechRangeType = "sensors"
-    value: int | None = Field(default=None, ge=0)
-
-
-class TechActionOverrideEffect(FrozenModel):
-    """
-    Overrides tech action targeting or requirements.
-
-    Examples:
-        TechActionOverrideEffect(requires_line_of_sight=False, range_override=TechRange(range_type="range", value=50))
-    """
-
-    applies_to: TechActionScope = "all"
-    requires_line_of_sight: bool | None = None
-    range_override: TechRange | None = None
-    target: EffectTargetNoAll = "self"
-    condition: EffectCondition | None = None
-
-
-class TechAction(FrozenModel):
-    """Defines a tech action granted by a system.
-
-    Per PR2 4060-4095: Tech actions target E-Defense and can apply status
-    effects, debuffs, or direct damage. Some tech actions are attacks.
-
-    Examples:
-        TechAction(name="Track", action_type="quick", is_attack=True, range=TechRange(range_type="sensors"))
-    """
-
-    name: str
-    action_type: ActionType
-    target: EffectTargetWithObjectNoAll = "enemy"
-    range: TechRange | None = None
-    is_attack: bool = False
-    attack_vs: Literal["e_defense", "evasion"] = "e_defense"
-    effect: MechanicalEffect | None = None
-    on_hit: MechanicalEffect | None = None
-    on_miss: MechanicalEffect | None = None
-    on_success: MechanicalEffect | None = None
-    on_failure: MechanicalEffect | None = None
-    uses_per: UsesPer = "unlimited"
-    special: str | None = None
-
-
-class TechAttackModifier(FrozenModel):
-    """
-    Accuracy/difficulty modifiers for tech attacks.
-
-    Examples:
-        TechAttackModifier(value=-1, target="ally", condition="adjacent", max_stacks=3)
-    """
-
-    value: int = Field(..., description="Positive = accuracy, negative = difficulty")
-    target: EffectTarget = "self"
-    condition: EffectCondition | None = None
-    max_stacks: int | None = Field(default=None, ge=1)
-    reset_trigger: (
-        Literal["turn_start", "turn_end", "round_end", "scene_end"] | None
-    ) = None
-
-
-class TechActionRestriction(FrozenModel):
-    """
-    Restrictions or immunity affecting tech actions.
-
-    Examples:
-        TechActionRestriction(disallow_tech_actions=True, end_tech_effects=True)
-    """
-
-    disallow_tech_actions: bool = False
-    immune_to_tech: bool = False
-    end_tech_effects: bool = False
-    target: EffectTarget = "self"
-    condition: EffectCondition | None = None
+# Tech classes moved to core.shared.effects.tech
+from core.shared.effects.tech import (
+    TechRange,
+    TechActionOverrideEffect,
+    TechAction,
+    TechAttackModifier,
+    TechActionRestriction,
+)
 
 
 class EffectChoice(FrozenModel):
@@ -1048,37 +642,19 @@ class LeadershipDicePoolEffect(FrozenModel):
     condition: EffectCondition | None = None
 
 
-class ActionRestriction(FrozenModel):
-    """
-    Restrictions for combat action usage.
-
-    Examples:
-        ActionRestriction(disallow_attack_rolls=True)
-        ActionRestriction(action_ids=["hide"], target="enemy")
-    """
-
-    disallow_attack_rolls: bool = False
-    disallow_heat_generation: bool = False
-    action_ids: list[str] = Field(default_factory=list)
-    action_categories: list[ActionCategoryType] = Field(default_factory=list)
-    target: EffectTarget = "self"
-    duration: EffectDuration = "end_of_turn"
-    condition: EffectCondition | None = None
-
-
-class StatusActionOverrideEffect(FrozenModel):
-    """
-    Allows actions that are normally restricted by a status.
-
-    Examples:
-        StatusActionOverrideEffect(status="jammed", allow_attack_types=["ranged"])
-    """
-
-    status: StatusType
-    allow_attack_types: list[AttackType] = Field(default_factory=list)
-    allow_action_categories: list[ActionCategoryType] = Field(default_factory=list)
-    target: EffectTarget = "self"
-    condition: EffectCondition | None = None
+# Status classes moved to core.shared.effects.status
+from core.shared.effects.status import (
+    StatusToggleEffect,
+    StatusGrant,
+    StatusClear,
+    StatusBreakCondition,
+    StatusStackLimit,
+    MovementScopedStatus,
+    StatusRestriction,
+    AllegianceShiftEffect,
+    StatusActionOverrideEffect,
+    StatusTrigger,
+)
 
 
 class LineOfSightRestriction(FrozenModel):
@@ -1203,250 +779,18 @@ class CheckValueModifierEffect(FrozenModel):
     condition: EffectCondition | None = Field(default=None)
 
 
-class DamageReduction(FrozenModel):
-    """
-    Flat damage reduction that applies before resistance.
-
-    Examples:
-        DamageReduction(amount=2, damage_type="all")
-    """
-
-    amount: int = Field(..., ge=0)
-    damage_type: DamageType | Literal["all", "heat", "burn"] = "all"
-    target: EffectTargetWithObject = "self"
-    minimum_damage: int | None = Field(default=None, ge=0)
-    condition: EffectCondition | None = None
-
-
-class DamageReductionRollEffect(FrozenModel):
-    """
-    Damage reduction based on a roll.
-
-    Examples:
-        DamageReductionRollEffect(roll=DiceExpression.parse("1d6"))
-    """
-
-    roll: DiceExpression
-    damage_type: DamageType | Literal["all", "heat", "burn"] = "all"
-    target: EffectTargetWithObject = "self"
-    minimum_damage: int | None = Field(default=None, ge=0)
-    condition: EffectCondition | None = None
-
-
-class MovementGrant(FrozenModel):
-    """Grants movement or teleportation.
-
-    Per PR2 4132-4145: Movement includes walking, flying, and teleporting.
-    Movement grants can be triggered by actions, reactions, or conditions.
-
-    Examples:
-        MovementGrant(spaces=2, movement_type="fly", trigger="on_successful_save")
-        MovementGrant(spaces=3, movement_type="teleport", trigger="after_boost")
-        MovementGrant(spaces="speed", movement_type="walk", trigger="brace")
-    """
-
-    spaces: MovementDistanceType
-    movement_type: Literal["walk", "fly", "teleport", "boost"] = "walk"
-    trigger: TriggerType | str | None = Field(default=None)
-    target: EffectTargetNoAll = "self"
-    distance_is_maximum: bool = False
-    requires_line_of_sight: bool = True
-    requires_free_space: bool = False
-    fails_if_occupied: bool = False
-    ignores_engagement: bool = False
-    provokes_reactions: bool = True
-    condition: EffectCondition | None = None
-
-
-class MoveAdjacentEffect(FrozenModel):
-    """
-    Moves the source adjacent to a target under specific conditions.
-
-    Examples:
-        MoveAdjacentEffect(target="enemy", movement_type="fly", trigger="on_turn_end")
-    """
-
-    target: Literal["enemy", "ally", "any"] = "enemy"
-    movement_type: Literal["walk", "fly", "teleport"] = "walk"
-    trigger: TriggerType | None = None
-    action_type: ActionType | None = None
-    requires_line_of_sight: bool = True
-    requires_free_space: bool = True
-    fails_if_occupied: bool = True
-    ignores_engagement: bool = False
-    provokes_reactions: bool = True
-    uses_per: UsesPer = "unlimited"
-    condition: EffectCondition | None = None
-
-
-class PositionSwapEffect(FrozenModel):
-    """
-    Swaps positions between the source and a target.
-
-    Examples:
-        PositionSwapEffect(action_type="quick", range=10, range_type="sensors", uses_per="scene")
-    """
-
-    action_type: ActionType
-    target: EffectTargetNoAll = "ally"
-    range: int | None = Field(default=None, ge=0)
-    range_type: TechRangeType = "sensors"
-    requires_line_of_sight: bool = True
-    uses_per: UsesPer = "scene"
-    condition: EffectCondition | None = None
-
-
-class ForcedMovement(FrozenModel):
-    """Forced push/pull movement applied to a target.
-
-    Per PR2 4146-4151: Forced movement moves targets against their will.
-    Push moves away from source, pull moves toward source or zone.
-
-    Examples:
-        ForcedMovement(direction="pull", distance=5, ignores_engagement=True)
-    """
-
-    direction: Literal["pull", "push"]
-    distance: ForcedMovementDistanceType
-    target: EffectTarget = "enemy"
-    toward: Literal["source", "zone_center"] = "source"
-    ignores_engagement: bool = False
-    provokes_reactions: bool = True
-    must_obey_obstructions: bool = True
-    on_collision: MechanicalEffect | None = None
-    condition: EffectCondition | None = None
-
-
-class StatusToggleEffect(FrozenModel):
-    """
-    Toggleable status at specific timing windows.
-
-    Examples:
-        StatusToggleEffect(status="invisible", activation_action="protocol",
-                           activation_timing="on_turn_start",
-                           deactivation_action="protocol",
-                           deactivation_timing="on_turn_start",
-                           duration="end_of_next_turn")
-    """
-
-    status: StatusType
-    target: EffectTargetNoAll = "self"
-    activation_action: ActionType = "protocol"
-    activation_timing: TriggerType = "on_turn_start"
-    deactivation_action: ActionType | None = None
-    deactivation_timing: TriggerType | None = None
-    duration: EffectDuration | None = None
-    condition: EffectCondition | None = None
-
-
-class StatusGrant(FrozenModel):
-    """
-    Grants or inflicts a status condition.
-
-    Examples:
-        StatusGrant(status="invisible", target="self", trigger="after_move_8_plus")
-        StatusGrant(status="prone", target="enemy", trigger="on_hit")
-    """
-
-    status: StatusType | Literal["invisible", "flying"]
-    target: EffectTarget
-    trigger: TriggerType | str | None = Field(default=None)
-    condition: EffectCondition | None = None
-    duration: Literal[
-        "end_of_turn",
-        "start_of_next_turn",
-        "end_of_next_turn",
-        "until_cleared",
-        "until_attack",
-        "match_trigger",
-        "scene",
-    ] = "end_of_turn"
-
-
-class StatusClear(FrozenModel):
-    """
-    Clears a status or condition from a target.
-
-    Examples:
-        StatusClear(status="burn", target="ally")
-        StatusClear(status="any", target="self")
-    """
-
-    status: StatusType | Literal["burn", "any", "tech"]
-    target: EffectTarget
-    count: int = Field(default=1, ge=1)
-
-
-class StatusBreakCondition(FrozenModel):
-    """
-    Defines triggers that end a status early.
-
-    Examples:
-        StatusBreakCondition(status="invisible", break_triggers=["move", "reaction"])
-    """
-
-    status: StatusType
-    target: EffectTarget = "self"
-    break_triggers: list[BreakTriggerType]
-    condition: EffectCondition | None = None
-
-
-class StatusStackLimit(FrozenModel):
-    """
-    Limits stacking or re-application of a status.
-
-    Examples:
-        StatusStackLimit(status="invisible", max_stacks=1)
-    """
-
-    status: StatusType
-    max_stacks: int = Field(default=1, ge=1)
-    target: EffectTarget = "self"
-    condition: EffectCondition | None = None
-
-
-class MovementScopedStatus(FrozenModel):
-    """
-    Status that applies only during movement.
-
-    Examples:
-        MovementScopedStatus(status="invisible", movement_modes=["any"], ends_on="movement_end")
-    """
-
-    status: StatusType
-    target: EffectTargetNoAll
-    movement_modes: list[MovementMode] = Field(default_factory=list)
-    ends_on: Literal["movement_end", "turn_end"] = "movement_end"
-    condition: EffectCondition | None = None
-
-
-class StatusRestriction(FrozenModel):
-    """
-    Restricts gaining or benefiting from statuses.
-
-    Examples:
-        StatusRestriction(statuses=["invisible"], restriction="cannot_benefit", target="enemy")
-    """
-
-    statuses: list[StatusType]
-    restriction: Literal["cannot_gain", "cannot_benefit"] = "cannot_gain"
-    target: EffectTarget = "enemy"
-    duration: EffectDuration = "end_of_turn"
-    condition: EffectCondition | None = None
-
-
-class AllegianceShiftEffect(FrozenModel):
-    """
-    Temporarily flips a target's allegiance.
-
-    Examples:
-        AllegianceShiftEffect(duration="end_of_next_turn", ends_on_hostile_action=True)
-    """
-
-    target: EffectTarget = "enemy"
-    duration: EffectDuration = "end_of_next_turn"
-    ends_on_hostile_action: bool = True
-    condition: EffectCondition | None = None
+# Movement classes moved to core.shared.effects.movement
+from core.shared.effects.movement import (
+    MovementGrant,
+    MoveAdjacentEffect,
+    PositionSwapEffect,
+    ForcedMovement,
+    MovementRestrictionEffect,
+    MovementSurfaceEffect,
+    MovementModeAccessEffect,
+    JumpDistanceEffect,
+    MovementOverrideEffect,
+)
 
 
 class CoverRestriction(FrozenModel):
@@ -1491,168 +835,6 @@ class IntelEffect(FrozenModel):
     perfect_vision: bool = False
     grants_line_of_sight: bool = True
     duration: EffectDuration = "end_of_turn"
-    condition: EffectCondition | None = None
-
-
-class MovementRestrictionEffect(FrozenModel):
-    """
-    Movement restriction applied to a target.
-
-    Examples:
-        MovementRestrictionEffect(target="enemy", cannot_move_closer_to_source=True)
-    """
-
-    target: EffectTarget = "enemy"
-    movement_modes: list[MovementMode] = Field(default_factory=list)
-    max_voluntary_speed: int | None = Field(default=None, ge=0)
-    cannot_move_closer_to_source: bool = False
-    cannot_move_further_from_source: bool = False
-    must_move_straight_line: bool = False
-    duration: EffectDuration = "end_of_turn"
-    condition: EffectCondition | None = None
-
-
-class MovementSurfaceEffect(FrozenModel):
-    """
-    Modifies terrain/surface rules for movement.
-
-    Examples:
-        MovementSurfaceEffect(ignore_difficult_terrain=True)
-        MovementSurfaceEffect(treat_vertical_as_ground=True, fall_if_prone=True)
-    """
-
-    target: EffectTarget = "self"
-    ignore_difficult_terrain: bool = False
-    treat_vertical_as_ground: bool = False
-    fall_if_prone: bool = False
-    duration: EffectDuration = "scene"
-    condition: EffectCondition | None = None
-
-
-class MovementModeAccessEffect(FrozenModel):
-    """
-    Grants access to movement modes or improves traversal.
-
-    Examples:
-        MovementModeAccessEffect(climb_at_full_speed=True, swim_at_full_speed=True)
-    """
-
-    target: EffectTargetNoAll = "self"
-    climb_at_full_speed: bool = False
-    swim_at_full_speed: bool = False
-    condition: EffectCondition | None = None
-
-
-class JumpDistanceEffect(FrozenModel):
-    """
-    Modifies jump distances relative to speed.
-
-    Examples:
-        JumpDistanceEffect(horizontal_multiplier=1.0, vertical_multiplier=0.5)
-    """
-
-    target: EffectTargetNoAll = "self"
-    horizontal_multiplier: float | None = Field(default=None, ge=0)
-    vertical_multiplier: float | None = Field(default=None, ge=0)
-    condition: EffectCondition | None = None
-
-
-class MovementOverrideEffect(FrozenModel):
-    """
-    Replaces movement modes with another type.
-
-    Examples:
-        MovementOverrideEffect(movement_modes=["move", "boost"], override_type="teleport")
-    """
-
-    target: EffectTargetNoAll = "self"
-    movement_modes: list[MovementMode] = Field(default_factory=list)
-    override_type: Literal["walk", "fly", "teleport"] = "teleport"
-    same_distance: bool = True
-    must_end_on_surface: bool = False
-    duration: EffectDuration = "end_of_turn"
-    condition: EffectCondition | None = None
-
-
-class ResourceChange(FrozenModel):
-    """
-    Change a resource value such as HP or heat.
-
-    Examples:
-        ResourceChange(resource="hp", amount="half_max", target="ally", cost_repairs=1)
-        ResourceChange(resource="heat", amount=DiceExpression.parse("1d6"), direction="lose", target="self")
-    """
-
-    resource: ResourceType
-    amount: ResourceAmount
-    direction: ResourceDirection = "gain"
-    target: EffectTargetNoAll
-    cost_repairs: int = Field(default=0, ge=0)
-    cost_source: Literal["self", "target", "either"] = "self"
-
-
-class ScaledResourceChange(FrozenModel):
-    """
-    Resource change based on a rolled value with a multiplier.
-
-    Examples:
-        ScaledResourceChange(resource="heat", roll=DiceExpression.parse("1d6"), multiplier=0.5)
-    """
-
-    resource: ResourceType
-    roll: DiceExpression
-    multiplier: float = Field(default=1.0, ge=0)
-    direction: ResourceDirection = "gain"
-    target: EffectTargetNoAll = "self"
-    rounding: Literal["floor", "ceil", "round"] = "floor"
-    condition: EffectCondition | None = None
-
-
-class OverchargeCostCapEffect(FrozenModel):
-    """
-    Caps the heat cost for overcharge actions.
-
-    Examples:
-        OverchargeCostCapEffect(max_cost=DiceExpression.parse("1d6"))
-    """
-
-    max_cost: int | DiceExpression
-    target: EffectTargetNoAll = "self"
-    condition: EffectCondition | None = None
-
-
-class LimitedUseBonusEffect(FrozenModel):
-    """
-    Adds limited-use charges to tagged systems, deployables, or weapons.
-
-    Examples:
-        LimitedUseBonusEffect(bonus_uses=2, applies_to=["system", "deployable"])
-    """
-
-    bonus_uses: int = Field(..., ge=1)
-    applies_to: list[Literal["system", "deployable", "weapon"]] = Field(
-        default_factory=list
-    )
-    requires_tag: str = "limited"
-    condition: EffectCondition | None = None
-
-
-class LimitedUseRechargeEffect(FrozenModel):
-    """
-    Replenishes limited-use charges as part of a rest or downtime action.
-
-    Examples:
-        LimitedUseRechargeEffect(bonus_uses=1, applies_to=["weapon", "deployable"], cost_repairs=2, uses_per="rest")
-    """
-
-    bonus_uses: int = Field(..., ge=1)
-    applies_to: list[Literal["system", "deployable", "weapon"]] = Field(
-        default_factory=list
-    )
-    requires_tag: str = "limited"
-    cost_repairs: int = Field(default=0, ge=0)
-    uses_per: UsesPer = "rest"
-    target: EffectTarget = "self"
     condition: EffectCondition | None = None
 
 
@@ -1779,491 +961,42 @@ class AreaSelectionEffect(FrozenModel):
     origin: Literal["self", "point"] = "self"
 
 
-class AttackRollOverrideEffect(FrozenModel):
-    """Overrides attack roll resolution details for a weapon or effect.
-
-    Per PR2 3965-3969: Attack rolls use d20 + relevant skill + any bonuses.
-    This effect allows overriding the target defense, attack type restrictions,
-    and cover/line-of-sight handling.
-
-    Examples:
-        AttackRollOverrideEffect(attack_vs="evasion", fixed_target_defense=8, target="ally",
-                                 allowed_attack_types=["ranged"])
-    """
-
-    attack_vs: Literal["evasion", "e_defense"] = "e_defense"
-    fixed_target_defense: int | None = Field(default=None, ge=0)
-    target: EffectTarget = "enemy"
-    allowed_attack_types: list[AttackType] = Field(default_factory=list)
-    respects_cover: bool = True
-    respects_line_of_sight: bool = True
-    condition: EffectCondition | None = None
-
-
-class AttackTargetingEffect(FrozenModel):
-    """
-    Describes multi-target attack selection.
-
-    Examples:
-        AttackTargetingEffect(target_count_options=[1, 2], separate_attack_rolls=True)
-    """
-
-    target_count_options: list[int] = Field(default_factory=list)
-    separate_attack_rolls: bool = True
-    require_distinct_targets: bool = True
-    condition: EffectCondition | None = None
-
-
-class AreaAttackPattern(FrozenModel):
-    """Defines multi-area attack patterns for weapons.
-
-    Per PR2 3970-3974: Area attacks use geometric patterns (blast, burst, line, cone)
-    to affect multiple targets simultaneously.
-
-    Examples:
-        AreaAttackPattern(area_shape="blast", area_size=1, area_count_options=[1, 2], non_overlapping=True)
-    """
-
-    area_shape: Literal["blast", "burst", "line", "cone"]
-    area_size: int = Field(..., ge=0)
-    area_count_options: list[int] = Field(default_factory=list)
-    non_overlapping: bool = False
-
-
-class LineAttackEffect(FrozenModel):
-    """Line-based attack behavior that augments a weapon or action.
-
-    Per PR2 3970-3974: Line attacks affect all targets in a straight line.
-    This effect allows customizing line length, origin point, and obstacle handling.
-
-    Examples:
-        LineAttackEffect(between_self_and_target=True, heat_per_additional_target=1)
-        LineAttackEffect(
-            length=3,
-            attack_origin_at_line_end=True,
-            measure_range_from_line_end=True,
-            measure_line_of_sight_from_line_end=True,
-            line_passes_through_obstacles=True,
-            line_damage=DirectDamage(damage_type="kinetic", dice=DiceExpression.parse("1d3"), ap=True),
-            line_hits_objects=True,
-        )
-    """
-
-    length: int | None = Field(
-        default=None,
-        ge=0,
-        description="Line length in spaces; None = between self and target",
-    )
-    between_self_and_target: bool = False
-    attack_origin_at_line_end: bool = False
-    measure_range_from_line_end: bool = False
-    measure_line_of_sight_from_line_end: bool = False
-    measure_cover_from_line_end: bool = False
-    line_passes_through_obstacles: bool = False
-    fixed_direction_after_firing: bool = False
-    line_hits_characters: bool = True
-    line_hits_objects: bool = False
-    line_damage: DirectDamage | None = None
-    heat_per_additional_target: int | None = Field(default=None, ge=0)
-    condition: EffectCondition | None = None
-
-
-class AttackSequenceModifierEffect(FrozenModel):
-    """
-    Modifies accuracy/difficulty across a sequence of attacks in a turn.
-
-    Examples:
-        AttackSequenceModifierEffect(
-            first_attack_accuracy=1,
-            first_attack_optional=True,
-            subsequent_attack_difficulty=1,
-            duration="end_of_turn",
-        )
-    """
-
-    trigger: TriggerType = "on_turn_start"
-    first_attack_accuracy: int = 0
-    first_attack_optional: bool = False
-    subsequent_attack_difficulty: int = 0
-    duration: EffectDuration = "end_of_turn"
-    condition: EffectCondition | None = None
-
-
-class AttackRerollEffect(FrozenModel):
-    """
-    Allows rerolling and retargeting attacks under constraints.
-
-    Examples:
-        AttackRerollEffect(trigger="on_miss", allowed_attack_types=["melee", "ranged"],
-                           require_new_target=True, max_rerolls_per_attack=1)
-    """
-
-    trigger: TriggerType = "on_miss"
-    allowed_attack_types: list[AttackType] = Field(default_factory=list)
-    require_new_target: bool = False
-    allow_same_area_for_aoe: bool = False
-    aoe_types: list[RangeType] = Field(default_factory=list)
-    max_rerolls_per_attack: int = Field(default=1, ge=1)
-    disallow_already_hit_targets: bool = False
-    keep_second: bool = False
-    uses_reaction: bool = False
-    duration: EffectDuration = "end_of_turn"
-    uses_per: UsesPer = "unlimited"
-    condition: EffectCondition | None = None
-
-
-class AttackOutcomeEffect(FrozenModel):
-    """
-    Modifies the outcome of an attack (e.g., upgrade to critical).
-
-    Examples:
-        AttackOutcomeEffect(trigger="on_ally_hit", upgrade_to_crit=True, uses_reaction=True)
-    """
-
-    trigger: TriggerType
-    upgrade_to_crit: bool = False
-    force_miss: bool = False
-    target: EffectTarget = "enemy"
-    attacker: EffectTarget = "ally"
-    uses_reaction: bool = False
-    duration: EffectDuration = "end_of_turn"
-    uses_per: UsesPer = "unlimited"
-    condition: EffectCondition | None = None
-
-
-class CriticalDamageOverrideEffect(FrozenModel):
-    """
-    Overrides critical damage resolution.
-
-    Examples:
-        CriticalDamageOverrideEffect(mode="max", requires_natural_20=True)
-    """
-
-    trigger: TriggerType = "on_crit"
-    applies_to: list[AttackType] = Field(default_factory=list)
-    mode: Literal["max"] = "max"
-    requires_natural_20: bool = False
-    target: EffectTarget = "enemy"
-    attacker: EffectTarget = "self"
-    condition: EffectCondition | None = None
-
-
-class DamageRollOverrideEffect(FrozenModel):
-    """
-    Overrides how damage rolls are resolved.
-
-    Examples:
-        DamageRollOverrideEffect(mode="average", optional=True)
-    """
-
-    mode: Literal["average"] = "average"
-    optional: bool = True
-    target: EffectTargetNoAll = "self"
-    condition: EffectCondition | None = None
-
-
-class AccuracyTradeEffect(FrozenModel):
-    """
-    Trade accuracy dice for bonus effects.
-
-    Examples:
-        AccuracyTradeEffect(accuracy_cost=1, bonus_damage=DiceExpression.parse("1d6"), requires_crit=True)
-    """
-
-    accuracy_cost: int = Field(..., ge=1)
-    bonus_damage: DiceExpression
-    bonus_damage_type: DamageType | DirectDamageType | None = None
-    requires_crit: bool = False
-    trigger: TriggerType = "on_attack_roll"
-    applies_to_attack_types: list[AttackType] = Field(default_factory=list)
-    allowed_weapon_types: list[WeaponTypeType] = Field(default_factory=list)
-    condition: EffectCondition | None = None
-
-
-class DelayedImpactEffect(FrozenModel):
-    """
-    Optional delayed impact behavior for weapon attacks.
-
-    Examples:
-        DelayedImpactEffect(
-            delay_timing="end_of_next_round",
-            delayed_damage=DiceExpression.parse("3d6"),
-            delayed_damage_type="explosive",
-            self_slow_duration="end_of_next_turn",
-            reveal_area=True,
-        )
-    """
-
-    delay_optional: bool = True
-    delay_timing: DelayedImpactTiming = "end_of_next_round"
-    delayed_damage: DiceExpression | None = None
-    delayed_damage_type: DamageType | None = None
-    self_slow_duration: EffectDuration | None = None
-    reveal_area: bool = False
-    reveal_audience: IntelAudience = "all"
-
-
-class WeaponTagGrant(FrozenModel):
-    """
-    Tag granted to a weapon.
-
-    Examples:
-        WeaponTagGrant(tag="ordnance")
-    """
-
-    tag: str
-    value: int | None = None
-
-
-class WeaponRangeSpec(FrozenModel):
-    """
-    Range entry for a granted weapon profile.
-
-    Examples:
-        WeaponRangeSpec(range_type="range", value=8)
-    """
-
-    range_type: RangeType
-    value: int = Field(..., ge=0)
-
-
-class WeaponSizeBonus(FrozenModel):
-    """
-    Size-based bonus for a weapon mod.
-
-    Examples:
-        WeaponSizeBonus(size="main", burn=2)
-    """
-
-    size: WeaponSizeType
-    burn: int = Field(..., ge=0)
-
-
-class WeaponGrantEffect(FrozenModel):
-    """
-    Grants a specific weapon profile as part of an effect.
-
-    Examples:
-        WeaponGrantEffect(
-            weapon_id="nuclear_cavalier_fuel_rod_gun",
-            name="Fuel Rod Gun",
-            size="main",
-            weapon_type="cqb",
-            ranges=[WeaponRangeSpec(range_type="range", value=8)],
-            damage=[DamageSpec(damage_type="energy", dice=DiceExpression.parse("1d3+2"))],
-            limited_uses=3,
-            integrated_mount=True,
-        )
-    """
-
-    weapon_id: WeaponIdField | None = None
-    name: str
-    size: WeaponSizeType
-    weapon_type: WeaponTypeType
-    ranges: list[WeaponRangeSpec] = Field(default_factory=list)
-    damage: list[DamageSpec] = Field(default_factory=list)
-    tags: list[WeaponTagGrant] = Field(default_factory=list)
-    limited_uses: int | None = Field(default=None, ge=0)
-    unique: bool = False
-    integrated_mount: bool = False
-    target: EffectTargetNoAll = "self"
-    condition: EffectCondition | None = None
-
-
-class WeaponModEffect(FrozenModel):
-    """
-    Modifies a selected weapon with tags or bonuses.
-
-    Examples:
-        WeaponModEffect(
-            allowed_weapon_types=["launcher", "cannon"],
-            range_bonus=5,
-            add_tags=[WeaponTagGrant(tag="ordnance")],
-        )
-    """
-
-    allowed_weapon_types: list[WeaponTypeType] = Field(default_factory=list)
-    allowed_weapon_sizes: list[WeaponSizeType] = Field(default_factory=list)
-    range_bonus: int = 0
-    add_tags: list[WeaponTagGrant] = Field(default_factory=list)
-    burn_by_size: list[WeaponSizeBonus] = Field(default_factory=list)
-    increase_existing_burn: bool = False
-    damage_unreducible: bool = False
-    condition: EffectCondition | None = None
-
-
-class WeaponSpinUpEffect(FrozenModel):
-    """
-    Spin-up mode for a weapon with alternate behavior while active.
-
-    Examples:
-        WeaponSpinUpEffect(
-            spin_up_action_type="quick",
-            spin_down_action_type="free",
-            spin_down_timing="start_of_turn",
-            effects_while_spun_up=MechanicalEffect(
-                status_grants=[StatusGrant(status="slowed", target="self", duration="until_cleared")],
-                weapon_mods=[WeaponModEffect(add_tags=[WeaponTagGrant(tag="reliable", value=3)])],
-            ),
-        )
-    """
-
-    spin_up_action_type: ActionType
-    spin_down_action_type: ActionType | None = None
-    spin_down_timing: Literal["start_of_turn", "end_of_turn", "anytime"] | None = None
-    allow_skirmish_with_base_profile: bool = False
-    requires_barrage_while_spun_up: bool = False
-    effects_while_spun_up: MechanicalEffect = Field(
-        default_factory=lambda: MechanicalEffect()
-    )
-    condition: EffectCondition | None = None
-
-
-class WeaponAIControlEffect(FrozenModel):
-    """
-    AI-controlled weapon handling rules.
-
-    Examples:
-        WeaponAIControlEffect(
-            allowed_weapon_sizes=["aux", "main", "heavy"],
-            free_attack_difficulty=2,
-            cannot_fire_if_used_this_turn=True,
-            weapon_locked_until_next_turn_after_ai_attack=True,
-            ai_selects_target_if_unshackled=True,
-        )
-    """
-
-    allowed_weapon_sizes: list[WeaponSizeType] = Field(default_factory=list)
-    free_attack_action_type: ActionType = "free"
-    free_attack_uses_per: UsesPer = "round"
-    free_attack_difficulty: int = 0
-    cannot_fire_if_used_this_turn: bool = False
-    weapon_locked_until_next_turn_after_ai_attack: bool = False
-    ai_selects_target_if_unshackled: bool = False
-    ai_control_scope: Literal["weapon_only", "mech"] = "weapon_only"
-    condition: EffectCondition | None = None
-
-
-class AISystemLimitEffect(FrozenModel):
-    """
-    Adjusts the maximum number of AI-tagged systems that can be installed.
-
-    Examples:
-        AISystemLimitEffect(bonus_systems=1, max_ai_systems=2)
-    """
-
-    bonus_systems: int = 0
-    max_ai_systems: int | None = Field(default=None, ge=0)
-    condition: EffectCondition | None = None
-
-
-class AIControlTransferEffect(FrozenModel):
-    """
-    Handles AI control transfer when another AI becomes unshackled.
-
-    Examples:
-        AIControlTransferEffect(transfer_on_unshackle=True)
-    """
-
-    transfer_on_unshackle: bool = True
-    source_tag: str = "ai"
-    target_tag: str = "ai"
-    condition: EffectCondition | None = None
-
-
-class DeploymentEffect(FrozenModel):
-    """
-    Represents deploying a device that primes and can be activated later.
-
-    Examples:
-        DeploymentEffect(
-            action_type="quick",
-            placement_range=1,
-            placement_relation="adjacent",
-            primes_after="turn_end",
-            activation_condition="adjacent_start_or_move",
-            activation_action="quick",
-            activation_target="ally",
-            consumes_on_activation=True,
-        )
-    """
-
-    action_type: ActionType
-    placement_range: int = Field(..., ge=0)
-    placement_relation: Literal["adjacent", "range"] = "adjacent"
-    placement_requires_free_space: bool = False
-    primes_after: Literal["turn_end", "immediate"] = "immediate"
-    activation_condition: DeploymentActivationCondition
-    activation_action: ActionType | None = None
-    activation_target: EffectTargetNoAll = "self"
-    activation_effect: MechanicalEffect | None = None
-    consumes_on_activation: bool = True
-    becomes_object_on_activation: bool = False
-    open_topped: bool = False
-    immobile: bool = False
-    can_deactivate: bool = True
-
-
-class AttachmentEffect(FrozenModel):
-    """
-    Attaches a device or effect to a target.
-
-    Examples:
-        AttachmentEffect(action_type="quick", range=5, target="ally")
-    """
-
-    action_type: ActionType
-    range: int = Field(..., ge=0)
-    target: EffectTargetNoAll = "ally"
-    requires_line_of_sight: bool = True
-    max_instances_per_target: int | None = Field(default=None, ge=1)
-    duration: EffectDuration | None = None
-    condition: EffectCondition | None = None
-
-
-class SystemLinkEffect(FrozenModel):
-    """
-    Persistent link between two characters for shared systems/conditions.
-
-    Examples:
-        SystemLinkEffect(
-            action_type="quick",
-            range=10,
-            range_type="sensors",
-            target="ally",
-            duration="scene",
-            tech_action_uses_target_sensors=True,
-            tech_action_uses_target_los=True,
-            check_stat_proxy_to_target=["systems"],
-            check_kinds=["check", "save"],
-            share_conditions=True,
-            share_heat_from_tech=True,
-        )
-    """
-
-    action_type: ActionType
-    range: int | None = Field(default=None, ge=0)
-    range_type: TechRangeType = "sensors"
-    target: EffectTargetNoAll = "ally"
-    requires_line_of_sight: bool = True
-    duration: EffectDuration | None = None
-    max_links_per_source: int | None = Field(default=None, ge=1)
-    breaks_on_out_of_range: bool = False
-    break_if_statuses: list[StatusType] = Field(default_factory=list)
-    shares_space: bool = False
-    moves_with_target: bool = False
-    cover_from_target: CoverType | None = None
-    share_conditions: bool = False
-    share_heat_from_tech: bool = False
-    share_heat_all: bool = False
-    tech_action_uses_target_sensors: bool = False
-    tech_action_uses_target_los: bool = False
-    stat_proxy_to_target: list[StatType] = Field(default_factory=list)
-    stat_proxy_to_source: list[StatType] = Field(default_factory=list)
-    check_stat_proxy_to_target: list[SaveType] = Field(default_factory=list)
-    check_stat_proxy_to_source: list[SaveType] = Field(default_factory=list)
-    check_kinds: list[CheckKind] = Field(default_factory=list)
-    condition: EffectCondition | None = None
+# Attack classes moved to core.shared.effects.attack
+from core.shared.effects.attack import (
+    AttackRollOverrideEffect,
+    AttackTargetingEffect,
+    AreaAttackPattern,
+    LineAttackEffect,
+    AttackSequenceModifierEffect,
+    AttackRerollEffect,
+    AttackOutcomeEffect,
+    CriticalDamageOverrideEffect,
+    DamageRollOverrideEffect,
+    AccuracyTradeEffect,
+    DelayedImpactEffect,
+)
+
+
+# Weapon classes moved to core.shared.effects.weapon
+from core.shared.effects.weapon import (
+    WeaponTagGrant,
+    WeaponRangeSpec,
+    WeaponSizeBonus,
+    WeaponGrantEffect,
+    WeaponModEffect,
+    WeaponSpinUpEffect,
+    WeaponAIControlEffect,
+    AISystemLimitEffect,
+    AIControlTransferEffect,
+)
+
+
+# Deployment classes moved to core.shared.effects.deployment
+from core.shared.effects.deployment import (
+    DeploymentEffect,
+    AttachmentEffect,
+    SystemLinkEffect,
+)
 
 
 class PhaseShiftEffect(FrozenModel):
@@ -2624,57 +1357,6 @@ class ReloadEffect(FrozenModel):
     consumes_source: bool = False
 
 
-class DamageShareEffect(FrozenModel):
-    """
-    Shares a fraction of damage from a target to a source.
-
-    Examples:
-        DamageShareEffect(share_fraction=0.5, source="self", target="ally", requires_adjacent=True)
-    """
-
-    share_fraction: float = Field(..., ge=0, le=1)
-    source: EffectTargetNoAll = "self"
-    target: EffectTargetNoAll = "ally"
-    timing: Literal["before_armor_and_reduction", "after_armor_and_reduction"] = (
-        "before_armor_and_reduction"
-    )
-    requires_adjacent: bool = False
-    breaks_on_separation: bool = False
-    condition: EffectCondition | None = None
-
-
-class DamageNegationEffect(FrozenModel):
-    """
-    Negates an incoming damage instance.
-
-    Examples:
-        DamageNegationEffect(target="self")
-    """
-
-    target: EffectTargetNoAll = "self"
-    negate_damage: bool = True
-    negate_heat: bool = False
-    negate_burn: bool = False
-    condition: EffectCondition | None = None
-
-
-class DamageAbsorption(FrozenModel):
-    """
-    Absorbs damage before it affects the target.
-
-    Examples:
-        DamageAbsorption(target="ally", base_hp=4, bonus_hp_per_grit=1)
-    """
-
-    target: EffectTargetNoAll
-    base_hp: int = Field(..., ge=0)
-    bonus_hp_per_grit: int = Field(default=0, ge=0)
-    max_instances_per_target: int = Field(default=1, ge=1)
-    spillover: bool = True
-    ends_on_zero: bool = True
-    duration: Literal["scene", "until_destroyed"] = "until_destroyed"
-
-
 class OutOfPlayEffect(FrozenModel):
     """
     Removes a target from play for a duration.
@@ -2765,24 +1447,6 @@ class RollPatternEffect(FrozenModel):
     target: EffectTargetNoAll = "self"
     effect: MechanicalEffect
     condition: EffectCondition | None = None
-
-
-class StatusTrigger(FrozenModel):
-    """
-    Effect triggered by inflicting or clearing a status.
-
-    Examples:
-        StatusTrigger(trigger="on_inflict", status="immobilized",
-                      effect=MechanicalEffect(status_grants=[StatusGrant(status="shredded", target="enemy",
-                      duration="match_trigger")]))
-    """
-
-    trigger: Literal["on_inflict", "on_clear"]
-    status: StatusType
-    target: EffectTargetNoAll = "enemy"
-    effect: MechanicalEffect
-    condition: EffectCondition | None = None
-    uses_per: UsesPer = "unlimited"
 
 
 class TriggeredEffect(FrozenModel):

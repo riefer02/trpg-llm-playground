@@ -4,7 +4,7 @@
 This project is a **monorepo** for Lancer TTRPG tooling with three domains:
 1. **`/core`**: Type-driven game schemas using Pydantic v2
 2. **`/llm`**: Synthetic data generation and LLM fine-tuning pipeline
-3. **`/app`**: Future application layer (placeholder)
+3. **`/app`**: Full-stack web application (FastAPI + TanStack Start)
 
 ## Monorepo Structure
 
@@ -26,7 +26,15 @@ trpg-llm-playground/
 │   ├── scripts/            # CLI tools
 │   ├── config/             # YAML configs
 │   └── tests/              # LLM pipeline tests
-├── app/                    # Future web application
+├── app/                    # Web application
+│   ├── backend/            # FastAPI REST API
+│   │   ├── api/            # Route handlers
+│   │   ├── db/             # SQLModel + Alembic migrations
+│   │   └── tests/          # pytest test suite
+│   └── frontend/           # TanStack Start + React
+│       ├── src/routes/     # File-based routing
+│       ├── src/lib/        # API client, hooks, types
+│       └── schemas/        # Generated JSON Schema
 ├── books/                  # Source PDFs (shared)
 ├── models/                 # GGUF models (shared)
 └── notes/                  # Planning documents
@@ -131,6 +139,122 @@ python -m core.export --combined  # Single combined schema
 
 **Note**: Notebooks `cd` into `/llm` after cloning. All paths are relative to `llm/`.
 
+## Web Application (`/app`)
+
+### Quick Start
+```bash
+make install-app    # Install Python + Node dependencies
+cp .env.example .env
+make db-up          # Start PostgreSQL (Docker)
+make db-migrate     # Run migrations
+make dev            # Start backend + frontend
+```
+
+### Backend Architecture (`app/backend/`)
+
+FastAPI application with dependency injection pattern:
+
+```python
+# Adding a new endpoint
+from fastapi import APIRouter, Depends
+from app.backend.db.engine import get_session
+from app.backend.dependencies import get_current_user
+
+router = APIRouter(prefix="/resource", tags=["resource"])
+
+@router.get("")
+async def list_resources(
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+):
+    # session: database connection (auto-commits on success)
+    # user: authenticated user (stub returns mock user)
+    pass
+```
+
+**Key files:**
+- **`main.py`**: FastAPI app factory with lifespan management
+- **`config.py`**: pydantic-settings configuration from `.env`
+- **`dependencies.py`**: Dependency injection (stub auth, easy to swap)
+- **`exceptions.py`**: Custom exceptions → consistent JSON error format
+- **`api/router.py`**: Main router aggregating all endpoints
+- **`db/engine.py`**: Async SQLAlchemy engine + session dependency
+- **`db/models.py`**: SQLModel tables (JSON blob pattern)
+
+**Error handling pattern:**
+```python
+from app.backend.exceptions import NotFoundError, ValidationError
+
+raise NotFoundError("Pilot", pilot_id)  # → 404 with {"code": "NOT_FOUND", ...}
+raise ValidationError("Invalid", errors=[...])  # → 422
+```
+
+### Frontend Architecture (`app/frontend/`)
+
+TanStack Start with React Query for data fetching:
+
+```typescript
+// Adding API hooks
+import { useQuery } from '@tanstack/react-query'
+import { api } from './client'
+
+export function useResources() {
+  return useQuery({
+    queryKey: ['resources'],
+    queryFn: () => api.get<Resource[]>('/resources'),
+  })
+}
+```
+
+**Key files:**
+- **`src/routes/__root.tsx`**: Root layout with React Query provider
+- **`src/lib/api/client.ts`**: Typed fetch wrapper with error handling
+- **`src/lib/api/*.ts`**: React Query hooks per resource
+- **`src/components/ui/`**: shadcn/ui-style components
+- **`src/lib/types/lancer.ts`**: Generated from Python (run `make generate-types`)
+
+**Adding routes:** Create file in `src/routes/`:
+```typescript
+// src/routes/campaigns/index.tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/campaigns/')({
+  component: CampaignsPage,
+})
+```
+
+### Type Bridge
+
+TypeScript types are auto-generated from Python Pydantic models:
+
+```bash
+make generate-types
+# 1. python -m core.export → JSON Schema
+# 2. json-schema-to-typescript → TypeScript
+```
+
+### Database
+
+- **PostgreSQL** via Docker on port 5433 (avoids conflicts)
+- **SQLModel** for ORM with JSON blob pattern
+- **Alembic** for migrations
+
+```bash
+make db-up              # Start PostgreSQL
+make db-migrate         # Apply migrations
+make db-revision MSG="description"  # Create migration
+```
+
+### Testing
+
+```bash
+make test-app           # All app tests
+cd app/backend && pytest -v   # Backend only
+cd app/frontend && npm test   # Frontend only
+```
+
+Backend tests use in-memory SQLite (no Docker needed).
+
 ## Conventions
 
 ### Core Domain
@@ -144,9 +268,16 @@ python -m core.export --combined  # Single combined schema
 - **Config-Driven**: All settings in YAML, no hardcoded values
 - **Logging**: Clear status updates for Colab monitoring
 
+### Web Application
+- **Dependency Injection**: Use FastAPI `Depends()` for database sessions and auth
+- **Error Handling**: Raise custom exceptions from `exceptions.py` for consistent responses
+- **API Hooks**: Create React Query hooks in `lib/api/` with proper query keys
+- **Type Safety**: Run `make generate-types` after changing Python models
+
 ### Testing
 - **Core changes**: Run `make test-core` before committing.
 - **LLM changes**: Run `make test-llm` (no third-party calls; mock mode is supported).
+- **App changes**: Run `make test-app` (uses in-memory SQLite, no Docker needed).
 
 ## Completed Features
 
@@ -170,14 +301,20 @@ python -m core.export --combined  # Single combined schema
 
 ## Roadmap
 
-### Current: Code Cleanliness (Phase 2)
+### Current: Web Application (Phase 3)
+- ✅ Phase 3A: Backend foundation (FastAPI, SQLModel, PostgreSQL)
+- ✅ Phase 3B: Frontend foundation (TanStack Start, React Query, Tailwind)
+- ✅ Phase 3C: Type bridge (JSON Schema → TypeScript generation)
+- 🔲 Phase 3D: Character builder (Pilot/Mech CRUD with full validation)
+- 🔲 Phase 3E: Combat core (WebGPU hex renderer, WebSocket sync)
+- 🔲 Phase 3F: Full combat (actions, damage, effects, NPC AI)
+
+### Completed
+- ✅ Phase 1: Core type system (3200+ tests)
 - ✅ Phase 2A: HexCoord migration with coercion validators
 - ✅ Phase 2B: Import consistency, `__all__` exports
-- 🔲 Phase 2C: Split large modules (effects.py, combat_resolution.py)
-- 🔲 Phase 2D: Generic type stubs, error message standardization
 
 ### Future
-- Database layer (SQLModel integration)
-- Web application (FastAPI + frontend)
-- Game engine with type dispatch
-- Character builder UI
+- Campaign persistence and GM tools
+- LLM integration for rules assistance
+- Mobile-responsive UI

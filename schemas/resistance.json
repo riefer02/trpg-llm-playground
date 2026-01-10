@@ -1,0 +1,40 @@
+{
+  "description": "Resistance (half damage) to a damage type.\n\nExamples:\n    Resistance(damage_type=\"energy\")\n    Resistance(damage_type=\"all\", condition=\"can_see_bondmate\")",
+  "properties": {
+    "damage_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "all",
+          "type": "string"
+        }
+      ],
+      "title": "Damage Type"
+    },
+    "condition": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Condition"
+    }
+  },
+  "required": [
+    "damage_type"
+  ],
+  "title": "Resistance",
+  "type": "object"
+}

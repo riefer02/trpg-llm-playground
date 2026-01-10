@@ -1,0 +1,39 @@
+{
+  "description": "A license definition - the template for a manufacturer license.\n\nEach license corresponds to a frame and unlocks:\n- Rank 1: Basic frame systems and weapons\n- Rank 2: Advanced systems\n- Rank 3: The frame itself plus signature gear\n\nNote: The 'description' field has been intentionally removed\nto avoid including copyrighted flavor text.",
+  "properties": {
+    "id": {
+      "description": "Unique identifier (e.g., 'blackbeard', 'nelson')",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "description": "Display name (usually the frame name)",
+      "title": "Name",
+      "type": "string"
+    },
+    "manufacturer": {
+      "enum": [
+        "GMS",
+        "IPS-N",
+        "SSC",
+        "HORUS",
+        "HA"
+      ],
+      "title": "Manufacturer",
+      "type": "string"
+    },
+    "frame_id": {
+      "description": "ID of the frame this license provides",
+      "title": "Frame Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "manufacturer",
+    "frame_id"
+  ],
+  "title": "LicenseDefinition",
+  "type": "object"
+}

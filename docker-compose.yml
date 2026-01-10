@@ -1,0 +1,30 @@
+# Docker Compose for Lancer Web Application
+#
+# Usage:
+#   make db-up         # Start PostgreSQL
+#   make db-down       # Stop PostgreSQL
+#   docker-compose up  # Start all services
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lancer-postgres
+    environment:
+      POSTGRES_USER: lancer
+      POSTGRES_PASSWORD: lancer
+      POSTGRES_DB: lancer
+    ports:
+      # Using port 5433 to avoid conflicts with other PostgreSQL instances
+      - "5433:5432"
+    volumes:
+      - lancer-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lancer -d lancer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  lancer-postgres-data:
+    driver: local
