@@ -277,11 +277,83 @@ Backend tests use in-memory SQLite (no Docker needed).
 - **Error Handling**: Raise custom exceptions from `exceptions.py` for consistent responses
 - **API Hooks**: Create React Query hooks in `lib/api/` with proper query keys
 - **Type Safety**: Run `make generate-types` after changing Python models
+- **Use Generated Types**: Never create ad-hoc types for core data (see below)
+
+### Type Usage (Critical)
+
+**Rule**: Always check for existing types before creating new ones.
+
+| Layer | Source of Truth | Check First |
+|-------|-----------------|-------------|
+| Frontend | `src/lib/types/lancer.ts` | Generated from core |
+| Backend | `core/*` modules | Import directly |
+
+```typescript
+// Frontend: ✅ Use generated types
+import type { Pilot } from '@/lib/types/lancer'
+
+// Frontend: ❌ Don't duplicate
+interface Pilot { ... }
+```
+
+```python
+# Backend: ✅ Import core models
+from core.pilot import Pilot
+
+# Backend: ❌ Don't duplicate
+class PilotData(BaseModel): ...
+```
+
+If a type is missing, add the model to `core/export.py` and run `make generate-types`.
 
 ### Testing
-- **Core changes**: Run `make test-core` before committing.
-- **LLM changes**: Run `make test-llm` (no third-party calls; mock mode is supported).
-- **App changes**: Run `make test-app` (uses in-memory SQLite, no Docker needed).
+
+**Test Commands**:
+- `make test-core` - Core type system (3225+ tests)
+- `make test-llm` - LLM pipeline (mock mode supported)
+- `make test-app` - Web app (in-memory SQLite, no Docker)
+- `make test` - All tests
+
+**Testing Requirements**:
+
+| When You | Test Requirement |
+|----------|------------------|
+| Change core model | Write/update tests for affected model |
+| Add computed property | Test derivation at relevant states |
+| Add API endpoint | Test CRUD, validation, errors, computed fields |
+| Change validation | Test both valid and invalid cases |
+| Fix a bug | Write failing test first, then fix |
+
+**Test Patterns**:
+
+```python
+# Core: test_new_feature.py
+def test_model_validation_rejects_invalid():
+    with pytest.raises(ValidationError):
+        Model(field=invalid_value)
+
+# Backend: test_resource.py
+@pytest.mark.asyncio
+async def test_endpoint_returns_computed_fields(client):
+    response = await client.post("/api/resource", json=data)
+    assert response.json()["computed_field"] == expected
+```
+
+### Change Propagation
+
+**See**: `docs/DEVELOPMENT_LIFECYCLE.md` for detailed workflow.
+
+**Quick Reference**:
+```
+core/ change → make test-core → make generate-types → update app/ → make test-app
+```
+
+| Change Type | Actions Required |
+|-------------|------------------|
+| Core model field | Test core → regenerate types → update API schemas → test app |
+| New core model | Add to export.py → regenerate types → create API endpoint |
+| API endpoint | Create tests → validate against core → test app |
+| Frontend component | Regenerate types (if needed) → use generated types |
 
 ## Completed Features
 
