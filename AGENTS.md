@@ -229,9 +229,13 @@ TypeScript types are auto-generated from Python Pydantic models:
 
 ```bash
 make generate-types
-# 1. python -m core.export → JSON Schema
-# 2. json-schema-to-typescript → TypeScript
+# 1. python -m core.export → app/frontend/schemas/lancer.json
+# 2. json-schema-to-typescript → app/frontend/src/lib/types/lancer.ts
 ```
+
+**When to regenerate**: After changing any `core/` Pydantic models used in the API.
+
+**What to commit**: Both `schemas/lancer.json` and `src/lib/types/lancer.ts` are tracked.
 
 ### Database
 
