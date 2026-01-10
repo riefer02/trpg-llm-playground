@@ -250,16 +250,24 @@ async def create_resource(
 - **`dependencies.py`**: Dependency injection (stub auth, easy to swap)
 - **`exceptions.py`**: Custom exceptions → consistent JSON error format
 - **`utils.py`**: Shared utilities for core model validation (use this!)
+- **`serializers/`**: Core model → API response shaping helpers
 - **`api/router.py`**: Main router aggregating all endpoints
 - **`db/engine.py`**: Async SQLAlchemy engine + session dependency
 - **`db/models.py`**: SQLModel tables (JSON blob pattern)
 
 **Shared Utilities** (`app/backend/utils.py`):
 ```python
-from app.backend.utils import validate_core_model, core_validation_error_to_api
+from app.backend.utils import (
+    validate_core_model,
+    validate_core_model_list,
+    core_validation_error_to_api,
+)
 
 # Validate request data against core model
 skills = validate_core_model(SkillSet, request.skills, "skills")
+
+# Validate lists of nested objects
+talents = validate_core_model_list(Talent, request.talents, "talent")
 
 # Convert caught validation errors to HTTP format
 except PydanticValidationError as e:
@@ -268,7 +276,16 @@ except PydanticValidationError as e:
 
 **Shared Response Schemas** (`app/backend/schemas/`):
 ```python
-from app.backend.schemas import ListResponse, ValidationResponse, ValidationIssue
+from app.backend.schemas import (
+    DatabaseMetadata,
+    ListResponse,
+    ValidationResponse,
+    ValidationIssue,
+)
+
+class CharacterResponse(DatabaseMetadata):
+    callsign: str
+    ...
 
 # Generic list response with pagination metadata
 @router.get("", response_model=ListResponse[CharacterResponse])
@@ -397,7 +414,7 @@ Backend tests use in-memory SQLite (no Docker needed).
 ### Core Domain
 - **Pydantic v2**: Use `FrozenModel` base class for immutable game rules
 - **Literal types**: Prefer `Literal["a", "b"]` over `Enum` for better IDE support
-- **Typed IDs**: Use `NewType` IDs from `core/shared/ids.py` (e.g., `WeaponId`, `MechId`)
+- **Typed IDs**: Use `NewType` IDs from `core/shared/ids.py` (e.g., `WeaponId`, `MechId`); prefer `IdField` helpers from `core/shared/id_helpers.py` for coercion/backward compatibility
 - **Effect primitives**: Build mechanical behaviors with types from `core/shared/effects/`
 
 ### LLM Pipeline
@@ -438,6 +455,9 @@ db_record.data = core_model.model_dump(mode="json")
 # Read
 core_model = CoreModel.model_validate(db_record.data)
 ```
+
+**Response Serialization**: Centralize core → API response shaping in
+`app/backend/serializers/` to avoid duplicated computed-field wiring.
 
 ### Type Usage (Critical)
 
