@@ -42,7 +42,7 @@ function HomePage() {
         <h2 className="text-xl font-semibold mb-4 text-foreground">
           Quick Actions
         </h2>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <QuickActionCard
             title="Create Character"
             description="Build a new pilot and mech"
@@ -52,6 +52,11 @@ function HomePage() {
             title="My Characters"
             description="View and manage characters"
             href="/characters"
+          />
+          <QuickActionCard
+            title="Compendium"
+            description="Browse frames, weapons, systems, and gear"
+            href="/compendium"
           />
           <QuickActionCard
             title="Start Combat"

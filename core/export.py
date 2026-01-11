@@ -170,6 +170,7 @@ from core.shared.narrative import (
 from core.mech import (
     DynamicWeaponDefinition,
     MechWeaponDefinition,
+    MechSystemDefinition,
     MimicGunProfileRule,
     MountlessWeaponDefinition,
     MountSlot,
@@ -410,6 +411,7 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "DynamicWeaponDefinition": DynamicWeaponDefinition,
     "MountlessWeaponDefinition": MountlessWeaponDefinition,
     "MechWeaponDefinition": MechWeaponDefinition,
+    "MechSystemDefinition": MechSystemDefinition,
     "MountSlot": MountSlot,
     "CoreSystemDefinition": CoreSystemDefinition,
     "MechFrameBaseStats": MechFrameBaseStats,

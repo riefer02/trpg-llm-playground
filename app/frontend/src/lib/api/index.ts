@@ -22,6 +22,8 @@ export {
   useCharacterValidation,
   useCreateCharacter,
   useUpdateCharacter,
+  useUpdatePilotGear,
+  useUpdateMechBuild,
   useDeleteCharacter,
   useAddMech,
   useRemoveMech,
@@ -33,6 +35,8 @@ export type {
   CharacterListResponse,
   CharacterCreateRequest,
   CharacterUpdateRequest,
+  PilotGearUpdateRequest,
+  MechBuildUpdateRequest,
   CharacterValidationResponse,
   MechAddRequest,
   MechStats,
@@ -45,6 +49,10 @@ export {
   useBackgrounds,
   useTriggers,
   useTalents,
+  useFrames,
+  useWeapons,
+  useSystems,
+  usePilotGear,
   compendiumKeys,
 } from './compendium'
 // Note: Compendium types are simplified API responses, not full core types

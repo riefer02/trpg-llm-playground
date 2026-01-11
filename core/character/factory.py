@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from core.character.character import Character, MechConfiguration
 from core.pilot.pilot import Pilot
+from core.pilot.gear import PilotLoadout
 from core.pilot.skill import SkillSet, PilotTrigger
 from core.pilot.background import Background
 from core.pilot.talent import Talent
@@ -33,6 +34,7 @@ def create_ll0_character(
     skills: SkillSet | None = None,
     triggers: list[PilotTrigger] | None = None,
     talents: list[Talent] | None = None,
+    pilot_gear: PilotLoadout | None = None,
     mech_name: str | None = None,
     mech_build: MechBuild | None = None,
     character_id: str | None = None,
@@ -58,6 +60,7 @@ def create_ll0_character(
         skills: HASE skill allocation (defaults to Hull +2)
         triggers: Pilot triggers (defaults to 4 basic triggers at +2)
         talents: Pilot talents (defaults to 3 rank I talents)
+        pilot_gear: Pilot gear loadout for the mission (optional)
         mech_name: Custom mech name (defaults to callsign)
         mech_build: Mech loadout (defaults to empty Everest)
         character_id: Override character ID
@@ -133,6 +136,7 @@ def create_ll0_character(
         skills=resolved_skills,
         triggers=resolved_triggers,
         talents=resolved_talents,
+        pilot_gear=pilot_gear,
         licenses=[],
         core_bonuses=[],
     )

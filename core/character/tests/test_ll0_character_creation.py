@@ -10,6 +10,7 @@ from core.character import (
 from core.pilot.skill import SkillSet, PilotTrigger
 from core.pilot.talent import Talent
 from core.pilot.background import Background
+from core.pilot.gear import PilotLoadout
 from core.mech.build import MechBuild
 
 
@@ -163,6 +164,21 @@ class TestCreateLL0CharacterCustomization:
         assert character.active_mech is not None
         assert character.active_mech.name == "RAIJIN"
 
+    def test_custom_pilot_gear(self) -> None:
+        """Can set pilot gear loadout."""
+        loadout = PilotLoadout(
+            clothing="flight_suit",
+            armor="light_hardsuit",
+            weapons=["alloy_composite_light"],
+            gear=["corrective"],
+        )
+
+        character = create_ll0_character(callsign="ALPHA", pilot_gear=loadout)
+
+        assert character.pilot.pilot_gear is not None
+        assert character.pilot.pilot_gear.clothing == "flight_suit"
+        assert character.pilot.pilot_gear.weapons == ["alloy_composite_light"]
+
     def test_mech_name_defaults_to_callsign(self) -> None:
         """Mech name defaults to callsign if not provided."""
         character = create_ll0_character(callsign="OMEGA")
@@ -232,6 +248,13 @@ class TestCreateLL0CharacterValidation:
 
         with pytest.raises(ValueError, match="GMS Everest frame"):
             create_ll0_character(callsign="ALPHA", mech_build=build)
+
+    def test_invalid_pilot_gear_rejected(self) -> None:
+        """Invalid pilot gear loadout raises ValueError."""
+        loadout = PilotLoadout(weapons=["alloy_composite_light"])
+
+        with pytest.raises(ValueError, match="Invalid pilot gear loadout"):
+            create_ll0_character(callsign="ALPHA", pilot_gear=loadout)
 
 
 class TestCreateEmptyCharacter:

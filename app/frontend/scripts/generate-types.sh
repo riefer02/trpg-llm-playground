@@ -23,11 +23,19 @@ python -m core.export --output-dir "$FRONTEND_DIR/schemas" --combined
 echo "🔄 Converting JSON Schema to TypeScript..."
 cd "$FRONTEND_DIR"
 
-# Convert to TypeScript
-npx json-schema-to-typescript \
-  schemas/lancer.json \
-  -o src/lib/types/lancer.ts \
-  --bannerComment "/* Auto-generated from core/ Pydantic models. DO NOT EDIT. */"
+JSON2TS_BIN="$FRONTEND_DIR/node_modules/.bin/json2ts"
+if [ -x "$JSON2TS_BIN" ]; then
+  "$JSON2TS_BIN" \
+    schemas/lancer.json \
+    -o src/lib/types/lancer.ts \
+    --bannerComment "/* Auto-generated from core/ Pydantic models. DO NOT EDIT. */"
+else
+  NPM_CONFIG_CACHE="$FRONTEND_DIR/.npm-cache" \
+    npx json2ts \
+    schemas/lancer.json \
+    -o src/lib/types/lancer.ts \
+    --bannerComment "/* Auto-generated from core/ Pydantic models. DO NOT EDIT. */"
+fi
 
 echo "✅ Type generation complete!"
 echo "   Output: src/lib/types/lancer.ts"

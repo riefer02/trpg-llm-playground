@@ -110,11 +110,14 @@ function Header() {
           <a href="/" className="text-foreground hover:underline">
             Home
           </a>
+          <a href="/characters" className="text-muted-foreground hover:underline">
+            Characters
+          </a>
+          <a href="/compendium" className="text-muted-foreground hover:underline">
+            Compendium
+          </a>
           <a href="/pilots" className="text-muted-foreground hover:underline">
             Pilots
-          </a>
-          <a href="/mechs" className="text-muted-foreground hover:underline">
-            Mechs
           </a>
         </nav>
       </div>

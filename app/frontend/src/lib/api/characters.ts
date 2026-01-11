@@ -16,6 +16,8 @@ import type {
   CoreBonus,
   Background,
   SkillSet,
+  PilotLoadout,
+  MechBuild,
 } from "../types/lancer";
 
 // =============================================================================
@@ -30,6 +32,7 @@ export interface CharacterCreateRequest {
   triggers?: PilotTrigger[];
   talents?: Talent[];
   background?: Background;
+  pilot_gear?: PilotLoadout;
   mech_name?: string;
   mech_frame_id?: string;
   level?: number;
@@ -50,6 +53,14 @@ export interface CharacterUpdateRequest {
   background?: Background;
   notes?: string;
   active_mech_id?: string;
+}
+
+export interface PilotGearUpdateRequest {
+  pilot_gear: PilotLoadout;
+}
+
+export interface MechBuildUpdateRequest {
+  build: Omit<MechBuild, "frame_id">;
 }
 
 export interface MechAddRequest {
@@ -81,7 +92,7 @@ export interface MechConfig {
   id: string;
   name: string;
   frame_id: string;
-  build: Record<string, unknown>;
+  build: MechBuild;
 }
 
 export interface CharacterResponse {
@@ -103,6 +114,7 @@ export interface CharacterResponse {
   licenses: License[];
   core_bonuses: CoreBonus[];
   background: Background | null;
+  pilot_gear: PilotLoadout | null;
   notes: string;
 
   // Pilot computed fields
@@ -222,6 +234,60 @@ export function useUpdateCharacter() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: CharacterUpdateRequest }) =>
       api.put<CharacterResponse>(`/characters/${id}`, data),
+    onSuccess: (updatedCharacter) => {
+      queryClient.setQueryData(
+        characterKeys.detail(updatedCharacter.id),
+        updatedCharacter
+      );
+      queryClient.invalidateQueries({ queryKey: characterKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Hook for updating pilot gear loadout.
+ */
+export function useUpdatePilotGear() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: PilotGearUpdateRequest;
+    }) => api.put<CharacterResponse>(`/characters/${id}/pilot-gear`, data),
+    onSuccess: (updatedCharacter) => {
+      queryClient.setQueryData(
+        characterKeys.detail(updatedCharacter.id),
+        updatedCharacter
+      );
+      queryClient.invalidateQueries({ queryKey: characterKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Hook for updating a mech build.
+ */
+export function useUpdateMechBuild() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      characterId,
+      mechId,
+      data,
+    }: {
+      characterId: string;
+      mechId: string;
+      data: MechBuildUpdateRequest;
+    }) =>
+      api.put<CharacterResponse>(
+        `/characters/${characterId}/mechs/${mechId}/build`,
+        data
+      ),
     onSuccess: (updatedCharacter) => {
       queryClient.setQueryData(
         characterKeys.detail(updatedCharacter.id),

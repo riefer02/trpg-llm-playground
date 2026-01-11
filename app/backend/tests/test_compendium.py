@@ -3,6 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
+from core.mech.compendium import ALL_FRAMES, ALL_WEAPONS, ALL_SYSTEMS
+from core.pilot.gear import PILOT_GEAR_DEFINITIONS
 
 @pytest.mark.asyncio
 async def test_list_backgrounds(client: AsyncClient):
@@ -69,3 +71,67 @@ async def test_background_triggers_are_valid(client: AsyncClient):
             assert trigger_id in valid_trigger_ids, (
                 f"Background '{bg['name']}' references invalid trigger: {trigger_id}"
             )
+
+
+@pytest.mark.asyncio
+async def test_list_frames(client: AsyncClient):
+    """Test listing all mech frames."""
+    response = await client.get("/api/compendium/frames")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total"] == len(ALL_FRAMES)
+
+    frame = data["items"][0]
+    assert "id" in frame
+    assert "name" in frame
+    assert "manufacturer" in frame
+    assert "license_id" in frame
+    assert "license_rank" in frame
+
+
+@pytest.mark.asyncio
+async def test_list_weapons(client: AsyncClient):
+    """Test listing all mech weapons."""
+    response = await client.get("/api/compendium/weapons")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total"] == len(ALL_WEAPONS)
+
+    weapon = data["items"][0]
+    assert "id" in weapon
+    assert "name" in weapon
+    assert "license_id" in weapon
+    assert "license_rank" in weapon
+
+
+@pytest.mark.asyncio
+async def test_list_systems(client: AsyncClient):
+    """Test listing all mech systems."""
+    response = await client.get("/api/compendium/systems")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total"] == len(ALL_SYSTEMS)
+
+    system = data["items"][0]
+    assert "id" in system
+    assert "name" in system
+    assert "license_id" in system
+    assert "license_rank" in system
+
+
+@pytest.mark.asyncio
+async def test_list_pilot_gear(client: AsyncClient):
+    """Test listing all pilot gear."""
+    response = await client.get("/api/compendium/pilot-gear")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total"] == len(PILOT_GEAR_DEFINITIONS)
+
+    gear = data["items"][0]
+    assert "id" in gear
+    assert "name" in gear
+    assert "category" in gear

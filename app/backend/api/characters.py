@@ -19,6 +19,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import Response
 from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -27,6 +28,7 @@ from app.backend.db.engine import get_session
 from app.backend.db.models import CharacterDB, utc_now
 from app.backend.dependencies import get_current_user
 from app.backend.exceptions import NotFoundError, ValidationError
+from app.backend.pdf import render_character_sheet_pdf
 from app.backend.schemas import (
     DatabaseMetadata,
     ListResponse,
@@ -55,8 +57,10 @@ from core.pilot import (
     License,
     CoreBonus,
     Background,
+    PilotLoadout,
 )
 from core.mech import MechBuild
+from core.mech.build_validation import validate_mech_build
 
 router = APIRouter(prefix="/characters", tags=["characters"])
 
@@ -101,6 +105,10 @@ class CharacterCreateRequest(BaseModel):
         default=None,
         description="Background as {id, name, triggers: [...]}",
     )
+    pilot_gear: dict[str, Any] | None = Field(
+        default=None,
+        description="Pilot gear loadout (clothing, armor, weapons, gear)",
+    )
 
     # Mech configuration
     mech_name: str | None = Field(
@@ -141,6 +149,22 @@ class MechAddRequest(BaseModel):
     name: str = Field(..., min_length=1)
     frame_id: str = Field(default="gms_everest")
     build: dict[str, Any] = Field(default_factory=dict, description="MechBuild data")
+
+
+class PilotGearUpdateRequest(BaseModel):
+    """Request body for updating pilot gear loadout."""
+
+    pilot_gear: dict[str, Any] = Field(
+        ..., description="PilotLoadout data for the mission"
+    )
+
+
+class MechBuildUpdateRequest(BaseModel):
+    """Request body for updating a mech build."""
+
+    build: dict[str, Any] = Field(
+        default_factory=dict, description="MechBuild data (weapons, systems)"
+    )
 
 
 # =============================================================================
@@ -191,6 +215,7 @@ class CharacterResponse(DatabaseMetadata):
     licenses: list[dict[str, Any]]
     core_bonuses: list[dict[str, Any]]
     background: dict[str, Any] | None
+    pilot_gear: dict[str, Any] | None
     notes: str
 
     # Pilot computed fields
@@ -223,6 +248,12 @@ def _generate_character_id() -> str:
 def _generate_mech_id() -> str:
     """Generate a unique mech configuration ID."""
     return f"mech_{uuid4().hex[:12]}"
+
+
+def _sanitize_filename(value: str) -> str:
+    safe = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in value)
+    safe = safe.strip("_")
+    return safe or "character"
 
 
 def _build_character_from_request(
@@ -258,6 +289,12 @@ def _build_character_from_request(
                     Background, request.background, "background"
                 )
 
+            pilot_gear = None
+            if request.pilot_gear:
+                pilot_gear = validate_core_model(
+                    PilotLoadout, request.pilot_gear, "pilot_gear"
+                )
+
             mech_build = MechBuild(frame_id=request.mech_frame_id)
 
             return create_ll0_character(
@@ -267,6 +304,7 @@ def _build_character_from_request(
                 skills=skills,
                 triggers=triggers,
                 talents=talents,
+                pilot_gear=pilot_gear,
                 mech_name=request.mech_name,
                 mech_build=mech_build,
                 character_id=character_id,
@@ -298,6 +336,8 @@ def _build_character_from_request(
         pilot_data["core_bonuses"] = request.core_bonuses
     if request.background:
         pilot_data["background"] = request.background
+    if request.pilot_gear:
+        pilot_data["pilot_gear"] = request.pilot_gear
 
     pilot = validate_core_model(Pilot, pilot_data, "pilot")
 
@@ -601,6 +641,169 @@ async def validate_character_endpoint(
             for issue in validation.issues
         ],
     )
+
+
+@router.get("/{character_id}/export.pdf")
+async def export_character_pdf(
+    character_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> Response:
+    """Render a character sheet PDF using a server-side template."""
+    result = await session.exec(
+        select(CharacterDB).where(
+            CharacterDB.id == character_id,
+            CharacterDB.user_id == user["id"],
+        )
+    )
+    char_db = result.first()
+
+    if not char_db:
+        raise NotFoundError("Character", character_id)
+
+    core_char = Character.model_validate(char_db.data)
+    pdf_bytes = render_character_sheet_pdf(core_char)
+    filename = f"{_sanitize_filename(core_char.pilot.callsign)}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
+    )
+
+
+# =============================================================================
+# Loadout Endpoints
+# =============================================================================
+
+
+@router.put("/{character_id}/pilot-gear", response_model=CharacterResponse)
+async def update_pilot_gear(
+    character_id: str,
+    body: PilotGearUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> CharacterResponse:
+    """Update a character's pilot gear loadout."""
+    result = await session.exec(
+        select(CharacterDB).where(
+            CharacterDB.id == character_id,
+            CharacterDB.user_id == user["id"],
+        )
+    )
+    char_db = result.first()
+
+    if not char_db:
+        raise NotFoundError("Character", character_id)
+
+    core_char = Character.model_validate(char_db.data)
+    pilot_gear = validate_core_model(PilotLoadout, body.pilot_gear, "pilot_gear")
+
+    pilot_data = core_char.pilot.model_dump(mode="json")
+    pilot_data["pilot_gear"] = pilot_gear.model_dump(mode="json")
+    updated_pilot = validate_core_model(Pilot, pilot_data, "pilot")
+
+    updated_char = Character(
+        id=core_char.id,
+        pilot=updated_pilot,
+        mechs=core_char.mechs,
+        active_mech_id=core_char.active_mech_id,
+    )
+
+    char_db.data = updated_char.model_dump(mode="json")
+    char_db.updated_at = utc_now()
+
+    session.add(char_db)
+    await session.commit()
+    await session.refresh(char_db)
+
+    return _character_to_response(char_db)
+
+
+@router.put("/{character_id}/mechs/{mech_id}/build", response_model=CharacterResponse)
+async def update_mech_build(
+    character_id: str,
+    mech_id: str,
+    body: MechBuildUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> CharacterResponse:
+    """Update a mech build (weapons + systems) for a character."""
+    result = await session.exec(
+        select(CharacterDB).where(
+            CharacterDB.id == character_id,
+            CharacterDB.user_id == user["id"],
+        )
+    )
+    char_db = result.first()
+
+    if not char_db:
+        raise NotFoundError("Character", character_id)
+
+    core_char = Character.model_validate(char_db.data)
+    mech = core_char.get_mech(mech_id)
+    if not mech:
+        raise NotFoundError("Mech", mech_id)
+
+    build_data = {"frame_id": mech.frame_id, **body.build}
+    mech_build = validate_core_model(MechBuild, build_data, "mech_build")
+
+    frame = mech.get_frame()
+    if frame is None:
+        raise ValidationError("Invalid mech frame")
+
+    validation = validate_mech_build(
+        frame=frame,
+        build=mech_build,
+        skills=core_char.pilot.skills,
+        grit=core_char.pilot.grit,
+        licenses=core_char.pilot.licenses,
+        bonus_effects=core_char.core_bonus_effects,
+    )
+
+    if not validation.valid:
+        raise ValidationError(
+            "Invalid mech build",
+            errors=[
+                {
+                    "code": issue.code,
+                    "message": issue.message,
+                    "severity": issue.severity,
+                }
+                for issue in validation.issues
+            ],
+        )
+
+    updated_char = core_char.update_mech(mech_id, build=mech_build)
+
+    if updated_char.pilot.level == 0:
+        ll0_validation = validate_character(updated_char)
+        ll0_errors = [
+            issue
+            for issue in ll0_validation.issues
+            if issue.severity == "error" and issue.code.startswith("ll0_")
+        ]
+        if ll0_errors:
+            raise ValidationError(
+                "Invalid LL0 mech build",
+                errors=[
+                    {
+                        "code": issue.code,
+                        "message": issue.message,
+                        "severity": issue.severity,
+                    }
+                    for issue in ll0_errors
+                ],
+            )
+
+    char_db.data = updated_char.model_dump(mode="json")
+    char_db.updated_at = utc_now()
+
+    session.add(char_db)
+    await session.commit()
+    await session.refresh(char_db)
+
+    return _character_to_response(char_db)
 
 
 # =============================================================================

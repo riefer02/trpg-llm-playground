@@ -1,8 +1,9 @@
 """Compendium endpoints for reference data.
 
-Read-only endpoints for game reference data (backgrounds, triggers, talents).
-This data comes from core definitions and is used by the frontend for
-character creation forms, validation, and display.
+Read-only endpoints for game reference data (backgrounds, triggers, talents,
+frames, weapons, systems, and pilot gear). This data comes from core
+definitions and is used by the frontend for character creation, loadouts,
+validation, and display.
 """
 
 from fastapi import APIRouter
@@ -11,9 +12,18 @@ from pydantic import BaseModel, Field
 from app.backend.schemas import ListResponse
 
 # Import core reference data
-from core.pilot.background import PILOT_BACKGROUNDS, Background
-from core.pilot.skill import TRIGGER_DEFINITIONS, TriggerDefinition
-from core.pilot.talent import EXAMPLE_TALENTS, TalentDefinition
+from core.pilot.background import PILOT_BACKGROUNDS
+from core.pilot.skill import TRIGGER_DEFINITIONS
+from core.pilot.talent import EXAMPLE_TALENTS
+from core.pilot.gear import PILOT_GEAR_DEFINITIONS, PilotGearItemDefinition
+from core.mech.compendium import (
+    ALL_FRAMES,
+    ALL_WEAPONS,
+    ALL_SYSTEMS,
+)
+from core.mech.frame import MechFrameDefinition
+from core.mech.weapon import MechWeaponDefinition
+from core.mech.system import MechSystemDefinition
 
 router = APIRouter(prefix="/compendium", tags=["compendium"])
 
@@ -83,3 +93,27 @@ async def list_talents() -> ListResponse[TalentResponse]:
     """
     items = [TalentResponse(id=t.id, name=t.name, ranks=3) for t in EXAMPLE_TALENTS]
     return ListResponse(items=items, total=len(items))
+
+
+@router.get("/frames", response_model=ListResponse[MechFrameDefinition])
+async def list_frames() -> ListResponse[MechFrameDefinition]:
+    """List all mech frames in the compendium."""
+    return ListResponse(items=ALL_FRAMES, total=len(ALL_FRAMES))
+
+
+@router.get("/weapons", response_model=ListResponse[MechWeaponDefinition])
+async def list_weapons() -> ListResponse[MechWeaponDefinition]:
+    """List all mech weapons in the compendium."""
+    return ListResponse(items=ALL_WEAPONS, total=len(ALL_WEAPONS))
+
+
+@router.get("/systems", response_model=ListResponse[MechSystemDefinition])
+async def list_systems() -> ListResponse[MechSystemDefinition]:
+    """List all mech systems in the compendium."""
+    return ListResponse(items=ALL_SYSTEMS, total=len(ALL_SYSTEMS))
+
+
+@router.get("/pilot-gear", response_model=ListResponse[PilotGearItemDefinition])
+async def list_pilot_gear() -> ListResponse[PilotGearItemDefinition]:
+    """List all pilot gear items in the compendium."""
+    return ListResponse(items=PILOT_GEAR_DEFINITIONS, total=len(PILOT_GEAR_DEFINITIONS))

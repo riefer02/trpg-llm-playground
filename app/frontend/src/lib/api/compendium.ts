@@ -1,7 +1,7 @@
 /**
  * Compendium API hooks for reference data.
  *
- * Read-only data for character creation forms (backgrounds, triggers, talents).
+ * Read-only data for character creation and compendium views.
  * Uses generated types from core where possible.
  */
 
@@ -11,6 +11,10 @@ import type {
   Background as CoreBackground,
   TriggerDefinition,
   TalentDefinition,
+  MechFrameDefinition,
+  MechWeaponDefinition,
+  MechSystemDefinition,
+  PilotGearItemDefinition,
 } from "../types/lancer";
 
 // =============================================================================
@@ -52,6 +56,10 @@ export const compendiumKeys = {
   backgrounds: () => [...compendiumKeys.all, "backgrounds"] as const,
   triggers: () => [...compendiumKeys.all, "triggers"] as const,
   talents: () => [...compendiumKeys.all, "talents"] as const,
+  frames: () => [...compendiumKeys.all, "frames"] as const,
+  weapons: () => [...compendiumKeys.all, "weapons"] as const,
+  systems: () => [...compendiumKeys.all, "systems"] as const,
+  pilotGear: () => [...compendiumKeys.all, "pilot-gear"] as const,
 };
 
 // =============================================================================
@@ -80,6 +88,46 @@ export function useTalents() {
   return useQuery({
     queryKey: compendiumKeys.talents(),
     queryFn: () => api.get<ListResponse<Talent>>("/compendium/talents"),
+    staleTime: Infinity,
+    select: (data) => data.items,
+  });
+}
+
+export function useFrames() {
+  return useQuery({
+    queryKey: compendiumKeys.frames(),
+    queryFn: () =>
+      api.get<ListResponse<MechFrameDefinition>>("/compendium/frames"),
+    staleTime: Infinity,
+    select: (data) => data.items,
+  });
+}
+
+export function useWeapons() {
+  return useQuery({
+    queryKey: compendiumKeys.weapons(),
+    queryFn: () =>
+      api.get<ListResponse<MechWeaponDefinition>>("/compendium/weapons"),
+    staleTime: Infinity,
+    select: (data) => data.items,
+  });
+}
+
+export function useSystems() {
+  return useQuery({
+    queryKey: compendiumKeys.systems(),
+    queryFn: () =>
+      api.get<ListResponse<MechSystemDefinition>>("/compendium/systems"),
+    staleTime: Infinity,
+    select: (data) => data.items,
+  });
+}
+
+export function usePilotGear() {
+  return useQuery({
+    queryKey: compendiumKeys.pilotGear(),
+    queryFn: () =>
+      api.get<ListResponse<PilotGearItemDefinition>>("/compendium/pilot-gear"),
     staleTime: Infinity,
     select: (data) => data.items,
   });

@@ -11,11 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PilotsIndexRouteImport } from './routes/pilots/index'
+import { Route as CompendiumIndexRouteImport } from './routes/compendium/index'
 import { Route as CharactersIndexRouteImport } from './routes/characters/index'
 import { Route as PilotsNewRouteImport } from './routes/pilots/new'
 import { Route as PilotsPilotIdRouteImport } from './routes/pilots/$pilotId'
 import { Route as CharactersNewRouteImport } from './routes/characters/new'
 import { Route as CharactersCharacterIdRouteImport } from './routes/characters/$characterId'
+import { Route as CharactersCharacterIdExportRouteImport } from './routes/characters/$characterId.export'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -25,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const PilotsIndexRoute = PilotsIndexRouteImport.update({
   id: '/pilots/',
   path: '/pilots/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompendiumIndexRoute = CompendiumIndexRouteImport.update({
+  id: '/compendium/',
+  path: '/compendium/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CharactersIndexRoute = CharactersIndexRouteImport.update({
@@ -52,34 +59,46 @@ const CharactersCharacterIdRoute = CharactersCharacterIdRouteImport.update({
   path: '/characters/$characterId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CharactersCharacterIdExportRoute =
+  CharactersCharacterIdExportRouteImport.update({
+    id: '/export',
+    path: '/export',
+    getParentRoute: () => CharactersCharacterIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/characters/$characterId': typeof CharactersCharacterIdRoute
+  '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
   '/characters': typeof CharactersIndexRoute
+  '/compendium': typeof CompendiumIndexRoute
   '/pilots': typeof PilotsIndexRoute
+  '/characters/$characterId/export': typeof CharactersCharacterIdExportRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/characters/$characterId': typeof CharactersCharacterIdRoute
+  '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
   '/characters': typeof CharactersIndexRoute
+  '/compendium': typeof CompendiumIndexRoute
   '/pilots': typeof PilotsIndexRoute
+  '/characters/$characterId/export': typeof CharactersCharacterIdExportRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/characters/$characterId': typeof CharactersCharacterIdRoute
+  '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
   '/characters/': typeof CharactersIndexRoute
+  '/compendium/': typeof CompendiumIndexRoute
   '/pilots/': typeof PilotsIndexRoute
+  '/characters/$characterId/export': typeof CharactersCharacterIdExportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,7 +109,9 @@ export interface FileRouteTypes {
     | '/pilots/$pilotId'
     | '/pilots/new'
     | '/characters'
+    | '/compendium'
     | '/pilots'
+    | '/characters/$characterId/export'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -99,7 +120,9 @@ export interface FileRouteTypes {
     | '/pilots/$pilotId'
     | '/pilots/new'
     | '/characters'
+    | '/compendium'
     | '/pilots'
+    | '/characters/$characterId/export'
   id:
     | '__root__'
     | '/'
@@ -108,16 +131,19 @@ export interface FileRouteTypes {
     | '/pilots/$pilotId'
     | '/pilots/new'
     | '/characters/'
+    | '/compendium/'
     | '/pilots/'
+    | '/characters/$characterId/export'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CharactersCharacterIdRoute: typeof CharactersCharacterIdRoute
+  CharactersCharacterIdRoute: typeof CharactersCharacterIdRouteWithChildren
   CharactersNewRoute: typeof CharactersNewRoute
   PilotsPilotIdRoute: typeof PilotsPilotIdRoute
   PilotsNewRoute: typeof PilotsNewRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
+  CompendiumIndexRoute: typeof CompendiumIndexRoute
   PilotsIndexRoute: typeof PilotsIndexRoute
 }
 
@@ -135,6 +161,13 @@ declare module '@tanstack/react-router' {
       path: '/pilots'
       fullPath: '/pilots'
       preLoaderRoute: typeof PilotsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compendium/': {
+      id: '/compendium/'
+      path: '/compendium'
+      fullPath: '/compendium'
+      preLoaderRoute: typeof CompendiumIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/characters/': {
@@ -172,16 +205,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CharactersCharacterIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/characters/$characterId/export': {
+      id: '/characters/$characterId/export'
+      path: '/export'
+      fullPath: '/characters/$characterId/export'
+      preLoaderRoute: typeof CharactersCharacterIdExportRouteImport
+      parentRoute: typeof CharactersCharacterIdRoute
+    }
   }
 }
 
+interface CharactersCharacterIdRouteChildren {
+  CharactersCharacterIdExportRoute: typeof CharactersCharacterIdExportRoute
+}
+
+const CharactersCharacterIdRouteChildren: CharactersCharacterIdRouteChildren = {
+  CharactersCharacterIdExportRoute: CharactersCharacterIdExportRoute,
+}
+
+const CharactersCharacterIdRouteWithChildren =
+  CharactersCharacterIdRoute._addFileChildren(
+    CharactersCharacterIdRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CharactersCharacterIdRoute: CharactersCharacterIdRoute,
+  CharactersCharacterIdRoute: CharactersCharacterIdRouteWithChildren,
   CharactersNewRoute: CharactersNewRoute,
   PilotsPilotIdRoute: PilotsPilotIdRoute,
   PilotsNewRoute: PilotsNewRoute,
   CharactersIndexRoute: CharactersIndexRoute,
+  CompendiumIndexRoute: CompendiumIndexRoute,
   PilotsIndexRoute: PilotsIndexRoute,
 }
 export const routeTree = rootRouteImport

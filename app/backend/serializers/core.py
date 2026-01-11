@@ -46,6 +46,9 @@ def _serialize_pilot_base(core_pilot: Pilot) -> dict[str, Any]:
         "background": core_pilot.background.model_dump()
         if core_pilot.background
         else None,
+        "pilot_gear": core_pilot.pilot_gear.model_dump()
+        if core_pilot.pilot_gear
+        else None,
         "notes": core_pilot.notes,
     }
 

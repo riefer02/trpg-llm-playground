@@ -151,6 +151,7 @@ export type LancerTTRPGSchema =
   | DynamicWeaponDefinition
   | MountlessWeaponDefinition
   | MechWeaponDefinition
+  | MechSystemDefinition
   | MountSlot
   | CoreSystemDefinition
   | MechFrameBaseStats
@@ -28442,6 +28443,86 @@ export type Ranges2 = WeaponRange[];
 export type Damage2 = WeaponDamage[];
 export type Tags4 = WeaponTag[];
 export type LimitedUses2 = number | null;
+/**
+ * Unique system identifier
+ */
+export type Id16 = string;
+/**
+ * Display name
+ */
+export type Name30 = string;
+export type SystemType = "system" | "tech" | "deployable" | "drone" | "shield" | "ai";
+export type SpCost1 = number;
+/**
+ * License ID required to use this system (None for GMS/general)
+ */
+export type LicenseId2 = string | null;
+/**
+ * Required license rank if gated by a specific license
+ */
+export type LicenseRank1 = number | null;
+export type Unique2 = boolean;
+export type LimitedUses3 = number | null;
+export type Tag3 =
+  | "ai"
+  | "shield"
+  | "deployable"
+  | "drone"
+  | "protocol"
+  | "reaction"
+  | "mod"
+  | "quick_action"
+  | "full_action"
+  | "grenade"
+  | "mine";
+export type Value15 = number | null;
+export type Tags5 = SystemTag[];
+export type Name31 = string;
+export type Range13 = number;
+export type Pattern2 = "range" | "threat" | "thrown" | "line" | "cone" | "burst" | "blast" | "sensors";
+export type Size11 = number;
+export type AttackVs3 = ("evasion" | "e_defense") | null;
+export type Range14 = number | null;
+export type Duration34 = "instant" | "end_of_turn" | "end_of_next_turn" | "scene";
+export type Cover4 = ("none" | "soft" | "hard") | null;
+export type Save1 = ("hull" | "agility" | "systems" | "engineering") | null;
+export type HalfOnSuccess = boolean;
+export type ObjectsAutoHit1 = boolean;
+export type Grenades1 = GrenadePayload[];
+export type Name32 = string;
+export type Detonation = "adjacent_movement" | "ally_adjacent_movement" | "manual";
+export type CanAttachToTerrain = boolean;
+export type DetonationAction = ("free" | "quick" | "full" | "reaction" | "protocol" | "move") | null;
+export type Mines = MinePayload[];
+export type Mode3 = "always" | "move" | "boost" | "move_or_boost" | "environmental";
+export type Environment = ("low_g" | "zero_g" | "submarine")[] | null;
+export type MustEndOnSurface2 = boolean;
+export type HeatOnTurnEnd = number | "size_plus_1" | null;
+export type IgnoresSlowedInEnvironment = boolean;
+export type Count7 = number;
+export type Size12 = number;
+export type Cover5 = ("none" | "soft" | "hard") | null;
+export type Evasion3 = number;
+export type Hp3 = number;
+export type PickupAction = ("free" | "quick" | "full" | "reaction" | "protocol" | "move") | null;
+export type Name33 = string;
+export type Size13 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
+export type Hp4 = number;
+export type Evasion4 = number;
+export type EDefense3 = number;
+export type Name34 = string;
+export type Trigger25 = "ally_hit_target_within_range";
+export type Range15 = number;
+export type UsesPerRound = number;
+export type Reactions = DroneReaction[];
+export type DeployRangeType = "range" | "threat" | "thrown" | "line" | "cone" | "burst" | "blast" | "sensors";
+export type DeployRequiresLineOfSight = boolean;
+export type Invisible = boolean;
+export type AttachToSurface = boolean;
+export type RedeployAction = ("free" | "quick" | "full" | "reaction" | "protocol" | "move") | null;
+export type RedeployRequiresLineOfSight = boolean;
+export type RecallAction = ("free" | "quick" | "full" | "reaction" | "protocol" | "move") | null;
+export type RecallRequiresLineOfSight = boolean;
 export type SlotType1 = "main" | "heavy" | "aux_aux" | "main_aux" | "flexible" | "integrated";
 /**
  * Integrated weapon ID (only for integrated mounts)
@@ -28450,18 +28531,18 @@ export type IntegratedWeaponId = string | null;
 /**
  * Unique core system identifier
  */
-export type Id16 = string;
+export type Id17 = string;
 /**
  * Display name
  */
-export type Name30 = string;
+export type Name35 = string;
 export type MountlessWeapons = MountlessWeaponDefinition[];
 export type UsesPerMission = number;
-export type Size11 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
+export type Size14 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
 export type Armor3 = number;
-export type Hp3 = number;
-export type Evasion3 = number;
-export type EDefense3 = number;
+export type Hp5 = number;
+export type Evasion5 = number;
+export type EDefense4 = number;
 export type Speed3 = number;
 export type SensorRange1 = number;
 export type TechAttack1 = number;
@@ -28472,26 +28553,26 @@ export type Structure1 = number;
 /**
  * Unique frame identifier
  */
-export type Id17 = string;
+export type Id18 = string;
 /**
  * Display name
  */
-export type Name31 = string;
+export type Name36 = string;
 export type Manufacturer2 = "GMS" | "IPS-N" | "SSC" | "HORUS" | "HA";
 /**
  * License ID required to use this frame (None for GMS/general)
  */
-export type LicenseId2 = string | null;
+export type LicenseId3 = string | null;
 /**
  * Required license rank for this frame (typically rank II)
  */
-export type LicenseRank1 = number | null;
+export type LicenseRank2 = number | null;
 export type Mounts = MountSlot[];
 export type SystemPoints1 = number;
 /**
  * Display name
  */
-export type Name32 = string;
+export type Name37 = string;
 export type Traits = FrameTrait[];
 export type UnlicensedStatusPenalties = (
   | "braced"
@@ -28684,8 +28765,8 @@ export type HoverAllowsStationary = boolean;
 export type HoverIgnoresStraightLine = boolean;
 export type CarryMaxTotalSize = number;
 export type CarryLimitIgnoredInZeroG = boolean;
-export type Pattern2 = "line" | "cone" | "blast" | "burst";
-export type Size12 = number;
+export type Pattern3 = "line" | "cone" | "blast" | "burst";
+export type Size15 = number;
 export type ConeMode = "wedge" | "axis";
 export type SeparateAttackPerTarget = boolean;
 export type SingleDamageRoll = boolean;
@@ -28719,7 +28800,7 @@ export type ChooseDestroyedBy = "target" | "attacker";
 export type ExcludeLimitedNoCharges = boolean;
 export type FallbackToOtherIfNone = boolean;
 export type FallbackToDirectHitIfNone = boolean;
-export type Name33 = "glancing_blow" | "system_trauma" | "direct_hit" | "crushing_hit";
+export type Name38 = "glancing_blow" | "system_trauma" | "direct_hit" | "crushing_hit";
 export type ImpairedUntilEndNextTurn = boolean;
 export type DestroyMount = boolean;
 export type DestroySystem = boolean;
@@ -28741,7 +28822,7 @@ export type DangerZoneFraction = number;
 export type DangerZoneRounding = "up" | "down";
 export type RollMin2 = number;
 export type RollMax2 = number;
-export type Name34 = "emergency_shunt" | "power_plant_destabilize" | "meltdown" | "irreversible_meltdown";
+export type Name39 = "emergency_shunt" | "power_plant_destabilize" | "meltdown" | "irreversible_meltdown";
 export type ImpairedUntilEndNextTurn1 = boolean;
 export type ExposedUntilCleared = boolean;
 export type MeltdownImmediate = boolean;
@@ -28834,8 +28915,8 @@ export type CannotReactWhileDragging1 = boolean;
 export type CannotReactWhileLifting1 = boolean;
 export type SlowedWhileDragging = boolean;
 export type ImmobilizedWhileLifting = boolean;
-export type Id18 = string;
-export type Name35 = string;
+export type Id19 = string;
+export type Name40 = string;
 export type ActionType16 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type AlternateActionTypes = ("free" | "quick" | "full" | "reaction" | "protocol" | "move")[];
 export type Scope = "mech" | "pilot" | "both";
@@ -28898,7 +28979,7 @@ export type InflictsConditions = (
   | "burn"
   | "unshackled"
 )[];
-export type Duration34 = ("end_of_next_turn" | "until_cleared") | null;
+export type Duration35 = ("end_of_next_turn" | "until_cleared") | null;
 export type OptionsPerAction = number | null;
 export type RepeatSameOptionAllowed = boolean;
 export type RepeatSameOptionRequiresFreeAction = boolean;
@@ -29007,14 +29088,14 @@ export type GrantsStatus =
 export type ResistAllDamageFromTrigger = boolean;
 export type ResistHeatFromTrigger = boolean;
 export type ResistBurnFromTrigger = boolean;
-export type Trigger25 = "enemy_starts_movement_in_threat";
+export type Trigger26 = "enemy_starts_movement_in_threat";
 export type UsesWeaponThreat = boolean;
 export type UsesSkirmishAttack = boolean;
-export type UsesPerRound = number;
+export type UsesPerRound1 = number;
 export type UsesPilotWeapon = boolean;
 export type SidearmCanBeQuick = boolean;
 export type ContestedCheck1 = "grit_vs_hull";
-export type Name36 = "distract" | "shred" | "damage";
+export type Name41 = "distract" | "shred" | "damage";
 export type InflictsConditions1 = (
   | "braced"
   | "immobilized"
@@ -29054,7 +29135,7 @@ export type Condition105 =
   | "engaged"
   | "burn"
   | "unshackled";
-export type Duration35 = "until_consumed" | "until_cleared" | "end_of_next_turn";
+export type Duration36 = "until_consumed" | "until_cleared" | "end_of_next_turn";
 export type Consumable = boolean;
 export type ConsumedBy = "hostile_attack";
 export type AccuracyBonus1 = number;
@@ -29086,10 +29167,10 @@ export type DefenderStat = "systems" | "agility" | "skill_check";
 export type TieBreaker1 = "attacker" | "defender";
 export type PilotRange = number;
 export type RevealsOnSuccess = boolean;
-export type Size13 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
+export type Size16 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
 export type HpMax = number;
-export type Evasion4 = number;
-export type EDefense4 = number;
+export type Evasion6 = number;
+export type EDefense5 = number;
 export type Armor4 = number;
 export type Speed4 = number;
 export type SensorRange2 = number;
@@ -29100,8 +29181,8 @@ export type HeatCap2 = number;
 export type StructureCurrent = number;
 export type StressCurrent = number;
 export type RepairsRemaining = number;
-export type Id19 = string;
-export type Name37 = string;
+export type Id20 = string;
+export type Name42 = string;
 export type Side = "players" | "hostiles" | "neutral";
 export type Kind = "mech" | "pilot" | "npc" | "object";
 export type Statuses1 = (
@@ -29143,7 +29224,7 @@ export type Conditions = (
 export type MountIndex1 = number;
 export type SlotType2 = ("main" | "heavy" | "aux_aux" | "main_aux" | "flexible" | "integrated") | null;
 export type WeaponId3 = string;
-export type Tags5 = (
+export type Tags6 = (
   | "accurate"
   | "inaccurate"
   | "loading"
@@ -29210,7 +29291,7 @@ export type ResetOn4 = "scene_end" | "rest" | "full_repair" | "never";
 export type TargetId2 = string | null;
 export type EffectId3 = string;
 export type TurnsRemaining = number;
-export type Duration36 = number;
+export type Duration37 = number;
 export type TriggerOn1 =
   | (
       | "on_hit"
@@ -29434,7 +29515,7 @@ export type ReactionTrigger =
 export type ConsumesLockOn = boolean;
 export type EffectId6 = string;
 export type TargetId8 = string;
-export type Count7 = number;
+export type Count8 = number;
 export type MaxCount2 = number | null;
 export type ResetOn6 = ("scene_end" | "rest" | "full_repair" | "never") | null;
 export type Source4 = "save_check" | "triggered_effect" | "direct";
@@ -29449,17 +29530,17 @@ export type Turns = CombatTurn[];
 export type Combatants = CombatantState[];
 export type Grapples = GrappleLink[];
 export type Rounds = CombatRound[];
-export type Environment = "standard" | "zero_g" | "underwater";
-export type Id20 = string;
-export type Name38 = string;
+export type Environment1 = "standard" | "zero_g" | "underwater";
+export type Id21 = string;
+export type Name43 = string;
 export type Kind1 = "drone" | "mine" | "deployable" | "other";
 export type OwnerId = string | null;
-export type Size14 = number;
-export type Hp4 = number;
+export type Size17 = number;
+export type Hp6 = number;
 export type MaxHp = number;
 export type Armor5 = number;
-export type Evasion5 = number;
-export type Cover4 = ("soft" | "hard") | null;
+export type Evasion7 = number;
+export type Cover6 = ("soft" | "hard") | null;
 export type IsDestroyed = boolean;
 export type IsActive = boolean;
 export type CanAct = boolean;
@@ -29470,8 +29551,8 @@ export type ArmingTurn = number | null;
 export type TriggerOnAdjacentEntry = boolean;
 export type DetectionDc = number | null;
 export type DisarmDc = number | null;
-export type EDefense5 = number;
-export type Reactions = string[];
+export type EDefense6 = number;
+export type Reactions1 = string[];
 export type Code4 = string;
 export type Message4 = string;
 export type Severity5 = "error" | "warning";
@@ -33227,6 +33308,133 @@ export interface MechWeaponDefinition {
   [k: string]: unknown;
 }
 /**
+ * Definition for a mech system or chassis mod.
+ */
+export interface MechSystemDefinition {
+  id: Id16;
+  name: Name30;
+  system_type?: SystemType;
+  sp_cost?: SpCost1;
+  license_id?: LicenseId2;
+  license_rank?: LicenseRank1;
+  unique?: Unique2;
+  limited_uses?: LimitedUses3;
+  tags?: Tags5;
+  grenades?: Grenades1;
+  mines?: Mines;
+  flight?: FlightEffect | null;
+  deployable?: DeployableEffect | null;
+  drone?: DronePayload | null;
+  effects?: MechanicalEffect;
+  [k: string]: unknown;
+}
+/**
+ * Structured tag for a mech system.
+ */
+export interface SystemTag {
+  tag: Tag3;
+  value?: Value15;
+  [k: string]: unknown;
+}
+/**
+ * Grenade option for a system.
+ */
+export interface GrenadePayload {
+  name: Name31;
+  range: Range13;
+  area: AreaEffect;
+  [k: string]: unknown;
+}
+/**
+ * Area effect payload (grenade, mine, etc).
+ */
+export interface AreaEffect {
+  pattern: Pattern2;
+  size: Size11;
+  attack_vs?: AttackVs3;
+  range?: Range14;
+  duration?: Duration34;
+  cover?: Cover4;
+  damage?: DamageSpec | null;
+  save?: Save1;
+  half_on_success?: HalfOnSuccess;
+  object_damage?: DamageSpec | null;
+  objects_auto_hit?: ObjectsAutoHit1;
+  [k: string]: unknown;
+}
+/**
+ * Mine option for a system.
+ */
+export interface MinePayload {
+  name: Name32;
+  area: AreaEffect;
+  detonation?: Detonation;
+  can_attach_to_terrain?: CanAttachToTerrain;
+  detonation_action?: DetonationAction;
+  [k: string]: unknown;
+}
+/**
+ * Flight behavior granted by a system.
+ */
+export interface FlightEffect {
+  mode: Mode3;
+  environment?: Environment;
+  must_end_on_surface?: MustEndOnSurface2;
+  heat_on_turn_end?: HeatOnTurnEnd;
+  ignores_slowed_in_environment?: IgnoresSlowedInEnvironment;
+  [k: string]: unknown;
+}
+/**
+ * Deployable system payload.
+ */
+export interface DeployableEffect {
+  count?: Count7;
+  obj: DeployableObject;
+  pickup_action?: PickupAction;
+  [k: string]: unknown;
+}
+/**
+ * Single deployable object definition.
+ */
+export interface DeployableObject {
+  size: Size12;
+  cover?: Cover5;
+  evasion?: Evasion3;
+  hp?: Hp3;
+  [k: string]: unknown;
+}
+/**
+ * Drone system payload.
+ */
+export interface DronePayload {
+  name: Name33;
+  size: Size13;
+  hp?: Hp4;
+  evasion?: Evasion4;
+  e_defense?: EDefense3;
+  reactions?: Reactions;
+  deploy_range_type?: DeployRangeType;
+  deploy_requires_line_of_sight?: DeployRequiresLineOfSight;
+  invisible?: Invisible;
+  attach_to_surface?: AttachToSurface;
+  redeploy_action?: RedeployAction;
+  redeploy_requires_line_of_sight?: RedeployRequiresLineOfSight;
+  recall_action?: RecallAction;
+  recall_requires_line_of_sight?: RecallRequiresLineOfSight;
+  [k: string]: unknown;
+}
+/**
+ * Reaction granted by a drone.
+ */
+export interface DroneReaction {
+  name: Name34;
+  trigger: Trigger25;
+  range: Range15;
+  damage: DamageSpec;
+  uses_per_round?: UsesPerRound;
+  [k: string]: unknown;
+}
+/**
  * A mount slot on a mech frame.
  */
 export interface MountSlot {
@@ -33238,8 +33446,8 @@ export interface MountSlot {
  * Core system ability unique to a frame.
  */
 export interface CoreSystemDefinition {
-  id: Id16;
-  name: Name30;
+  id: Id17;
+  name: Name35;
   effects?: MechanicalEffect;
   mountless_weapons?: MountlessWeapons;
   uses_per_mission?: UsesPerMission;
@@ -33249,11 +33457,11 @@ export interface CoreSystemDefinition {
  * Base statistics provided by a frame before pilot bonuses.
  */
 export interface MechFrameBaseStats {
-  size: Size11;
+  size: Size14;
   armor?: Armor3;
-  hp?: Hp3;
-  evasion?: Evasion3;
-  e_defense?: EDefense3;
+  hp?: Hp5;
+  evasion?: Evasion5;
+  e_defense?: EDefense4;
   speed?: Speed3;
   sensor_range?: SensorRange1;
   tech_attack?: TechAttack1;
@@ -33267,11 +33475,11 @@ export interface MechFrameBaseStats {
  * Definition for a mech frame.
  */
 export interface MechFrameDefinition {
-  id: Id17;
-  name: Name31;
+  id: Id18;
+  name: Name36;
   manufacturer: Manufacturer2;
-  license_id?: LicenseId2;
-  license_rank?: LicenseRank1;
+  license_id?: LicenseId3;
+  license_rank?: LicenseRank2;
   base_stats: MechFrameBaseStats;
   mounts?: Mounts;
   system_points?: SystemPoints1;
@@ -33283,7 +33491,7 @@ export interface MechFrameDefinition {
  * Passive trait provided by a mech frame.
  */
 export interface FrameTrait {
-  name: Name32;
+  name: Name37;
   effects?: MechanicalEffect;
   [k: string]: unknown;
 }
@@ -33593,8 +33801,8 @@ export interface FlightRules {
  * Definition for area attack patterns.
  */
 export interface AttackPatternDefinition {
-  pattern: Pattern2;
-  size: Size12;
+  pattern: Pattern3;
+  size: Size15;
   cone_mode?: ConeMode;
   separate_attack_per_target?: SeparateAttackPerTarget;
   single_damage_roll?: SingleDamageRoll;
@@ -33688,7 +33896,7 @@ export interface D6Range {
  * Outcome detail for structure damage.
  */
 export interface StructureOutcomeType {
-  name: Name33;
+  name: Name38;
   impaired_until_end_next_turn?: ImpairedUntilEndNextTurn;
   destroy_mount?: DestroyMount;
   destroy_system?: DestroySystem;
@@ -33745,7 +33953,7 @@ export interface OverheatTableEntry {
  * Outcome detail for overheat checks.
  */
 export interface OverheatOutcomeType {
-  name: Name34;
+  name: Name39;
   impaired_until_end_next_turn?: ImpairedUntilEndNextTurn1;
   exposed_until_cleared?: ExposedUntilCleared;
   meltdown_immediate?: MeltdownImmediate;
@@ -34002,8 +34210,8 @@ export interface LiftDragRules {
  * Rule definition for a combat action.
  */
 export interface ActionRule {
-  id: Id18;
-  name: Name35;
+  id: Id19;
+  name: Name40;
   action_type: ActionType16;
   alternate_action_types?: AlternateActionTypes;
   scope?: Scope;
@@ -34069,7 +34277,7 @@ export interface TechActionProfile {
   bolster_accuracy?: BolsterAccuracy;
   scan_options?: ScanOptions;
   inflicts_conditions?: InflictsConditions;
-  duration?: Duration34;
+  duration?: Duration35;
   options_per_action?: OptionsPerAction;
   repeat_same_option_allowed?: RepeatSameOptionAllowed;
   repeat_same_option_requires_free_action?: RepeatSameOptionRequiresFreeAction;
@@ -34174,10 +34382,10 @@ export interface BraceRule {
  * Overwatch reaction trigger and behavior.
  */
 export interface OverwatchRule {
-  trigger?: Trigger25;
+  trigger?: Trigger26;
   uses_weapon_threat?: UsesWeaponThreat;
   uses_skirmish_attack?: UsesSkirmishAttack;
-  uses_per_round?: UsesPerRound;
+  uses_per_round?: UsesPerRound1;
   [k: string]: unknown;
 }
 /**
@@ -34200,7 +34408,7 @@ export interface JockeyRule {
  * Jockey follow-up option.
  */
 export interface JockeyOption {
-  name: Name36;
+  name: Name41;
   inflicts_conditions?: InflictsConditions1;
   heat?: Heat;
   damage?: Damage3;
@@ -34212,7 +34420,7 @@ export interface JockeyOption {
  */
 export interface LockOnRule {
   condition?: Condition105;
-  duration?: Duration35;
+  duration?: Duration36;
   consumable?: Consumable;
   consumed_by?: ConsumedBy;
   accuracy_bonus?: AccuracyBonus1;
@@ -34254,10 +34462,10 @@ export interface ContestedCheckRule {
  * Combat-relevant stats for a combatant.
  */
 export interface CombatStats {
-  size: Size13;
+  size: Size16;
   hp_max: HpMax;
-  evasion: Evasion4;
-  e_defense: EDefense4;
+  evasion: Evasion6;
+  e_defense: EDefense5;
   armor?: Armor4;
   speed?: Speed4;
   sensor_range?: SensorRange2;
@@ -34283,8 +34491,8 @@ export interface CombatResources {
  * and convert to CombatantState using the helper functions.
  */
 export interface CombatantState {
-  id: Id19;
-  name: Name37;
+  id: Id20;
+  name: Name42;
   side: Side;
   kind: Kind;
   stats: CombatStats;
@@ -34344,7 +34552,7 @@ export interface WeaponMountState {
  */
 export interface WeaponState {
   weapon_id: WeaponId3;
-  tags?: Tags5;
+  tags?: Tags6;
   destroyed?: Destroyed1;
   limited_charges_remaining?: LimitedChargesRemaining;
   [k: string]: unknown;
@@ -34411,7 +34619,7 @@ export interface CooldownStates {
 export interface CooldownState {
   effect_id: EffectId3;
   turns_remaining?: TurnsRemaining;
-  duration?: Duration36;
+  duration?: Duration37;
   trigger_on?: TriggerOn1;
   reset_on?: ResetOn5;
   per_target?: PerTarget2;
@@ -34600,7 +34808,7 @@ export interface ActionUse {
 export interface AppliedPerTargetEffect {
   effect_id: EffectId6;
   target_id: TargetId8;
-  count?: Count7;
+  count?: Count8;
   max_count?: MaxCount2;
   reset_on?: ResetOn6;
   source?: Source4;
@@ -34642,7 +34850,7 @@ export interface MechCombatScenario {
   grapples?: Grapples;
   rounds?: Rounds;
   terrain?: TerrainMap | null;
-  environment?: Environment;
+  environment?: Environment1;
   deployables?: Deployables;
   [k: string]: unknown;
 }
@@ -34661,17 +34869,17 @@ export interface Deployables {
  * Deployables: 10 HP/size, evasion 5, default armor 0
  */
 export interface DeployableState {
-  id: Id20;
-  name: Name38;
+  id: Id21;
+  name: Name43;
   kind: Kind1;
   owner_id?: OwnerId;
   position: HexPosition;
-  size: Size14;
-  hp: Hp4;
+  size: Size17;
+  hp: Hp6;
   max_hp: MaxHp;
   armor?: Armor5;
-  evasion?: Evasion5;
-  cover?: Cover4;
+  evasion?: Evasion7;
+  cover?: Cover6;
   is_destroyed?: IsDestroyed;
   is_active?: IsActive;
   can_act?: CanAct;
@@ -34682,8 +34890,8 @@ export interface DeployableState {
   trigger_on_adjacent_entry?: TriggerOnAdjacentEntry;
   detection_dc?: DetectionDc;
   disarm_dc?: DisarmDc;
-  e_defense?: EDefense5;
-  reactions?: Reactions;
+  e_defense?: EDefense6;
+  reactions?: Reactions1;
   [k: string]: unknown;
 }
 /**

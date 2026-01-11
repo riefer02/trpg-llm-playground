@@ -9,19 +9,18 @@
  * 5. Mech - name + GMS Everest (LL0)
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import {
   useCreateCharacter,
   useBackgrounds,
   useTriggers,
   useTalents,
+  usePilotGear,
 } from "../../lib/api";
 import type {
   CharacterCreateRequest,
   Background,
-  Trigger,
-  Talent,
 } from "../../lib/api";
 import {
   Card,
@@ -37,7 +36,7 @@ export const Route = createFileRoute("/characters/new" as const)({
 });
 
 // Form steps
-type Step = "background" | "triggers" | "skills" | "talents" | "mech";
+type Step = "background" | "triggers" | "skills" | "talents" | "gear" | "mech";
 
 interface FormData {
   callsign: string;
@@ -52,6 +51,12 @@ interface FormData {
     engineering: number;
   };
   talents: string[]; // 3 talent IDs
+  pilotGear: {
+    clothing: string | null;
+    armor: string | null;
+    weapons: string[];
+    gear: string[];
+  };
   mechName: string;
   notes: string;
 }
@@ -64,6 +69,12 @@ const defaultFormData: FormData = {
   triggers: [],
   skills: { hull: 0, agility: 0, systems: 0, engineering: 0 },
   talents: [],
+  pilotGear: {
+    clothing: null,
+    armor: null,
+    weapons: [],
+    gear: [],
+  },
   mechName: "",
   notes: "",
 };
@@ -76,6 +87,7 @@ function NewCharacterPage() {
   const { data: backgrounds, isLoading: loadingBackgrounds } = useBackgrounds();
   const { data: allTriggers, isLoading: loadingTriggers } = useTriggers();
   const { data: allTalents, isLoading: loadingTalents } = useTalents();
+  const { data: pilotGear, isLoading: loadingPilotGear } = usePilotGear();
 
   const [step, setStep] = useState<Step>("background");
   const [formData, setFormData] = useState<FormData>(defaultFormData);
@@ -84,6 +96,16 @@ function NewCharacterPage() {
   // Create lookup maps
   const triggerMap = new Map(allTriggers?.map((t) => [t.id, t]) ?? []);
   const talentMap = new Map(allTalents?.map((t) => [t.id, t]) ?? []);
+  const pilotGearMap = new Map(pilotGear?.map((item) => [item.id, item]) ?? []);
+
+  const clothingOptions =
+    pilotGear?.filter((item) => item.category === "clothing") ?? [];
+  const armorOptions =
+    pilotGear?.filter((item) => item.category === "armor") ?? [];
+  const weaponOptions =
+    pilotGear?.filter((item) => item.category === "weapon") ?? [];
+  const gearOptions =
+    pilotGear?.filter((item) => item.category === "gear") ?? [];
 
   // When background is selected, pre-populate triggers
   const handleBackgroundSelect = (bg: Background) => {
@@ -104,6 +126,11 @@ function NewCharacterPage() {
       return;
     }
 
+    if (!formData.pilotGear.clothing) {
+      setError("Pilot gear requires a clothing selection");
+      return;
+    }
+
     // Build request with all the selected data
     const request: CharacterCreateRequest = {
       callsign: formData.callsign,
@@ -119,6 +146,12 @@ function NewCharacterPage() {
             triggers: formData.triggers,
           }
         : undefined,
+      pilot_gear: {
+        clothing: formData.pilotGear.clothing,
+        armor: formData.pilotGear.armor || null,
+        weapons: formData.pilotGear.weapons,
+        gear: formData.pilotGear.gear,
+      },
       mech_name: formData.mechName || undefined,
       notes: formData.notes || undefined,
     };
@@ -136,6 +169,36 @@ function NewCharacterPage() {
     }
   };
 
+  const togglePilotGearList = (
+    key: "weapons" | "gear",
+    id: string,
+    max: number
+  ) => {
+    setFormData((prev) => {
+      const current = prev.pilotGear[key];
+      const isSelected = current.includes(id);
+      if (isSelected) {
+        return {
+          ...prev,
+          pilotGear: {
+            ...prev.pilotGear,
+            [key]: current.filter((itemId) => itemId !== id),
+          },
+        };
+      }
+      if (current.length >= max) {
+        return prev;
+      }
+      return {
+        ...prev,
+        pilotGear: {
+          ...prev.pilotGear,
+          [key]: [...current, id],
+        },
+      };
+    });
+  };
+
   // Validation helpers
   const totalSkillPoints =
     formData.skills.hull +
@@ -146,8 +209,9 @@ function NewCharacterPage() {
   const canProceedFromTriggers = formData.triggers.length === 4;
   const canProceedFromSkills = totalSkillPoints === 2;
   const canProceedFromTalents = formData.talents.length === 3;
+  const canProceedFromGear = formData.pilotGear.clothing !== null;
 
-  if (loadingBackgrounds || loadingTriggers || loadingTalents) {
+  if (loadingBackgrounds || loadingTriggers || loadingTalents || loadingPilotGear) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
         <p className="text-muted-foreground">Loading reference data...</p>
@@ -174,14 +238,28 @@ function NewCharacterPage() {
 
       {/* Progress indicator */}
       <div className="mb-6 flex gap-2">
-        {(["background", "triggers", "skills", "talents", "mech"] as Step[]).map(
+        {([
+          "background",
+          "triggers",
+          "skills",
+          "talents",
+          "gear",
+          "mech",
+        ] as Step[]).map(
           (s, i) => (
             <div
               key={s}
               className={`flex-1 h-2 rounded ${
                 step === s
                   ? "bg-primary"
-                  : (["background", "triggers", "skills", "talents", "mech"] as Step[]).indexOf(step) > i
+                  : ([
+                      "background",
+                      "triggers",
+                      "skills",
+                      "talents",
+                      "gear",
+                      "mech",
+                    ] as Step[]).indexOf(step) > i
                   ? "bg-primary/50"
                   : "bg-border"
               }`}
@@ -526,8 +604,195 @@ function NewCharacterPage() {
               </Button>
               <Button
                 type="button"
-                onClick={() => setStep("mech")}
+                onClick={() => setStep("gear")}
                 disabled={!canProceedFromTalents}
+              >
+                Next: Pilot Gear
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 5: Pilot Gear */}
+      {step === "gear" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Step 5: Pilot Gear</CardTitle>
+            <CardDescription>
+              Choose your mission loadout: clothing, optional armor, up to 2
+              weapons, and up to 3 gear items.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
+                  Clothing (Required)
+                </div>
+                <div className="grid gap-2">
+                  {clothingOptions.map((item) => {
+                    const isSelected = formData.pilotGear.clothing === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            pilotGear: {
+                              ...prev.pilotGear,
+                              clothing: item.id,
+                            },
+                          }))
+                        }
+                        className={`p-3 text-left border rounded-md transition-colors ${
+                          isSelected
+                            ? "bg-primary/20 border-primary"
+                            : "hover:bg-primary/10"
+                        }`}
+                      >
+                        <div className="font-medium">{item.name}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
+                  Armor (Optional)
+                </div>
+                <div className="grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        pilotGear: { ...prev.pilotGear, armor: null },
+                      }))
+                    }
+                    className={`p-3 text-left border rounded-md transition-colors ${
+                      formData.pilotGear.armor === null
+                        ? "bg-primary/20 border-primary"
+                        : "hover:bg-primary/10"
+                    }`}
+                  >
+                    <div className="font-medium">No armor</div>
+                  </button>
+                  {armorOptions.map((item) => {
+                    const isSelected = formData.pilotGear.armor === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            pilotGear: {
+                              ...prev.pilotGear,
+                              armor: item.id,
+                            },
+                          }))
+                        }
+                        className={`p-3 text-left border rounded-md transition-colors ${
+                          isSelected
+                            ? "bg-primary/20 border-primary"
+                            : "hover:bg-primary/10"
+                        }`}
+                      >
+                        <div className="font-medium">{item.name}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Weapons (Up to 2)
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Selected: {formData.pilotGear.weapons.length} / 2
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  {weaponOptions.map((item) => {
+                    const isSelected = formData.pilotGear.weapons.includes(item.id);
+                    const isFull =
+                      formData.pilotGear.weapons.length >= 2 && !isSelected;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() =>
+                          togglePilotGearList("weapons", item.id, 2)
+                        }
+                        disabled={isFull}
+                        className={`p-3 text-left border rounded-md transition-colors ${
+                          isSelected
+                            ? "bg-primary/20 border-primary"
+                            : isFull
+                            ? "opacity-50"
+                            : "hover:bg-primary/10"
+                        }`}
+                      >
+                        <div className="font-medium">{item.name}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Gear (Up to 3)
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Selected: {formData.pilotGear.gear.length} / 3
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  {gearOptions.map((item) => {
+                    const isSelected = formData.pilotGear.gear.includes(item.id);
+                    const isFull =
+                      formData.pilotGear.gear.length >= 3 && !isSelected;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => togglePilotGearList("gear", item.id, 3)}
+                        disabled={isFull}
+                        className={`p-3 text-left border rounded-md transition-colors ${
+                          isSelected
+                            ? "bg-primary/20 border-primary"
+                            : isFull
+                            ? "opacity-50"
+                            : "hover:bg-primary/10"
+                        }`}
+                      >
+                        <div className="font-medium">{item.name}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep("talents")}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setStep("mech")}
+                disabled={!canProceedFromGear}
               >
                 Next: Mech
               </Button>
@@ -536,11 +801,11 @@ function NewCharacterPage() {
         </Card>
       )}
 
-      {/* Step 5: Mech */}
+      {/* Step 6: Mech */}
       {step === "mech" && (
         <Card>
           <CardHeader>
-            <CardTitle>Step 5: Your Mech</CardTitle>
+            <CardTitle>Step 6: Your Mech</CardTitle>
             <CardDescription>
               LL0 pilots start with a GMS Everest frame
             </CardDescription>
@@ -611,6 +876,30 @@ function NewCharacterPage() {
                   <strong>Talents:</strong>{" "}
                   {formData.talents
                     .map((id) => talentMap.get(id)?.name ?? id)
+                    .join(", ")}
+                </li>
+                <li>
+                  <strong>Pilot Gear:</strong>{" "}
+                  {[
+                    formData.pilotGear.clothing
+                      ? pilotGearMap.get(formData.pilotGear.clothing)?.name ??
+                        formData.pilotGear.clothing
+                      : "No clothing",
+                    formData.pilotGear.armor
+                      ? pilotGearMap.get(formData.pilotGear.armor)?.name ??
+                        formData.pilotGear.armor
+                      : "No armor",
+                  ]
+                    .concat(
+                      formData.pilotGear.weapons.map(
+                        (id) => pilotGearMap.get(id)?.name ?? id
+                      )
+                    )
+                    .concat(
+                      formData.pilotGear.gear.map(
+                        (id) => pilotGearMap.get(id)?.name ?? id
+                      )
+                    )
                     .join(", ")}
                 </li>
               </ul>

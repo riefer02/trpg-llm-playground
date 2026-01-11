@@ -60,3 +60,52 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
+
+/* Print-friendly export layout */
+.print-sheet {
+  background: var(--color-background);
+}
+
+@media print {
+  @page {
+    margin: 0.5in;
+  }
+
+  body {
+    background: #ffffff;
+    color: #0f172a;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-sheet {
+    background: #ffffff;
+    color: #0f172a;
+  }
+
+  .print-card {
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+  }
+
+  .print-muted {
+    color: #475569 !important;
+  }
+
+  .print-border {
+    border-color: #cbd5e1 !important;
+  }
+
+  .print-grid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

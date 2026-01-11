@@ -103,6 +103,28 @@ async def test_create_character_with_mech_name(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_character_with_pilot_gear(client: AsyncClient) -> None:
+    """Test creating a character with pilot gear."""
+    response = await client.post(
+        "/api/characters",
+        json=make_character_create(
+            callsign="GEAR",
+            pilot_gear={
+                "clothing": "flight_suit",
+                "armor": "light_hardsuit",
+                "weapons": ["alloy_composite_light"],
+                "gear": ["corrective"],
+            },
+        ),
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["pilot_gear"]["clothing"] == "flight_suit"
+    assert data["pilot_gear"]["weapons"] == ["alloy_composite_light"]
+
+
+@pytest.mark.asyncio
 async def test_list_characters_empty(client: AsyncClient) -> None:
     """Test listing characters when none exist."""
     response = await client.get("/api/characters")
@@ -289,6 +311,93 @@ async def test_validate_character_with_invalid_skills(client: AsyncClient) -> No
 
 
 @pytest.mark.asyncio
+async def test_update_pilot_gear(client: AsyncClient) -> None:
+    """Test updating pilot gear loadout."""
+    create_response = await client.post(
+        "/api/characters",
+        json={"callsign": "LOADOUT"},
+    )
+    char_id = create_response.json()["id"]
+
+    response = await client.put(
+        f"/api/characters/{char_id}/pilot-gear",
+        json={
+            "pilot_gear": {
+                "clothing": "flight_suit",
+                "armor": "light_hardsuit",
+                "weapons": ["alloy_composite_light"],
+                "gear": ["corrective"],
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["pilot_gear"]["armor"] == "light_hardsuit"
+    assert data["pilot_gear"]["gear"] == ["corrective"]
+
+
+@pytest.mark.asyncio
+async def test_update_mech_build(client: AsyncClient) -> None:
+    """Test updating a mech build."""
+    create_response = await client.post(
+        "/api/characters",
+        json={"callsign": "BUILDER"},
+    )
+    char_id = create_response.json()["id"]
+    mech_id = create_response.json()["active_mech_id"]
+
+    response = await client.put(
+        f"/api/characters/{char_id}/mechs/{mech_id}/build",
+        json={
+            "build": {
+                "weapons": [
+                    {
+                        "mount_index": 1,
+                        "weapon_id": "assault_rifle",
+                        "weapon_size": "main",
+                    }
+                ],
+                "systems": [],
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    mech = next(m for m in data["mechs"] if m["id"] == mech_id)
+    assert mech["build"]["weapons"][0]["weapon_id"] == "assault_rifle"
+
+
+@pytest.mark.asyncio
+async def test_update_mech_build_invalid_license(client: AsyncClient) -> None:
+    """Test updating a mech build with unlicensed gear fails."""
+    create_response = await client.post(
+        "/api/characters",
+        json={"callsign": "NOPE"},
+    )
+    char_id = create_response.json()["id"]
+    mech_id = create_response.json()["active_mech_id"]
+
+    response = await client.put(
+        f"/api/characters/{char_id}/mechs/{mech_id}/build",
+        json={
+            "build": {
+                "weapons": [
+                    {
+                        "mount_index": 0,
+                        "weapon_id": "ipsn_assault_cannon",
+                        "weapon_size": "heavy",
+                    }
+                ],
+            }
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_add_mech(client: AsyncClient) -> None:
     """Test adding a mech to a character."""
     create_response = await client.post(
@@ -409,3 +518,36 @@ async def test_ll0_character_has_default_triggers_talents(client: AsyncClient) -
     # LL0 should have 3 rank-1 talents
     assert len(data["talents"]) == 3
     assert all(t["rank"] == 1 for t in data["talents"])
+
+
+# =============================================================================
+# PDF Export Tests
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_export_character_pdf(client: AsyncClient) -> None:
+    """Test exporting a character as PDF."""
+    pytest.importorskip("weasyprint")
+
+    create_response = await client.post(
+        "/api/characters",
+        json={"callsign": "SHEET"},
+    )
+    char_id = create_response.json()["id"]
+
+    response = await client.get(f"/api/characters/{char_id}/export.pdf")
+
+    assert response.status_code == 200
+    assert response.headers.get("content-type", "").startswith("application/pdf")
+    assert response.content[:4] == b"%PDF"
+    assert "content-disposition" in response.headers
+
+
+@pytest.mark.asyncio
+async def test_export_character_pdf_not_found(client: AsyncClient) -> None:
+    """Test exporting a non-existent character returns 404."""
+    pytest.importorskip("weasyprint")
+
+    response = await client.get("/api/characters/missing/export.pdf")
+    assert response.status_code == 404
