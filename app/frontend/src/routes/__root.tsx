@@ -76,7 +76,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <div className="min-h-screen flex flex-col">
+          <div className="app-shell flex flex-col">
             <Header />
             <main className="flex-1">
               {children}
@@ -100,24 +100,39 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function Header() {
   return (
-    <header className="border-b border-border bg-card px-6 py-4">
+    <header className="border-b border-border bg-card/80 backdrop-blur px-6 py-4">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-primary">LANCER</span>
-          <span className="text-sm text-muted-foreground">Combat</span>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center font-heading text-primary font-semibold">
+            LC
+          </div>
+          <div>
+            <div className="text-lg font-heading font-semibold text-foreground">
+              Lancer Control
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Operations Console
+            </div>
+          </div>
         </div>
-        <nav className="flex gap-4">
-          <a href="/" className="text-foreground hover:underline">
+        <nav className="flex gap-2 text-sm" aria-label="Primary navigation">
+          <a
+            href="/"
+            className="px-3 py-1.5 rounded-full border border-transparent text-foreground hover:bg-muted"
+          >
             Home
           </a>
-          <a href="/characters" className="text-muted-foreground hover:underline">
+          <a
+            href="/characters"
+            className="px-3 py-1.5 rounded-full border border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
             Characters
           </a>
-          <a href="/compendium" className="text-muted-foreground hover:underline">
+          <a
+            href="/compendium"
+            className="px-3 py-1.5 rounded-full border border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
             Compendium
-          </a>
-          <a href="/pilots" className="text-muted-foreground hover:underline">
-            Pilots
           </a>
         </nav>
       </div>

@@ -142,6 +142,25 @@ raise ValidationError("Invalid data", errors=[...])
 
 ## Frontend Patterns
 
+### Styling + Dashboard Theme
+
+The frontend now uses a "mission control" dashboard theme defined in
+`app/frontend/src/styles.css`. Follow these conventions when adding UI:
+
+- **Typography**: Use `font-heading` for major titles, body uses IBM Plex Sans.
+- **Shell**: Wrap page layouts in `app-shell` (already applied in root).
+- **Surface**: Use `dashboard-surface` for hero headers and major panels.
+- **Cards**: Cards inherit the dashboard surface; use `bg-muted/50` +
+  `border-border` for stat tiles and list rows.
+- **Motion**: Use `animate-rise` sparingly for page-load panels; respect
+  `prefers-reduced-motion` (already in global styles).
+- **Status messaging**: Use the small alert blocks with
+  `border-destructive/40 bg-destructive/10 text-destructive` or
+  `border-primary/30 bg-primary/10 text-primary` for inline validation.
+
+This keeps the UI consistent and accessible, and avoids long scrolling by
+pairing main content with a sticky `aside` that holds checklists/guidance.
+
 ### Adding API Hooks
 
 1. Create hooks in `app/frontend/src/lib/api/`:

@@ -233,189 +233,233 @@ function CompendiumPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col gap-2">
+    <div className="px-6 py-8 max-w-7xl mx-auto space-y-6">
+      <section className="dashboard-surface p-6 animate-rise">
         <Link to="/" className="text-primary hover:underline text-sm">
           ← Back to Home
         </Link>
-        <h1 className="text-3xl font-bold text-foreground">Compendium</h1>
-        <p className="text-muted-foreground">
-          Reference data for frames, weapons, systems, and pilot gear. License
-          requirements are shown for quick gating checks.
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Browse</CardTitle>
-          <CardDescription>Search and filter the compendium.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-2 md:grid-cols-2">
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name or ID..."
-              className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground"
-            />
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  "frames",
-                  "weapons",
-                  "systems",
-                  "pilot-gear",
-                ] as CompendiumCategory[]
-              ).map((item) => (
-                <Button
-                  key={item}
-                  type="button"
-                  variant={category === item ? "primary" : "outline"}
-                  size="sm"
-                  onClick={() => setCategory(item)}
-                >
-                  {categoryLabels[item]} ({categoryCounts[item]})
-                </Button>
-              ))}
+        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-heading font-semibold text-foreground">
+              Compendium
+            </h1>
+            <p className="text-muted-foreground">
+              Reference data for frames, weapons, systems, and pilot gear. License
+              requirements are shown for quick gating checks.
+            </p>
+          </div>
+          <div className="rounded-full border border-border px-4 py-1 text-xs text-muted-foreground">
+            {categoryLabels[category]} focus
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          {(
+            [
+              { label: "Frames", count: categoryCounts.frames },
+              { label: "Weapons", count: categoryCounts.weapons },
+              { label: "Systems", count: categoryCounts.systems },
+              { label: "Pilot Gear", count: categoryCounts["pilot-gear"] },
+            ] as Array<{ label: string; count: number }>
+          ).map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-lg border border-border bg-muted/40 p-3"
+            >
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                {stat.label}
+              </div>
+              <div className="text-lg font-semibold">{stat.count}</div>
             </div>
-          </div>
+          ))}
+        </div>
+      </section>
 
-          <div className="grid gap-3 md:grid-cols-4">
-            <FilterSelect
-              label="Availability"
-              value={availability}
-              onChange={(value) => setAvailability(value as AvailabilityFilter)}
-              options={[
-                { value: "all", label: "All gear" },
-                { value: "gms", label: "GMS only" },
-                { value: "licensed", label: "Licensed only" },
-              ]}
-            />
-            <FilterSelect
-              label="License rank"
-              value={licenseRank}
-              onChange={(value) => setLicenseRank(value as RankFilter)}
-              options={[
-                { value: "all", label: "Any rank" },
-                { value: "1", label: "Rank I" },
-                { value: "2", label: "Rank II" },
-                { value: "3", label: "Rank III" },
-              ]}
-            />
-            {category === "frames" && (
-              <FilterSelect
-                label="Manufacturer"
-                value={manufacturer}
-                onChange={(value) =>
-                  setManufacturer(value as ManufacturerFilter)
-                }
-                options={[
-                  { value: "all", label: "All manufacturers" },
-                  { value: "GMS", label: "GMS" },
-                  { value: "IPS-N", label: "IPS-N" },
-                  { value: "SSC", label: "SSC" },
-                  { value: "HORUS", label: "HORUS" },
-                  { value: "HA", label: "HA" },
-                ]}
-              />
-            )}
-            {category === "weapons" && (
-              <FilterSelect
-                label="Weapon size"
-                value={weaponSize}
-                onChange={(value) => setWeaponSize(value)}
-                options={weaponSizeOptions.map((value) => ({
-                  value,
-                  label: value === "all" ? "All sizes" : formatEnum(value),
-                }))}
-              />
-            )}
-            {category === "weapons" && (
-              <FilterSelect
-                label="Weapon type"
-                value={weaponType}
-                onChange={(value) => setWeaponType(value)}
-                options={weaponTypeOptions.map((value) => ({
-                  value,
-                  label: value === "all" ? "All types" : formatEnum(value),
-                }))}
-              />
-            )}
-            {category === "systems" && (
-              <FilterSelect
-                label="System type"
-                value={systemType}
-                onChange={(value) => setSystemType(value)}
-                options={systemTypeOptions.map((value) => ({
-                  value,
-                  label: value === "all" ? "All types" : formatEnum(value),
-                }))}
-              />
-            )}
-            {category === "pilot-gear" && (
-              <FilterSelect
-                label="Gear category"
-                value={gearCategory}
-                onChange={(value) => setGearCategory(value as GearCategoryFilter)}
-                options={gearCategoryOptions.map((value) => ({
-                  value,
-                  label: value === "all" ? "All categories" : formatEnum(value),
-                }))}
-              />
-            )}
-            <div className="flex items-end">
-              <Button type="button" variant="ghost" onClick={clearFilters}>
-                Reset filters
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="space-y-4 lg:sticky lg:top-6 h-fit">
+          <Card>
+            <CardHeader>
+              <CardTitle>Browse</CardTitle>
+              <CardDescription>Search and filter the compendium.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search by name or ID..."
+                  className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                />
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      "frames",
+                      "weapons",
+                      "systems",
+                      "pilot-gear",
+                    ] as CompendiumCategory[]
+                  ).map((item) => (
+                    <Button
+                      key={item}
+                      type="button"
+                      variant={category === item ? "primary" : "outline"}
+                      size="sm"
+                      onClick={() => setCategory(item)}
+                    >
+                      {categoryLabels[item]} ({categoryCounts[item]})
+                    </Button>
+                  ))}
+                </div>
+              </div>
 
-      {isLoading && (
-        <div className="text-muted-foreground">Loading compendium data...</div>
-      )}
+              <div className="grid gap-3">
+                <FilterSelect
+                  label="Availability"
+                  value={availability}
+                  onChange={(value) => setAvailability(value as AvailabilityFilter)}
+                  options={[
+                    { value: "all", label: "All gear" },
+                    { value: "gms", label: "GMS only" },
+                    { value: "licensed", label: "Licensed only" },
+                  ]}
+                />
+                <FilterSelect
+                  label="License rank"
+                  value={licenseRank}
+                  onChange={(value) => setLicenseRank(value as RankFilter)}
+                  options={[
+                    { value: "all", label: "Any rank" },
+                    { value: "1", label: "Rank I" },
+                    { value: "2", label: "Rank II" },
+                    { value: "3", label: "Rank III" },
+                  ]}
+                />
+                {category === "frames" && (
+                  <FilterSelect
+                    label="Manufacturer"
+                    value={manufacturer}
+                    onChange={(value) =>
+                      setManufacturer(value as ManufacturerFilter)
+                    }
+                    options={[
+                      { value: "all", label: "All manufacturers" },
+                      { value: "GMS", label: "GMS" },
+                      { value: "IPS-N", label: "IPS-N" },
+                      { value: "SSC", label: "SSC" },
+                      { value: "HORUS", label: "HORUS" },
+                      { value: "HA", label: "HA" },
+                    ]}
+                  />
+                )}
+                {category === "weapons" && (
+                  <FilterSelect
+                    label="Weapon size"
+                    value={weaponSize}
+                    onChange={(value) => setWeaponSize(value)}
+                    options={weaponSizeOptions.map((value) => ({
+                      value,
+                      label: value === "all" ? "All sizes" : formatEnum(value),
+                    }))}
+                  />
+                )}
+                {category === "weapons" && (
+                  <FilterSelect
+                    label="Weapon type"
+                    value={weaponType}
+                    onChange={(value) => setWeaponType(value)}
+                    options={weaponTypeOptions.map((value) => ({
+                      value,
+                      label: value === "all" ? "All types" : formatEnum(value),
+                    }))}
+                  />
+                )}
+                {category === "systems" && (
+                  <FilterSelect
+                    label="System type"
+                    value={systemType}
+                    onChange={(value) => setSystemType(value)}
+                    options={systemTypeOptions.map((value) => ({
+                      value,
+                      label: value === "all" ? "All types" : formatEnum(value),
+                    }))}
+                  />
+                )}
+                {category === "pilot-gear" && (
+                  <FilterSelect
+                    label="Gear category"
+                    value={gearCategory}
+                    onChange={(value) =>
+                      setGearCategory(value as GearCategoryFilter)
+                    }
+                    options={gearCategoryOptions.map((value) => ({
+                      value,
+                      label: value === "all" ? "All categories" : formatEnum(value),
+                    }))}
+                  />
+                )}
+                <div className="flex items-end">
+                  <Button type="button" variant="ghost" onClick={clearFilters}>
+                    Reset filters
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {activeError && (
-        <Card className="border-destructive">
-          <CardContent className="pt-6 text-destructive">
-            Failed to load compendium data.
-          </CardContent>
-        </Card>
-      )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Usage Notes</CardTitle>
+              <CardDescription>How to read entries</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>License rank tags show when items unlock.</p>
+              <p>GMS gear is available at LL0.</p>
+              <p>Use filters to match a pilot’s license profile.</p>
+            </CardContent>
+          </Card>
+        </aside>
 
-      {!isLoading && !activeError && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>
-              Showing {filteredCounts[category]} of {categoryCounts[category]}
-            </span>
-            <span>Search and filters apply to the active category.</span>
-          </div>
-
-          {category === "frames" && (
-            <FrameGrid frames={filteredFrames} />
+        <section className="space-y-4">
+          {isLoading && (
+            <div className="text-muted-foreground">Loading compendium data...</div>
           )}
-          {category === "weapons" && (
-            <WeaponGrid weapons={filteredWeapons} />
-          )}
-          {category === "systems" && (
-            <SystemGrid systems={filteredSystems} />
-          )}
-          {category === "pilot-gear" && (
-            <PilotGearGrid items={filteredPilotGear} />
-          )}
 
-          {filteredCounts[category] === 0 && (
-            <Card>
-              <CardContent className="pt-6 text-muted-foreground">
-                No results found. Try clearing filters or using a broader search.
+          {activeError && (
+            <Card className="border-destructive/40">
+              <CardContent className="pt-6 text-destructive">
+                Failed to load compendium data.
               </CardContent>
             </Card>
           )}
-        </div>
-      )}
+
+          {!isLoading && !activeError && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  Showing {filteredCounts[category]} of {categoryCounts[category]}
+                </span>
+                <span>Search and filters apply to the active category.</span>
+              </div>
+
+              {category === "frames" && <FrameGrid frames={filteredFrames} />}
+              {category === "weapons" && <WeaponGrid weapons={filteredWeapons} />}
+              {category === "systems" && <SystemGrid systems={filteredSystems} />}
+              {category === "pilot-gear" && (
+                <PilotGearGrid items={filteredPilotGear} />
+              )}
+
+              {filteredCounts[category] === 0 && (
+                <Card>
+                  <CardContent className="pt-6 text-muted-foreground">
+                    No results found. Try clearing filters or using a broader
+                    search.
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

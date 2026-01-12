@@ -21,57 +21,120 @@ export const Route = createFileRoute("/pilots/" as const)({
 
 function PilotsPage() {
   const { data, isLoading, error } = usePilots();
+  const totalPilots = data?.items.length ?? 0;
+  const averageLevel =
+    totalPilots > 0
+      ? Math.round(
+          data!.items.reduce((sum, pilot) => sum + pilot.level, 0) / totalPilots
+        )
+      : 0;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Pilots</h1>
-          <p className="text-muted-foreground">
-            Manage your pilot characters
-          </p>
+    <div className="px-6 py-8 max-w-7xl mx-auto space-y-6">
+      <section className="dashboard-surface p-6 animate-rise">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-heading font-semibold text-foreground">
+              Pilots
+            </h1>
+            <p className="text-muted-foreground">
+              Manage pilot progression, licenses, and narrative stats.
+            </p>
+          </div>
+          <Link to="/pilots/new">
+            <Button>Create Pilot</Button>
+          </Link>
         </div>
-        <Link to="/pilots/new">
-          <Button>Create Pilot</Button>
-        </Link>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border border-border bg-muted/40 p-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Total pilots
+            </div>
+            <div className="text-lg font-semibold">{totalPilots}</div>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/40 p-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Average license level
+            </div>
+            <div className="text-lg font-semibold">LL{averageLevel}</div>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/40 p-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Active focus
+            </div>
+            <div className="text-lg font-semibold">Progression</div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-4">
+          {isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              Loading pilots...
+            </div>
+          )}
+
+          {error && (
+            <Card className="border-destructive/40">
+              <CardContent className="pt-6">
+                <p className="text-destructive">
+                  Error loading pilots: {error.message}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {data && data.items.length === 0 && (
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <p className="text-muted-foreground mb-4">
+                  No pilots yet. Create your first pilot to get started.
+                </p>
+                <Link to="/pilots/new">
+                  <Button>Create Pilot</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {data && data.items.length > 0 && (
+            <div className="grid gap-4">
+              {data.items.map((pilot) => (
+                <PilotCard key={pilot.id} pilot={pilot} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <aside className="space-y-4 lg:sticky lg:top-6 h-fit">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pilot Guidance</CardTitle>
+              <CardDescription>Progression rules at a glance</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>LL0 pilots start with 2 HASE points and 3 talents.</p>
+              <p>License ranks unlock mech gear in the compendium.</p>
+              <p>Use pilot validation to catch missing points.</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Links</CardTitle>
+              <CardDescription>Jump to related tools</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <Link to="/compendium" className="text-primary hover:underline">
+                Browse Compendium
+              </Link>
+              <Link to="/characters" className="text-primary hover:underline">
+                View Characters
+              </Link>
+            </CardContent>
+          </Card>
+        </aside>
       </div>
-
-      {isLoading && (
-        <div className="text-center py-8 text-muted-foreground">
-          Loading pilots...
-        </div>
-      )}
-
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="pt-6">
-            <p className="text-destructive">
-              Error loading pilots: {error.message}
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {data && data.items.length === 0 && (
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground mb-4">
-              No pilots yet. Create your first pilot to get started.
-            </p>
-            <Link to="/pilots/new">
-              <Button>Create Pilot</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
-
-      {data && data.items.length > 0 && (
-        <div className="grid gap-4">
-          {data.items.map((pilot) => (
-            <PilotCard key={pilot.id} pilot={pilot} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -92,7 +155,7 @@ function PilotCard({ pilot }: { pilot: PilotResponse }) {
           <div>
             <CardTitle className="text-xl">{pilot.callsign}</CardTitle>
             <CardDescription>
-              {pilot.name || "Unnamed"} • LL{pilot.level}
+              {pilot.name || "Unnamed"} - LL{pilot.level}
             </CardDescription>
           </div>
           <div className="flex gap-2">

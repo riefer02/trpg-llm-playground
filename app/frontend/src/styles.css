@@ -1,47 +1,48 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
 
 /* Tailwind v4 theme - register custom colors as utilities */
 @theme {
-  /* Lancer-themed color palette */
-  --color-background: hsl(222 47% 11%);
-  --color-foreground: hsl(210 40% 98%);
-  
-  --color-card: hsl(222 47% 13%);
-  --color-card-foreground: hsl(210 40% 98%);
-  
-  --color-popover: hsl(222 47% 13%);
-  --color-popover-foreground: hsl(210 40% 98%);
-  
-  --color-primary: hsl(210 100% 50%);
-  --color-primary-foreground: hsl(210 40% 98%);
-  
-  --color-secondary: hsl(217 33% 17%);
-  --color-secondary-foreground: hsl(210 40% 98%);
-  
-  --color-muted: hsl(217 33% 17%);
-  --color-muted-foreground: hsl(215 20% 65%);
-  
-  --color-accent: hsl(45 100% 51%);
-  --color-accent-foreground: hsl(222 47% 11%);
-  
-  --color-destructive: hsl(0 84% 60%);
-  --color-destructive-foreground: hsl(210 40% 98%);
-  
-  --color-border: hsl(217 33% 25%);
-  --color-input: hsl(217 33% 25%);
-  --color-ring: hsl(210 100% 50%);
-  
+  /* Mission control palette */
+  --color-background: hsl(28 30% 96%);
+  --color-foreground: hsl(215 35% 15%);
+
+  --color-card: hsl(24 40% 98%);
+  --color-card-foreground: hsl(215 35% 15%);
+
+  --color-popover: hsl(24 40% 98%);
+  --color-popover-foreground: hsl(215 35% 15%);
+
+  --color-primary: hsl(198 74% 35%);
+  --color-primary-foreground: hsl(30 30% 98%);
+
+  --color-secondary: hsl(32 35% 90%);
+  --color-secondary-foreground: hsl(215 30% 20%);
+
+  --color-muted: hsl(30 18% 88%);
+  --color-muted-foreground: hsl(215 18% 40%);
+
+  --color-accent: hsl(18 85% 55%);
+  --color-accent-foreground: hsl(30 30% 98%);
+
+  --color-destructive: hsl(355 75% 55%);
+  --color-destructive-foreground: hsl(30 30% 98%);
+
+  --color-border: hsl(30 20% 85%);
+  --color-input: hsl(30 20% 85%);
+  --color-ring: hsl(198 74% 35%);
+
   /* Faction colors */
-  --color-ipsn: hsl(348 83% 47%);
-  --color-ssc: hsl(45 100% 51%);
-  --color-horus: hsl(142 71% 45%);
-  --color-ha: hsl(210 100% 50%);
-  --color-gms: hsl(215 20% 65%);
-  
+  --color-ipsn: hsl(350 78% 45%);
+  --color-ssc: hsl(18 85% 55%);
+  --color-horus: hsl(150 55% 35%);
+  --color-ha: hsl(198 74% 35%);
+  --color-gms: hsl(215 18% 40%);
+
   /* Border radius */
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
+  --radius-lg: 0.85rem;
 }
 
 /* Base styles */
@@ -51,14 +52,81 @@
 
 body {
   @apply m-0 bg-background text-foreground antialiased;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-    sans-serif;
+  font-family: "IBM Plex Sans", "Helvetica Neue", system-ui, sans-serif;
+  background-image:
+    radial-gradient(circle at top left, hsl(198 74% 35% / 0.12), transparent 45%),
+    radial-gradient(circle at 20% 30%, hsl(18 85% 55% / 0.12), transparent 50%),
+    linear-gradient(120deg, hsl(30 30% 98%), hsl(24 40% 96%));
+  background-attachment: fixed;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-    monospace;
+  font-family: "IBM Plex Mono", "SFMono-Regular", "Courier New", monospace;
+}
+
+h1,
+h2,
+h3,
+.font-heading {
+  font-family: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glow-pulse {
+  0% {
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 8px hsl(198 74% 35% / 0.15);
+  }
+}
+
+@layer utilities {
+  .app-shell {
+    @apply min-h-screen;
+    background-image:
+      radial-gradient(circle at 10% 20%, hsl(18 85% 55% / 0.15), transparent 40%),
+      radial-gradient(circle at 80% 0%, hsl(198 74% 35% / 0.18), transparent 45%),
+      linear-gradient(150deg, hsl(30 30% 98%), hsl(24 40% 96%));
+  }
+
+  .dashboard-surface {
+    @apply bg-card/90 backdrop-blur border border-border shadow-sm;
+  }
+
+  .panel-grid {
+    background-image:
+      linear-gradient(transparent 95%, hsl(30 20% 85% / 0.5) 95%),
+      linear-gradient(90deg, transparent 95%, hsl(30 20% 85% / 0.5) 95%);
+    background-size: 26px 26px;
+  }
+
+  .animate-rise {
+    animation: rise-in 0.6s ease-out both;
+  }
+
+  .animate-glow {
+    animation: glow-pulse 1.6s ease-out infinite alternate;
+  }
 }
 
 /* Print-friendly export layout */

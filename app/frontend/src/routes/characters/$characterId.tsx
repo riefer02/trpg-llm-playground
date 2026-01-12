@@ -75,25 +75,34 @@ function CharacterDetailPage() {
     );
   }
 
+  const validationIssues = validation?.issues ?? [];
+  const warningCount = validationIssues.filter(
+    (issue) => issue.severity === "warning"
+  ).length;
+  const errorCount = validationIssues.filter(
+    (issue) => issue.severity !== "warning"
+  ).length;
+  const activeMech = character.mechs.find(
+    (mech) => mech.id === character.active_mech_id
+  );
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <Link
-          to="/characters"
-          className="text-primary hover:underline text-sm"
-        >
+    <div className="px-6 py-8 max-w-7xl mx-auto space-y-6">
+      <section className="dashboard-surface p-6 animate-rise">
+        <Link to="/characters" className="text-primary hover:underline text-sm">
           ← Back to Characters
         </Link>
-        <div className="flex justify-between items-start mt-2">
+        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
+            <h1 className="text-3xl font-heading font-semibold text-foreground">
               {character.callsign}
             </h1>
             <p className="text-muted-foreground">
-              {character.name || "Unnamed"} • License Level {character.level}
+              {character.name || "Unnamed"} - License Level {character.level}
+              {activeMech ? ` - Active: ${activeMech.name}` : ""}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               onClick={() => {
@@ -102,115 +111,180 @@ function CharacterDetailPage() {
             >
               Download PDF
             </Button>
-            <Link
-              to="/characters/$characterId/export"
-              params={{ characterId }}
-            >
+            <Link to="/characters/$characterId/export" params={{ characterId }}>
               <Button variant="outline">Export PDF</Button>
             </Link>
             <ValidationBadge validation={validation} />
           </div>
         </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <PilotSection character={character} />
-        <MechSection character={character} />
-      </div>
-
-      <LoadoutSection character={character} />
-
-      {validation && !validation.valid && (
-        <Card className="mt-6 border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">
-              Validation Issues
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {validation.issues.map((issue, i) => (
-                <li
-                  key={i}
-                  className={
-                    issue.severity === "warning"
-                      ? "text-accent"
-                      : "text-destructive"
-                  }
-                >
-                  <span className="font-mono text-xs mr-2">[{issue.code}]</span>
-                  {issue.message}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {character.triggers.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Triggers</CardTitle>
-            <CardDescription>
-              Bonuses for narrative skill checks
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {character.triggers.map((trigger, i) => (
-                <div
-                  key={i}
-                  className="p-3 bg-card-foreground/5 rounded-md text-sm"
-                >
-                  <div className="font-medium capitalize">
-                    {trigger.trigger_id.replace(/_/g, " ")}
-                  </div>
-                  <div className="text-primary">+{trigger.rank}</div>
-                </div>
-              ))}
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="p-3 rounded-lg border border-border bg-muted/40">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Pilot HP / Grit
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {character.talents.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Talents</CardTitle>
-            <CardDescription>Combat abilities and specializations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-3">
-              {character.talents.map((talent, i) => (
-                <div
-                  key={i}
-                  className="p-3 bg-card-foreground/5 rounded-md text-sm"
-                >
-                  <div className="font-medium capitalize">
-                    {talent.talent_id.replace(/_/g, " ")}
-                  </div>
-                  <div className="text-muted-foreground">
-                    Rank {talent.rank}
-                  </div>
-                </div>
-              ))}
+            <div className="text-lg font-semibold">
+              {character.pilot_hp} HP / +{character.grit} grit
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+          <div className="p-3 rounded-lg border border-border bg-muted/40">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Active Frame
+            </div>
+            <div className="text-lg font-semibold">
+              {activeMech?.frame_id
+                ? activeMech.frame_id.replace(/^gms_/, "GMS ").replace(/_/g, " ")
+                : "None selected"}
+            </div>
+          </div>
+          <div className="p-3 rounded-lg border border-border bg-muted/40">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Validation
+            </div>
+            <div className="text-lg font-semibold">
+              {errorCount > 0
+                ? `${errorCount} issue${errorCount > 1 ? "s" : ""}`
+                : warningCount > 0
+                ? `${warningCount} warning${warningCount > 1 ? "s" : ""}`
+                : "All clear"}
+            </div>
+          </div>
+        </div>
+      </section>
 
-      {character.notes && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Notes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-muted-foreground">
-              {character.notes}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <PilotSection character={character} />
+            <MechSection character={character} />
+          </div>
+
+          <LoadoutSection character={character} />
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {character.triggers.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Triggers</CardTitle>
+                  <CardDescription>
+                    Bonuses for narrative skill checks
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    {character.triggers.map((trigger, i) => (
+                      <div
+                        key={i}
+                        className="p-3 bg-muted/50 border border-border rounded-md text-sm"
+                      >
+                        <div className="font-medium capitalize">
+                          {trigger.trigger_id.replace(/_/g, " ")}
+                        </div>
+                        <div className="text-primary">+{trigger.rank}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {character.talents.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Talents</CardTitle>
+                  <CardDescription>
+                    Combat abilities and specializations
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    {character.talents.map((talent, i) => (
+                      <div
+                        key={i}
+                        className="p-3 bg-muted/50 border border-border rounded-md text-sm"
+                      >
+                        <div className="font-medium capitalize">
+                          {talent.talent_id.replace(/_/g, " ")}
+                        </div>
+                        <div className="text-muted-foreground">
+                          Rank {talent.rank}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {character.notes && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="whitespace-pre-wrap text-muted-foreground">
+                  {character.notes}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <aside className="space-y-4 lg:sticky lg:top-6 h-fit">
+          <Card>
+            <CardHeader>
+              <CardTitle>Validation Feed</CardTitle>
+              <CardDescription>
+                Live rules checks from core validation
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {validationIssues.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No validation issues detected. You are ready to deploy.
+                </p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {validationIssues.map((issue, i) => (
+                    <li
+                      key={i}
+                      className={`rounded-md border px-3 py-2 ${
+                        issue.severity === "warning"
+                          ? "border-accent/40 bg-accent/10 text-accent"
+                          : "border-destructive/40 bg-destructive/10 text-destructive"
+                      }`}
+                    >
+                      <div className="font-mono text-xs">[{issue.code}]</div>
+                      <div>{issue.message}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Field Guide</CardTitle>
+              <CardDescription>Quick reminders for loadouts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li>Weapons and systems are filtered by your license ranks.</li>
+                <li>SP limits are enforced on save, warnings show instantly.</li>
+                <li>Pilot gear needs clothing before it can be saved.</li>
+                <li>LL0 builds must obey strict license limits.</li>
+              </ul>
+              <Link
+                to="/compendium"
+                className="mt-3 inline-flex text-sm text-primary hover:underline"
+              >
+                Open Compendium
+              </Link>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
     </div>
   );
 }
@@ -231,7 +305,10 @@ function ValidationBadge({
 
   if (validation.valid && warnings === 0) {
     return (
-      <div className="px-3 py-1 bg-horus/20 text-horus rounded-full text-sm font-medium">
+      <div
+        className="px-3 py-1 rounded-full text-sm font-medium border border-horus/30 bg-horus/10 text-horus"
+        role="status"
+      >
         Valid
       </div>
     );
@@ -239,14 +316,20 @@ function ValidationBadge({
 
   if (errors > 0) {
     return (
-      <div className="px-3 py-1 bg-destructive/20 text-destructive rounded-full text-sm font-medium">
+      <div
+        className="px-3 py-1 rounded-full text-sm font-medium border border-destructive/30 bg-destructive/10 text-destructive"
+        role="status"
+      >
         {errors} Error{errors > 1 ? "s" : ""}
       </div>
     );
   }
 
   return (
-    <div className="px-3 py-1 bg-accent/20 text-accent rounded-full text-sm font-medium">
+    <div
+      className="px-3 py-1 rounded-full text-sm font-medium border border-accent/30 bg-accent/10 text-accent"
+      role="status"
+    >
       {warnings} Warning{warnings > 1 ? "s" : ""}
     </div>
   );
@@ -397,11 +480,15 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
     });
   };
 
-  const canSave = draft.clothing !== null && !updatePilotGear.isPending;
+  const missingClothing = draft.clothing === null;
+  const canSave = !missingClothing && !updatePilotGear.isPending;
   const pilotGearError =
     updatePilotGear.error instanceof Error
       ? updatePilotGear.error.message
       : "Failed to update pilot gear.";
+  const pilotGearStatus = missingClothing
+    ? "Select a clothing item to enable saving."
+    : "Loadout ready to save.";
 
   return (
     <Card>
@@ -433,6 +520,8 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
                   updatePilotGear.mutate({
                     id: character.id,
                     data: { pilot_gear: draft },
+                  }, {
+                    onSuccess: () => setIsEditing(false),
                   })
                 }
                 disabled={!canSave}
@@ -444,6 +533,19 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
         </div>
       </CardHeader>
       <CardContent>
+        {isEditing && (
+          <div
+            className={`mb-4 rounded-md border px-3 py-2 text-xs ${
+              missingClothing
+                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                : "border-primary/30 bg-primary/10 text-primary"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {pilotGearStatus}
+          </div>
+        )}
         {!isEditing ? (
           <div className="space-y-3 text-sm">
             <div>
@@ -783,6 +885,9 @@ function MechBuildSection({ character }: { character: CharacterResponse }) {
 
   const spLimit = character.active_mech_stats?.system_points ?? 0;
   const spOver = spSpent > spLimit;
+  const spStatus = spOver
+    ? `Over budget by ${spSpent - spLimit} SP. Remove systems to save.`
+    : "Within SP budget.";
 
   const canSave = Boolean(activeMech) && !updateMechBuild.isPending;
   const mechBuildError =
@@ -825,11 +930,16 @@ function MechBuildSection({ character }: { character: CharacterResponse }) {
                 type="button"
                 onClick={() => {
                   if (!activeMech) return;
-                  updateMechBuild.mutate({
-                    characterId: character.id,
-                    mechId: activeMech.id,
-                    data: { build: draft },
-                  });
+                  updateMechBuild.mutate(
+                    {
+                      characterId: character.id,
+                      mechId: activeMech.id,
+                      data: { build: draft },
+                    },
+                    {
+                      onSuccess: () => setIsEditing(false),
+                    }
+                  );
                 }}
                 disabled={!canSave}
               >
@@ -970,6 +1080,17 @@ function MechBuildSection({ character }: { character: CharacterResponse }) {
                 <div className={spOver ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
                   SP: {spSpent} / {spLimit}
                 </div>
+              </div>
+              <div
+                className={`mb-2 rounded-md border px-3 py-2 text-xs ${
+                  spOver
+                    ? "border-destructive/40 bg-destructive/10 text-destructive"
+                    : "border-primary/30 bg-primary/10 text-primary"
+                }`}
+                role="status"
+                aria-live="polite"
+              >
+                {spStatus}
               </div>
               <div className="grid gap-2 max-h-56 overflow-y-auto">
                 {(systems ?? [])
