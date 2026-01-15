@@ -1,0 +1,339 @@
+{
+  "$defs": {
+    "MissionObjectiveBrief": {
+      "description": "Lightweight mission objective summary for lobby/session prep.",
+      "properties": {
+        "id": {
+          "description": "Local identifier for this objective",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "description": "Display title for the objective",
+          "title": "Title",
+          "type": "string"
+        },
+        "success_condition": {
+          "description": "What success looks like for this objective",
+          "title": "Success Condition",
+          "type": "string"
+        },
+        "priority": {
+          "default": "primary",
+          "description": "Priority communicated to players",
+          "enum": [
+            "primary",
+            "secondary",
+            "optional"
+          ],
+          "title": "Priority",
+          "type": "string"
+        },
+        "related_objective_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional reference to core.shared.scenario MissionObjective.id",
+          "title": "Related Objective Id"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "success_condition"
+      ],
+      "title": "MissionObjectiveBrief",
+      "type": "object"
+    },
+    "MissionPrepPlan": {
+      "description": "Mission prep metadata surfaced in the lobby UI.",
+      "properties": {
+        "mission_name": {
+          "description": "Operation name shared with table",
+          "title": "Mission Name",
+          "type": "string"
+        },
+        "operation_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional ops code",
+          "title": "Operation Code"
+        },
+        "theater": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Where this mission occurs",
+          "title": "Theater"
+        },
+        "objectives": {
+          "description": "Objectives highlighted for this mission",
+          "items": {
+            "$ref": "#/$defs/MissionObjectiveBrief"
+          },
+          "title": "Objectives",
+          "type": "array"
+        },
+        "stakes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MissionStakesBrief"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reserves": {
+          "description": "Reserve plan for the mission",
+          "items": {
+            "$ref": "#/$defs/ReservePlanEntry"
+          },
+          "title": "Reserves",
+          "type": "array"
+        },
+        "briefing_notes": {
+          "default": "",
+          "description": "GM notes for the briefing",
+          "title": "Briefing Notes",
+          "type": "string"
+        },
+        "support_assets": {
+          "description": "Allies/support available",
+          "items": {
+            "type": "string"
+          },
+          "title": "Support Assets",
+          "type": "array"
+        },
+        "threats": {
+          "description": "Known threats",
+          "items": {
+            "type": "string"
+          },
+          "title": "Threats",
+          "type": "array"
+        }
+      },
+      "required": [
+        "mission_name"
+      ],
+      "title": "MissionPrepPlan",
+      "type": "object"
+    },
+    "MissionStakesBrief": {
+      "description": "Summarizes mission stakes per PR2 guidance (lines ~2835-2841).",
+      "properties": {
+        "stakes_type": {
+          "enum": [
+            "personal",
+            "faction",
+            "immediate",
+            "gradual",
+            "custom"
+          ],
+          "title": "Stakes Type",
+          "type": "string"
+        },
+        "summary": {
+          "description": "Narrative description of the stakes",
+          "title": "Summary",
+          "type": "string"
+        },
+        "consequences_success": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consequences Success"
+        },
+        "consequences_failure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consequences Failure"
+        },
+        "consequences_partial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consequences Partial"
+        }
+      },
+      "required": [
+        "stakes_type",
+        "summary"
+      ],
+      "title": "MissionStakesBrief",
+      "type": "object"
+    },
+    "ReservePlanEntry": {
+      "description": "Tracks reserve usage/assignments planned for a mission.",
+      "properties": {
+        "reserve_id": {
+          "description": "Identifier for the reserve asset",
+          "title": "Reserve Id",
+          "type": "string"
+        },
+        "assigned_pilot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pilot expected to use this reserve",
+          "title": "Assigned Pilot Id"
+        },
+        "usage_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When/how it will be used",
+          "title": "Usage Notes"
+        },
+        "status": {
+          "default": "planned",
+          "enum": [
+            "planned",
+            "spent",
+            "earned"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reserve_id"
+      ],
+      "title": "ReservePlanEntry",
+      "type": "object"
+    }
+  },
+  "description": "Active lobby plan that gates combat launch.",
+  "properties": {
+    "mission_plan": {
+      "$ref": "#/$defs/MissionPrepPlan",
+      "description": "Mission prep plan surfaced to the table"
+    },
+    "assigned_member_ids": {
+      "description": "Member IDs slated for this mission",
+      "items": {
+        "type": "string"
+      },
+      "title": "Assigned Member Ids",
+      "type": "array"
+    },
+    "preferred_pilot_count": {
+      "default": 4,
+      "description": "Soft cap per PR2 (GM + 3-5 pilots)",
+      "maximum": 6,
+      "minimum": 1,
+      "title": "Preferred Pilot Count",
+      "type": "integer"
+    },
+    "min_pilot_count": {
+      "default": 3,
+      "description": "Minimum pilots before launch is allowed",
+      "maximum": 5,
+      "minimum": 1,
+      "title": "Min Pilot Count",
+      "type": "integer"
+    },
+    "gm_notes": {
+      "default": "",
+      "description": "GM-only prep notes",
+      "title": "Gm Notes",
+      "type": "string"
+    },
+    "status": {
+      "default": "draft",
+      "description": "Lobby readiness state",
+      "enum": [
+        "draft",
+        "ready",
+        "launched",
+        "cooldown"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "last_ready_check": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Ready Check"
+    },
+    "combat_session_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Linked CombatSessionDB id once launched",
+      "title": "Combat Session Id"
+    }
+  },
+  "required": [
+    "mission_plan"
+  ],
+  "title": "CampaignLobbyState",
+  "type": "object"
+}

@@ -16,6 +16,7 @@ import { Route as CharactersIndexRouteImport } from './routes/characters/index'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns/index'
 import { Route as PilotsNewRouteImport } from './routes/pilots/new'
 import { Route as PilotsPilotIdRouteImport } from './routes/pilots/$pilotId'
+import { Route as InvitesTokenRouteImport } from './routes/invites/$token'
 import { Route as CharactersNewRouteImport } from './routes/characters/new'
 import { Route as CharactersCharacterIdRouteImport } from './routes/characters/$characterId'
 import { Route as CampaignsCampaignIdRouteImport } from './routes/campaigns/$campaignId'
@@ -56,6 +57,11 @@ const PilotsPilotIdRoute = PilotsPilotIdRouteImport.update({
   path: '/pilots/$pilotId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InvitesTokenRoute = InvitesTokenRouteImport.update({
+  id: '/invites/$token',
+  path: '/invites/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CharactersNewRoute = CharactersNewRouteImport.update({
   id: '/characters/new',
   path: '/characters/new',
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
+  '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
   '/campaigns': typeof CampaignsIndexRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
+  '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
   '/campaigns': typeof CampaignsIndexRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
+  '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
   '/campaigns/': typeof CampaignsIndexRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
+    | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
     | '/campaigns'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
+    | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
     | '/campaigns'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
+    | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
     | '/campaigns/'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   CampaignsCampaignIdRoute: typeof CampaignsCampaignIdRoute
   CharactersCharacterIdRoute: typeof CharactersCharacterIdRouteWithChildren
   CharactersNewRoute: typeof CharactersNewRoute
+  InvitesTokenRoute: typeof InvitesTokenRoute
   PilotsPilotIdRoute: typeof PilotsPilotIdRoute
   PilotsNewRoute: typeof PilotsNewRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
@@ -224,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PilotsPilotIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invites/$token': {
+      id: '/invites/$token'
+      path: '/invites/$token'
+      fullPath: '/invites/$token'
+      preLoaderRoute: typeof InvitesTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/characters/new': {
       id: '/characters/new'
       path: '/characters/new'
@@ -273,6 +293,7 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsCampaignIdRoute: CampaignsCampaignIdRoute,
   CharactersCharacterIdRoute: CharactersCharacterIdRouteWithChildren,
   CharactersNewRoute: CharactersNewRoute,
+  InvitesTokenRoute: InvitesTokenRoute,
   PilotsPilotIdRoute: PilotsPilotIdRoute,
   PilotsNewRoute: PilotsNewRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,

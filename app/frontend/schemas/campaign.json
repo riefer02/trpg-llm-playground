@@ -1,0 +1,915 @@
+{
+  "$defs": {
+    "ActiveSessionMission": {
+      "description": "Tracks a mission that is in-progress during a session.\n\nAttributes:\n    mission_state: The current state of the mission as serialized dict\n    participating_pilot_ids: Pilots currently engaged in this mission\n    started_at: When the mission was started",
+      "properties": {
+        "mission_state": {
+          "additionalProperties": true,
+          "description": "Mission state as serialized dict",
+          "title": "Mission State",
+          "type": "object"
+        },
+        "participating_pilot_ids": {
+          "description": "IDs of pilots in this mission",
+          "items": {
+            "type": "string"
+          },
+          "title": "Participating Pilot Ids",
+          "type": "array"
+        },
+        "started_at": {
+          "description": "When the mission was started",
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mission_state"
+      ],
+      "title": "ActiveSessionMission",
+      "type": "object"
+    },
+    "CampaignIdentity": {
+      "description": "Stores onboarding prompts per PR2 tables (Who are we? patrons, etc.).",
+      "properties": {
+        "squad_name": {
+          "default": "",
+          "description": "What the squad calls itself",
+          "title": "Squad Name",
+          "type": "string"
+        },
+        "patron": {
+          "default": "",
+          "description": "Primary patron or employer",
+          "title": "Patron",
+          "type": "string"
+        },
+        "who_we_are": {
+          "default": "",
+          "description": "Elevator pitch for the squad",
+          "title": "Who We Are",
+          "type": "string"
+        },
+        "relationships": {
+          "description": "Key relationships/prompts",
+          "items": {
+            "type": "string"
+          },
+          "title": "Relationships",
+          "type": "array"
+        },
+        "themes": {
+          "description": "Tone or themes",
+          "items": {
+            "type": "string"
+          },
+          "title": "Themes",
+          "type": "array"
+        },
+        "gm_prompts": {
+          "description": "Reference prompts for the GM",
+          "items": {
+            "type": "string"
+          },
+          "title": "Gm Prompts",
+          "type": "array"
+        }
+      },
+      "title": "CampaignIdentity",
+      "type": "object"
+    },
+    "CampaignLobbyState": {
+      "description": "Active lobby plan that gates combat launch.",
+      "properties": {
+        "mission_plan": {
+          "$ref": "#/$defs/MissionPrepPlan",
+          "description": "Mission prep plan surfaced to the table"
+        },
+        "assigned_member_ids": {
+          "description": "Member IDs slated for this mission",
+          "items": {
+            "type": "string"
+          },
+          "title": "Assigned Member Ids",
+          "type": "array"
+        },
+        "preferred_pilot_count": {
+          "default": 4,
+          "description": "Soft cap per PR2 (GM + 3-5 pilots)",
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Preferred Pilot Count",
+          "type": "integer"
+        },
+        "min_pilot_count": {
+          "default": 3,
+          "description": "Minimum pilots before launch is allowed",
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Min Pilot Count",
+          "type": "integer"
+        },
+        "gm_notes": {
+          "default": "",
+          "description": "GM-only prep notes",
+          "title": "Gm Notes",
+          "type": "string"
+        },
+        "status": {
+          "default": "draft",
+          "description": "Lobby readiness state",
+          "enum": [
+            "draft",
+            "ready",
+            "launched",
+            "cooldown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "last_ready_check": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Ready Check"
+        },
+        "combat_session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Linked CombatSessionDB id once launched",
+          "title": "Combat Session Id"
+        }
+      },
+      "required": [
+        "mission_plan"
+      ],
+      "title": "CampaignLobbyState",
+      "type": "object"
+    },
+    "CampaignMissionRecord": {
+      "description": "Records a completed mission for campaign history.\n\nAttributes:\n    mission_id: Reference to the mission definition\n    session_id: Which session this mission was completed in\n    mission_name: Display name of the mission\n    outcome: Mission outcome (success, partial, failure, catastrophic)\n    completion_score: 0.0-1.0 progress score\n    mission_date: When the mission was completed\n    participating_pilot_ids: Pilots who took part\n    debrief_notes: Optional notes about the mission",
+      "properties": {
+        "mission_id": {
+          "description": "Reference to mission.id",
+          "title": "Mission Id",
+          "type": "string"
+        },
+        "session_id": {
+          "description": "Reference to Session.id",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "mission_name": {
+          "description": "Mission display name",
+          "title": "Mission Name",
+          "type": "string"
+        },
+        "outcome": {
+          "description": "Mission outcome",
+          "enum": [
+            "success",
+            "partial",
+            "failure",
+            "catastrophic"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "completion_score": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Completion Score",
+          "type": "number"
+        },
+        "mission_date": {
+          "description": "Completion date",
+          "format": "date",
+          "title": "Mission Date",
+          "type": "string"
+        },
+        "participating_pilot_ids": {
+          "description": "Pilots who took part",
+          "items": {
+            "type": "string"
+          },
+          "title": "Participating Pilot Ids",
+          "type": "array"
+        },
+        "debrief_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Session notes",
+          "title": "Debrief Notes"
+        },
+        "reserves_spent": {
+          "description": "Reserves consumed during the mission",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Reserves Spent",
+          "type": "array"
+        },
+        "reserves_earned": {
+          "description": "Reserves awarded after the mission",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Reserves Earned",
+          "type": "array"
+        },
+        "rewards": {
+          "description": "Loot, intel, or standing changes",
+          "items": {
+            "type": "string"
+          },
+          "title": "Rewards",
+          "type": "array"
+        }
+      },
+      "required": [
+        "mission_id",
+        "session_id",
+        "mission_name",
+        "outcome"
+      ],
+      "title": "CampaignMissionRecord",
+      "type": "object"
+    },
+    "MissionObjectiveBrief": {
+      "description": "Lightweight mission objective summary for lobby/session prep.",
+      "properties": {
+        "id": {
+          "description": "Local identifier for this objective",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "description": "Display title for the objective",
+          "title": "Title",
+          "type": "string"
+        },
+        "success_condition": {
+          "description": "What success looks like for this objective",
+          "title": "Success Condition",
+          "type": "string"
+        },
+        "priority": {
+          "default": "primary",
+          "description": "Priority communicated to players",
+          "enum": [
+            "primary",
+            "secondary",
+            "optional"
+          ],
+          "title": "Priority",
+          "type": "string"
+        },
+        "related_objective_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional reference to core.shared.scenario MissionObjective.id",
+          "title": "Related Objective Id"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "success_condition"
+      ],
+      "title": "MissionObjectiveBrief",
+      "type": "object"
+    },
+    "MissionOutcomeReport": {
+      "description": "Summary of a mission's outcome captured during debrief.",
+      "properties": {
+        "outcome": {
+          "description": "Overall mission result communicated to the table",
+          "enum": [
+            "success",
+            "partial",
+            "failure",
+            "catastrophic"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "completion_score": {
+          "default": 0.0,
+          "description": "0-1 scale for partial success tracking",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Completion Score",
+          "type": "number"
+        },
+        "debrief_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Narrative debrief shared with the table",
+          "title": "Debrief Notes"
+        },
+        "reserves_spent": {
+          "description": "Reserves consumed during the mission",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Reserves Spent",
+          "type": "array"
+        },
+        "reserves_earned": {
+          "description": "Reserves awarded after the mission",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Reserves Earned",
+          "type": "array"
+        },
+        "rewards": {
+          "description": "Specific rewards, loot, or consequences",
+          "items": {
+            "type": "string"
+          },
+          "title": "Rewards",
+          "type": "array"
+        },
+        "recorded_at": {
+          "description": "Timestamp when this outcome was recorded",
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome"
+      ],
+      "title": "MissionOutcomeReport",
+      "type": "object"
+    },
+    "MissionPrepPlan": {
+      "description": "Mission prep metadata surfaced in the lobby UI.",
+      "properties": {
+        "mission_name": {
+          "description": "Operation name shared with table",
+          "title": "Mission Name",
+          "type": "string"
+        },
+        "operation_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional ops code",
+          "title": "Operation Code"
+        },
+        "theater": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Where this mission occurs",
+          "title": "Theater"
+        },
+        "objectives": {
+          "description": "Objectives highlighted for this mission",
+          "items": {
+            "$ref": "#/$defs/MissionObjectiveBrief"
+          },
+          "title": "Objectives",
+          "type": "array"
+        },
+        "stakes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MissionStakesBrief"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reserves": {
+          "description": "Reserve plan for the mission",
+          "items": {
+            "$ref": "#/$defs/ReservePlanEntry"
+          },
+          "title": "Reserves",
+          "type": "array"
+        },
+        "briefing_notes": {
+          "default": "",
+          "description": "GM notes for the briefing",
+          "title": "Briefing Notes",
+          "type": "string"
+        },
+        "support_assets": {
+          "description": "Allies/support available",
+          "items": {
+            "type": "string"
+          },
+          "title": "Support Assets",
+          "type": "array"
+        },
+        "threats": {
+          "description": "Known threats",
+          "items": {
+            "type": "string"
+          },
+          "title": "Threats",
+          "type": "array"
+        }
+      },
+      "required": [
+        "mission_name"
+      ],
+      "title": "MissionPrepPlan",
+      "type": "object"
+    },
+    "MissionStakesBrief": {
+      "description": "Summarizes mission stakes per PR2 guidance (lines ~2835-2841).",
+      "properties": {
+        "stakes_type": {
+          "enum": [
+            "personal",
+            "faction",
+            "immediate",
+            "gradual",
+            "custom"
+          ],
+          "title": "Stakes Type",
+          "type": "string"
+        },
+        "summary": {
+          "description": "Narrative description of the stakes",
+          "title": "Summary",
+          "type": "string"
+        },
+        "consequences_success": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consequences Success"
+        },
+        "consequences_failure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consequences Failure"
+        },
+        "consequences_partial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consequences Partial"
+        }
+      },
+      "required": [
+        "stakes_type",
+        "summary"
+      ],
+      "title": "MissionStakesBrief",
+      "type": "object"
+    },
+    "PilotMechAssignment": {
+      "description": "Links a pilot to their mech build, persisting across sessions.\n\nAttributes:\n    pilot_id: Reference to the pilot (matches Pilot.id)\n    mech_id: Unique identifier for this mech (e.g., \"pilot_callsign-mech_name\")\n    mech_name: Human-readable name for the mech\n    mech_build: Full mech loadout as serialized dict\n    is_active: Whether this is the pilot's current active mech",
+      "properties": {
+        "pilot_id": {
+          "description": "Reference to pilot.id",
+          "title": "Pilot Id",
+          "type": "string"
+        },
+        "mech_id": {
+          "description": "Unique mech identifier",
+          "title": "Mech Id",
+          "type": "string"
+        },
+        "mech_name": {
+          "description": "Human-readable mech name",
+          "title": "Mech Name",
+          "type": "string"
+        },
+        "mech_build": {
+          "additionalProperties": true,
+          "description": "Full mech loadout as serialized dict",
+          "title": "Mech Build",
+          "type": "object"
+        },
+        "is_active": {
+          "default": true,
+          "description": "Is this the pilot's active mech",
+          "title": "Is Active",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "pilot_id",
+        "mech_id",
+        "mech_name",
+        "mech_build"
+      ],
+      "title": "PilotMechAssignment",
+      "type": "object"
+    },
+    "ReservePlanEntry": {
+      "description": "Tracks reserve usage/assignments planned for a mission.",
+      "properties": {
+        "reserve_id": {
+          "description": "Identifier for the reserve asset",
+          "title": "Reserve Id",
+          "type": "string"
+        },
+        "assigned_pilot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pilot expected to use this reserve",
+          "title": "Assigned Pilot Id"
+        },
+        "usage_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When/how it will be used",
+          "title": "Usage Notes"
+        },
+        "status": {
+          "default": "planned",
+          "enum": [
+            "planned",
+            "spent",
+            "earned"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reserve_id"
+      ],
+      "title": "ReservePlanEntry",
+      "type": "object"
+    },
+    "Session": {
+      "description": "A single play session within a campaign.\n\nAttributes:\n    id: Unique session identifier\n    session_number: Ordinal number (1, 2, 3...)\n    session_date: Date of the session\n    debrief: Summary of what happened\n    mission_plan: Mission prep data highlighted during the session\n    lifecycle_checkpoints: Downtime \u2192 Brief \u2192 Prep \u2192 Mission \u2192 Debrief tracking\n    active_missions: Missions currently in progress\n    reserves_earned: Reserves gained from this session as dict list\n    downtime_plans: Downtime actions taken as dict list",
+      "properties": {
+        "id": {
+          "description": "Unique session identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "session_number": {
+          "description": "Ordinal session number",
+          "minimum": 1,
+          "title": "Session Number",
+          "type": "integer"
+        },
+        "session_date": {
+          "description": "Session date",
+          "format": "date",
+          "title": "Session Date",
+          "type": "string"
+        },
+        "debrief": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Session summary",
+          "title": "Debrief"
+        },
+        "mission_plan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MissionPrepPlan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mission prep metadata tied to this session"
+        },
+        "mission_outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MissionOutcomeReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Recorded mission outcome / debrief summary"
+        },
+        "lifecycle_checkpoints": {
+          "description": "Downtime \u2192 Brief \u2192 Prep \u2192 Mission \u2192 Debrief checkpoints",
+          "items": {
+            "$ref": "#/$defs/SessionLifecycleCheckpoint"
+          },
+          "title": "Lifecycle Checkpoints",
+          "type": "array"
+        },
+        "active_missions": {
+          "description": "In-progress missions",
+          "items": {
+            "$ref": "#/$defs/ActiveSessionMission"
+          },
+          "title": "Active Missions",
+          "type": "array"
+        },
+        "reserves_earned": {
+          "description": "Reserves earned this session",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Reserves Earned",
+          "type": "array"
+        },
+        "downtime_plans": {
+          "description": "Downtime actions taken",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Downtime Plans",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "session_number"
+      ],
+      "title": "Session",
+      "type": "object"
+    },
+    "SessionLifecycleCheckpoint": {
+      "description": "Represents one checkpoint in the Downtime \u2192 Brief \u2192 Prep \u2192 Mission \u2192 Debrief loop.",
+      "properties": {
+        "phase": {
+          "description": "Lifecycle phase name",
+          "enum": [
+            "downtime",
+            "brief",
+            "prep",
+            "mission",
+            "debrief"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "status": {
+          "default": "pending",
+          "description": "Current status of this checkpoint",
+          "enum": [
+            "pending",
+            "in_progress",
+            "complete"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "description": "Narrative summary for this phase",
+          "title": "Summary",
+          "type": "string"
+        },
+        "gm_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Private GM notes",
+          "title": "Gm Notes"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timestamp when this checkpoint completed",
+          "title": "Completed At"
+        },
+        "issues": {
+          "description": "Any issues raised during this phase",
+          "items": {
+            "type": "string"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "reserves_spent": {
+          "description": "Reserves consumed in this phase (validated elsewhere)",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Reserves Spent",
+          "type": "array"
+        }
+      },
+      "required": [
+        "phase"
+      ],
+      "title": "SessionLifecycleCheckpoint",
+      "type": "object"
+    }
+  },
+  "description": "Root persistence object for a Lancer campaign.\n\nTracks all campaign state including pilots, their mechs, session history,\nand mission completion records.\n\nAttributes:\n    id: Unique campaign identifier\n    name: Display name for the campaign\n    description: Summary of the campaign premise\n    sessions: Ordered list of all sessions (completed and in-progress)\n    pilots: All pilots in the campaign as serialized dicts\n    pilot_mech_links: Links between pilots and their mech builds\n    mission_history: Records of all completed missions\n    campaign_notes: GM notes about the campaign\n    identity: Onboarding prompts/patrons for fast reference\n    lobby_state: Active lobby data ready to launch into combat\n    created_at: When the campaign was created\n    modified_at: When the campaign was last modified",
+  "properties": {
+    "id": {
+      "description": "Unique campaign identifier",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "description": "Campaign display name",
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "description": "Campaign premise",
+      "title": "Description",
+      "type": "string"
+    },
+    "sessions": {
+      "description": "All sessions in chronological order",
+      "items": {
+        "$ref": "#/$defs/Session"
+      },
+      "title": "Sessions",
+      "type": "array"
+    },
+    "pilots": {
+      "description": "All pilots as serialized dicts",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Pilots",
+      "type": "array"
+    },
+    "pilot_mech_links": {
+      "description": "Pilot to mech assignments",
+      "items": {
+        "$ref": "#/$defs/PilotMechAssignment"
+      },
+      "title": "Pilot Mech Links",
+      "type": "array"
+    },
+    "mission_history": {
+      "description": "Completed mission records",
+      "items": {
+        "$ref": "#/$defs/CampaignMissionRecord"
+      },
+      "title": "Mission History",
+      "type": "array"
+    },
+    "campaign_notes": {
+      "default": "",
+      "description": "GM campaign notes",
+      "title": "Campaign Notes",
+      "type": "string"
+    },
+    "identity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CampaignIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Who we are / patron prompts"
+    },
+    "lobby_state": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CampaignLobbyState"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Active lobby/mission prep data"
+    },
+    "created_at": {
+      "description": "Campaign creation time",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "modified_at": {
+      "description": "Last modification time",
+      "format": "date-time",
+      "title": "Modified At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name"
+  ],
+  "title": "Campaign",
+  "type": "object"
+}

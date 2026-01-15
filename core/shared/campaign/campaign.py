@@ -12,6 +12,184 @@ from datetime import date, datetime
 from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
+MissionLifecyclePhase = Literal["downtime", "brief", "prep", "mission", "debrief"]
+LifecycleStatus = Literal["pending", "in_progress", "complete"]
+ObjectivePriority = Literal["primary", "secondary", "optional"]
+ReservePlanStatus = Literal["planned", "spent", "earned"]
+LobbyStatus = Literal["draft", "ready", "launched", "cooldown"]
+MissionOutcomeResult = Literal["success", "partial", "failure", "catastrophic"]
+
+MISSION_LIFECYCLE_ORDER: tuple[MissionLifecyclePhase, ...] = (
+    "downtime",
+    "brief",
+    "prep",
+    "mission",
+    "debrief",
+)
+
+
+class SessionLifecycleCheckpoint(BaseModel):
+    """Represents one checkpoint in the Downtime → Brief → Prep → Mission → Debrief loop."""
+
+    phase: MissionLifecyclePhase = Field(..., description="Lifecycle phase name")
+    status: LifecycleStatus = Field(
+        default="pending", description="Current status of this checkpoint"
+    )
+    summary: str = Field(default="", description="Narrative summary for this phase")
+    gm_notes: str | None = Field(default=None, description="Private GM notes")
+    completed_at: datetime | None = Field(
+        default=None, description="Timestamp when this checkpoint completed"
+    )
+    issues: list[str] = Field(
+        default_factory=list, description="Any issues raised during this phase"
+    )
+    reserves_spent: list[dict] = Field(
+        default_factory=list,
+        description="Reserves consumed in this phase (validated elsewhere)",
+    )
+
+
+class MissionObjectiveBrief(BaseModel):
+    """Lightweight mission objective summary for lobby/session prep."""
+
+    id: str = Field(..., description="Local identifier for this objective")
+    title: str = Field(..., description="Display title for the objective")
+    success_condition: str = Field(
+        ..., description="What success looks like for this objective"
+    )
+    priority: ObjectivePriority = Field(
+        default="primary", description="Priority communicated to players"
+    )
+    related_objective_id: str | None = Field(
+        default=None,
+        description="Optional reference to core.shared.scenario MissionObjective.id",
+    )
+
+
+class MissionStakesBrief(BaseModel):
+    """Summarizes mission stakes per PR2 guidance (lines ~2835-2841)."""
+
+    stakes_type: Literal["personal", "faction", "immediate", "gradual", "custom"]
+    summary: str = Field(..., description="Narrative description of the stakes")
+    consequences_success: str | None = Field(default=None)
+    consequences_failure: str | None = Field(default=None)
+    consequences_partial: str | None = Field(default=None)
+
+
+class ReservePlanEntry(BaseModel):
+    """Tracks reserve usage/assignments planned for a mission."""
+
+    reserve_id: str = Field(..., description="Identifier for the reserve asset")
+    assigned_pilot_id: str | None = Field(
+        default=None, description="Pilot expected to use this reserve"
+    )
+    usage_notes: str | None = Field(
+        default=None, description="When/how it will be used"
+    )
+    status: ReservePlanStatus = Field(default="planned")
+
+
+class MissionPrepPlan(BaseModel):
+    """Mission prep metadata surfaced in the lobby UI."""
+
+    mission_name: str = Field(..., description="Operation name shared with table")
+    operation_code: str | None = Field(default=None, description="Optional ops code")
+    theater: str | None = Field(default=None, description="Where this mission occurs")
+    objectives: list[MissionObjectiveBrief] = Field(
+        default_factory=list, description="Objectives highlighted for this mission"
+    )
+    stakes: MissionStakesBrief | None = Field(default=None)
+    reserves: list[ReservePlanEntry] = Field(
+        default_factory=list, description="Reserve plan for the mission"
+    )
+    briefing_notes: str = Field(default="", description="GM notes for the briefing")
+    support_assets: list[str] = Field(
+        default_factory=list, description="Allies/support available"
+    )
+    threats: list[str] = Field(default_factory=list, description="Known threats")
+
+
+class CampaignIdentity(BaseModel):
+    """Stores onboarding prompts per PR2 tables (Who are we? patrons, etc.)."""
+
+    squad_name: str = Field(default="", description="What the squad calls itself")
+    patron: str = Field(default="", description="Primary patron or employer")
+    who_we_are: str = Field(default="", description="Elevator pitch for the squad")
+    relationships: list[str] = Field(
+        default_factory=list, description="Key relationships/prompts"
+    )
+    themes: list[str] = Field(default_factory=list, description="Tone or themes")
+    gm_prompts: list[str] = Field(
+        default_factory=list, description="Reference prompts for the GM"
+    )
+
+
+class CampaignLobbyState(BaseModel):
+    """Active lobby plan that gates combat launch."""
+
+    mission_plan: MissionPrepPlan = Field(
+        ..., description="Mission prep plan surfaced to the table"
+    )
+    assigned_member_ids: list[str] = Field(
+        default_factory=list, description="Member IDs slated for this mission"
+    )
+    preferred_pilot_count: int = Field(
+        default=4, ge=1, le=6, description="Soft cap per PR2 (GM + 3-5 pilots)"
+    )
+    min_pilot_count: int = Field(
+        default=3, ge=1, le=5, description="Minimum pilots before launch is allowed"
+    )
+    gm_notes: str = Field(default="", description="GM-only prep notes")
+    status: LobbyStatus = Field(default="draft", description="Lobby readiness state")
+    last_ready_check: datetime | None = Field(default=None)
+    combat_session_id: str | None = Field(
+        default=None, description="Linked CombatSessionDB id once launched"
+    )
+
+    @model_validator(mode="after")
+    def validate_seat_limits(self) -> "CampaignLobbyState":
+        if self.min_pilot_count > self.preferred_pilot_count:
+            raise ValueError("Minimum pilots cannot exceed preferred pilot count")
+        return self
+
+
+class MissionOutcomeReport(BaseModel):
+    """Summary of a mission's outcome captured during debrief."""
+
+    outcome: MissionOutcomeResult = Field(
+        ..., description="Overall mission result communicated to the table"
+    )
+    completion_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="0-1 scale for partial success tracking",
+    )
+    debrief_notes: str | None = Field(
+        default=None, description="Narrative debrief shared with the table"
+    )
+    reserves_spent: list[dict] = Field(
+        default_factory=list, description="Reserves consumed during the mission"
+    )
+    reserves_earned: list[dict] = Field(
+        default_factory=list, description="Reserves awarded after the mission"
+    )
+    rewards: list[str] = Field(
+        default_factory=list, description="Specific rewards, loot, or consequences"
+    )
+    recorded_at: datetime = Field(
+        default_factory=datetime.now,
+        description="Timestamp when this outcome was recorded",
+    )
+
+
+def _default_lifecycle_checkpoints() -> list[SessionLifecycleCheckpoint]:
+    """Build the canonical Downtime → Brief → Prep → Mission → Debrief checkpoints."""
+
+    return [
+        SessionLifecycleCheckpoint(phase=phase) for phase in MISSION_LIFECYCLE_ORDER
+    ]
+
 
 class PilotMechAssignment(BaseModel):
     """Links a pilot to their mech build, persisting across sessions.
@@ -66,9 +244,7 @@ class CampaignMissionRecord(BaseModel):
     mission_id: str = Field(..., description="Reference to mission.id")
     session_id: str = Field(..., description="Reference to Session.id")
     mission_name: str = Field(..., description="Mission display name")
-    outcome: Literal["success", "partial", "failure", "catastrophic"] = Field(
-        ..., description="Mission outcome"
-    )
+    outcome: MissionOutcomeResult = Field(..., description="Mission outcome")
     completion_score: float = Field(default=0.0, ge=0.0, le=1.0)
     mission_date: date = Field(
         default_factory=date.today, description="Completion date"
@@ -77,6 +253,15 @@ class CampaignMissionRecord(BaseModel):
         default_factory=list, description="Pilots who took part"
     )
     debrief_notes: str | None = Field(default=None, description="Session notes")
+    reserves_spent: list[dict] = Field(
+        default_factory=list, description="Reserves consumed during the mission"
+    )
+    reserves_earned: list[dict] = Field(
+        default_factory=list, description="Reserves awarded after the mission"
+    )
+    rewards: list[str] = Field(
+        default_factory=list, description="Loot, intel, or standing changes"
+    )
 
 
 class Session(BaseModel):
@@ -87,6 +272,8 @@ class Session(BaseModel):
         session_number: Ordinal number (1, 2, 3...)
         session_date: Date of the session
         debrief: Summary of what happened
+        mission_plan: Mission prep data highlighted during the session
+        lifecycle_checkpoints: Downtime → Brief → Prep → Mission → Debrief tracking
         active_missions: Missions currently in progress
         reserves_earned: Reserves gained from this session as dict list
         downtime_plans: Downtime actions taken as dict list
@@ -96,6 +283,16 @@ class Session(BaseModel):
     session_number: int = Field(..., ge=1, description="Ordinal session number")
     session_date: date = Field(default_factory=date.today, description="Session date")
     debrief: str | None = Field(default=None, description="Session summary")
+    mission_plan: MissionPrepPlan | None = Field(
+        default=None, description="Mission prep metadata tied to this session"
+    )
+    mission_outcome: MissionOutcomeReport | None = Field(
+        default=None, description="Recorded mission outcome / debrief summary"
+    )
+    lifecycle_checkpoints: list[SessionLifecycleCheckpoint] = Field(
+        default_factory=_default_lifecycle_checkpoints,
+        description="Downtime → Brief → Prep → Mission → Debrief checkpoints",
+    )
     active_missions: list[ActiveSessionMission] = Field(
         default_factory=list, description="In-progress missions"
     )
@@ -107,11 +304,26 @@ class Session(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_mission_pilot_ids(self) -> Session:
+    def validate_mission_pilot_ids(self) -> "Session":
         """Ensure all missions reference valid pilot IDs."""
         all_pilot_ids: set[str] = set()
         for mission in self.active_missions:
             all_pilot_ids.update(mission.participating_pilot_ids)
+        return self
+
+    @model_validator(mode="after")
+    def validate_lifecycle_phases(self) -> "Session":
+        """Ensure lifecycle checkpoints cover the canonical phases."""
+        seen: set[MissionLifecyclePhase] = set()
+        for checkpoint in self.lifecycle_checkpoints:
+            if checkpoint.phase in seen:
+                raise ValueError(f"Duplicate lifecycle phase found: {checkpoint.phase}")
+            seen.add(checkpoint.phase)
+        missing = [phase for phase in MISSION_LIFECYCLE_ORDER if phase not in seen]
+        if missing:
+            raise ValueError(
+                "Session lifecycle is missing phases: " + ", ".join(missing)
+            )
         return self
 
 
@@ -130,6 +342,8 @@ class Campaign(BaseModel):
         pilot_mech_links: Links between pilots and their mech builds
         mission_history: Records of all completed missions
         campaign_notes: GM notes about the campaign
+        identity: Onboarding prompts/patrons for fast reference
+        lobby_state: Active lobby data ready to launch into combat
         created_at: When the campaign was created
         modified_at: When the campaign was last modified
     """
@@ -150,6 +364,12 @@ class Campaign(BaseModel):
         default_factory=list, description="Completed mission records"
     )
     campaign_notes: str = Field(default="", description="GM campaign notes")
+    identity: CampaignIdentity | None = Field(
+        default=None, description="Who we are / patron prompts"
+    )
+    lobby_state: CampaignLobbyState | None = Field(
+        default=None, description="Active lobby/mission prep data"
+    )
     created_at: datetime = Field(
         default_factory=datetime.now, description="Campaign creation time"
     )

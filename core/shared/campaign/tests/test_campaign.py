@@ -22,6 +22,10 @@ from core.shared.campaign import (
     PilotMechAssignment,
     CampaignMissionRecord,
     ActiveSessionMission,
+    MissionPrepPlan,
+    CampaignIdentity,
+    CampaignLobbyState,
+    MissionOutcomeReport,
 )
 from core.shared.campaign.serialization import (
     save_campaign,
@@ -198,8 +202,52 @@ class TestSession:
         assert session.id == "session-001"
         assert session.session_number == 1
         assert session.debrief == "First session went well"
+
+    def test_session_tracks_mission_outcome(self):
+        """Sessions can store mission outcome summaries for exports."""
+        outcome = MissionOutcomeReport(
+            outcome="success",
+            completion_score=0.9,
+            debrief_notes="Pulled civilians out",
+            reserves_spent=[{"id": "supply_drop", "notes": "Used on round 3"}],
+            reserves_earned=[{"id": "intel_cache"}],
+            rewards=["+1 reserve", "New contact"],
+        )
+        session = Session(
+            id="session-002",
+            session_number=2,
+            mission_outcome=outcome,
+        )
+        assert session.mission_outcome is not None
+        assert session.mission_outcome.outcome == "success"
+        assert session.mission_outcome.rewards == ["+1 reserve", "New contact"]
         assert session.active_missions == []
         assert session.reserves_earned == []
+
+    def test_session_has_default_lifecycle(self):
+        """Session should auto-populate the lifecycle checkpoints."""
+        session = Session(id="session-002", session_number=2)
+        phases = [checkpoint.phase for checkpoint in session.lifecycle_checkpoints]
+        assert phases == ["downtime", "brief", "prep", "mission", "debrief"]
+        assert all(
+            checkpoint.status == "pending"
+            for checkpoint in session.lifecycle_checkpoints
+        )
+
+    def test_session_can_store_mission_plan(self):
+        """Mission prep data should be stored alongside the session."""
+        mission_plan = MissionPrepPlan(
+            mission_name="Operation Dawn",
+            objectives=[],
+            support_assets=["Orbital overwatch"],
+        )
+        session = Session(
+            id="session-003",
+            session_number=3,
+            mission_plan=mission_plan,
+        )
+        assert session.mission_plan is not None
+        assert session.mission_plan.mission_name == "Operation Dawn"
 
 
 class TestCampaign:
@@ -321,6 +369,25 @@ class TestCampaign:
         with pytest.raises(ValueError, match="Duplicate mech IDs"):
             Campaign.model_validate(campaign_dict)
 
+    def test_campaign_identity_storage(self, sample_campaign: Campaign):
+        """Campaign identity data should be persisted on the model."""
+        identity = CampaignIdentity(
+            squad_name="ThirdComm Auxilia",
+            patron="Union Navy",
+            who_we_are="Freelance rangers",
+            relationships=["GM: Pax", "Handler: Ort"],
+        )
+        sample_campaign.identity = identity
+        assert sample_campaign.identity is not None
+        assert sample_campaign.identity.patron == "Union Navy"
+
+    def test_campaign_lobby_state_defaults(self, sample_campaign: Campaign):
+        """Campaign lobby should enforce seat defaults."""
+        mission_plan = MissionPrepPlan(mission_name="Operation Emberfall")
+        sample_campaign.lobby_state = CampaignLobbyState(mission_plan=mission_plan)
+        assert sample_campaign.lobby_state.preferred_pilot_count == 4
+        assert sample_campaign.lobby_state.min_pilot_count == 3
+
 
 class TestCampaignSerialization:
     """Tests for campaign serialization."""
@@ -406,6 +473,27 @@ class TestCampaignSerialization:
         assert loaded_link.mech_id == "test-mech"
         assert loaded_link.mech_build["frame_id"] == "everest"
         assert len(loaded_link.mech_build["weapons"]) == 2
+
+    def test_lobby_state_survives_serialization(self, sample_campaign: Campaign):
+        """Ensure lobby state and mission prep persist through serialization."""
+        sample_campaign.identity = CampaignIdentity(
+            squad_name="Drake Company",
+            patron="Karr Nexus",
+        )
+        sample_campaign.lobby_state = CampaignLobbyState(
+            mission_plan=MissionPrepPlan(
+                mission_name="Operation Radiant",
+                support_assets=["Desert recon drone"],
+            ),
+            assigned_member_ids=["member-1"],
+        )
+        json_str = save_campaign_to_string(sample_campaign)
+        restored = load_campaign_from_string(json_str)
+        assert restored.identity is not None
+        assert restored.identity.squad_name == "Drake Company"
+        assert restored.lobby_state is not None
+        assert restored.lobby_state.mission_plan.mission_name == "Operation Radiant"
+        assert restored.lobby_state.assigned_member_ids == ["member-1"]
 
 
 class TestCampaignValidation:
@@ -518,6 +606,23 @@ class TestCampaignMissionRecord:
         assert record.outcome == "success"
         assert record.completion_score == 1.0
         assert len(record.participating_pilot_ids) == 2
+
+    def test_mission_record_tracks_reserve_delta(self):
+        """Mission records capture reserves spent/earned for GM summaries."""
+        record = CampaignMissionRecord(
+            mission_id="mission-002",
+            session_id="session-010",
+            mission_name="Second Mission",
+            outcome="partial",
+            completion_score=0.5,
+            participating_pilot_ids=["pilot-1"],
+            reserves_spent=[{"id": "airstrike"}],
+            reserves_earned=[{"id": "intel_cache"}],
+            rewards=["+Rep", "Prototype unlocked"],
+        )
+        assert record.reserves_spent[0]["id"] == "airstrike"
+        assert record.reserves_earned[0]["id"] == "intel_cache"
+        assert record.rewards[-1] == "Prototype unlocked"
 
 
 class TestActiveSessionMission:

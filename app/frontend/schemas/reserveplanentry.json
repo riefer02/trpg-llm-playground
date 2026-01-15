@@ -1,0 +1,51 @@
+{
+  "description": "Tracks reserve usage/assignments planned for a mission.",
+  "properties": {
+    "reserve_id": {
+      "description": "Identifier for the reserve asset",
+      "title": "Reserve Id",
+      "type": "string"
+    },
+    "assigned_pilot_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Pilot expected to use this reserve",
+      "title": "Assigned Pilot Id"
+    },
+    "usage_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "When/how it will be used",
+      "title": "Usage Notes"
+    },
+    "status": {
+      "default": "planned",
+      "enum": [
+        "planned",
+        "spent",
+        "earned"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reserve_id"
+  ],
+  "title": "ReservePlanEntry",
+  "type": "object"
+}

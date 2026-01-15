@@ -172,6 +172,7 @@ class CombatSessionDB(TimestampMixin, table=True):
     # Ownership and organization
     gm_user_id: str = Field(index=True, default="default_user")
     campaign_id: str | None = Field(default=None, index=True)
+    campaign_session_id: str | None = Field(default=None, index=True)
 
     # Optional metadata
     notes: str = Field(default="")

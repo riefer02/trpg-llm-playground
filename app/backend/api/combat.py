@@ -16,7 +16,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.backend.db.engine import get_session
 from app.backend.db.models import CombatSessionDB, utc_now
 from app.backend.dependencies import get_current_user
-from app.backend.exceptions import NotFoundError, ValidationError
+from app.backend.exceptions import ConflictError, NotFoundError, ValidationError
+from app.backend.api.campaigns import record_campaign_session_outcome
 
 # Import core combat models - use directly, don't duplicate!
 from core.mech.combat_state import (
@@ -26,6 +27,7 @@ from core.mech.combat_state import (
     CombatResources,
 )
 from core.mech.grid import HexPosition, HexCoord
+from core.shared.campaign.campaign import MissionOutcomeReport
 
 router = APIRouter(prefix="/combat", tags=["combat"])
 
@@ -44,7 +46,7 @@ SessionStatus = Literal["active", "paused", "completed", "abandoned"]
 
 class CombatSessionCreateRequest(BaseModel):
     """Request body for creating a combat session.
-    
+
     Combatants use the exact same structure as core.mech.combat_state.CombatantState.
     """
 
@@ -68,11 +70,23 @@ class CombatSessionUpdateRequest(BaseModel):
 
 class AddCombatantRequest(BaseModel):
     """Request body for adding a combatant.
-    
+
     Combatant dict is validated against core.mech.combat_state.CombatantState.
     """
 
     combatant: dict[str, Any]
+
+
+class CombatSessionCompleteRequest(BaseModel):
+    """Request body for completing a combat session and logging outcomes."""
+
+    outcome: Literal["success", "partial", "failure", "catastrophic"]
+    completion_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    debrief_notes: str | None = None
+    reserves_spent: list[dict] = Field(default_factory=list)
+    reserves_earned: list[dict] = Field(default_factory=list)
+    rewards: list[str] = Field(default_factory=list)
+    notes: str | None = None
 
 
 # =============================================================================
@@ -129,7 +143,7 @@ class CombatSessionListResponse(BaseModel):
 
 def _validate_combatant(data: dict[str, Any]) -> CombatantState:
     """Validate combatant dict against core CombatantState.
-    
+
     Core model handles all validation - we just wrap errors.
     """
     try:
@@ -148,7 +162,7 @@ def _validate_scenario(
 ) -> MechCombatScenario:
     """Build and validate scenario using core models."""
     validated_combatants = [_validate_combatant(c) for c in combatants]
-    
+
     try:
         return MechCombatScenario(
             combatants=validated_combatants,
@@ -203,7 +217,9 @@ def _session_to_list_item(session_db: CombatSessionDB) -> CombatSessionListItem:
 # =============================================================================
 
 
-@router.post("", response_model=CombatSessionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=CombatSessionResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_combat_session(
     body: CombatSessionCreateRequest,
     session: AsyncSession = Depends(get_session),
@@ -317,6 +333,52 @@ async def update_combat_session(
     return _session_to_response(combat_session)
 
 
+@router.post("/{session_id}/complete", response_model=CombatSessionResponse)
+async def complete_combat_session(
+    session_id: str,
+    body: CombatSessionCompleteRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> CombatSessionResponse:
+    """Mark a combat session complete and propagate mission outcomes."""
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+    if combat_session.status == "completed":
+        raise ConflictError("Combat session already completed")
+
+    combat_session.status = "completed"
+    if body.notes is not None:
+        combat_session.notes = body.notes
+    combat_session.updated_at = utc_now()
+
+    payload = body.model_dump(exclude={"notes"})
+    if payload.get("completion_score") is None:
+        payload.pop("completion_score", None)
+    mission_outcome = MissionOutcomeReport(**payload)
+
+    if combat_session.campaign_id and combat_session.campaign_session_id:
+        await record_campaign_session_outcome(
+            session,
+            combat_session.campaign_id,
+            combat_session.campaign_session_id,
+            mission_outcome,
+        )
+
+    session.add(combat_session)
+    await session.commit()
+    await session.refresh(combat_session)
+
+    return _session_to_response(combat_session)
+
+
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_combat_session(
     session_id: str,
@@ -367,7 +429,13 @@ async def add_combatant(
     if new_combatant.id in existing_ids:
         raise ValidationError(
             f"Combatant with ID '{new_combatant.id}' already exists",
-            errors=[{"loc": ["combatant", "id"], "msg": "Duplicate combatant ID", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["combatant", "id"],
+                    "msg": "Duplicate combatant ID",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Update scenario with new combatant
@@ -390,7 +458,9 @@ async def add_combatant(
     return _session_to_response(combat_session)
 
 
-@router.delete("/{session_id}/combatants/{combatant_id}", response_model=CombatSessionResponse)
+@router.delete(
+    "/{session_id}/combatants/{combatant_id}", response_model=CombatSessionResponse
+)
 async def remove_combatant(
     session_id: str,
     combatant_id: str,
@@ -419,7 +489,11 @@ async def remove_combatant(
 
     updated_scenario = MechCombatScenario(
         combatants=updated_combatants,
-        grapples=[g for g in scenario.grapples if g.grappler_id != combatant_id and g.target_id != combatant_id],
+        grapples=[
+            g
+            for g in scenario.grapples
+            if g.grappler_id != combatant_id and g.target_id != combatant_id
+        ],
         rounds=list(scenario.rounds),
         terrain=scenario.terrain,
         environment=scenario.environment,

@@ -1,0 +1,83 @@
+{
+  "description": "Represents one checkpoint in the Downtime \u2192 Brief \u2192 Prep \u2192 Mission \u2192 Debrief loop.",
+  "properties": {
+    "phase": {
+      "description": "Lifecycle phase name",
+      "enum": [
+        "downtime",
+        "brief",
+        "prep",
+        "mission",
+        "debrief"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "status": {
+      "default": "pending",
+      "description": "Current status of this checkpoint",
+      "enum": [
+        "pending",
+        "in_progress",
+        "complete"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "summary": {
+      "default": "",
+      "description": "Narrative summary for this phase",
+      "title": "Summary",
+      "type": "string"
+    },
+    "gm_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Private GM notes",
+      "title": "Gm Notes"
+    },
+    "completed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Timestamp when this checkpoint completed",
+      "title": "Completed At"
+    },
+    "issues": {
+      "description": "Any issues raised during this phase",
+      "items": {
+        "type": "string"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "reserves_spent": {
+      "description": "Reserves consumed in this phase (validated elsewhere)",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Reserves Spent",
+      "type": "array"
+    }
+  },
+  "required": [
+    "phase"
+  ],
+  "title": "SessionLifecycleCheckpoint",
+  "type": "object"
+}

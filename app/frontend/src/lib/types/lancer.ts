@@ -39,6 +39,16 @@ export type LancerTTRPGSchema =
   | PilotCombatRules
   | Character
   | MechConfiguration
+  | Campaign
+  | Session
+  | MissionPrepPlan
+  | CampaignIdentity
+  | CampaignLobbyState
+  | MissionObjectiveBrief
+  | MissionStakesBrief
+  | ReservePlanEntry
+  | SessionLifecycleCheckpoint
+  | MissionOutcomeReport
   | DiceExpression
   | MechanicalEffect
   | StatModifier
@@ -161,7 +171,7 @@ export type LancerTTRPGSchema =
   | SystemPointRules
   | MountedWeapon
   | InstalledSystem
-  | MechBuild1
+  | MechBuild2
   | MechDerivedStats
   | ValidationIssue2
   | MechBuildValidation
@@ -28087,6 +28097,337 @@ export type AttackBonus1 = number;
 export type LimitedBonus = number;
 export type OverchargeCostCaps1 = OverchargeCostCapEffect[];
 export type AiSystemLimit = number;
+/**
+ * Unique campaign identifier
+ */
+export type Id11 = string;
+/**
+ * Campaign display name
+ */
+export type Name27 = string;
+/**
+ * Campaign premise
+ */
+export type Description2 = string;
+/**
+ * Unique session identifier
+ */
+export type Id12 = string;
+/**
+ * Ordinal session number
+ */
+export type SessionNumber = number;
+/**
+ * Session date
+ */
+export type SessionDate = string;
+/**
+ * Session summary
+ */
+export type Debrief = string | null;
+/**
+ * Operation name shared with table
+ */
+export type MissionName = string;
+/**
+ * Optional ops code
+ */
+export type OperationCode = string | null;
+/**
+ * Where this mission occurs
+ */
+export type Theater = string | null;
+/**
+ * Local identifier for this objective
+ */
+export type Id13 = string;
+/**
+ * Display title for the objective
+ */
+export type Title = string;
+/**
+ * What success looks like for this objective
+ */
+export type SuccessCondition = string;
+/**
+ * Priority communicated to players
+ */
+export type Priority = "primary" | "secondary" | "optional";
+/**
+ * Optional reference to core.shared.scenario MissionObjective.id
+ */
+export type RelatedObjectiveId = string | null;
+/**
+ * Objectives highlighted for this mission
+ */
+export type Objectives = MissionObjectiveBrief[];
+export type StakesType = "personal" | "faction" | "immediate" | "gradual" | "custom";
+/**
+ * Narrative description of the stakes
+ */
+export type Summary = string;
+export type ConsequencesSuccess = string | null;
+export type ConsequencesFailure = string | null;
+export type ConsequencesPartial = string | null;
+/**
+ * Identifier for the reserve asset
+ */
+export type ReserveId1 = string;
+/**
+ * Pilot expected to use this reserve
+ */
+export type AssignedPilotId = string | null;
+/**
+ * When/how it will be used
+ */
+export type UsageNotes = string | null;
+export type Status9 = "planned" | "spent" | "earned";
+/**
+ * Reserve plan for the mission
+ */
+export type Reserves = ReservePlanEntry[];
+/**
+ * GM notes for the briefing
+ */
+export type BriefingNotes = string;
+/**
+ * Allies/support available
+ */
+export type SupportAssets = string[];
+/**
+ * Known threats
+ */
+export type Threats = string[];
+/**
+ * Overall mission result communicated to the table
+ */
+export type Outcome1 = "success" | "partial" | "failure" | "catastrophic";
+/**
+ * 0-1 scale for partial success tracking
+ */
+export type CompletionScore = number;
+/**
+ * Narrative debrief shared with the table
+ */
+export type DebriefNotes = string | null;
+/**
+ * Reserves consumed during the mission
+ */
+export type ReservesSpent = {
+  [k: string]: unknown;
+}[];
+/**
+ * Reserves awarded after the mission
+ */
+export type ReservesEarned = {
+  [k: string]: unknown;
+}[];
+/**
+ * Specific rewards, loot, or consequences
+ */
+export type Rewards = string[];
+/**
+ * Timestamp when this outcome was recorded
+ */
+export type RecordedAt = string;
+/**
+ * Lifecycle phase name
+ */
+export type Phase = "downtime" | "brief" | "prep" | "mission" | "debrief";
+/**
+ * Current status of this checkpoint
+ */
+export type Status10 = "pending" | "in_progress" | "complete";
+/**
+ * Narrative summary for this phase
+ */
+export type Summary1 = string;
+/**
+ * Private GM notes
+ */
+export type GmNotes = string | null;
+/**
+ * Timestamp when this checkpoint completed
+ */
+export type CompletedAt = string | null;
+/**
+ * Any issues raised during this phase
+ */
+export type Issues2 = string[];
+/**
+ * Reserves consumed in this phase (validated elsewhere)
+ */
+export type ReservesSpent1 = {
+  [k: string]: unknown;
+}[];
+/**
+ * Downtime → Brief → Prep → Mission → Debrief checkpoints
+ */
+export type LifecycleCheckpoints = SessionLifecycleCheckpoint[];
+/**
+ * IDs of pilots in this mission
+ */
+export type ParticipatingPilotIds = string[];
+/**
+ * When the mission was started
+ */
+export type StartedAt = string;
+/**
+ * In-progress missions
+ */
+export type ActiveMissions = ActiveSessionMission[];
+/**
+ * Reserves earned this session
+ */
+export type ReservesEarned1 = {
+  [k: string]: unknown;
+}[];
+/**
+ * Downtime actions taken
+ */
+export type DowntimePlans = {
+  [k: string]: unknown;
+}[];
+/**
+ * All sessions in chronological order
+ */
+export type Sessions = Session[];
+/**
+ * All pilots as serialized dicts
+ */
+export type Pilots = {
+  [k: string]: unknown;
+}[];
+/**
+ * Reference to pilot.id
+ */
+export type PilotId1 = string;
+/**
+ * Unique mech identifier
+ */
+export type MechId = string;
+/**
+ * Human-readable mech name
+ */
+export type MechName = string;
+/**
+ * Is this the pilot's active mech
+ */
+export type IsActive = boolean;
+/**
+ * Pilot to mech assignments
+ */
+export type PilotMechLinks = PilotMechAssignment[];
+/**
+ * Reference to mission.id
+ */
+export type MissionId = string;
+/**
+ * Reference to Session.id
+ */
+export type SessionId = string;
+/**
+ * Mission display name
+ */
+export type MissionName1 = string;
+/**
+ * Mission outcome
+ */
+export type Outcome2 = "success" | "partial" | "failure" | "catastrophic";
+export type CompletionScore1 = number;
+/**
+ * Completion date
+ */
+export type MissionDate = string;
+/**
+ * Pilots who took part
+ */
+export type ParticipatingPilotIds1 = string[];
+/**
+ * Session notes
+ */
+export type DebriefNotes1 = string | null;
+/**
+ * Reserves consumed during the mission
+ */
+export type ReservesSpent2 = {
+  [k: string]: unknown;
+}[];
+/**
+ * Reserves awarded after the mission
+ */
+export type ReservesEarned2 = {
+  [k: string]: unknown;
+}[];
+/**
+ * Loot, intel, or standing changes
+ */
+export type Rewards1 = string[];
+/**
+ * Completed mission records
+ */
+export type MissionHistory = CampaignMissionRecord[];
+/**
+ * GM campaign notes
+ */
+export type CampaignNotes = string;
+/**
+ * What the squad calls itself
+ */
+export type SquadName = string;
+/**
+ * Primary patron or employer
+ */
+export type Patron = string;
+/**
+ * Elevator pitch for the squad
+ */
+export type WhoWeAre = string;
+/**
+ * Key relationships/prompts
+ */
+export type Relationships = string[];
+/**
+ * Tone or themes
+ */
+export type Themes = string[];
+/**
+ * Reference prompts for the GM
+ */
+export type GmPrompts = string[];
+/**
+ * Member IDs slated for this mission
+ */
+export type AssignedMemberIds = string[];
+/**
+ * Soft cap per PR2 (GM + 3-5 pilots)
+ */
+export type PreferredPilotCount = number;
+/**
+ * Minimum pilots before launch is allowed
+ */
+export type MinPilotCount = number;
+/**
+ * GM-only prep notes
+ */
+export type GmNotes1 = string;
+/**
+ * Lobby readiness state
+ */
+export type Status11 = "draft" | "ready" | "launched" | "cooldown";
+export type LastReadyCheck = string | null;
+/**
+ * Linked CombatSessionDB id once launched
+ */
+export type CombatSessionId = string | null;
+/**
+ * Campaign creation time
+ */
+export type CreatedAt = string;
+/**
+ * Last modification time
+ */
+export type ModifiedAt = string;
 export type Accuracy = number;
 export type Difficulty = number;
 /**
@@ -28165,7 +28506,7 @@ export type ComplicationDescription = string | null;
 /**
  * Unique condition identifier
  */
-export type Id11 = string;
+export type Id14 = string;
 export type ConditionType =
   | "skill_check"
   | "position_reached"
@@ -28177,7 +28518,7 @@ export type ConditionType =
 /**
  * What must be true for this condition
  */
-export type Description2 = string;
+export type Description3 = string;
 /**
  * Tier needed if condition is check-based
  */
@@ -28197,11 +28538,11 @@ export type TargetId = string | null;
 /**
  * Unique goal identifier
  */
-export type Id12 = string;
+export type Id15 = string;
 /**
  * Pilot's stated goal
  */
-export type Description3 = string;
+export type Description4 = string;
 /**
  * Conditions that represent success
  */
@@ -28250,7 +28591,7 @@ export type ComplicationDescription1 = string | null;
 /**
  * Pilot taking the action
  */
-export type PilotId1 = string | null;
+export type PilotId2 = string | null;
 /**
  * Pilot skill used for the check
  */
@@ -28263,7 +28604,7 @@ export type ActionId1 = string | null;
  * Narrative description of the action
  */
 export type ActionDescription = string | null;
-export type Status9 = "active" | "completed" | "failed" | "blocked";
+export type Status12 = "active" | "completed" | "failed" | "blocked";
 export type Successes = number;
 export type Failures = number;
 export type Attempts = number;
@@ -28280,7 +28621,7 @@ export type RequirementType =
 /**
  * What clears this complication
  */
-export type Description4 = string;
+export type Description5 = string;
 /**
  * Narrative tier required (if resolution needs a check)
  */
@@ -28296,12 +28637,12 @@ export type RequiredAmount1 = number | null;
 /**
  * Unique complication identifier
  */
-export type Id13 = string;
+export type Id16 = string;
 export type ComplicationType1 = "harm" | "time" | "resources" | "collateral" | "position" | "effect";
 /**
  * What is going wrong
  */
-export type Description5 = string;
+export type Description6 = string;
 /**
  * Severity of the complication
  */
@@ -28326,7 +28667,7 @@ export type ResolutionRequirements = NarrativeResolutionRequirement[];
  * Damage amount if this is a harm complication
  */
 export type HarmDamage = number | null;
-export type Status10 = "active" | "resolved" | "escalated";
+export type Status13 = "active" | "resolved" | "escalated";
 /**
  * Who resolved the complication
  */
@@ -28347,7 +28688,7 @@ export type ProfileId = string;
 /**
  * Display name
  */
-export type Name27 = string;
+export type Name28 = string;
 /**
  * Primary damage type for the profile (if applicable)
  */
@@ -28395,11 +28736,11 @@ export type RerollActionType = "full";
 /**
  * Unique identifier
  */
-export type Id14 = string;
+export type Id17 = string;
 /**
  * Display name
  */
-export type Name28 = string;
+export type Name29 = string;
 export type ActionType15 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type Target83 = "self" | "enemy" | "ally" | "adjacent" | "object";
 export type UsesPer14 = "unlimited" | "round" | "scene" | "mission" | "rest" | "full_repair";
@@ -28414,11 +28755,11 @@ export type BenefitsFromTalents = boolean;
 /**
  * Unique weapon identifier
  */
-export type Id15 = string;
+export type Id18 = string;
 /**
  * Display name
  */
-export type Name29 = string;
+export type Name30 = string;
 export type Size10 = "aux" | "main" | "heavy" | "superheavy";
 export type WeaponType1 = "cqb" | "rifle" | "launcher" | "cannon" | "melee" | "nexus";
 /**
@@ -28446,11 +28787,11 @@ export type LimitedUses2 = number | null;
 /**
  * Unique system identifier
  */
-export type Id16 = string;
+export type Id19 = string;
 /**
  * Display name
  */
-export type Name30 = string;
+export type Name31 = string;
 export type SystemType = "system" | "tech" | "deployable" | "drone" | "shield" | "ai";
 export type SpCost1 = number;
 /**
@@ -28477,7 +28818,7 @@ export type Tag3 =
   | "mine";
 export type Value15 = number | null;
 export type Tags5 = SystemTag[];
-export type Name31 = string;
+export type Name32 = string;
 export type Range13 = number;
 export type Pattern2 = "range" | "threat" | "thrown" | "line" | "cone" | "burst" | "blast" | "sensors";
 export type Size11 = number;
@@ -28489,7 +28830,7 @@ export type Save1 = ("hull" | "agility" | "systems" | "engineering") | null;
 export type HalfOnSuccess = boolean;
 export type ObjectsAutoHit1 = boolean;
 export type Grenades1 = GrenadePayload[];
-export type Name32 = string;
+export type Name33 = string;
 export type Detonation = "adjacent_movement" | "ally_adjacent_movement" | "manual";
 export type CanAttachToTerrain = boolean;
 export type DetonationAction = ("free" | "quick" | "full" | "reaction" | "protocol" | "move") | null;
@@ -28505,12 +28846,12 @@ export type Cover5 = ("none" | "soft" | "hard") | null;
 export type Evasion3 = number;
 export type Hp3 = number;
 export type PickupAction = ("free" | "quick" | "full" | "reaction" | "protocol" | "move") | null;
-export type Name33 = string;
+export type Name34 = string;
 export type Size13 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
 export type Hp4 = number;
 export type Evasion4 = number;
 export type EDefense3 = number;
-export type Name34 = string;
+export type Name35 = string;
 export type Trigger25 = "ally_hit_target_within_range";
 export type Range15 = number;
 export type UsesPerRound = number;
@@ -28531,11 +28872,11 @@ export type IntegratedWeaponId = string | null;
 /**
  * Unique core system identifier
  */
-export type Id17 = string;
+export type Id20 = string;
 /**
  * Display name
  */
-export type Name35 = string;
+export type Name36 = string;
 export type MountlessWeapons = MountlessWeaponDefinition[];
 export type UsesPerMission = number;
 export type Size14 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
@@ -28553,11 +28894,11 @@ export type Structure1 = number;
 /**
  * Unique frame identifier
  */
-export type Id18 = string;
+export type Id21 = string;
 /**
  * Display name
  */
-export type Name36 = string;
+export type Name37 = string;
 export type Manufacturer2 = "GMS" | "IPS-N" | "SSC" | "HORUS" | "HA";
 /**
  * License ID required to use this frame (None for GMS/general)
@@ -28572,7 +28913,7 @@ export type SystemPoints1 = number;
 /**
  * Display name
  */
-export type Name37 = string;
+export type Name38 = string;
 export type Traits = FrameTrait[];
 export type UnlicensedStatusPenalties = (
   | "braced"
@@ -28601,7 +28942,7 @@ export type Code3 = string;
 export type Message3 = string;
 export type Severity4 = "error" | "warning";
 export type Valid2 = boolean;
-export type Issues2 = ValidationIssue1[];
+export type Issues3 = ValidationIssue1[];
 export type ItemId = string;
 export type Uses = number;
 export type Weapons2 = LimitedUseEntry[];
@@ -28633,7 +28974,7 @@ export type HardCoverSize = ("size_half" | "size_1" | "size_2" | "size_3" | "siz
 export type Difficult = boolean;
 export type Dangerous = boolean;
 export type Tiles = TerrainHex[];
-export type Status11 =
+export type Status14 =
   | "braced"
   | "immobilized"
   | "impaired"
@@ -28800,7 +29141,7 @@ export type ChooseDestroyedBy = "target" | "attacker";
 export type ExcludeLimitedNoCharges = boolean;
 export type FallbackToOtherIfNone = boolean;
 export type FallbackToDirectHitIfNone = boolean;
-export type Name38 = "glancing_blow" | "system_trauma" | "direct_hit" | "crushing_hit";
+export type Name39 = "glancing_blow" | "system_trauma" | "direct_hit" | "crushing_hit";
 export type ImpairedUntilEndNextTurn = boolean;
 export type DestroyMount = boolean;
 export type DestroySystem = boolean;
@@ -28822,7 +29163,7 @@ export type DangerZoneFraction = number;
 export type DangerZoneRounding = "up" | "down";
 export type RollMin2 = number;
 export type RollMax2 = number;
-export type Name39 = "emergency_shunt" | "power_plant_destabilize" | "meltdown" | "irreversible_meltdown";
+export type Name40 = "emergency_shunt" | "power_plant_destabilize" | "meltdown" | "irreversible_meltdown";
 export type ImpairedUntilEndNextTurn1 = boolean;
 export type ExposedUntilCleared = boolean;
 export type MeltdownImmediate = boolean;
@@ -28915,8 +29256,8 @@ export type CannotReactWhileDragging1 = boolean;
 export type CannotReactWhileLifting1 = boolean;
 export type SlowedWhileDragging = boolean;
 export type ImmobilizedWhileLifting = boolean;
-export type Id19 = string;
-export type Name40 = string;
+export type Id22 = string;
+export type Name41 = string;
 export type ActionType16 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type AlternateActionTypes = ("free" | "quick" | "full" | "reaction" | "protocol" | "move")[];
 export type Scope = "mech" | "pilot" | "both";
@@ -29095,7 +29436,7 @@ export type UsesPerRound1 = number;
 export type UsesPilotWeapon = boolean;
 export type SidearmCanBeQuick = boolean;
 export type ContestedCheck1 = "grit_vs_hull";
-export type Name41 = "distract" | "shred" | "damage";
+export type Name42 = "distract" | "shred" | "damage";
 export type InflictsConditions1 = (
   | "braced"
   | "immobilized"
@@ -29181,8 +29522,8 @@ export type HeatCap2 = number;
 export type StructureCurrent = number;
 export type StressCurrent = number;
 export type RepairsRemaining = number;
-export type Id20 = string;
-export type Name42 = string;
+export type Id23 = string;
+export type Name43 = string;
 export type Side = "players" | "hostiles" | "neutral";
 export type Kind = "mech" | "pilot" | "npc" | "object";
 export type Statuses1 = (
@@ -29531,8 +29872,8 @@ export type Combatants = CombatantState[];
 export type Grapples = GrappleLink[];
 export type Rounds = CombatRound[];
 export type Environment1 = "standard" | "zero_g" | "underwater";
-export type Id21 = string;
-export type Name43 = string;
+export type Id24 = string;
+export type Name44 = string;
 export type Kind1 = "drone" | "mine" | "deployable" | "other";
 export type OwnerId = string | null;
 export type Size17 = number;
@@ -29542,7 +29883,7 @@ export type Armor5 = number;
 export type Evasion7 = number;
 export type Cover6 = ("soft" | "hard") | null;
 export type IsDestroyed = boolean;
-export type IsActive = boolean;
+export type IsActive1 = boolean;
 export type CanAct = boolean;
 export type CanMove = boolean;
 export type ActsOnOwnerTurn = boolean;
@@ -29557,7 +29898,7 @@ export type Code4 = string;
 export type Message4 = string;
 export type Severity5 = "error" | "warning";
 export type Valid3 = boolean;
-export type Issues3 = CombatValidationIssue[];
+export type Issues4 = CombatValidationIssue[];
 export type Rolls = number[];
 export type Chosen = number[];
 export type Roll1 = number;
@@ -32949,6 +33290,265 @@ export interface MechDerivedStats {
   [k: string]: unknown;
 }
 /**
+ * Root persistence object for a Lancer campaign.
+ *
+ * Tracks all campaign state including pilots, their mechs, session history,
+ * and mission completion records.
+ *
+ * Attributes:
+ *     id: Unique campaign identifier
+ *     name: Display name for the campaign
+ *     description: Summary of the campaign premise
+ *     sessions: Ordered list of all sessions (completed and in-progress)
+ *     pilots: All pilots in the campaign as serialized dicts
+ *     pilot_mech_links: Links between pilots and their mech builds
+ *     mission_history: Records of all completed missions
+ *     campaign_notes: GM notes about the campaign
+ *     identity: Onboarding prompts/patrons for fast reference
+ *     lobby_state: Active lobby data ready to launch into combat
+ *     created_at: When the campaign was created
+ *     modified_at: When the campaign was last modified
+ */
+export interface Campaign {
+  id: Id11;
+  name: Name27;
+  description?: Description2;
+  sessions?: Sessions;
+  pilots?: Pilots;
+  pilot_mech_links?: PilotMechLinks;
+  mission_history?: MissionHistory;
+  campaign_notes?: CampaignNotes;
+  /**
+   * Who we are / patron prompts
+   */
+  identity?: CampaignIdentity | null;
+  /**
+   * Active lobby/mission prep data
+   */
+  lobby_state?: CampaignLobbyState | null;
+  created_at?: CreatedAt;
+  modified_at?: ModifiedAt;
+  [k: string]: unknown;
+}
+/**
+ * A single play session within a campaign.
+ *
+ * Attributes:
+ *     id: Unique session identifier
+ *     session_number: Ordinal number (1, 2, 3...)
+ *     session_date: Date of the session
+ *     debrief: Summary of what happened
+ *     mission_plan: Mission prep data highlighted during the session
+ *     lifecycle_checkpoints: Downtime → Brief → Prep → Mission → Debrief tracking
+ *     active_missions: Missions currently in progress
+ *     reserves_earned: Reserves gained from this session as dict list
+ *     downtime_plans: Downtime actions taken as dict list
+ */
+export interface Session {
+  id: Id12;
+  session_number: SessionNumber;
+  session_date?: SessionDate;
+  debrief?: Debrief;
+  /**
+   * Mission prep metadata tied to this session
+   */
+  mission_plan?: MissionPrepPlan | null;
+  /**
+   * Recorded mission outcome / debrief summary
+   */
+  mission_outcome?: MissionOutcomeReport | null;
+  lifecycle_checkpoints?: LifecycleCheckpoints;
+  active_missions?: ActiveMissions;
+  reserves_earned?: ReservesEarned1;
+  downtime_plans?: DowntimePlans;
+  [k: string]: unknown;
+}
+/**
+ * Mission prep metadata surfaced in the lobby UI.
+ */
+export interface MissionPrepPlan {
+  mission_name: MissionName;
+  operation_code?: OperationCode;
+  theater?: Theater;
+  objectives?: Objectives;
+  stakes?: MissionStakesBrief | null;
+  reserves?: Reserves;
+  briefing_notes?: BriefingNotes;
+  support_assets?: SupportAssets;
+  threats?: Threats;
+  [k: string]: unknown;
+}
+/**
+ * Lightweight mission objective summary for lobby/session prep.
+ */
+export interface MissionObjectiveBrief {
+  id: Id13;
+  title: Title;
+  success_condition: SuccessCondition;
+  priority?: Priority;
+  related_objective_id?: RelatedObjectiveId;
+  [k: string]: unknown;
+}
+/**
+ * Summarizes mission stakes per PR2 guidance (lines ~2835-2841).
+ */
+export interface MissionStakesBrief {
+  stakes_type: StakesType;
+  summary: Summary;
+  consequences_success?: ConsequencesSuccess;
+  consequences_failure?: ConsequencesFailure;
+  consequences_partial?: ConsequencesPartial;
+  [k: string]: unknown;
+}
+/**
+ * Tracks reserve usage/assignments planned for a mission.
+ */
+export interface ReservePlanEntry {
+  reserve_id: ReserveId1;
+  assigned_pilot_id?: AssignedPilotId;
+  usage_notes?: UsageNotes;
+  status?: Status9;
+  [k: string]: unknown;
+}
+/**
+ * Summary of a mission's outcome captured during debrief.
+ */
+export interface MissionOutcomeReport {
+  outcome: Outcome1;
+  completion_score?: CompletionScore;
+  debrief_notes?: DebriefNotes;
+  reserves_spent?: ReservesSpent;
+  reserves_earned?: ReservesEarned;
+  rewards?: Rewards;
+  recorded_at?: RecordedAt;
+  [k: string]: unknown;
+}
+/**
+ * Represents one checkpoint in the Downtime → Brief → Prep → Mission → Debrief loop.
+ */
+export interface SessionLifecycleCheckpoint {
+  phase: Phase;
+  status?: Status10;
+  summary?: Summary1;
+  gm_notes?: GmNotes;
+  completed_at?: CompletedAt;
+  issues?: Issues2;
+  reserves_spent?: ReservesSpent1;
+  [k: string]: unknown;
+}
+/**
+ * Tracks a mission that is in-progress during a session.
+ *
+ * Attributes:
+ *     mission_state: The current state of the mission as serialized dict
+ *     participating_pilot_ids: Pilots currently engaged in this mission
+ *     started_at: When the mission was started
+ */
+export interface ActiveSessionMission {
+  mission_state: MissionState;
+  participating_pilot_ids?: ParticipatingPilotIds;
+  started_at?: StartedAt;
+  [k: string]: unknown;
+}
+/**
+ * Mission state as serialized dict
+ */
+export interface MissionState {
+  [k: string]: unknown;
+}
+/**
+ * Links a pilot to their mech build, persisting across sessions.
+ *
+ * Attributes:
+ *     pilot_id: Reference to the pilot (matches Pilot.id)
+ *     mech_id: Unique identifier for this mech (e.g., "pilot_callsign-mech_name")
+ *     mech_name: Human-readable name for the mech
+ *     mech_build: Full mech loadout as serialized dict
+ *     is_active: Whether this is the pilot's current active mech
+ */
+export interface PilotMechAssignment {
+  pilot_id: PilotId1;
+  mech_id: MechId;
+  mech_name: MechName;
+  mech_build: MechBuild1;
+  is_active?: IsActive;
+  [k: string]: unknown;
+}
+/**
+ * Full mech loadout as serialized dict
+ */
+export interface MechBuild1 {
+  [k: string]: unknown;
+}
+/**
+ * Records a completed mission for campaign history.
+ *
+ * Attributes:
+ *     mission_id: Reference to the mission definition
+ *     session_id: Which session this mission was completed in
+ *     mission_name: Display name of the mission
+ *     outcome: Mission outcome (success, partial, failure, catastrophic)
+ *     completion_score: 0.0-1.0 progress score
+ *     mission_date: When the mission was completed
+ *     participating_pilot_ids: Pilots who took part
+ *     debrief_notes: Optional notes about the mission
+ */
+export interface CampaignMissionRecord {
+  mission_id: MissionId;
+  session_id: SessionId;
+  mission_name: MissionName1;
+  outcome: Outcome2;
+  completion_score?: CompletionScore1;
+  mission_date?: MissionDate;
+  participating_pilot_ids?: ParticipatingPilotIds1;
+  debrief_notes?: DebriefNotes1;
+  reserves_spent?: ReservesSpent2;
+  reserves_earned?: ReservesEarned2;
+  rewards?: Rewards1;
+  [k: string]: unknown;
+}
+/**
+ * Stores onboarding prompts per PR2 tables (Who are we? patrons, etc.).
+ */
+export interface CampaignIdentity {
+  squad_name?: SquadName;
+  patron?: Patron;
+  who_we_are?: WhoWeAre;
+  relationships?: Relationships;
+  themes?: Themes;
+  gm_prompts?: GmPrompts;
+  [k: string]: unknown;
+}
+/**
+ * Active lobby plan that gates combat launch.
+ */
+export interface CampaignLobbyState {
+  mission_plan: MissionPrepPlan1;
+  assigned_member_ids?: AssignedMemberIds;
+  preferred_pilot_count?: PreferredPilotCount;
+  min_pilot_count?: MinPilotCount;
+  gm_notes?: GmNotes1;
+  status?: Status11;
+  last_ready_check?: LastReadyCheck;
+  combat_session_id?: CombatSessionId;
+  [k: string]: unknown;
+}
+/**
+ * Mission prep plan surfaced to the table
+ */
+export interface MissionPrepPlan1 {
+  mission_name: MissionName;
+  operation_code?: OperationCode;
+  theater?: Theater;
+  objectives?: Objectives;
+  stakes?: MissionStakesBrief | null;
+  reserves?: Reserves;
+  briefing_notes?: BriefingNotes;
+  support_assets?: SupportAssets;
+  threats?: Threats;
+  [k: string]: unknown;
+}
+/**
  * Accuracy and difficulty dice pool for a roll.
  */
 export interface AccuracyDifficulty {
@@ -33068,9 +33668,9 @@ export interface NarrativeGoalOutcome {
  * Condition that must be met to complete a narrative goal.
  */
 export interface NarrativeGoalCondition {
-  id: Id11;
+  id: Id14;
   condition_type: ConditionType;
-  description: Description2;
+  description: Description3;
   required_tier?: RequiredTier;
   required_skill?: RequiredSkill;
   required_amount?: RequiredAmount;
@@ -33081,8 +33681,8 @@ export interface NarrativeGoalCondition {
  * Goal definition for narrative combat.
  */
 export interface NarrativeGoal {
-  id: Id12;
-  description: Description3;
+  id: Id15;
+  description: Description4;
   success_conditions?: SuccessConditions;
   successes_required?: SuccessesRequired;
   failure_limit?: FailureLimit;
@@ -33104,7 +33704,7 @@ export interface NarrativeGoalAttempt {
   consequence_suffered?: ConsequenceSuffered;
   complication_type?: ComplicationType;
   complication_description?: ComplicationDescription1;
-  pilot_id?: PilotId1;
+  pilot_id?: PilotId2;
   skill_used?: SkillUsed;
   action_id?: ActionId1;
   action_description?: ActionDescription;
@@ -33115,7 +33715,7 @@ export interface NarrativeGoalAttempt {
  */
 export interface NarrativeGoalState {
   goal: NarrativeGoal;
-  status?: Status9;
+  status?: Status12;
   successes?: Successes;
   failures?: Failures;
   attempts?: Attempts;
@@ -33142,7 +33742,7 @@ export interface NarrativeGoalTracker {
  */
 export interface NarrativeResolutionRequirement {
   requirement_type: RequirementType;
-  description: Description4;
+  description: Description5;
   required_tier?: RequiredTier1;
   required_skill?: RequiredSkill1;
   required_amount?: RequiredAmount1;
@@ -33152,9 +33752,9 @@ export interface NarrativeResolutionRequirement {
  * Complication that persists in narrative combat until resolved.
  */
 export interface NarrativeComplication {
-  id: Id13;
+  id: Id16;
   complication_type: ComplicationType1;
-  description: Description5;
+  description: Description6;
   severity?: Severity3;
   established_before_roll?: EstablishedBeforeRoll;
   trigger?: Trigger24;
@@ -33168,7 +33768,7 @@ export interface NarrativeComplication {
  */
 export interface NarrativeComplicationState {
   complication: NarrativeComplication;
-  status?: Status10;
+  status?: Status13;
   resolved_by?: ResolvedBy;
   resolution_notes?: ResolutionNotes;
   [k: string]: unknown;
@@ -33187,7 +33787,7 @@ export interface NarrativeCombatState {
  */
 export interface WeaponProfile {
   profile_id: ProfileId;
-  name: Name27;
+  name: Name28;
   damage_type?: DamageType8;
   ranges?: Ranges1;
   damage?: Damage1;
@@ -33269,8 +33869,8 @@ export interface DynamicWeaponDefinition {
  * Weapon-like profile that does not count as a weapon or occupy a mount.
  */
 export interface MountlessWeaponDefinition {
-  id: Id14;
-  name: Name28;
+  id: Id17;
+  name: Name29;
   profile: WeaponProfile;
   action_type?: ActionType15;
   target?: Target83;
@@ -33289,8 +33889,8 @@ export interface MountlessWeaponDefinition {
  * Definition for a mech weapon.
  */
 export interface MechWeaponDefinition {
-  id: Id15;
-  name: Name29;
+  id: Id18;
+  name: Name30;
   size: Size10;
   weapon_type: WeaponType1;
   damage_type?: DamageType10;
@@ -33311,8 +33911,8 @@ export interface MechWeaponDefinition {
  * Definition for a mech system or chassis mod.
  */
 export interface MechSystemDefinition {
-  id: Id16;
-  name: Name30;
+  id: Id19;
+  name: Name31;
   system_type?: SystemType;
   sp_cost?: SpCost1;
   license_id?: LicenseId2;
@@ -33340,7 +33940,7 @@ export interface SystemTag {
  * Grenade option for a system.
  */
 export interface GrenadePayload {
-  name: Name31;
+  name: Name32;
   range: Range13;
   area: AreaEffect;
   [k: string]: unknown;
@@ -33366,7 +33966,7 @@ export interface AreaEffect {
  * Mine option for a system.
  */
 export interface MinePayload {
-  name: Name32;
+  name: Name33;
   area: AreaEffect;
   detonation?: Detonation;
   can_attach_to_terrain?: CanAttachToTerrain;
@@ -33407,7 +34007,7 @@ export interface DeployableObject {
  * Drone system payload.
  */
 export interface DronePayload {
-  name: Name33;
+  name: Name34;
   size: Size13;
   hp?: Hp4;
   evasion?: Evasion4;
@@ -33427,7 +34027,7 @@ export interface DronePayload {
  * Reaction granted by a drone.
  */
 export interface DroneReaction {
-  name: Name34;
+  name: Name35;
   trigger: Trigger25;
   range: Range15;
   damage: DamageSpec;
@@ -33446,8 +34046,8 @@ export interface MountSlot {
  * Core system ability unique to a frame.
  */
 export interface CoreSystemDefinition {
-  id: Id17;
-  name: Name35;
+  id: Id20;
+  name: Name36;
   effects?: MechanicalEffect;
   mountless_weapons?: MountlessWeapons;
   uses_per_mission?: UsesPerMission;
@@ -33475,8 +34075,8 @@ export interface MechFrameBaseStats {
  * Definition for a mech frame.
  */
 export interface MechFrameDefinition {
-  id: Id18;
-  name: Name36;
+  id: Id21;
+  name: Name37;
   manufacturer: Manufacturer2;
   license_id?: LicenseId3;
   license_rank?: LicenseRank2;
@@ -33491,7 +34091,7 @@ export interface MechFrameDefinition {
  * Passive trait provided by a mech frame.
  */
 export interface FrameTrait {
-  name: Name37;
+  name: Name38;
   effects?: MechanicalEffect;
   [k: string]: unknown;
 }
@@ -33537,7 +34137,7 @@ export interface SystemPointRules {
 /**
  * A mech build derived from a frame and loadout.
  */
-export interface MechBuild1 {
+export interface MechBuild2 {
   frame_id: FrameId2;
   weapons?: Weapons1;
   systems?: Systems1;
@@ -33557,7 +34157,7 @@ export interface ValidationIssue2 {
  */
 export interface MechBuildValidation {
   valid: Valid2;
-  issues?: Issues2;
+  issues?: Issues3;
   limited_uses?: LimitedUseSummary;
   overcharge_cost_caps?: OverchargeCostCaps2;
   ai_system_limit?: AiSystemLimit1;
@@ -33627,7 +34227,7 @@ export interface TerrainMap {
  * Definition for a combat status or condition.
  */
 export interface StatusDefinition {
-  status: Status11;
+  status: Status14;
   category: Category2;
   effects?: StatusEffect;
   clear_triggers?: ClearTriggers;
@@ -33896,7 +34496,7 @@ export interface D6Range {
  * Outcome detail for structure damage.
  */
 export interface StructureOutcomeType {
-  name: Name38;
+  name: Name39;
   impaired_until_end_next_turn?: ImpairedUntilEndNextTurn;
   destroy_mount?: DestroyMount;
   destroy_system?: DestroySystem;
@@ -33953,7 +34553,7 @@ export interface OverheatTableEntry {
  * Outcome detail for overheat checks.
  */
 export interface OverheatOutcomeType {
-  name: Name39;
+  name: Name40;
   impaired_until_end_next_turn?: ImpairedUntilEndNextTurn1;
   exposed_until_cleared?: ExposedUntilCleared;
   meltdown_immediate?: MeltdownImmediate;
@@ -34210,8 +34810,8 @@ export interface LiftDragRules {
  * Rule definition for a combat action.
  */
 export interface ActionRule {
-  id: Id19;
-  name: Name40;
+  id: Id22;
+  name: Name41;
   action_type: ActionType16;
   alternate_action_types?: AlternateActionTypes;
   scope?: Scope;
@@ -34408,7 +35008,7 @@ export interface JockeyRule {
  * Jockey follow-up option.
  */
 export interface JockeyOption {
-  name: Name41;
+  name: Name42;
   inflicts_conditions?: InflictsConditions1;
   heat?: Heat;
   damage?: Damage3;
@@ -34491,8 +35091,8 @@ export interface CombatResources {
  * and convert to CombatantState using the helper functions.
  */
 export interface CombatantState {
-  id: Id20;
-  name: Name42;
+  id: Id23;
+  name: Name43;
   side: Side;
   kind: Kind;
   stats: CombatStats;
@@ -34869,8 +35469,8 @@ export interface Deployables {
  * Deployables: 10 HP/size, evasion 5, default armor 0
  */
 export interface DeployableState {
-  id: Id21;
-  name: Name43;
+  id: Id24;
+  name: Name44;
   kind: Kind1;
   owner_id?: OwnerId;
   position: HexPosition;
@@ -34881,7 +35481,7 @@ export interface DeployableState {
   evasion?: Evasion7;
   cover?: Cover6;
   is_destroyed?: IsDestroyed;
-  is_active?: IsActive;
+  is_active?: IsActive1;
   can_act?: CanAct;
   can_move?: CanMove;
   acts_on_owner_turn?: ActsOnOwnerTurn;
@@ -34908,7 +35508,7 @@ export interface CombatValidationIssue {
  */
 export interface CombatValidation {
   valid: Valid3;
-  issues?: Issues3;
+  issues?: Issues4;
   [k: string]: unknown;
 }
 /**

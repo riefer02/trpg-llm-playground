@@ -10,6 +10,14 @@ from core.shared.campaign.campaign import (
     PilotMechAssignment,
     CampaignMissionRecord,
     ActiveSessionMission,
+    MissionPrepPlan,
+    CampaignIdentity,
+    CampaignLobbyState,
+    MissionObjectiveBrief,
+    MissionStakesBrief,
+    ReservePlanEntry,
+    SessionLifecycleCheckpoint,
+    MissionOutcomeReport,
 )
 
 __all__ = [
@@ -18,4 +26,12 @@ __all__ = [
     "PilotMechAssignment",
     "CampaignMissionRecord",
     "ActiveSessionMission",
+    "MissionPrepPlan",
+    "CampaignIdentity",
+    "CampaignLobbyState",
+    "MissionObjectiveBrief",
+    "MissionStakesBrief",
+    "ReservePlanEntry",
+    "SessionLifecycleCheckpoint",
+    "MissionOutcomeReport",
 ]

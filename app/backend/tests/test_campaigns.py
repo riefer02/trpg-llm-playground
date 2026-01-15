@@ -65,6 +65,8 @@ async def test_campaign_invite_and_character_flow(client: AsyncClient) -> None:
     assert attach_resp.status_code == 200
     attached_detail = attach_resp.json()
     assert any(c["character_id"] == character_id for c in attached_detail["characters"])
+    assert "readiness_summary" in attached_detail
+    assert attached_detail["seat_warning"] is None
 
     # Pilot marks themselves ready
     member_id = next(
@@ -84,6 +86,52 @@ async def test_campaign_invite_and_character_flow(client: AsyncClient) -> None:
     )
     assert char_detail.status_code == 200
     assert campaign_id in char_detail.json()["campaign_ids"]
+
+
+@pytest.mark.asyncio
+async def test_campaign_invite_preview_and_management(client: AsyncClient) -> None:
+    owner_headers = {"X-User-Id": "invite_mgr"}
+    viewer_headers = {"X-User-Id": "invite_viewer"}
+
+    create_resp = await client.post(
+        "/api/campaigns",
+        json={"name": "Preview Squad"},
+        headers=owner_headers,
+    )
+    campaign_id = create_resp.json()["id"]
+
+    invite_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites",
+        json={"role": "player"},
+        headers=owner_headers,
+    )
+    invite = invite_resp.json()
+
+    preview_resp = await client.get(
+        f"/api/campaigns/invites/{invite['token']}/preview",
+        headers=viewer_headers,
+    )
+    assert preview_resp.status_code == 200
+    preview_data = preview_resp.json()
+    assert preview_data["campaign_name"] == "Preview Squad"
+    assert preview_data["status"] == "pending"
+
+    revoke_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites/{invite['id']}/revoke",
+        headers=owner_headers,
+    )
+    assert revoke_resp.status_code == 200
+    assert revoke_resp.json()["status"] == "revoked"
+
+    resend_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites/{invite['id']}/resend",
+        json={"expires_in_hours": 2},
+        headers=owner_headers,
+    )
+    assert resend_resp.status_code == 200
+    resend_data = resend_resp.json()
+    assert resend_data["status"] == "pending"
+    assert resend_data["expires_at"] is not None
 
 
 @pytest.mark.asyncio
@@ -111,3 +159,206 @@ async def test_attach_requires_membership(client: AsyncClient) -> None:
         headers=outsider_headers,
     )
     assert attach_resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_campaign_lobby_launch_flow(client: AsyncClient) -> None:
+    owner_headers = {"X-User-Id": "owner_lobby"}
+    pilot_headers = {"X-User-Id": "pilot_lobby"}
+
+    # Create campaign and update identity
+    create_resp = await client.post(
+        "/api/campaigns",
+        json={"name": "Echo Company"},
+        headers=owner_headers,
+    )
+    assert create_resp.status_code == 201
+    campaign_id = create_resp.json()["id"]
+
+    identity_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/identity",
+        json={"squad_name": "Echo", "patron": "Union Navy"},
+        headers=owner_headers,
+    )
+    assert identity_resp.status_code == 200
+    assert identity_resp.json()["data"]["identity"]["patron"] == "Union Navy"
+
+    # Invite and accept pilot
+    invite_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites",
+        json={"role": "player"},
+        headers=owner_headers,
+    )
+    invite_token = invite_resp.json()["token"]
+
+    accept_resp = await client.post(
+        f"/api/campaigns/invites/{invite_token}/accept",
+        headers=pilot_headers,
+    )
+    assert accept_resp.status_code == 200
+
+    # Pilot character setup
+    char_resp = await client.post(
+        "/api/characters",
+        json={"callsign": "FLARE"},
+        headers=pilot_headers,
+    )
+    character_id = char_resp.json()["id"]
+
+    attach_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/characters",
+        json={"character_id": character_id},
+        headers=pilot_headers,
+    )
+    member_id = next(
+        m["id"] for m in attach_resp.json()["members"] if m["user_id"] == "pilot_lobby"
+    )
+
+    ready_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/members/{member_id}/settings",
+        json={"ready": True, "assigned_character_id": character_id},
+        headers=pilot_headers,
+    )
+    assert ready_resp.status_code == 200
+
+    # Configure lobby with preferred pilot count of 1 (to trigger cap warning on extra invites)
+    lobby_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/lobby",
+        json={
+            "mission_name": "Operation Glass",
+            "assigned_member_ids": [member_id],
+            "preferred_pilot_count": 1,
+            "min_pilot_count": 1,
+            "objectives": [
+                {
+                    "id": "obj-1",
+                    "title": "Secure the relay",
+                    "success_condition": "Hold the point for 3 rounds",
+                }
+            ],
+            "stakes": {
+                "stakes_type": "personal",
+                "summary": "Keep the colony online",
+            },
+        },
+        headers=owner_headers,
+    )
+    assert lobby_resp.status_code == 200
+
+    # Attempting another player invite should now hit the soft cap
+    cap_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites",
+        json={"role": "player"},
+        headers=owner_headers,
+    )
+    assert cap_resp.status_code == 409
+
+    # Launch mission
+    launch_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/launch",
+        json={"environment": "standard"},
+        headers=owner_headers,
+    )
+    assert launch_resp.status_code == 200
+    launch_data = launch_resp.json()
+    assert launch_data["data"]["lobby_state"]["status"] == "launched"
+    assert launch_data["readiness_summary"]["can_launch"] is True
+    assert "issues" in launch_data["readiness_summary"]
+    assert any(
+        "Mission already launched" in issue
+        for issue in launch_data["readiness_summary"]["issues"]
+    )
+    assert launch_data["data"]["lobby_state"]["combat_session_id"] is not None
+
+    # Update lifecycle phase for the newly created session
+    session_id = launch_data["data"]["sessions"][-1]["id"]
+    lifecycle_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/sessions/{session_id}/lifecycle",
+        json={"phase": "mission", "status": "complete", "summary": "Relayed"},
+        headers=owner_headers,
+    )
+    assert lifecycle_resp.status_code == 200
+    lifecycle_data = lifecycle_resp.json()["data"]["sessions"][-1]
+    mission_checkpoint = next(
+        c for c in lifecycle_data["lifecycle_checkpoints"] if c["phase"] == "mission"
+    )
+    assert mission_checkpoint["status"] == "complete"
+
+
+@pytest.mark.asyncio
+async def test_campaign_session_outcome_updates_history(client: AsyncClient) -> None:
+    owner_headers = {"X-User-Id": "outcome_owner"}
+    pilot_headers = {"X-User-Id": "outcome_pilot"}
+
+    create_resp = await client.post(
+        "/api/campaigns",
+        json={"name": "Outcome Co"},
+        headers=owner_headers,
+    )
+    campaign_id = create_resp.json()["id"]
+
+    invite_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites",
+        json={"role": "player"},
+        headers=owner_headers,
+    )
+    invite_token = invite_resp.json()["token"]
+    await client.post(
+        f"/api/campaigns/invites/{invite_token}/accept",
+        headers=pilot_headers,
+    )
+
+    char_resp = await client.post(
+        "/api/characters",
+        json={"callsign": "SPOT"},
+        headers=pilot_headers,
+    )
+    character_id = char_resp.json()["id"]
+    attach_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/characters",
+        json={"character_id": character_id},
+        headers=pilot_headers,
+    )
+    member_id = next(
+        m["id"]
+        for m in attach_resp.json()["members"]
+        if m["user_id"] == "outcome_pilot"
+    )
+    await client.post(
+        f"/api/campaigns/{campaign_id}/members/{member_id}/settings",
+        json={"ready": True, "assigned_character_id": character_id},
+        headers=pilot_headers,
+    )
+    await client.post(
+        f"/api/campaigns/{campaign_id}/lobby",
+        json={
+            "mission_name": "Operation Outcome",
+            "assigned_member_ids": [member_id],
+            "min_pilot_count": 1,
+            "preferred_pilot_count": 1,
+        },
+        headers=owner_headers,
+    )
+    launch_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/launch",
+        json={},
+        headers=owner_headers,
+    )
+    session_id = launch_resp.json()["data"]["sessions"][-1]["id"]
+
+    outcome_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/sessions/{session_id}/outcome",
+        json={
+            "outcome": "success",
+            "completion_score": 0.8,
+            "debrief_notes": "Objective secured",
+            "rewards": ["+1 reserve"],
+        },
+        headers=owner_headers,
+    )
+    assert outcome_resp.status_code == 200
+    data = outcome_resp.json()
+    session_record = data["data"]["sessions"][-1]
+    assert session_record["mission_outcome"]["outcome"] == "success"
+    assert data["data"]["mission_history"][-1]["rewards"] == ["+1 reserve"]
+    assert data["data"]["lobby_state"]["status"] == "cooldown"

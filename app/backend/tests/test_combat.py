@@ -349,11 +349,96 @@ async def test_combatant_sides(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_combat_session_complete_updates_campaign(client: AsyncClient) -> None:
+    owner_headers = {"X-User-Id": "combat_owner"}
+    pilot_headers = {"X-User-Id": "combat_pilot"}
+
+    campaign_resp = await client.post(
+        "/api/campaigns",
+        json={"name": "Combat Link"},
+        headers=owner_headers,
+    )
+    campaign_id = campaign_resp.json()["id"]
+    invite_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites",
+        json={"role": "player"},
+        headers=owner_headers,
+    )
+    invite_token = invite_resp.json()["token"]
+    await client.post(
+        f"/api/campaigns/invites/{invite_token}/accept",
+        headers=pilot_headers,
+    )
+    character_resp = await client.post(
+        "/api/characters",
+        json={"callsign": "ANCHOR"},
+        headers=pilot_headers,
+    )
+    character_id = character_resp.json()["id"]
+    attach_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/characters",
+        json={"character_id": character_id},
+        headers=pilot_headers,
+    )
+    member_id = next(
+        m["id"] for m in attach_resp.json()["members"] if m["user_id"] == "combat_pilot"
+    )
+    await client.post(
+        f"/api/campaigns/{campaign_id}/members/{member_id}/settings",
+        json={"ready": True, "assigned_character_id": character_id},
+        headers=pilot_headers,
+    )
+    await client.post(
+        f"/api/campaigns/{campaign_id}/lobby",
+        json={
+            "mission_name": "Operation Clash",
+            "assigned_member_ids": [member_id],
+            "min_pilot_count": 1,
+            "preferred_pilot_count": 1,
+        },
+        headers=owner_headers,
+    )
+    launch_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/launch",
+        json={},
+        headers=owner_headers,
+    )
+    combat_session_id = launch_resp.json()["data"]["lobby_state"]["combat_session_id"]
+    assert combat_session_id is not None
+
+    complete_resp = await client.post(
+        f"/api/combat/{combat_session_id}/complete",
+        json={
+            "outcome": "success",
+            "completion_score": 0.7,
+            "debrief_notes": "Secured zone",
+            "rewards": ["supply cache"],
+        },
+        headers=owner_headers,
+    )
+    assert complete_resp.status_code == 200
+    assert complete_resp.json()["status"] == "completed"
+
+    detail_resp = await client.get(
+        f"/api/campaigns/{campaign_id}",
+        headers=owner_headers,
+    )
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()["data"]
+    assert detail["sessions"][-1]["mission_outcome"]["outcome"] == "success"
+    assert detail["mission_history"][-1]["rewards"] == ["supply cache"]
+    assert detail["lobby_state"]["status"] == "cooldown"
+
+
+@pytest.mark.asyncio
 async def test_invalid_combatant_rejected(client: AsyncClient) -> None:
     """Test that invalid combatant data is rejected by core validation."""
     # Missing required fields
-    invalid_combatant = {"id": "bad", "name": "Bad Mech"}  # Missing stats, resources, etc.
-    
+    invalid_combatant = {
+        "id": "bad",
+        "name": "Bad Mech",
+    }  # Missing stats, resources, etc.
+
     response = await client.post(
         "/api/combat",
         json=make_session_create(combatants=[invalid_combatant]),

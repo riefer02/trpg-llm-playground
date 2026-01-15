@@ -1,0 +1,74 @@
+{
+  "description": "Summary of a mission's outcome captured during debrief.",
+  "properties": {
+    "outcome": {
+      "description": "Overall mission result communicated to the table",
+      "enum": [
+        "success",
+        "partial",
+        "failure",
+        "catastrophic"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "completion_score": {
+      "default": 0.0,
+      "description": "0-1 scale for partial success tracking",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Completion Score",
+      "type": "number"
+    },
+    "debrief_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Narrative debrief shared with the table",
+      "title": "Debrief Notes"
+    },
+    "reserves_spent": {
+      "description": "Reserves consumed during the mission",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Reserves Spent",
+      "type": "array"
+    },
+    "reserves_earned": {
+      "description": "Reserves awarded after the mission",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Reserves Earned",
+      "type": "array"
+    },
+    "rewards": {
+      "description": "Specific rewards, loot, or consequences",
+      "items": {
+        "type": "string"
+      },
+      "title": "Rewards",
+      "type": "array"
+    },
+    "recorded_at": {
+      "description": "Timestamp when this outcome was recorded",
+      "format": "date-time",
+      "title": "Recorded At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "outcome"
+  ],
+  "title": "MissionOutcomeReport",
+  "type": "object"
+}

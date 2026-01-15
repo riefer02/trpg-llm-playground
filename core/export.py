@@ -253,6 +253,18 @@ from core.character import (
     Character,
     MechConfiguration,
 )
+from core.shared.campaign import (
+    Campaign,
+    Session,
+    MissionPrepPlan,
+    CampaignIdentity,
+    CampaignLobbyState,
+    MissionObjectiveBrief,
+    MissionStakesBrief,
+    ReservePlanEntry,
+    SessionLifecycleCheckpoint,
+    MissionOutcomeReport,
+)
 
 
 # All exportable models
@@ -294,6 +306,17 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     # Character domain (unified pilot + mech)
     "Character": Character,
     "MechConfiguration": MechConfiguration,
+    # Campaign persistence
+    "Campaign": Campaign,
+    "Session": Session,
+    "MissionPrepPlan": MissionPrepPlan,
+    "CampaignIdentity": CampaignIdentity,
+    "CampaignLobbyState": CampaignLobbyState,
+    "MissionObjectiveBrief": MissionObjectiveBrief,
+    "MissionStakesBrief": MissionStakesBrief,
+    "ReservePlanEntry": ReservePlanEntry,
+    "SessionLifecycleCheckpoint": SessionLifecycleCheckpoint,
+    "MissionOutcomeReport": MissionOutcomeReport,
     # Shared - Dice
     "DiceExpression": DiceExpression,
     # Shared - Effects

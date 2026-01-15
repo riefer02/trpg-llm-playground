@@ -1,0 +1,63 @@
+{
+  "description": "Summarizes mission stakes per PR2 guidance (lines ~2835-2841).",
+  "properties": {
+    "stakes_type": {
+      "enum": [
+        "personal",
+        "faction",
+        "immediate",
+        "gradual",
+        "custom"
+      ],
+      "title": "Stakes Type",
+      "type": "string"
+    },
+    "summary": {
+      "description": "Narrative description of the stakes",
+      "title": "Summary",
+      "type": "string"
+    },
+    "consequences_success": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Consequences Success"
+    },
+    "consequences_failure": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Consequences Failure"
+    },
+    "consequences_partial": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Consequences Partial"
+    }
+  },
+  "required": [
+    "stakes_type",
+    "summary"
+  ],
+  "title": "MissionStakesBrief",
+  "type": "object"
+}

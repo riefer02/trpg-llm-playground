@@ -1,0 +1,51 @@
+{
+  "description": "Lightweight mission objective summary for lobby/session prep.",
+  "properties": {
+    "id": {
+      "description": "Local identifier for this objective",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "description": "Display title for the objective",
+      "title": "Title",
+      "type": "string"
+    },
+    "success_condition": {
+      "description": "What success looks like for this objective",
+      "title": "Success Condition",
+      "type": "string"
+    },
+    "priority": {
+      "default": "primary",
+      "description": "Priority communicated to players",
+      "enum": [
+        "primary",
+        "secondary",
+        "optional"
+      ],
+      "title": "Priority",
+      "type": "string"
+    },
+    "related_objective_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional reference to core.shared.scenario MissionObjective.id",
+      "title": "Related Objective Id"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "success_condition"
+  ],
+  "title": "MissionObjectiveBrief",
+  "type": "object"
+}

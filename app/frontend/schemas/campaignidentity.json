@@ -1,0 +1,49 @@
+{
+  "description": "Stores onboarding prompts per PR2 tables (Who are we? patrons, etc.).",
+  "properties": {
+    "squad_name": {
+      "default": "",
+      "description": "What the squad calls itself",
+      "title": "Squad Name",
+      "type": "string"
+    },
+    "patron": {
+      "default": "",
+      "description": "Primary patron or employer",
+      "title": "Patron",
+      "type": "string"
+    },
+    "who_we_are": {
+      "default": "",
+      "description": "Elevator pitch for the squad",
+      "title": "Who We Are",
+      "type": "string"
+    },
+    "relationships": {
+      "description": "Key relationships/prompts",
+      "items": {
+        "type": "string"
+      },
+      "title": "Relationships",
+      "type": "array"
+    },
+    "themes": {
+      "description": "Tone or themes",
+      "items": {
+        "type": "string"
+      },
+      "title": "Themes",
+      "type": "array"
+    },
+    "gm_prompts": {
+      "description": "Reference prompts for the GM",
+      "items": {
+        "type": "string"
+      },
+      "title": "Gm Prompts",
+      "type": "array"
+    }
+  },
+  "title": "CampaignIdentity",
+  "type": "object"
+}
