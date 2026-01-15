@@ -80,6 +80,30 @@ export type {
   PilotValidationResponse,
 } from './pilots'
 
+// Campaign hooks
+export {
+  useCampaigns,
+  useCampaign,
+  useCreateCampaign,
+  useCreateCampaignInvite,
+  useAcceptCampaignInvite,
+  useAttachCampaignCharacter,
+  useUpdateCampaignMemberSettings,
+  campaignKeys,
+} from './campaigns'
+export type {
+  CampaignSummary,
+  CampaignDetail,
+  CampaignListResponse,
+  CampaignCreateRequest,
+  CampaignInviteCreateRequest,
+  CampaignCharacterAttachRequest,
+  CampaignMemberSettingsRequest,
+  CampaignMember,
+  CampaignInvite,
+  CampaignCharacter,
+} from './campaigns'
+
 // Re-export generated core types for convenience
 // These are the source of truth - use these for domain data
 export type {

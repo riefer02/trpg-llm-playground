@@ -7,6 +7,7 @@ from app.backend.api.pilots import router as pilots_router
 from app.backend.api.characters import router as characters_router
 from app.backend.api.combat import router as combat_router
 from app.backend.api.compendium import router as compendium_router
+from app.backend.api.campaigns import router as campaigns_router
 
 api_router = APIRouter()
 
@@ -16,3 +17,4 @@ api_router.include_router(compendium_router)  # Reference data
 api_router.include_router(characters_router)  # Primary user-facing
 api_router.include_router(pilots_router)  # Internal primitive
 api_router.include_router(combat_router)
+api_router.include_router(campaigns_router)

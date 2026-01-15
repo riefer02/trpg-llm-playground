@@ -8,7 +8,7 @@ common query patterns.
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import Column, JSON
+from sqlalchemy import Column, JSON, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -26,11 +26,11 @@ class TimestampMixin(SQLModel):
 
 class PilotDB(TimestampMixin, table=True):
     """Pilot storage with full JSON blob.
-    
+
     The `data` column contains the full core.pilot.Pilot model serialized
     as JSON. This allows the frontend to work with the complete pilot data
     while the database handles persistence.
-    
+
     Indexed columns (id, name, user_id, campaign_id) support common queries
     without needing to parse the JSON.
     """
@@ -46,7 +46,7 @@ class PilotDB(TimestampMixin, table=True):
 
 class MechDB(TimestampMixin, table=True):
     """Mech storage with loadout data.
-    
+
     Similar to PilotDB, stores the full mech configuration as JSON
     with indexed columns for common queries.
     """
@@ -68,9 +68,62 @@ class CampaignDB(TimestampMixin, table=True):
 
     id: str = Field(primary_key=True)
     name: str = Field(index=True)
-    description: str = ""
-    gm_user_id: str = Field(index=True)
+    description: str = Field(default="")
+    user_id: str = Field(index=True)
+    status: str = Field(default="active", index=True)
+    visibility: str = Field(default="private")
+    data: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     settings: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+
+class CampaignMembershipDB(TimestampMixin, table=True):
+    """Campaign membership linking users to campaigns with roles."""
+
+    __tablename__ = "campaign_memberships"
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "user_id", name="uq_campaign_member"),
+    )
+
+    id: str = Field(primary_key=True)
+    campaign_id: str = Field(index=True)
+    user_id: str = Field(index=True)
+    role: str = Field(default="player")  # owner, co_gm, player
+    status: str = Field(default="active", index=True)
+    ready_state: str = Field(default="not_ready")  # ready, not_ready
+    assigned_character_id: str | None = Field(default=None, index=True)
+
+
+class CampaignInviteDB(TimestampMixin, table=True):
+    """Shareable invite links for campaigns."""
+
+    __tablename__ = "campaign_invites"
+    __table_args__ = (UniqueConstraint("token", name="uq_campaign_invite_token"),)
+
+    id: str = Field(primary_key=True)
+    campaign_id: str = Field(index=True)
+    invited_by_user_id: str = Field(index=True)
+    role: str = Field(default="player")
+    token: str = Field(index=True)
+    status: str = Field(default="pending")  # pending, accepted, revoked, expired
+    invited_email: str | None = None
+    expires_at: datetime | None = None
+    redeemed_by_user_id: str | None = Field(default=None, index=True)
+
+
+class CampaignCharacterDB(TimestampMixin, table=True):
+    """Associates characters with campaigns (many-to-many)."""
+
+    __tablename__ = "campaign_characters"
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "character_id", name="uq_campaign_character"),
+    )
+
+    id: str = Field(primary_key=True)
+    campaign_id: str = Field(index=True)
+    character_id: str = Field(index=True)
+    added_by_user_id: str = Field(index=True)
+    role: str = Field(default="player")  # player, npc
+    notes: str = Field(default="")
 
 
 class CharacterDB(TimestampMixin, table=True):
@@ -97,11 +150,11 @@ CombatSessionStatus = str  # "active", "paused", "completed", "abandoned"
 
 class CombatSessionDB(TimestampMixin, table=True):
     """Combat session storage with full scenario as JSON blob.
-    
+
     The `scenario` column contains the full core.mech.combat_state.MechCombatScenario
     model serialized as JSON. This includes all combatants, rounds, terrain, and
     deployables.
-    
+
     Indexed columns support queries for active sessions and session history.
     """
 
@@ -112,13 +165,13 @@ class CombatSessionDB(TimestampMixin, table=True):
     status: CombatSessionStatus = Field(default="active", index=True)
     current_round: int = Field(default=1, ge=1)
     current_turn_index: int = Field(default=0, ge=0)
-    
+
     # Full combat scenario as JSON blob
     scenario: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
-    
+
     # Ownership and organization
     gm_user_id: str = Field(index=True, default="default_user")
     campaign_id: str | None = Field(default=None, index=True)
-    
+
     # Optional metadata
     notes: str = Field(default="")

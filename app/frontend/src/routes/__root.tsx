@@ -129,6 +129,12 @@ function Header() {
             Characters
           </a>
           <a
+            href="/campaigns"
+            className="px-3 py-1.5 rounded-full border border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            Campaigns
+          </a>
+          <a
             href="/compendium"
             className="px-3 py-1.5 rounded-full border border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
           >

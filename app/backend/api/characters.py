@@ -25,7 +25,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.backend.db.engine import get_session
-from app.backend.db.models import CharacterDB, utc_now
+from app.backend.db.models import CharacterDB, CampaignCharacterDB, utc_now
 from app.backend.dependencies import get_current_user
 from app.backend.exceptions import NotFoundError, ValidationError
 from app.backend.pdf import render_character_sheet_pdf
@@ -204,6 +204,9 @@ class CharacterResponse(DatabaseMetadata):
     Includes database metadata, full character data, and computed fields.
     """
 
+    # Linkage metadata
+    campaign_ids: list[str]
+
     # Pilot data
     pilot_id: str
     callsign: str
@@ -251,7 +254,9 @@ def _generate_mech_id() -> str:
 
 
 def _sanitize_filename(value: str) -> str:
-    safe = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in value)
+    safe = "".join(
+        char if char.isalnum() or char in {"-", "_"} else "_" for char in value
+    )
     safe = safe.strip("_")
     return safe or "character"
 
@@ -433,17 +438,34 @@ def _update_character_from_request(
     return character
 
 
-def _character_to_response(char_db: CharacterDB) -> CharacterResponse:
+async def _get_character_campaign_ids(
+    session: AsyncSession, character_id: str
+) -> list[str]:
+    result = await session.exec(
+        select(CampaignCharacterDB.campaign_id).where(
+            CampaignCharacterDB.character_id == character_id
+        )
+    )
+    return [campaign_id for campaign_id in result.all() if campaign_id]
+
+
+async def _character_to_response(
+    session: AsyncSession, char_db: CharacterDB
+) -> CharacterResponse:
     """Convert a CharacterDB record to a CharacterResponse.
 
     Hydrates the core Character model to get computed fields.
     """
     core_char = Character.model_validate(char_db.data)
+    campaign_ids = set(await _get_character_campaign_ids(session, char_db.id))
+    if char_db.campaign_id:
+        campaign_ids.add(char_db.campaign_id)
 
     return CharacterResponse(
         id=char_db.id,
         user_id=char_db.user_id,
         campaign_id=char_db.campaign_id,
+        campaign_ids=sorted(campaign_ids),
         created_at=char_db.created_at,
         updated_at=char_db.updated_at,
         **serialize_character_response_fields(core_char),
@@ -491,7 +513,7 @@ async def create_character(
     await session.commit()
     await session.refresh(db_char)
 
-    return _character_to_response(db_char)
+    return await _character_to_response(session, db_char)
 
 
 @router.get("", response_model=ListResponse[CharacterResponse])
@@ -506,16 +528,28 @@ async def list_characters(
     """
     query = select(CharacterDB).where(CharacterDB.user_id == user["id"])
 
+    linked_ids: list[str] = []
     if campaign_id:
-        query = query.where(CharacterDB.campaign_id == campaign_id)
+        link_result = await session.exec(
+            select(CampaignCharacterDB.character_id).where(
+                CampaignCharacterDB.campaign_id == campaign_id
+            )
+        )
+        linked_ids = [char_id for char_id in link_result.all() if char_id]
 
     result = await session.exec(query)
     characters = result.all()
 
-    return ListResponse(
-        items=[_character_to_response(c) for c in characters],
-        total=len(characters),
-    )
+    if campaign_id:
+        characters = [
+            c for c in characters if c.campaign_id == campaign_id or c.id in linked_ids
+        ]
+
+    items: list[CharacterResponse] = []
+    for char_db in characters:
+        items.append(await _character_to_response(session, char_db))
+
+    return ListResponse(items=items, total=len(items))
 
 
 @router.get("/{character_id}", response_model=CharacterResponse)
@@ -536,7 +570,7 @@ async def get_character(
     if not character:
         raise NotFoundError("Character", character_id)
 
-    return _character_to_response(character)
+    return await _character_to_response(session, character)
 
 
 @router.put("/{character_id}", response_model=CharacterResponse)
@@ -577,7 +611,7 @@ async def update_character(
     await session.commit()
     await session.refresh(char_db)
 
-    return _character_to_response(char_db)
+    return await _character_to_response(session, char_db)
 
 
 @router.delete("/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -668,7 +702,7 @@ async def export_character_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -717,7 +751,7 @@ async def update_pilot_gear(
     await session.commit()
     await session.refresh(char_db)
 
-    return _character_to_response(char_db)
+    return await _character_to_response(session, char_db)
 
 
 @router.put("/{character_id}/mechs/{mech_id}/build", response_model=CharacterResponse)
@@ -803,7 +837,7 @@ async def update_mech_build(
     await session.commit()
     await session.refresh(char_db)
 
-    return _character_to_response(char_db)
+    return await _character_to_response(session, char_db)
 
 
 # =============================================================================
@@ -858,7 +892,7 @@ async def add_mech(
     await session.commit()
     await session.refresh(char_db)
 
-    return _character_to_response(char_db)
+    return await _character_to_response(session, char_db)
 
 
 @router.delete("/{character_id}/mechs/{mech_id}", response_model=CharacterResponse)
@@ -897,7 +931,7 @@ async def remove_mech(
     await session.commit()
     await session.refresh(char_db)
 
-    return _character_to_response(char_db)
+    return await _character_to_response(session, char_db)
 
 
 @router.put(
@@ -938,4 +972,4 @@ async def set_active_mech(
     await session.commit()
     await session.refresh(char_db)
 
-    return _character_to_response(char_db)
+    return await _character_to_response(session, char_db)

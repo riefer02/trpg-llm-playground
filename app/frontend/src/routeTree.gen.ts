@@ -13,10 +13,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PilotsIndexRouteImport } from './routes/pilots/index'
 import { Route as CompendiumIndexRouteImport } from './routes/compendium/index'
 import { Route as CharactersIndexRouteImport } from './routes/characters/index'
+import { Route as CampaignsIndexRouteImport } from './routes/campaigns/index'
 import { Route as PilotsNewRouteImport } from './routes/pilots/new'
 import { Route as PilotsPilotIdRouteImport } from './routes/pilots/$pilotId'
 import { Route as CharactersNewRouteImport } from './routes/characters/new'
 import { Route as CharactersCharacterIdRouteImport } from './routes/characters/$characterId'
+import { Route as CampaignsCampaignIdRouteImport } from './routes/campaigns/$campaignId'
 import { Route as CharactersCharacterIdExportRouteImport } from './routes/characters/$characterId.export'
 
 const IndexRoute = IndexRouteImport.update({
@@ -39,6 +41,11 @@ const CharactersIndexRoute = CharactersIndexRouteImport.update({
   path: '/characters/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CampaignsIndexRoute = CampaignsIndexRouteImport.update({
+  id: '/campaigns/',
+  path: '/campaigns/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PilotsNewRoute = PilotsNewRouteImport.update({
   id: '/pilots/new',
   path: '/pilots/new',
@@ -59,6 +66,11 @@ const CharactersCharacterIdRoute = CharactersCharacterIdRouteImport.update({
   path: '/characters/$characterId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CampaignsCampaignIdRoute = CampaignsCampaignIdRouteImport.update({
+  id: '/campaigns/$campaignId',
+  path: '/campaigns/$campaignId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CharactersCharacterIdExportRoute =
   CharactersCharacterIdExportRouteImport.update({
     id: '/export',
@@ -68,10 +80,12 @@ const CharactersCharacterIdExportRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
   '/compendium': typeof CompendiumIndexRoute
   '/pilots': typeof PilotsIndexRoute
@@ -79,10 +93,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
   '/compendium': typeof CompendiumIndexRoute
   '/pilots': typeof PilotsIndexRoute
@@ -91,10 +107,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
   '/compendium/': typeof CompendiumIndexRoute
   '/pilots/': typeof PilotsIndexRoute
@@ -104,10 +122,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
     | '/pilots/$pilotId'
     | '/pilots/new'
+    | '/campaigns'
     | '/characters'
     | '/compendium'
     | '/pilots'
@@ -115,10 +135,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
     | '/pilots/$pilotId'
     | '/pilots/new'
+    | '/campaigns'
     | '/characters'
     | '/compendium'
     | '/pilots'
@@ -126,10 +148,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
     | '/pilots/$pilotId'
     | '/pilots/new'
+    | '/campaigns/'
     | '/characters/'
     | '/compendium/'
     | '/pilots/'
@@ -138,10 +162,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CampaignsCampaignIdRoute: typeof CampaignsCampaignIdRoute
   CharactersCharacterIdRoute: typeof CharactersCharacterIdRouteWithChildren
   CharactersNewRoute: typeof CharactersNewRoute
   PilotsPilotIdRoute: typeof PilotsPilotIdRoute
   PilotsNewRoute: typeof PilotsNewRoute
+  CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
   CompendiumIndexRoute: typeof CompendiumIndexRoute
   PilotsIndexRoute: typeof PilotsIndexRoute
@@ -177,6 +203,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CharactersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/campaigns/': {
+      id: '/campaigns/'
+      path: '/campaigns'
+      fullPath: '/campaigns'
+      preLoaderRoute: typeof CampaignsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pilots/new': {
       id: '/pilots/new'
       path: '/pilots/new'
@@ -205,6 +238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CharactersCharacterIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/campaigns/$campaignId': {
+      id: '/campaigns/$campaignId'
+      path: '/campaigns/$campaignId'
+      fullPath: '/campaigns/$campaignId'
+      preLoaderRoute: typeof CampaignsCampaignIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/characters/$characterId/export': {
       id: '/characters/$characterId/export'
       path: '/export'
@@ -230,10 +270,12 @@ const CharactersCharacterIdRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CampaignsCampaignIdRoute: CampaignsCampaignIdRoute,
   CharactersCharacterIdRoute: CharactersCharacterIdRouteWithChildren,
   CharactersNewRoute: CharactersNewRoute,
   PilotsPilotIdRoute: PilotsPilotIdRoute,
   PilotsNewRoute: PilotsNewRoute,
+  CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,
   CompendiumIndexRoute: CompendiumIndexRoute,
   PilotsIndexRoute: PilotsIndexRoute,

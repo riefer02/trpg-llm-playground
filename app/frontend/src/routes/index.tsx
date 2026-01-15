@@ -59,9 +59,9 @@ function HomePage() {
             href="/compendium"
           />
           <QuickActionCard
-            title="Start Combat"
-            description="Begin a tactical encounter"
-            href="/combat"
+            title="Campaigns"
+            description="Create lobbies and invite players"
+            href="/campaigns"
           />
         </div>
       </div>

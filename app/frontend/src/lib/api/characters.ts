@@ -100,6 +100,7 @@ export interface CharacterResponse {
   id: string;
   user_id: string;
   campaign_id: string | null;
+  campaign_ids: string[];
   created_at: string;
   updated_at: string;
 
