@@ -137,27 +137,47 @@ def validate_campaign(data: dict[str, Any]) -> list[str]:
     if "name" not in data:
         errors.append("Campaign must have a 'name' field")
 
-    if "pilots" in data and not isinstance(data["pilots"], list):
-        errors.append("'pilots' must be a list")
+    characters_key = None
+    if "characters" in data:
+        characters_key = "characters"
     elif "pilots" in data:
-        for i, pilot in enumerate(data["pilots"]):
-            if not isinstance(pilot, dict):
-                errors.append(f"Pilot {i} must be a dictionary")
-            elif "id" not in pilot:
-                errors.append(f"Pilot {i} is missing 'id' field")
+        characters_key = "pilots"
 
-    if "pilot_mech_links" in data and not isinstance(data["pilot_mech_links"], list):
-        errors.append("'pilot_mech_links' must be a list")
+    if characters_key and not isinstance(data[characters_key], list):
+        errors.append(f"'{characters_key}' must be a list")
+    elif characters_key:
+        for i, character in enumerate(data[characters_key]):
+            if not isinstance(character, dict):
+                errors.append(f"Character {i} must be a dictionary")
+            elif "id" not in character:
+                errors.append(f"Character {i} is missing 'id' field")
+
+    links_key = None
+    if "character_mech_links" in data:
+        links_key = "character_mech_links"
     elif "pilot_mech_links" in data:
-        pilot_ids = {p.get("id") for p in data.get("pilots", [])}
-        for i, link in enumerate(data["pilot_mech_links"]):
+        links_key = "pilot_mech_links"
+
+    if links_key and not isinstance(data[links_key], list):
+        errors.append(f"'{links_key}' must be a list")
+    elif links_key:
+        characters = data.get(characters_key or "characters", [])
+        character_ids = {
+            c.get("id") for c in characters if isinstance(c, dict)
+        }
+        for i, link in enumerate(data[links_key]):
             if not isinstance(link, dict):
-                errors.append(f"Pilot mech link {i} must be a dictionary")
-            elif "pilot_id" not in link:
-                errors.append(f"Pilot mech link {i} is missing 'pilot_id' field")
-            elif link.get("pilot_id") not in pilot_ids:
+                errors.append(f"Character mech link {i} must be a dictionary")
+                continue
+            link_character_id = link.get("character_id") or link.get("pilot_id")
+            if link_character_id is None:
                 errors.append(
-                    f"Pilot mech link {i} references unknown pilot: {link['pilot_id']}"
+                    f"Character mech link {i} is missing 'character_id' field"
+                )
+            elif link_character_id not in character_ids:
+                errors.append(
+                    "Character mech link "
+                    f"{i} references unknown character: {link_character_id}"
                 )
 
     if "sessions" in data and not isinstance(data["sessions"], list):
@@ -204,24 +224,28 @@ def validate_campaign_synchronous(
     """
     errors: list[str] = []
 
-    pilot_ids = {p["id"] for p in campaign.pilots}
+    character_ids = {c["id"] for c in campaign.characters}
 
-    for link in campaign.pilot_mech_links:
-        if link.pilot_id not in pilot_ids:
-            errors.append(f"Pilot mech link references unknown pilot: {link.pilot_id}")
+    for link in campaign.character_mech_links:
+        if link.character_id not in character_ids:
+            errors.append(
+                f"Character mech link references unknown character: {link.character_id}"
+            )
 
     for session in campaign.sessions:
         for mission in session.active_missions:
-            for pilot_id in mission.participating_pilot_ids:
-                if pilot_id not in pilot_ids:
+            for character_id in mission.participating_character_ids:
+                if character_id not in character_ids:
                     errors.append(
-                        f"Session mission references unknown pilot: {pilot_id}"
+                        f"Session mission references unknown character: {character_id}"
                     )
 
     for record in campaign.mission_history:
-        for pilot_id in record.participating_pilot_ids:
-            if pilot_id not in pilot_ids:
-                errors.append(f"Mission history references unknown pilot: {pilot_id}")
+        for character_id in record.participating_character_ids:
+            if character_id not in character_ids:
+                errors.append(
+                    f"Mission history references unknown character: {character_id}"
+                )
 
     return errors
 
@@ -264,26 +288,48 @@ def get_campaign_summary(campaign: Campaign) -> dict[str, Any]:
         else 0.0
     )
 
-    living_pilots = sum(1 for p in campaign.pilots if not p.get("is_dead", False))
-    cloned_pilots = sum(
-        1
-        for p in campaign.pilots
-        if p.get("clone_state") is not None and p["clone_state"].get("is_cloned", False)
+    last_record = campaign.mission_history[-1] if campaign.mission_history else None
+    last_outcome = last_record.outcome if last_record else None
+    last_mission_name = last_record.mission_name if last_record else None
+    last_mission_date = (
+        last_record.mission_date.isoformat() if last_record else None
     )
+
+    def _pilot_data(character: dict) -> dict:
+        if not isinstance(character, dict):
+            return {}
+        pilot = character.get("pilot", character)
+        return pilot if isinstance(pilot, dict) else {}
+
+    living_characters = sum(
+        1
+        for character in campaign.characters
+        if not _pilot_data(character).get("is_dead", False)
+    )
+    cloned_characters = 0
+    for character in campaign.characters:
+        pilot_data = _pilot_data(character)
+        clone_state = pilot_data.get("clone_state") or {}
+        status = clone_state.get("status") or {}
+        if status.get("times_cloned", 0) > 0:
+            cloned_characters += 1
 
     return {
         "id": campaign.id,
         "name": campaign.name,
         "session_count": len(campaign.sessions),
-        "pilot_count": len(campaign.pilots),
-        "living_pilots": living_pilots,
-        "cloned_pilots": cloned_pilots,
+        "character_count": len(campaign.characters),
+        "living_characters": living_characters,
+        "cloned_characters": cloned_characters,
         "total_missions": total_missions,
         "successful_missions": successful_missions,
         "partial_missions": partial_missions,
         "failed_missions": failed_missions,
         "average_completion": round(avg_completion, 2),
-        "mech_assignments": len(campaign.pilot_mech_links),
+        "last_outcome": last_outcome,
+        "last_mission_name": last_mission_name,
+        "last_mission_date": last_mission_date,
+        "mech_assignments": len(campaign.character_mech_links),
         "created_at": campaign.created_at.isoformat(),
         "modified_at": campaign.modified_at.isoformat(),
     }

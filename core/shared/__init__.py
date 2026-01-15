@@ -1,7 +1,7 @@
 from core.shared.campaign import (
     Campaign,
     Session,
-    PilotMechAssignment,
+    CharacterMechAssignment,
     CampaignMissionRecord,
     ActiveSessionMission,
 )
@@ -859,7 +859,7 @@ __all__ = [
     # Campaign Persistence
     "Campaign",
     "Session",
-    "PilotMechAssignment",
+    "CharacterMechAssignment",
     "CampaignMissionRecord",
     "ActiveSessionMission",
     "save_campaign",

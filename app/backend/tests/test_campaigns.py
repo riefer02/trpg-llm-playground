@@ -27,6 +27,7 @@ async def test_campaign_invite_and_character_flow(client: AsyncClient) -> None:
     list_data = list_resp.json()
     assert list_data["total"] == 1
     assert list_data["items"][0]["membership_role"] == "owner"
+    assert list_data["items"][0]["mission_summary"]["total_missions"] == 0
 
     # Issue invite
     invite_resp = await client.post(
@@ -66,6 +67,7 @@ async def test_campaign_invite_and_character_flow(client: AsyncClient) -> None:
     attached_detail = attach_resp.json()
     assert any(c["character_id"] == character_id for c in attached_detail["characters"])
     assert "readiness_summary" in attached_detail
+    assert "member_issues" in attached_detail["readiness_summary"]
     assert attached_detail["seat_warning"] is None
 
     # Pilot marks themselves ready
@@ -115,6 +117,8 @@ async def test_campaign_invite_preview_and_management(client: AsyncClient) -> No
     preview_data = preview_resp.json()
     assert preview_data["campaign_name"] == "Preview Squad"
     assert preview_data["status"] == "pending"
+    assert "readiness_issues" in preview_data
+    assert preview_data["min_pilots"] >= 1
 
     revoke_resp = await client.post(
         f"/api/campaigns/{campaign_id}/invites/{invite['id']}/revoke",
@@ -132,6 +136,26 @@ async def test_campaign_invite_preview_and_management(client: AsyncClient) -> No
     resend_data = resend_resp.json()
     assert resend_data["status"] == "pending"
     assert resend_data["expires_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_export_campaign_pdf(client: AsyncClient) -> None:
+    pytest.importorskip("weasyprint")
+    owner_headers = {"X-User-Id": "pdf_owner"}
+
+    create_resp = await client.post(
+        "/api/campaigns",
+        json={"name": "PDF Campaign"},
+        headers=owner_headers,
+    )
+    campaign_id = create_resp.json()["id"]
+
+    export_resp = await client.get(
+        f"/api/campaigns/{campaign_id}/export.pdf",
+        headers=owner_headers,
+    )
+    assert export_resp.status_code == 200
+    assert export_resp.headers["content-type"].startswith("application/pdf")
 
 
 @pytest.mark.asyncio

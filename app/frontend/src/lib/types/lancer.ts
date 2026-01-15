@@ -28174,9 +28174,9 @@ export type ConsequencesPartial = string | null;
  */
 export type ReserveId1 = string;
 /**
- * Pilot expected to use this reserve
+ * Character expected to use this reserve
  */
-export type AssignedPilotId = string | null;
+export type AssignedCharacterId = string | null;
 /**
  * When/how it will be used
  */
@@ -28265,9 +28265,9 @@ export type ReservesSpent1 = {
  */
 export type LifecycleCheckpoints = SessionLifecycleCheckpoint[];
 /**
- * IDs of pilots in this mission
+ * IDs of characters in this mission
  */
-export type ParticipatingPilotIds = string[];
+export type ParticipatingCharacterIds = string[];
 /**
  * When the mission was started
  */
@@ -28293,15 +28293,15 @@ export type DowntimePlans = {
  */
 export type Sessions = Session[];
 /**
- * All pilots as serialized dicts
+ * All characters as serialized dicts
  */
-export type Pilots = {
+export type Characters = {
   [k: string]: unknown;
 }[];
 /**
- * Reference to pilot.id
+ * Reference to character.id
  */
-export type PilotId1 = string;
+export type CharacterId = string;
 /**
  * Unique mech identifier
  */
@@ -28311,13 +28311,13 @@ export type MechId = string;
  */
 export type MechName = string;
 /**
- * Is this the pilot's active mech
+ * Is this the character's active mech
  */
 export type IsActive = boolean;
 /**
- * Pilot to mech assignments
+ * Character to mech assignments
  */
-export type PilotMechLinks = PilotMechAssignment[];
+export type CharacterMechLinks = CharacterMechAssignment[];
 /**
  * Reference to mission.id
  */
@@ -28340,9 +28340,9 @@ export type CompletionScore1 = number;
  */
 export type MissionDate = string;
 /**
- * Pilots who took part
+ * Characters who took part
  */
-export type ParticipatingPilotIds1 = string[];
+export type ParticipatingCharacterIds1 = string[];
 /**
  * Session notes
  */
@@ -28591,7 +28591,7 @@ export type ComplicationDescription1 = string | null;
 /**
  * Pilot taking the action
  */
-export type PilotId2 = string | null;
+export type PilotId1 = string | null;
 /**
  * Pilot skill used for the check
  */
@@ -33292,7 +33292,7 @@ export interface MechDerivedStats {
 /**
  * Root persistence object for a Lancer campaign.
  *
- * Tracks all campaign state including pilots, their mechs, session history,
+ * Tracks all campaign state including characters, their mechs, session history,
  * and mission completion records.
  *
  * Attributes:
@@ -33300,8 +33300,8 @@ export interface MechDerivedStats {
  *     name: Display name for the campaign
  *     description: Summary of the campaign premise
  *     sessions: Ordered list of all sessions (completed and in-progress)
- *     pilots: All pilots in the campaign as serialized dicts
- *     pilot_mech_links: Links between pilots and their mech builds
+ *     characters: All characters in the campaign as serialized dicts
+ *     character_mech_links: Links between characters and their mech builds
  *     mission_history: Records of all completed missions
  *     campaign_notes: GM notes about the campaign
  *     identity: Onboarding prompts/patrons for fast reference
@@ -33314,8 +33314,8 @@ export interface Campaign {
   name: Name27;
   description?: Description2;
   sessions?: Sessions;
-  pilots?: Pilots;
-  pilot_mech_links?: PilotMechLinks;
+  characters?: Characters;
+  character_mech_links?: CharacterMechLinks;
   mission_history?: MissionHistory;
   campaign_notes?: CampaignNotes;
   /**
@@ -33405,7 +33405,7 @@ export interface MissionStakesBrief {
  */
 export interface ReservePlanEntry {
   reserve_id: ReserveId1;
-  assigned_pilot_id?: AssignedPilotId;
+  assigned_character_id?: AssignedCharacterId;
   usage_notes?: UsageNotes;
   status?: Status9;
   [k: string]: unknown;
@@ -33441,12 +33441,12 @@ export interface SessionLifecycleCheckpoint {
  *
  * Attributes:
  *     mission_state: The current state of the mission as serialized dict
- *     participating_pilot_ids: Pilots currently engaged in this mission
+ *     participating_character_ids: Characters currently engaged in this mission
  *     started_at: When the mission was started
  */
 export interface ActiveSessionMission {
   mission_state: MissionState;
-  participating_pilot_ids?: ParticipatingPilotIds;
+  participating_character_ids?: ParticipatingCharacterIds;
   started_at?: StartedAt;
   [k: string]: unknown;
 }
@@ -33457,17 +33457,17 @@ export interface MissionState {
   [k: string]: unknown;
 }
 /**
- * Links a pilot to their mech build, persisting across sessions.
+ * Links a character to their mech build, persisting across sessions.
  *
  * Attributes:
- *     pilot_id: Reference to the pilot (matches Pilot.id)
- *     mech_id: Unique identifier for this mech (e.g., "pilot_callsign-mech_name")
+ *     character_id: Reference to the character (matches Character.id)
+ *     mech_id: Unique identifier for this mech (e.g., "callsign-mech_name")
  *     mech_name: Human-readable name for the mech
  *     mech_build: Full mech loadout as serialized dict
- *     is_active: Whether this is the pilot's current active mech
+ *     is_active: Whether this is the character's current active mech
  */
-export interface PilotMechAssignment {
-  pilot_id: PilotId1;
+export interface CharacterMechAssignment {
+  character_id: CharacterId;
   mech_id: MechId;
   mech_name: MechName;
   mech_build: MechBuild1;
@@ -33490,7 +33490,7 @@ export interface MechBuild1 {
  *     outcome: Mission outcome (success, partial, failure, catastrophic)
  *     completion_score: 0.0-1.0 progress score
  *     mission_date: When the mission was completed
- *     participating_pilot_ids: Pilots who took part
+ *     participating_character_ids: Characters who took part
  *     debrief_notes: Optional notes about the mission
  */
 export interface CampaignMissionRecord {
@@ -33500,7 +33500,7 @@ export interface CampaignMissionRecord {
   outcome: Outcome2;
   completion_score?: CompletionScore1;
   mission_date?: MissionDate;
-  participating_pilot_ids?: ParticipatingPilotIds1;
+  participating_character_ids?: ParticipatingCharacterIds1;
   debrief_notes?: DebriefNotes1;
   reserves_spent?: ReservesSpent2;
   reserves_earned?: ReservesEarned2;
@@ -33704,7 +33704,7 @@ export interface NarrativeGoalAttempt {
   consequence_suffered?: ConsequenceSuffered;
   complication_type?: ComplicationType;
   complication_description?: ComplicationDescription1;
-  pilot_id?: PilotId2;
+  pilot_id?: PilotId1;
   skill_used?: SkillUsed;
   action_id?: ActionId1;
   action_description?: ActionDescription;

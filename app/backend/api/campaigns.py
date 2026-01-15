@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel, Field, constr
 from sqlmodel import select, func
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -31,6 +31,7 @@ from app.backend.db.models import (
 )
 from app.backend.dependencies import get_current_user
 from app.backend.exceptions import ConflictError, ForbiddenError, NotFoundError
+from app.backend.pdf.campaign_brief import render_campaign_brief_pdf
 from app.backend.schemas import DatabaseMetadata, ListResponse
 from core.character import Character
 from core.mech.combat_state import (
@@ -52,6 +53,7 @@ from core.shared.campaign.campaign import (
     Session,
     SessionLifecycleCheckpoint,
 )
+from core.shared.campaign.serialization import get_campaign_summary
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -158,6 +160,7 @@ def _build_readiness_summary(
     ready_players = [m for m in ready_members if m.role == "player"]
     members_by_id = {m.id: m for m in members}
     issues: list[str] = []
+    member_issues: dict[str, list[str]] = {m.id: [] for m in members}
 
     if lobby:
         assigned_ready_players = [
@@ -172,8 +175,10 @@ def _build_readiness_summary(
                 continue
             if member.ready_state != "ready":
                 issues.append(f"{member.user_id} is not ready")
+                member_issues[member.id].append("Not ready")
             if member.assigned_character_id is None:
                 issues.append(f"{member.user_id} missing character assignment")
+                member_issues[member.id].append("Character missing")
         if len(assigned_ready_players) < min_required:
             issues.append(
                 f"Need {min_required} ready pilots, currently {len(assigned_ready_players)}"
@@ -199,7 +204,22 @@ def _build_readiness_summary(
         "can_launch": can_launch,
         "lobby_status": lobby_status,
         "issues": issues,
+        "member_issues": member_issues,
     }
+
+
+def _build_mission_summary(core_campaign: Campaign) -> CampaignOutcomeSummary:
+    summary = get_campaign_summary(core_campaign)
+    return CampaignOutcomeSummary(
+        total_missions=summary["total_missions"],
+        successful_missions=summary["successful_missions"],
+        partial_missions=summary["partial_missions"],
+        failed_missions=summary["failed_missions"],
+        average_completion=summary["average_completion"],
+        last_outcome=summary.get("last_outcome"),
+        last_mission_name=summary.get("last_mission_name"),
+        last_mission_date=summary.get("last_mission_date"),
+    )
 
 
 def _compute_seat_warning(
@@ -314,7 +334,7 @@ class CampaignLobbyStakesInput(BaseModel):
 
 class CampaignLobbyReserveInput(BaseModel):
     reserve_id: str
-    assigned_pilot_id: str | None = None
+    assigned_character_id: str | None = None
     usage_notes: str | None = None
     status: Literal["planned", "spent", "earned"] = "planned"
 
@@ -401,6 +421,10 @@ class CampaignInvitePreviewResponse(BaseModel):
     seat_warning: str | None
     ready_players: int
     preferred_pilots: int
+    assigned_ready_players: int
+    min_pilots: int
+    lobby_status: str | None
+    readiness_issues: list[str]
     can_join: bool
 
 
@@ -426,6 +450,18 @@ class CampaignReadinessSummary(BaseModel):
     can_launch: bool
     lobby_status: str | None
     issues: list[str]
+    member_issues: dict[str, list[str]]
+
+
+class CampaignOutcomeSummary(BaseModel):
+    total_missions: int
+    successful_missions: int
+    partial_missions: int
+    failed_missions: int
+    average_completion: float
+    last_outcome: str | None
+    last_mission_name: str | None
+    last_mission_date: str | None
 
 
 class CampaignSummaryResponse(DatabaseMetadata):
@@ -439,6 +475,7 @@ class CampaignSummaryResponse(DatabaseMetadata):
     member_count: int
     character_count: int
     lobby_status: str | None
+    mission_summary: CampaignOutcomeSummary
 
 
 class CampaignDetailResponse(DatabaseMetadata):
@@ -452,6 +489,7 @@ class CampaignDetailResponse(DatabaseMetadata):
     characters: list[CampaignCharacterResponse]
     readiness_summary: CampaignReadinessSummary
     seat_warning: str | None
+    mission_summary: CampaignOutcomeSummary
 
 
 # =============================================================================
@@ -483,6 +521,7 @@ async def list_campaigns(
             session, CampaignCharacterDB, campaign_id=campaign_db.id
         )
         core_campaign = _load_campaign_model(campaign_db)
+        mission_summary = _build_mission_summary(core_campaign)
         summaries.append(
             CampaignSummaryResponse(
                 id=campaign_db.id,
@@ -502,6 +541,7 @@ async def list_campaigns(
                 lobby_status=core_campaign.lobby_state.status
                 if core_campaign.lobby_state
                 else None,
+                mission_summary=mission_summary,
             )
         )
 
@@ -562,6 +602,27 @@ async def get_campaign(
     campaign_db = await _get_campaign_or_404(session, campaign_id)
     await _require_membership(session, campaign_id, user["id"])
     return await _build_campaign_detail_response(session, campaign_db, user["id"])
+
+
+@router.get("/{campaign_id}/export.pdf")
+async def export_campaign_pdf(
+    campaign_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict[str, Any] = Depends(get_current_user),
+) -> Response:
+    """Render a campaign briefing PDF using a server-side template."""
+    campaign_db = await _get_campaign_or_404(session, campaign_id)
+    await _require_membership(session, campaign_id, user["id"])
+
+    core_campaign = _load_campaign_model(campaign_db)
+    pdf_bytes = render_campaign_brief_pdf(core_campaign)
+    filename = f"campaign_{campaign_db.id}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/{campaign_id}/invites", response_model=CampaignInviteResponse)
@@ -713,6 +774,10 @@ async def preview_invite(
         seat_warning=seat_warning,
         ready_players=readiness["ready_players"],
         preferred_pilots=readiness["preferred_pilots"],
+        assigned_ready_players=readiness["assigned_ready_players"],
+        min_pilots=readiness["min_pilots"],
+        lobby_status=readiness["lobby_status"],
+        readiness_issues=readiness["issues"],
         can_join=can_join,
     )
 
@@ -1232,6 +1297,7 @@ async def _build_campaign_detail_response(
     readiness_summary = CampaignReadinessSummary(
         **_build_readiness_summary(core_campaign, members)
     )
+    mission_summary = _build_mission_summary(core_campaign)
     seat_warning = _compute_seat_warning(core_campaign, members, invites)
 
     return CampaignDetailResponse(
@@ -1250,6 +1316,7 @@ async def _build_campaign_detail_response(
         characters=character_payload,
         readiness_summary=readiness_summary,
         seat_warning=seat_warning,
+        mission_summary=mission_summary,
     )
 
 
@@ -1302,7 +1369,7 @@ async def record_campaign_session_outcome(
         "mission_name": mission_name,
         "outcome": outcome.outcome,
         "completion_score": outcome.completion_score,
-        "participating_pilot_ids": [],
+        "participating_character_ids": [],
         "debrief_notes": outcome.debrief_notes,
         "reserves_spent": outcome.reserves_spent,
         "reserves_earned": outcome.reserves_earned,

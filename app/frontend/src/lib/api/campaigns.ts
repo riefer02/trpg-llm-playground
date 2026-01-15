@@ -49,6 +49,7 @@ export interface CampaignReadinessSummary {
     can_launch: boolean;
     lobby_status: string | null;
     issues: string[];
+    member_issues: Record<string, string[]>;
 }
 
 export interface CampaignInvitePreviewResponse {
@@ -62,7 +63,22 @@ export interface CampaignInvitePreviewResponse {
     seat_warning: string | null;
     ready_players: number;
     preferred_pilots: number;
+    assigned_ready_players: number;
+    min_pilots: number;
+    lobby_status: string | null;
+    readiness_issues: string[];
     can_join: boolean;
+}
+
+export interface CampaignOutcomeSummary {
+    total_missions: number;
+    successful_missions: number;
+    partial_missions: number;
+    failed_missions: number;
+    average_completion: number;
+    last_outcome: string | null;
+    last_mission_name: string | null;
+    last_mission_date: string | null;
 }
 
 export interface CampaignInviteResendRequest {
@@ -94,6 +110,7 @@ export interface CampaignSummary {
     member_count: number;
     character_count: number;
     lobby_status: string | null;
+    mission_summary: CampaignOutcomeSummary;
 }
 
 export interface CampaignDetail extends CampaignSummary {
@@ -163,7 +180,7 @@ export interface CampaignLobbyStakesInput {
 
 export interface CampaignLobbyReserveInput {
     reserve_id: string;
-    assigned_pilot_id?: string | null;
+    assigned_character_id?: string | null;
     usage_notes?: string | null;
     status?: "planned" | "spent" | "earned";
 }
@@ -472,5 +489,3 @@ export function useResendCampaignInvite() {
         },
     });
 }
-
-

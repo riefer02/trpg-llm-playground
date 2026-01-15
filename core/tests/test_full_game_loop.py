@@ -10,6 +10,7 @@ Real compendium data is used for realistic testing.
 
 import pytest
 from datetime import date
+from core.character import Character
 from core.pilot.pilot import Pilot, create_ll0_pilot
 from core.pilot.background import Background
 from core.pilot.skill import SkillSet, PilotTrigger
@@ -20,8 +21,13 @@ from core.pilot.clone_state import CloneState
 from core.mech.frame import MechFrameDefinition
 from core.mech.build import MechBuild, compute_mech_stats
 from core.mech.compendium import get_frame_definition
-from core.shared.campaign.campaign import Campaign, Session, ActiveSessionMission
-from core.shared.campaign.campaign import PilotMechAssignment, CampaignMissionRecord
+from core.shared.campaign.campaign import (
+    Campaign,
+    Session,
+    ActiveSessionMission,
+    CharacterMechAssignment,
+    CampaignMissionRecord,
+)
 from core.shared.scenario import (
     SitrepTemplate,
     MissionObjective,
@@ -164,21 +170,21 @@ class TestMechBuildingFlow:
             assert mounted.mount_index >= 0
             assert mounted.weapon_id is not None
 
-    def test_pilot_mech_assignment(
-        self, integration_pilot_ll0: Pilot, integration_mech_everest
+    def test_character_mech_assignment(
+        self, integration_character_ll0, integration_mech_everest
     ):
-        """Pilot can be assigned to a mech."""
+        """Character can be assigned to a mech."""
         frame, build, _ = integration_mech_everest
 
-        assignment = PilotMechAssignment(
-            pilot_id=integration_pilot_ll0.id,
-            mech_id=f"{integration_pilot_ll0.callsign.lower()}-everest",
+        assignment = CharacterMechAssignment(
+            character_id=integration_character_ll0.id,
+            mech_id=f"{integration_character_ll0.pilot.callsign.lower()}-everest",
             mech_name="Everest",
             mech_build=build.model_dump(mode="json"),
             is_active=True,
         )
 
-        assert assignment.pilot_id == integration_pilot_ll0.id
+        assert assignment.character_id == integration_character_ll0.id
         assert assignment.mech_build["frame_id"] == "gms_everest"
 
     def test_mech_raleigh_build(self, integration_mech_raleigh):
@@ -210,14 +216,14 @@ class TestMissionPreparation:
 
     def test_mission_preparation_selects_mech(
         self,
-        integration_pilot_ll0: Pilot,
+        integration_character_ll0,
         integration_mech_everest: tuple,
     ):
-        """Pilot can select mech for mission."""
+        """Character can select mech for mission."""
         frame, build, _ = integration_mech_everest
 
-        assignment = PilotMechAssignment(
-            pilot_id=integration_pilot_ll0.id,
+        assignment = CharacterMechAssignment(
+            character_id=integration_character_ll0.id,
             mech_id="selected_mech",
             mech_name="Everest",
             mech_build=build.model_dump(mode="json"),
@@ -243,7 +249,7 @@ class TestMissionPreparation:
 
     def test_boots_on_ground_starts_mission(
         self,
-        integration_pilot_ll0: Pilot,
+        integration_character_ll0,
         integration_sitrep_template: SitrepTemplate,
     ):
         """Boots on ground establishes mission start state."""
@@ -260,14 +266,14 @@ class TestMissionPreparation:
                         "status": "in_progress",
                     }
                 ],
-                "zones": [
-                    {"id": "zone_1", "control": "neutral", "controlling_side": None}
-                ],
-            },
-            participating_pilot_ids=[integration_pilot_ll0.id],
-        )
+            "zones": [
+                {"id": "zone_1", "control": "neutral", "controlling_side": None}
+            ],
+        },
+        participating_character_ids=[integration_character_ll0.id],
+    )
 
-        assert mission.participating_pilot_ids[0] == integration_pilot_ll0.id
+        assert mission.participating_character_ids[0] == integration_character_ll0.id
         assert "objectives" in mission.mission_state
 
 
@@ -407,26 +413,29 @@ class TestMissionResolution:
         self,
         integration_campaign: Campaign,
     ):
-        """Campaign tracks pilot level across sessions."""
-        pilot_id = integration_campaign.pilots[0]["id"]
-        pilot_level = integration_campaign.pilot_level(pilot_id)
+        """Campaign tracks character license level across sessions."""
+        character_id = integration_campaign.characters[0]["id"]
+        character_level = integration_campaign.character_level(character_id)
 
-        assert pilot_level == 0
+        assert character_level == 0
+
+        updated_character = {
+            **integration_campaign.characters[0],
+            "pilot": {
+                **integration_campaign.characters[0]["pilot"],
+                "level": 1,
+            },
+        }
 
         updated_campaign = Campaign(
             id=integration_campaign.id,
             name=integration_campaign.name,
-            pilots=[
-                {
-                    **integration_campaign.pilots[0],
-                    "level": 1,
-                }
-            ],
-            pilot_mech_links=integration_campaign.pilot_mech_links,
+            characters=[updated_character],
+            character_mech_links=integration_campaign.character_mech_links,
         )
 
-        pilot_level = updated_campaign.pilot_level(pilot_id)
-        assert pilot_level == 1
+        character_level = updated_campaign.character_level(character_id)
+        assert character_level == 1
 
 
 class TestCampaignPersistence:
@@ -443,8 +452,8 @@ class TestCampaignPersistence:
 
         assert data["id"] == integration_campaign.id
         assert data["name"] == integration_campaign.name
-        assert len(data["pilots"]) == 1
-        assert len(data["pilot_mech_links"]) == 1
+        assert len(data["characters"]) == 1
+        assert len(data["character_mech_links"]) == 1
 
     def test_campaign_deserialization(self):
         """Campaign can be loaded from JSON."""
@@ -453,17 +462,25 @@ class TestCampaignPersistence:
         data = {
             "id": "test_campaign",
             "name": "Test Campaign",
-            "pilots": [
+            "characters": [
                 {
-                    "id": "test_pilot",
-                    "callsign": "TEST",
-                    "level": 0,
-                    "skills": {"hull": 2, "agility": 0, "systems": 0, "engineering": 0},
-                    "triggers": [],
-                    "talents": [],
+                    "id": "test_character",
+                    "pilot": {
+                        "id": "test_pilot",
+                        "callsign": "TEST",
+                        "level": 0,
+                        "skills": {
+                            "hull": 2,
+                            "agility": 0,
+                            "systems": 0,
+                            "engineering": 0,
+                        },
+                        "triggers": [],
+                        "talents": [],
+                    },
                 }
             ],
-            "pilot_mech_links": [],
+            "character_mech_links": [],
             "sessions": [],
             "mission_history": [],
         }
@@ -472,7 +489,7 @@ class TestCampaignPersistence:
 
         assert campaign.id == "test_campaign"
         assert campaign.name == "Test Campaign"
-        assert len(campaign.pilots) == 1
+        assert len(campaign.characters) == 1
 
     def test_session_tracking(self, integration_campaign: Campaign):
         """Sessions are tracked in campaign."""
@@ -486,8 +503,8 @@ class TestCampaignPersistence:
         updated_campaign = Campaign(
             id=integration_campaign.id,
             name=integration_campaign.name,
-            pilots=integration_campaign.pilots,
-            pilot_mech_links=integration_campaign.pilot_mech_links,
+            characters=integration_campaign.characters,
+            character_mech_links=integration_campaign.character_mech_links,
             sessions=integration_campaign.sessions + [new_session],
         )
 
@@ -502,7 +519,7 @@ class TestCampaignPersistence:
             mission_name="First Mission",
             outcome="success",
             completion_score=1.0,
-            participating_pilot_ids=[integration_campaign.pilots[0]["id"]],
+            participating_character_ids=[integration_campaign.characters[0]["id"]],
         )
 
         assert mission_record.outcome == "success"
@@ -698,7 +715,7 @@ class TestIntegrationScenarios:
             mission_name="VIP Escort",
             outcome="success",
             completion_score=1.0,
-            participating_pilot_ids=[integration_campaign.pilots[0]["id"]],
+            participating_character_ids=[integration_campaign.characters[0]["id"]],
         )
 
         updated_history = integration_campaign.mission_history + [mission_record]
@@ -706,12 +723,12 @@ class TestIntegrationScenarios:
         assert len(updated_history) == 1
         assert updated_history[0].outcome == "success"
 
-    def test_multi_pilot_campaign(
+    def test_multi_character_campaign(
         self,
         integration_pilot_ll0: Pilot,
         integration_mech_everest: tuple,
     ):
-        """Campaign can track multiple pilots."""
+        """Campaign can track multiple characters."""
         pilot1 = integration_pilot_ll0
 
         pilot2 = Pilot(
@@ -723,14 +740,20 @@ class TestIntegrationScenarios:
             talents=[],
         )
 
+        character1 = Character(id="test_character_1", pilot=pilot1)
+        character2 = Character(id="test_character_2", pilot=pilot2)
+
         campaign = Campaign(
-            id="test_multi_pilot",
-            name="Multi-Pilot Campaign",
-            pilots=[pilot1.model_dump(mode="json"), pilot2.model_dump(mode="json")],
-            pilot_mech_links=[],
+            id="test_multi_character",
+            name="Multi-Character Campaign",
+            characters=[
+                character1.model_dump(mode="json"),
+                character2.model_dump(mode="json"),
+            ],
+            character_mech_links=[],
         )
 
-        assert len(campaign.pilots) == 2
+        assert len(campaign.characters) == 2
 
     def test_reserve_accumulation_across_sessions(self):
         """Reserves can be accumulated across sessions."""

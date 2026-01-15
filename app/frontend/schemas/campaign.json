@@ -1,7 +1,7 @@
 {
   "$defs": {
     "ActiveSessionMission": {
-      "description": "Tracks a mission that is in-progress during a session.\n\nAttributes:\n    mission_state: The current state of the mission as serialized dict\n    participating_pilot_ids: Pilots currently engaged in this mission\n    started_at: When the mission was started",
+      "description": "Tracks a mission that is in-progress during a session.\n\nAttributes:\n    mission_state: The current state of the mission as serialized dict\n    participating_character_ids: Characters currently engaged in this mission\n    started_at: When the mission was started",
       "properties": {
         "mission_state": {
           "additionalProperties": true,
@@ -9,12 +9,12 @@
           "title": "Mission State",
           "type": "object"
         },
-        "participating_pilot_ids": {
-          "description": "IDs of pilots in this mission",
+        "participating_character_ids": {
+          "description": "IDs of characters in this mission",
           "items": {
             "type": "string"
           },
-          "title": "Participating Pilot Ids",
+          "title": "Participating Character Ids",
           "type": "array"
         },
         "started_at": {
@@ -162,7 +162,7 @@
       "type": "object"
     },
     "CampaignMissionRecord": {
-      "description": "Records a completed mission for campaign history.\n\nAttributes:\n    mission_id: Reference to the mission definition\n    session_id: Which session this mission was completed in\n    mission_name: Display name of the mission\n    outcome: Mission outcome (success, partial, failure, catastrophic)\n    completion_score: 0.0-1.0 progress score\n    mission_date: When the mission was completed\n    participating_pilot_ids: Pilots who took part\n    debrief_notes: Optional notes about the mission",
+      "description": "Records a completed mission for campaign history.\n\nAttributes:\n    mission_id: Reference to the mission definition\n    session_id: Which session this mission was completed in\n    mission_name: Display name of the mission\n    outcome: Mission outcome (success, partial, failure, catastrophic)\n    completion_score: 0.0-1.0 progress score\n    mission_date: When the mission was completed\n    participating_character_ids: Characters who took part\n    debrief_notes: Optional notes about the mission",
       "properties": {
         "mission_id": {
           "description": "Reference to mission.id",
@@ -203,12 +203,12 @@
           "title": "Mission Date",
           "type": "string"
         },
-        "participating_pilot_ids": {
-          "description": "Pilots who took part",
+        "participating_character_ids": {
+          "description": "Characters who took part",
           "items": {
             "type": "string"
           },
-          "title": "Participating Pilot Ids",
+          "title": "Participating Character Ids",
           "type": "array"
         },
         "debrief_notes": {
@@ -258,6 +258,46 @@
         "outcome"
       ],
       "title": "CampaignMissionRecord",
+      "type": "object"
+    },
+    "CharacterMechAssignment": {
+      "description": "Links a character to their mech build, persisting across sessions.\n\nAttributes:\n    character_id: Reference to the character (matches Character.id)\n    mech_id: Unique identifier for this mech (e.g., \"callsign-mech_name\")\n    mech_name: Human-readable name for the mech\n    mech_build: Full mech loadout as serialized dict\n    is_active: Whether this is the character's current active mech",
+      "properties": {
+        "character_id": {
+          "description": "Reference to character.id",
+          "title": "Character Id",
+          "type": "string"
+        },
+        "mech_id": {
+          "description": "Unique mech identifier",
+          "title": "Mech Id",
+          "type": "string"
+        },
+        "mech_name": {
+          "description": "Human-readable mech name",
+          "title": "Mech Name",
+          "type": "string"
+        },
+        "mech_build": {
+          "additionalProperties": true,
+          "description": "Full mech loadout as serialized dict",
+          "title": "Mech Build",
+          "type": "object"
+        },
+        "is_active": {
+          "default": true,
+          "description": "Is this the character's active mech",
+          "title": "Is Active",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "character_id",
+        "mech_id",
+        "mech_name",
+        "mech_build"
+      ],
+      "title": "CharacterMechAssignment",
       "type": "object"
     },
     "MissionObjectiveBrief": {
@@ -538,46 +578,6 @@
       "title": "MissionStakesBrief",
       "type": "object"
     },
-    "PilotMechAssignment": {
-      "description": "Links a pilot to their mech build, persisting across sessions.\n\nAttributes:\n    pilot_id: Reference to the pilot (matches Pilot.id)\n    mech_id: Unique identifier for this mech (e.g., \"pilot_callsign-mech_name\")\n    mech_name: Human-readable name for the mech\n    mech_build: Full mech loadout as serialized dict\n    is_active: Whether this is the pilot's current active mech",
-      "properties": {
-        "pilot_id": {
-          "description": "Reference to pilot.id",
-          "title": "Pilot Id",
-          "type": "string"
-        },
-        "mech_id": {
-          "description": "Unique mech identifier",
-          "title": "Mech Id",
-          "type": "string"
-        },
-        "mech_name": {
-          "description": "Human-readable mech name",
-          "title": "Mech Name",
-          "type": "string"
-        },
-        "mech_build": {
-          "additionalProperties": true,
-          "description": "Full mech loadout as serialized dict",
-          "title": "Mech Build",
-          "type": "object"
-        },
-        "is_active": {
-          "default": true,
-          "description": "Is this the pilot's active mech",
-          "title": "Is Active",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "pilot_id",
-        "mech_id",
-        "mech_name",
-        "mech_build"
-      ],
-      "title": "PilotMechAssignment",
-      "type": "object"
-    },
     "ReservePlanEntry": {
       "description": "Tracks reserve usage/assignments planned for a mission.",
       "properties": {
@@ -586,7 +586,7 @@
           "title": "Reserve Id",
           "type": "string"
         },
-        "assigned_pilot_id": {
+        "assigned_character_id": {
           "anyOf": [
             {
               "type": "string"
@@ -596,8 +596,8 @@
             }
           ],
           "default": null,
-          "description": "Pilot expected to use this reserve",
-          "title": "Assigned Pilot Id"
+          "description": "Character expected to use this reserve",
+          "title": "Assigned Character Id"
         },
         "usage_notes": {
           "anyOf": [
@@ -812,7 +812,7 @@
       "type": "object"
     }
   },
-  "description": "Root persistence object for a Lancer campaign.\n\nTracks all campaign state including pilots, their mechs, session history,\nand mission completion records.\n\nAttributes:\n    id: Unique campaign identifier\n    name: Display name for the campaign\n    description: Summary of the campaign premise\n    sessions: Ordered list of all sessions (completed and in-progress)\n    pilots: All pilots in the campaign as serialized dicts\n    pilot_mech_links: Links between pilots and their mech builds\n    mission_history: Records of all completed missions\n    campaign_notes: GM notes about the campaign\n    identity: Onboarding prompts/patrons for fast reference\n    lobby_state: Active lobby data ready to launch into combat\n    created_at: When the campaign was created\n    modified_at: When the campaign was last modified",
+  "description": "Root persistence object for a Lancer campaign.\n\nTracks all campaign state including characters, their mechs, session history,\nand mission completion records.\n\nAttributes:\n    id: Unique campaign identifier\n    name: Display name for the campaign\n    description: Summary of the campaign premise\n    sessions: Ordered list of all sessions (completed and in-progress)\n    characters: All characters in the campaign as serialized dicts\n    character_mech_links: Links between characters and their mech builds\n    mission_history: Records of all completed missions\n    campaign_notes: GM notes about the campaign\n    identity: Onboarding prompts/patrons for fast reference\n    lobby_state: Active lobby data ready to launch into combat\n    created_at: When the campaign was created\n    modified_at: When the campaign was last modified",
   "properties": {
     "id": {
       "description": "Unique campaign identifier",
@@ -838,21 +838,21 @@
       "title": "Sessions",
       "type": "array"
     },
-    "pilots": {
-      "description": "All pilots as serialized dicts",
+    "characters": {
+      "description": "All characters as serialized dicts",
       "items": {
         "additionalProperties": true,
         "type": "object"
       },
-      "title": "Pilots",
+      "title": "Characters",
       "type": "array"
     },
-    "pilot_mech_links": {
-      "description": "Pilot to mech assignments",
+    "character_mech_links": {
+      "description": "Character to mech assignments",
       "items": {
-        "$ref": "#/$defs/PilotMechAssignment"
+        "$ref": "#/$defs/CharacterMechAssignment"
       },
-      "title": "Pilot Mech Links",
+      "title": "Character Mech Links",
       "type": "array"
     },
     "mission_history": {

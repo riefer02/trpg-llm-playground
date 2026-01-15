@@ -67,11 +67,32 @@ function InviteLandingPage() {
                 <span className="font-medium text-foreground">Seat guidance:</span>{" "}
                 {previewQuery.data.ready_players}/{previewQuery.data.preferred_pilots} pilots ready
               </div>
+              <div>
+                <span className="font-medium text-foreground">Assigned pilots:</span>{" "}
+                {previewQuery.data.assigned_ready_players}/{previewQuery.data.min_pilots} ready for launch
+              </div>
+              <div>
+                <span className="font-medium text-foreground">Lobby status:</span>{" "}
+                {previewQuery.data.lobby_status ?? "Not set"}
+              </div>
               {previewQuery.data.seat_warning && (
                 <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-600">
                   {previewQuery.data.seat_warning}
                 </div>
               )}
+              {previewQuery.data.readiness_issues.length > 0 && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-600 space-y-1">
+                  {previewQuery.data.readiness_issues.map((issue) => (
+                    <div key={issue}>• {issue}</div>
+                  ))}
+                </div>
+              )}
+              <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground space-y-1">
+                <div className="font-medium text-foreground">Next steps</div>
+                <div>1. Accept the invite.</div>
+                <div>2. Attach a character in the campaign lobby.</div>
+                <div>3. Toggle ready when your loadout is set.</div>
+              </div>
             </div>
           )}
           <div className="flex gap-2">

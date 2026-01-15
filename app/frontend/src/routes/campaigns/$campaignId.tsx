@@ -34,6 +34,33 @@ export const Route = createFileRoute("/campaigns/$campaignId")({
   component: CampaignDetailPage,
 });
 
+const STAKE_PRESETS = [
+  {
+    id: "personal",
+    label: "Personal - protect a key ally",
+    stakes_type: "personal",
+    summary: "A trusted contact is on the line if this goes sideways.",
+  },
+  {
+    id: "faction",
+    label: "Faction - maintain hard-won support",
+    stakes_type: "faction",
+    summary: "Secure the objective to keep faction backing and resources.",
+  },
+  {
+    id: "immediate",
+    label: "Immediate - stop a crisis now",
+    stakes_type: "immediate",
+    summary: "Failing here means immediate loss or destruction.",
+  },
+  {
+    id: "gradual",
+    label: "Gradual - long-term advantage",
+    stakes_type: "gradual",
+    summary: "Success shifts the campaign trajectory in your favor.",
+  },
+] as const;
+
 function CampaignDetailPage() {
   const { campaignId } = Route.useParams();
   const { data, isLoading } = useCampaign(campaignId);
@@ -55,6 +82,9 @@ function CampaignDetailPage() {
     squad_name: "",
     patron: "",
     who_we_are: "",
+    relationships: [] as string[],
+    themes: [] as string[],
+    gm_prompts: [] as string[],
   });
   const [lobbyForm, setLobbyForm] = useState({
     mission_name: "",
@@ -68,6 +98,7 @@ function CampaignDetailPage() {
     support_assets: [] as string[],
     reserves: [] as ReservePlanEntry[],
   });
+  const [stakePresetId, setStakePresetId] = useState("");
   const [launchNotes, setLaunchNotes] = useState("");
   const [outcomeDrafts, setOutcomeDrafts] = useState<
     Record<string, { outcome: MissionOutcomeReport["outcome"]; completion_score: number; debrief_notes: string }>
@@ -92,14 +123,25 @@ function CampaignDetailPage() {
   const campaignModel = data.data as LancerCampaign;
   const lobbyState = campaignModel.lobby_state;
   const readiness = data.readiness_summary;
+  const missionSummary = data.mission_summary;
 
   useEffect(() => {
     setIdentityForm({
       squad_name: campaignModel.identity?.squad_name ?? "",
       patron: campaignModel.identity?.patron ?? "",
       who_we_are: campaignModel.identity?.who_we_are ?? "",
+      relationships: [...(campaignModel.identity?.relationships ?? [])],
+      themes: [...(campaignModel.identity?.themes ?? [])],
+      gm_prompts: [...(campaignModel.identity?.gm_prompts ?? [])],
     });
-  }, [campaignModel.identity?.patron, campaignModel.identity?.squad_name, campaignModel.identity?.who_we_are]);
+  }, [
+    campaignModel.identity?.patron,
+    campaignModel.identity?.squad_name,
+    campaignModel.identity?.who_we_are,
+    campaignModel.identity?.relationships,
+    campaignModel.identity?.themes,
+    campaignModel.identity?.gm_prompts,
+  ]);
 
   useEffect(() => {
     setLobbyForm({
@@ -118,6 +160,7 @@ function CampaignDetailPage() {
         ...reserve,
       })) ?? [],
     });
+    setStakePresetId("");
   }, [
     lobbyState?.assigned_member_ids,
     lobbyState?.mission_plan,
@@ -173,8 +216,42 @@ function CampaignDetailPage() {
         squad_name: identityForm.squad_name.trim() || undefined,
         patron: identityForm.patron.trim() || undefined,
         who_we_are: identityForm.who_we_are.trim() || undefined,
+        relationships: identityForm.relationships.filter((item) => item.trim().length > 0),
+        themes: identityForm.themes.filter((item) => item.trim().length > 0),
+        gm_prompts: identityForm.gm_prompts.filter((item) => item.trim().length > 0),
       },
     });
+  };
+
+  const addIdentityListItem = (
+    field: "relationships" | "themes" | "gm_prompts",
+  ) => {
+    setIdentityForm((prev) => ({
+      ...prev,
+      [field]: [...prev[field], ""],
+    }));
+  };
+
+  const updateIdentityListItem = (
+    field: "relationships" | "themes" | "gm_prompts",
+    index: number,
+    value: string,
+  ) => {
+    setIdentityForm((prev) => {
+      const next = [...prev[field]];
+      next[index] = value;
+      return { ...prev, [field]: next };
+    });
+  };
+
+  const removeIdentityListItem = (
+    field: "relationships" | "themes" | "gm_prompts",
+    index: number,
+  ) => {
+    setIdentityForm((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((_, idx) => idx !== index),
+    }));
   };
 
   const addObjectiveField = () => {
@@ -244,7 +321,7 @@ function CampaignDetailPage() {
         ...prev.reserves,
         {
           reserve_id: "",
-          assigned_pilot_id: null,
+          assigned_character_id: null,
           usage_notes: null,
           status: "planned",
         },
@@ -371,9 +448,24 @@ function CampaignDetailPage() {
     });
   };
 
-  const copyInvite = async (token: string) => {
+  const buildInviteLink = (token: string) => {
+    if (typeof window === "undefined") {
+      return `/invites/${token}`;
+    }
+    return `${window.location.origin}/invites/${token}`;
+  };
+
+  const copyInviteToken = async (token: string) => {
     try {
       await navigator.clipboard.writeText(token);
+    } catch (_) {
+      // ignore clipboard errors
+    }
+  };
+
+  const copyInviteLink = async (token: string) => {
+    try {
+      await navigator.clipboard.writeText(buildInviteLink(token));
     } catch (_) {
       // ignore clipboard errors
     }
@@ -383,14 +475,25 @@ function CampaignDetailPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-8">
-      <div className="space-y-2">
-        <p className="text-sm uppercase tracking-wide text-muted-foreground">
-          Campaign
-        </p>
-        <h1 className="text-3xl font-heading font-semibold text-foreground">
-          {data.name}
-        </h1>
-        <p className="text-muted-foreground max-w-2xl">{data.description}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-2">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">
+            Campaign
+          </p>
+          <h1 className="text-3xl font-heading font-semibold text-foreground">
+            {data.name}
+          </h1>
+          <p className="text-muted-foreground max-w-2xl">{data.description}</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            window.location.href = `/api/campaigns/${campaignId}/export.pdf`;
+          }}
+        >
+          Download GM brief
+        </Button>
       </div>
 
       {data.seat_warning && (
@@ -449,6 +552,114 @@ function CampaignDetailPage() {
                   }
                   placeholder="LL0 freelancers hunting interstellar salvage"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Relationships</label>
+                <div className="space-y-2">
+                  {identityForm.relationships.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Add key allies, rivals, or contacts.</p>
+                  )}
+                  {identityForm.relationships.map((item, index) => (
+                    <div key={`relationship-${index}`} className="flex gap-2">
+                      <input
+                        className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        value={item}
+                        onChange={(event) =>
+                          updateIdentityListItem("relationships", index, event.target.value)
+                        }
+                        placeholder="Union liaison"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeIdentityListItem("relationships", index)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addIdentityListItem("relationships")}
+                >
+                  Add relationship
+                </Button>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Themes</label>
+                <div className="space-y-2">
+                  {identityForm.themes.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Track campaign themes or tone cues.</p>
+                  )}
+                  {identityForm.themes.map((item, index) => (
+                    <div key={`theme-${index}`} className="flex gap-2">
+                      <input
+                        className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        value={item}
+                        onChange={(event) =>
+                          updateIdentityListItem("themes", index, event.target.value)
+                        }
+                        placeholder="Salvage operations, high tension"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeIdentityListItem("themes", index)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addIdentityListItem("themes")}
+                >
+                  Add theme
+                </Button>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">GM prompts</label>
+                <div className="space-y-2">
+                  {identityForm.gm_prompts.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Capture reminders for the GM.</p>
+                  )}
+                  {identityForm.gm_prompts.map((item, index) => (
+                    <div key={`gm-prompt-${index}`} className="flex gap-2">
+                      <input
+                        className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        value={item}
+                        onChange={(event) =>
+                          updateIdentityListItem("gm_prompts", index, event.target.value)
+                        }
+                        placeholder="Who benefits from the mission outcome?"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeIdentityListItem("gm_prompts", index)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addIdentityListItem("gm_prompts")}
+                >
+                  Add prompt
+                </Button>
               </div>
               <Button type="submit" disabled={updateIdentity.isPending}>
                 {updateIdentity.isPending ? "Saving..." : "Save identity"}
@@ -509,6 +720,35 @@ function CampaignDetailPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Mission Outcomes</CardTitle>
+          <CardDescription>High-level outcomes and completion trends.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+            <StatTile label="Total" value={missionSummary.total_missions.toString()} />
+            <StatTile label="Success" value={missionSummary.successful_missions.toString()} />
+            <StatTile label="Partial" value={missionSummary.partial_missions.toString()} />
+            <StatTile label="Failure" value={missionSummary.failed_missions.toString()} />
+          </div>
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div>
+              Avg completion: {missionSummary.average_completion.toFixed(2)}
+            </div>
+            <div>
+              Last mission: {missionSummary.last_mission_name ?? "None"}{" "}
+              {missionSummary.last_mission_date
+                ? `(${missionSummary.last_mission_date})`
+                : ""}
+            </div>
+            <div>
+              Last outcome: {missionSummary.last_outcome ?? "None"}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Mission Lobby</CardTitle>
           <CardDescription>
             Capture briefs, stakes, and assignments before starting combat.
@@ -544,6 +784,29 @@ function CampaignDetailPage() {
                   }
                   placeholder="Keep the colony online"
                 />
+                <select
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  value={stakePresetId}
+                  onChange={(event) => {
+                    const presetId = event.target.value;
+                    setStakePresetId(presetId);
+                    const preset = STAKE_PRESETS.find((item) => item.id === presetId);
+                    if (preset) {
+                      setLobbyForm((prev) => ({
+                        ...prev,
+                        stakes_summary: preset.summary,
+                        stakes_type: preset.stakes_type,
+                      }));
+                    }
+                  }}
+                >
+                  <option value="">Apply stake preset</option>
+                  {STAKE_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
                 <select
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                   value={lobbyForm.stakes_type}
@@ -673,9 +936,9 @@ function CampaignDetailPage() {
                     />
                     <input
                       className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-                      placeholder="Assigned pilot"
-                      value={reserve.assigned_pilot_id ?? ""}
-                      onChange={(event) => updateReserveRow(index, "assigned_pilot_id", event.target.value)}
+                      placeholder="Assigned character"
+                      value={reserve.assigned_character_id ?? ""}
+                      onChange={(event) => updateReserveRow(index, "assigned_character_id", event.target.value)}
                     />
                     <select
                       className="rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -822,9 +1085,14 @@ function CampaignDetailPage() {
                         <option key={character.character_id} value={character.character_id}>
                           {character.callsign}
                         </option>
-                      ))}
+                    ))}
                   </select>
                 </div>
+                {(readiness.member_issues?.[member.id] ?? []).length > 0 && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-600">
+                    Issues: {(readiness.member_issues?.[member.id] ?? []).join(", ")}
+                  </div>
+                )}
               </div>
             ))}
           </CardContent>
@@ -883,9 +1151,12 @@ function CampaignDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>Invites</CardTitle>
-            <CardDescription>Share tokens with other users.</CardDescription>
+            <CardDescription>Share invite links and track who has accepted.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Send the invite link to players so they can review the lobby and join.
+            </p>
             <form className="space-y-3" onSubmit={handleInvite}>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Role</label>
@@ -930,7 +1201,18 @@ function CampaignDetailPage() {
                       {invite.status}
                     </span>
                   </div>
-                  <div className="text-xs font-mono break-all">{invite.token}</div>
+                  <div className="text-xs text-muted-foreground">Invite link</div>
+                  <div className="text-xs font-mono break-all">
+                    {buildInviteLink(invite.token)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Token: <span className="font-mono">{invite.token}</span>
+                  </div>
+                  {invite.invited_email && (
+                    <p className="text-xs text-muted-foreground">
+                      Memo: {invite.invited_email}
+                    </p>
+                  )}
                   {invite.redeemed_by_user_id && (
                     <p className="text-xs text-muted-foreground">
                       Accepted by {invite.redeemed_by_user_id}
@@ -941,7 +1223,15 @@ function CampaignDetailPage() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => copyInvite(invite.token)}
+                      onClick={() => copyInviteLink(invite.token)}
+                    >
+                      Copy link
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyInviteToken(invite.token)}
                     >
                       Copy token
                     </Button>
@@ -993,11 +1283,18 @@ function CampaignDetailPage() {
           {campaignModel.sessions.map((sessionRecord) => (
             <div key={sessionRecord.id} className="border border-border/50 rounded-lg px-3 py-2 space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <div>
-                  Session {sessionRecord.session_number}
-                  {sessionRecord.mission_plan?.mission_name
-                    ? ` • ${sessionRecord.mission_plan.mission_name}`
-                    : ""}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>
+                    Session {sessionRecord.session_number}
+                    {sessionRecord.mission_plan?.mission_name
+                      ? ` • ${sessionRecord.mission_plan.mission_name}`
+                      : ""}
+                  </span>
+                  {sessionRecord.mission_outcome && (
+                    <span className="px-2 py-0.5 text-xs rounded-full border border-border/60 text-muted-foreground">
+                      Outcome: {sessionRecord.mission_outcome.outcome}
+                    </span>
+                  )}
                 </div>
                 {sessionRecord.lifecycle_checkpoints?.some(
                   (checkpoint) =>

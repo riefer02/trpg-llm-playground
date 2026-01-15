@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>${campaign_name} - Campaign Brief</title>
+    <style>
+      @page {
+        size: Letter;
+        margin: 0.6in;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Helvetica", "Arial", sans-serif;
+        color: #0f172a;
+        margin: 0;
+        padding: 0;
+      }
+
+      h1 {
+        font-size: 26px;
+        margin: 0 0 6px;
+      }
+
+      h2 {
+        font-size: 15px;
+        margin: 0 0 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #334155;
+      }
+
+      h3 {
+        font-size: 12px;
+        margin: 12px 0 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #475569;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .sheet {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .sheet-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2px solid #0f172a;
+        padding-bottom: 10px;
+      }
+
+      .sheet-subtitle {
+        font-size: 13px;
+        color: #475569;
+      }
+
+      .section {
+        border: 1px solid #cbd5e1;
+        padding: 14px;
+        border-radius: 10px;
+        break-inside: avoid;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .label {
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #64748b;
+        letter-spacing: 0.08em;
+      }
+
+      .value {
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .note-box {
+        border: 1px dashed #cbd5e1;
+        padding: 8px;
+        min-height: 44px;
+        font-size: 12px;
+        color: #475569;
+        white-space: pre-wrap;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li {
+        margin-bottom: 4px;
+      }
+
+      .empty {
+        font-size: 12px;
+        color: #94a3b8;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .summary-card {
+        border: 1px solid #e2e8f0;
+        padding: 8px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .summary-label {
+        font-size: 10px;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .summary-value {
+        font-size: 16px;
+        font-weight: 700;
+        margin-top: 4px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 6px 0;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      th {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <header class="sheet-header">
+        <div>
+          <h1>${campaign_name}</h1>
+          <p class="sheet-subtitle">${campaign_description}</p>
+        </div>
+        <div class="sheet-subtitle">Lancer Campaign Brief</div>
+      </header>
+
+      <section class="section">
+        <h2>Identity</h2>
+        <div class="grid-2">
+          <div class="field">
+            <div class="label">Squad</div>
+            <div class="value">${squad_name}</div>
+          </div>
+          <div class="field">
+            <div class="label">Patron</div>
+            <div class="value">${patron}</div>
+          </div>
+          <div class="field">
+            <div class="label">Who We Are</div>
+            <div class="note-box">${who_we_are}</div>
+          </div>
+          <div class="field">
+            <div class="label">Relationships</div>
+            ${relationships}
+          </div>
+          <div class="field">
+            <div class="label">Themes</div>
+            ${themes}
+          </div>
+          <div class="field">
+            <div class="label">GM Prompts</div>
+            ${gm_prompts}
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Mission Summary</h2>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="summary-label">Total Missions</div>
+            <div class="summary-value">${total_missions}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Success</div>
+            <div class="summary-value">${successful_missions}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Partial</div>
+            <div class="summary-value">${partial_missions}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Failure</div>
+            <div class="summary-value">${failed_missions}</div>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top: 12px">
+          <div class="field">
+            <div class="label">Average Completion</div>
+            <div class="value">${average_completion}</div>
+          </div>
+          <div class="field">
+            <div class="label">Last Outcome</div>
+            <div class="value">${last_outcome}</div>
+          </div>
+          <div class="field">
+            <div class="label">Last Mission</div>
+            <div class="value">${last_mission_name}</div>
+          </div>
+          <div class="field">
+            <div class="label">Last Mission Date</div>
+            <div class="value">${last_mission_date}</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Lobby Plan</h2>
+        <div class="grid-2">
+          <div class="field">
+            <div class="label">Lobby Status</div>
+            <div class="value">${lobby_status}</div>
+          </div>
+          <div class="field">
+            <div class="label">Mission Name</div>
+            <div class="value">${mission_name}</div>
+          </div>
+          <div class="field">
+            <div class="label">Stake Type</div>
+            <div class="value">${stakes_type}</div>
+          </div>
+          <div class="field">
+            <div class="label">Stake Summary</div>
+            <div class="note-box">${stakes_summary}</div>
+          </div>
+          <div class="field">
+            <div class="label">Briefing Notes</div>
+            <div class="note-box">${mission_briefing}</div>
+          </div>
+          <div class="field">
+            <div class="label">Objectives</div>
+            ${objectives}
+          </div>
+          <div class="field">
+            <div class="label">Support Assets</div>
+            ${support_assets}
+          </div>
+          <div class="field">
+            <div class="label">Reserves</div>
+            ${reserves}
+          </div>
+          <div class="field">
+            <div class="label">Min Pilots</div>
+            <div class="value">${min_pilots}</div>
+          </div>
+          <div class="field">
+            <div class="label">Preferred Pilots</div>
+            <div class="value">${preferred_pilots}</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Mission History</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Mission</th>
+              <th>Outcome</th>
+              <th>Completion</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${mission_history_rows}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </body>
+</html>

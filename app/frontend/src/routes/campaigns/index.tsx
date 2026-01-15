@@ -143,6 +143,16 @@ function CampaignCard({ campaign }: { campaign: CampaignSummary }) {
           <span>{campaign.member_count} members</span>
           <span>{campaign.character_count} characters</span>
         </div>
+        <div className="text-xs text-muted-foreground space-y-1">
+          <div>
+            Outcomes: {campaign.mission_summary.successful_missions} success /{" "}
+            {campaign.mission_summary.partial_missions} partial /{" "}
+            {campaign.mission_summary.failed_missions} failure
+          </div>
+          <div>
+            Last mission: {campaign.mission_summary.last_outcome ?? "None"}
+          </div>
+        </div>
         <Link
           to="/campaigns/$campaignId"
           params={{ campaignId: campaign.id }}

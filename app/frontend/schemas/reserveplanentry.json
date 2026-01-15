@@ -6,7 +6,7 @@
       "title": "Reserve Id",
       "type": "string"
     },
-    "assigned_pilot_id": {
+    "assigned_character_id": {
       "anyOf": [
         {
           "type": "string"
@@ -16,8 +16,8 @@
         }
       ],
       "default": null,
-      "description": "Pilot expected to use this reserve",
-      "title": "Assigned Pilot Id"
+      "description": "Character expected to use this reserve",
+      "title": "Assigned Character Id"
     },
     "usage_notes": {
       "anyOf": [

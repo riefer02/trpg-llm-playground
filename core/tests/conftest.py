@@ -25,6 +25,7 @@ import pytest
 from uuid import uuid4
 from typing import TYPE_CHECKING
 
+from core.character import Character, MechConfiguration
 from core.pilot.background import Background
 from core.pilot.pilot import Pilot
 from core.pilot.skill import SkillSet, PilotTrigger, TRIGGER_DEFINITIONS
@@ -33,8 +34,12 @@ from core.pilot.gear import PilotLoadout
 from core.mech.frame import MechFrameDefinition
 from core.mech.build import MechBuild, build_mech_from_compendium
 from core.mech.compendium import get_frame_definition
-from core.shared.campaign.campaign import Campaign, Session, ActiveSessionMission
-from core.shared.campaign.campaign import PilotMechAssignment
+from core.shared.campaign.campaign import (
+    Campaign,
+    Session,
+    ActiveSessionMission,
+    CharacterMechAssignment,
+)
 from core.shared.scenario import (
     SitrepTemplate,
     MissionObjective,
@@ -186,6 +191,27 @@ def integration_mech_everest(
 
 
 @pytest.fixture
+def integration_character_ll0(
+    integration_pilot_ll0: Pilot,
+    integration_mech_everest: tuple[MechFrameDefinition, MechBuild, SkillSet],
+) -> Character:
+    """Character with pilot + Everest mech for campaign testing."""
+    frame, build, _ = integration_mech_everest
+    mech = MechConfiguration(
+        id="test_mech_everest",
+        name="Everest",
+        frame_id=frame.id,
+        build=build,
+    )
+    return Character(
+        id="test_character_oda",
+        pilot=integration_pilot_ll0,
+        mechs=[mech],
+        active_mech_id=mech.id,
+    )
+
+
+@pytest.fixture
 def integration_mech_raleigh(
     integration_pilot_ll3: Pilot,
 ) -> tuple[MechFrameDefinition, MechBuild, SkillSet]:
@@ -255,21 +281,21 @@ def integration_narrative_tracker() -> NarrativeGoalTracker:
 
 @pytest.fixture
 def integration_campaign(
-    integration_pilot_ll0: Pilot,
+    integration_character_ll0: Character,
     integration_mech_everest: tuple[MechFrameDefinition, MechBuild, SkillSet],
 ) -> Campaign:
-    """Campaign with pilot and mech for persistence testing.
+    """Campaign with character and mech for persistence testing.
 
     Purpose: Full campaign state for save/load tests.
-    Dependencies: Pilot and mech fixtures.
+    Dependencies: Character and mech fixtures.
     """
-    frame, build, _ = integration_mech_everest
+    _, build, _ = integration_mech_everest
 
-    pilot_dict = integration_pilot_ll0.model_dump(mode="json")
+    character_dict = integration_character_ll0.model_dump(mode="json")
 
-    mech_link = PilotMechAssignment(
-        pilot_id=integration_pilot_ll0.id,
-        mech_id=f"{integration_pilot_ll0.callsign.lower()}-everest",
+    mech_link = CharacterMechAssignment(
+        character_id=integration_character_ll0.id,
+        mech_id=integration_character_ll0.active_mech_id or "active_mech",
         mech_name="Everest",
         mech_build=build.model_dump(mode="json"),
         is_active=True,
@@ -279,8 +305,8 @@ def integration_campaign(
         id="test_campaign_alpha",
         name="Alpha Squad Campaign",
         description="Test campaign for integration testing",
-        pilots=[pilot_dict],
-        pilot_mech_links=[mech_link],
+        characters=[character_dict],
+        character_mech_links=[mech_link],
         sessions=[
             Session(
                 id="test_session_1",
@@ -294,7 +320,7 @@ def integration_campaign(
 @pytest.fixture
 def integration_active_session(
     integration_sitrep_template: SitrepTemplate,
-    integration_pilot_ll0: Pilot,
+    integration_character_ll0: Character,
 ) -> ActiveSessionMission:
     """Active mission session for testing.
 
@@ -318,7 +344,7 @@ def integration_active_session(
                 {"id": "zone_end", "control": "enemies"},
             ],
         },
-        participating_pilot_ids=[integration_pilot_ll0.id],
+        participating_character_ids=[integration_character_ll0.id],
     )
 
 

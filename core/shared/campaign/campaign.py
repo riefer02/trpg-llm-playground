@@ -1,7 +1,7 @@
 """Campaign persistence models for Lancer TTRPG.
 
 Provides type-safe models for tracking persistent campaign state across sessions,
-including pilots, mech assignments, mission history, and session metadata.
+including characters, mech assignments, mission history, and session metadata.
 
 Note: Uses dict types for nested structures to avoid circular imports.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Literal
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 MissionLifecyclePhase = Literal["downtime", "brief", "prep", "mission", "debrief"]
 LifecycleStatus = Literal["pending", "in_progress", "complete"]
@@ -80,8 +80,14 @@ class ReservePlanEntry(BaseModel):
     """Tracks reserve usage/assignments planned for a mission."""
 
     reserve_id: str = Field(..., description="Identifier for the reserve asset")
-    assigned_pilot_id: str | None = Field(
-        default=None, description="Pilot expected to use this reserve"
+    assigned_character_id: str | None = Field(
+        default=None,
+        description="Character expected to use this reserve",
+        validation_alias=AliasChoices(
+            "assigned_character_id",
+            "assigned_pilot_id",
+        ),
+        serialization_alias="assigned_character_id",
     )
     usage_notes: str | None = Field(
         default=None, description="When/how it will be used"
@@ -191,22 +197,29 @@ def _default_lifecycle_checkpoints() -> list[SessionLifecycleCheckpoint]:
     ]
 
 
-class PilotMechAssignment(BaseModel):
-    """Links a pilot to their mech build, persisting across sessions.
+class CharacterMechAssignment(BaseModel):
+    """Links a character to their mech build, persisting across sessions.
 
     Attributes:
-        pilot_id: Reference to the pilot (matches Pilot.id)
-        mech_id: Unique identifier for this mech (e.g., "pilot_callsign-mech_name")
+        character_id: Reference to the character (matches Character.id)
+        mech_id: Unique identifier for this mech (e.g., "callsign-mech_name")
         mech_name: Human-readable name for the mech
         mech_build: Full mech loadout as serialized dict
-        is_active: Whether this is the pilot's current active mech
+        is_active: Whether this is the character's current active mech
     """
 
-    pilot_id: str = Field(..., description="Reference to pilot.id")
+    character_id: str = Field(
+        ...,
+        description="Reference to character.id",
+        validation_alias=AliasChoices("character_id", "pilot_id"),
+        serialization_alias="character_id",
+    )
     mech_id: str = Field(..., description="Unique mech identifier")
     mech_name: str = Field(..., description="Human-readable mech name")
     mech_build: dict = Field(..., description="Full mech loadout as serialized dict")
-    is_active: bool = Field(default=True, description="Is this the pilot's active mech")
+    is_active: bool = Field(
+        default=True, description="Is this the character's active mech"
+    )
 
 
 class ActiveSessionMission(BaseModel):
@@ -214,13 +227,19 @@ class ActiveSessionMission(BaseModel):
 
     Attributes:
         mission_state: The current state of the mission as serialized dict
-        participating_pilot_ids: Pilots currently engaged in this mission
+        participating_character_ids: Characters currently engaged in this mission
         started_at: When the mission was started
     """
 
     mission_state: dict = Field(..., description="Mission state as serialized dict")
-    participating_pilot_ids: list[str] = Field(
-        default_factory=list, description="IDs of pilots in this mission"
+    participating_character_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of characters in this mission",
+        validation_alias=AliasChoices(
+            "participating_character_ids",
+            "participating_pilot_ids",
+        ),
+        serialization_alias="participating_character_ids",
     )
     started_at: datetime = Field(
         default_factory=datetime.now, description="When the mission was started"
@@ -237,7 +256,7 @@ class CampaignMissionRecord(BaseModel):
         outcome: Mission outcome (success, partial, failure, catastrophic)
         completion_score: 0.0-1.0 progress score
         mission_date: When the mission was completed
-        participating_pilot_ids: Pilots who took part
+        participating_character_ids: Characters who took part
         debrief_notes: Optional notes about the mission
     """
 
@@ -249,8 +268,14 @@ class CampaignMissionRecord(BaseModel):
     mission_date: date = Field(
         default_factory=date.today, description="Completion date"
     )
-    participating_pilot_ids: list[str] = Field(
-        default_factory=list, description="Pilots who took part"
+    participating_character_ids: list[str] = Field(
+        default_factory=list,
+        description="Characters who took part",
+        validation_alias=AliasChoices(
+            "participating_character_ids",
+            "participating_pilot_ids",
+        ),
+        serialization_alias="participating_character_ids",
     )
     debrief_notes: str | None = Field(default=None, description="Session notes")
     reserves_spent: list[dict] = Field(
@@ -304,11 +329,11 @@ class Session(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_mission_pilot_ids(self) -> "Session":
-        """Ensure all missions reference valid pilot IDs."""
-        all_pilot_ids: set[str] = set()
+    def validate_mission_character_ids(self) -> "Session":
+        """Ensure all missions reference valid character IDs."""
+        all_character_ids: set[str] = set()
         for mission in self.active_missions:
-            all_pilot_ids.update(mission.participating_pilot_ids)
+            all_character_ids.update(mission.participating_character_ids)
         return self
 
     @model_validator(mode="after")
@@ -330,7 +355,7 @@ class Session(BaseModel):
 class Campaign(BaseModel):
     """Root persistence object for a Lancer campaign.
 
-    Tracks all campaign state including pilots, their mechs, session history,
+    Tracks all campaign state including characters, their mechs, session history,
     and mission completion records.
 
     Attributes:
@@ -338,8 +363,8 @@ class Campaign(BaseModel):
         name: Display name for the campaign
         description: Summary of the campaign premise
         sessions: Ordered list of all sessions (completed and in-progress)
-        pilots: All pilots in the campaign as serialized dicts
-        pilot_mech_links: Links between pilots and their mech builds
+        characters: All characters in the campaign as serialized dicts
+        character_mech_links: Links between characters and their mech builds
         mission_history: Records of all completed missions
         campaign_notes: GM notes about the campaign
         identity: Onboarding prompts/patrons for fast reference
@@ -354,11 +379,17 @@ class Campaign(BaseModel):
     sessions: list[Session] = Field(
         default_factory=list, description="All sessions in chronological order"
     )
-    pilots: list[dict] = Field(
-        default_factory=list, description="All pilots as serialized dicts"
+    characters: list[dict] = Field(
+        default_factory=list,
+        description="All characters as serialized dicts",
+        validation_alias=AliasChoices("characters", "pilots"),
+        serialization_alias="characters",
     )
-    pilot_mech_links: list[PilotMechAssignment] = Field(
-        default_factory=list, description="Pilot to mech assignments"
+    character_mech_links: list[CharacterMechAssignment] = Field(
+        default_factory=list,
+        description="Character to mech assignments",
+        validation_alias=AliasChoices("character_mech_links", "pilot_mech_links"),
+        serialization_alias="character_mech_links",
     )
     mission_history: list[CampaignMissionRecord] = Field(
         default_factory=list, description="Completed mission records"
@@ -380,49 +411,50 @@ class Campaign(BaseModel):
     model_config = {"validate_assignment": True}
 
     @model_validator(mode="after")
-    def validate_pilot_mech_links(self) -> Campaign:
-        """Ensure all mech links reference valid pilots."""
-        pilot_ids = {p.get("id") for p in self.pilots}
-        for link in self.pilot_mech_links:
-            if link.pilot_id not in pilot_ids:
+    def validate_character_mech_links(self) -> Campaign:
+        """Ensure all mech links reference valid characters."""
+        character_ids = {c.get("id") for c in self.characters}
+        for link in self.character_mech_links:
+            if link.character_id not in character_ids:
                 raise ValueError(
-                    f"Pilot mech link references unknown pilot: {link.pilot_id}"
+                    f"Character mech link references unknown character: {link.character_id}"
                 )
         return self
 
     @model_validator(mode="after")
-    def validate_mission_pilot_ids(self) -> Campaign:
-        """Ensure all mission records reference valid pilots."""
-        pilot_ids = {p.get("id") for p in self.pilots}
+    def validate_mission_character_ids(self) -> Campaign:
+        """Ensure all mission records reference valid characters."""
+        character_ids = {c.get("id") for c in self.characters}
         for session in self.sessions:
             for mission in session.active_missions:
-                for pilot_id in mission.participating_pilot_ids:
-                    if pilot_id not in pilot_ids:
+                for character_id in mission.participating_character_ids:
+                    if character_id not in character_ids:
                         raise ValueError(
-                            f"Session mission references unknown pilot: {pilot_id}"
+                            "Session mission references unknown character: "
+                            f"{character_id}"
                         )
         for record in self.mission_history:
-            for pilot_id in record.participating_pilot_ids:
-                if pilot_id not in pilot_ids:
+            for character_id in record.participating_character_ids:
+                if character_id not in character_ids:
                     raise ValueError(
-                        f"Mission history references unknown pilot: {pilot_id}"
+                        f"Mission history references unknown character: {character_id}"
                     )
         return self
 
     @model_validator(mode="after")
-    def validate_unique_pilot_ids(self) -> Campaign:
-        """Ensure all pilots have unique IDs."""
-        pilot_ids = [p.get("id") for p in self.pilots]
-        if len(pilot_ids) != len(set(pilot_ids)):
-            raise ValueError("Duplicate pilot IDs found in campaign")
+    def validate_unique_character_ids(self) -> Campaign:
+        """Ensure all characters have unique IDs."""
+        character_ids = [c.get("id") for c in self.characters]
+        if len(character_ids) != len(set(character_ids)):
+            raise ValueError("Duplicate character IDs found in campaign")
         return self
 
     @model_validator(mode="after")
     def validate_unique_mech_ids(self) -> Campaign:
         """Ensure all mech assignments have unique mech IDs."""
-        mech_ids = [link.mech_id for link in self.pilot_mech_links]
+        mech_ids = [link.mech_id for link in self.character_mech_links]
         if len(mech_ids) != len(set(mech_ids)):
-            raise ValueError("Duplicate mech IDs found in pilot mech links")
+            raise ValueError("Duplicate mech IDs found in character mech links")
         return self
 
     @model_validator(mode="after")
@@ -433,21 +465,27 @@ class Campaign(BaseModel):
             raise ValueError("Duplicate session numbers found")
         return self
 
-    def get_pilot(self, pilot_id: str) -> dict | None:
-        """Get a pilot by ID."""
-        for pilot in self.pilots:
-            if pilot.get("id") == pilot_id:
-                return pilot
+    def get_character(self, character_id: str) -> dict | None:
+        """Get a character by ID."""
+        for character in self.characters:
+            if character.get("id") == character_id:
+                return character
         return None
 
-    def get_pilot_mech_assignment(self, pilot_id: str) -> list[PilotMechAssignment]:
-        """Get all mech assignments for a pilot."""
-        return [link for link in self.pilot_mech_links if link.pilot_id == pilot_id]
+    def get_character_mech_assignment(
+        self, character_id: str
+    ) -> list[CharacterMechAssignment]:
+        """Get all mech assignments for a character."""
+        return [
+            link for link in self.character_mech_links if link.character_id == character_id
+        ]
 
-    def get_active_mech_for_pilot(self, pilot_id: str) -> PilotMechAssignment | None:
-        """Get the active mech assignment for a pilot."""
-        for link in self.pilot_mech_links:
-            if link.pilot_id == pilot_id and link.is_active:
+    def get_active_mech_for_character(
+        self, character_id: str
+    ) -> CharacterMechAssignment | None:
+        """Get the active mech assignment for a character."""
+        for link in self.character_mech_links:
+            if link.character_id == character_id and link.is_active:
                 return link
         return None
 
@@ -462,33 +500,41 @@ class Campaign(BaseModel):
         """Get all mission records for a specific mission."""
         return [r for r in self.mission_history if r.mission_id == mission_id]
 
-    def get_pilot_mission_history(self, pilot_id: str) -> list[CampaignMissionRecord]:
-        """Get all mission records for a specific pilot."""
+    def get_character_mission_history(
+        self, character_id: str
+    ) -> list[CampaignMissionRecord]:
+        """Get all mission records for a specific character."""
         return [
-            r for r in self.mission_history if pilot_id in r.participating_pilot_ids
+            r
+            for r in self.mission_history
+            if character_id in r.participating_character_ids
         ]
 
-    def get_active_missions_for_pilot(
-        self, pilot_id: str
+    def get_active_missions_for_character(
+        self, character_id: str
     ) -> list[ActiveSessionMission]:
-        """Get all in-progress missions for a specific pilot."""
+        """Get all in-progress missions for a specific character."""
         active: list[ActiveSessionMission] = []
         for session in self.sessions:
             for mission in session.active_missions:
-                if pilot_id in mission.participating_pilot_ids:
+                if character_id in mission.participating_character_ids:
                     active.append(mission)
         return active
 
-    def pilot_level(self, pilot_id: str) -> int | None:
-        """Get the license level of a pilot."""
-        pilot = self.get_pilot(pilot_id)
-        if pilot:
-            return pilot.get("level", 0)
+    def character_level(self, character_id: str) -> int | None:
+        """Get the license level of a character."""
+        character = self.get_character(character_id)
+        if character and isinstance(character, dict):
+            pilot = character.get("pilot", character)
+            if isinstance(pilot, dict):
+                return pilot.get("level", 0)
         return None
 
-    def pilot_is_dead(self, pilot_id: str) -> bool | None:
-        """Check if a pilot is dead."""
-        pilot = self.get_pilot(pilot_id)
-        if pilot:
-            return pilot.get("is_dead", False)
+    def character_is_dead(self, character_id: str) -> bool | None:
+        """Check if a character's pilot is dead."""
+        character = self.get_character(character_id)
+        if character and isinstance(character, dict):
+            pilot = character.get("pilot", character)
+            if isinstance(pilot, dict):
+                return pilot.get("is_dead", False)
         return None
