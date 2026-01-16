@@ -28,6 +28,7 @@ from app.backend.db.models import (
     CampaignCharacterDB,
     CharacterDB,
     CombatSessionDB,
+    utc_now,
 )
 from app.backend.dependencies import get_current_user
 from app.backend.exceptions import ConflictError, ForbiddenError, NotFoundError
@@ -82,7 +83,7 @@ def _load_campaign_model(record: CampaignDB) -> Campaign:
 
 def _save_campaign_model(record: CampaignDB, core_campaign: Campaign) -> None:
     record.data = core_campaign.model_dump(mode="json")
-    record.updated_at = datetime.utcnow()
+    record.updated_at = utc_now()
 
 
 async def _get_campaign_or_404(session: AsyncSession, campaign_id: str) -> CampaignDB:
@@ -316,36 +317,19 @@ class CampaignIdentityUpdateRequest(BaseModel):
     gm_prompts: list[str] | None = Field(default=None)
 
 
-class CampaignLobbyObjectiveInput(BaseModel):
-    id: str
-    title: str
-    success_condition: str
-    priority: Literal["primary", "secondary", "optional"] = "primary"
-    related_objective_id: str | None = None
-
-
-class CampaignLobbyStakesInput(BaseModel):
-    stakes_type: Literal["personal", "faction", "immediate", "gradual", "custom"]
-    summary: str
-    consequences_success: str | None = None
-    consequences_failure: str | None = None
-    consequences_partial: str | None = None
-
-
-class CampaignLobbyReserveInput(BaseModel):
-    reserve_id: str
-    assigned_character_id: str | None = None
-    usage_notes: str | None = None
-    status: Literal["planned", "spent", "earned"] = "planned"
-
-
 class CampaignLobbyUpdateRequest(BaseModel):
+    """Request body for updating lobby state.
+
+    Uses core types directly (MissionObjectiveBrief, MissionStakesBrief, ReservePlanEntry)
+    instead of duplicating their definitions here. Core handles validation.
+    """
+
     mission_name: constr(strip_whitespace=True, min_length=1)
     operation_code: str | None = None
     theater: str | None = None
-    objectives: list[CampaignLobbyObjectiveInput] = Field(default_factory=list)
-    stakes: CampaignLobbyStakesInput | None = None
-    reserves: list[CampaignLobbyReserveInput] = Field(default_factory=list)
+    objectives: list[MissionObjectiveBrief] = Field(default_factory=list)
+    stakes: MissionStakesBrief | None = None
+    reserves: list[ReservePlanEntry] = Field(default_factory=list)
     briefing_notes: str | None = None
     support_assets: list[str] = Field(default_factory=list)
     threats: list[str] = Field(default_factory=list)
@@ -593,6 +577,27 @@ async def create_campaign(
     return await _build_campaign_detail_response(session, campaign_db, user["id"])
 
 
+@router.get("/reserve-templates")
+async def list_reserve_templates(
+    category: str | None = None,
+    user: dict[str, Any] = Depends(get_current_user),
+):
+    """List available reserve templates from PR2 tables.
+
+    Args:
+        category: Optional filter by reserve type (narrative, mech, tactical)
+
+    Returns:
+        List of reserve template definitions
+    """
+    from core.pilot.mission import ALL_RESERVES
+
+    templates = ALL_RESERVES
+    if category:
+        templates = [t for t in templates if t.reserve_type == category]
+    return {"items": [t.model_dump() for t in templates], "total": len(templates)}
+
+
 @router.get("/{campaign_id}", response_model=CampaignDetailResponse)
 async def get_campaign(
     campaign_id: str,
@@ -666,7 +671,7 @@ async def create_invite(
     token = uuid4().hex
     expires_at = None
     if body.expires_in_hours:
-        expires_at = datetime.utcnow() + timedelta(hours=body.expires_in_hours)
+        expires_at = utc_now() + timedelta(hours=body.expires_in_hours)
 
     invite = CampaignInviteDB(
         id=invite_id,
@@ -699,7 +704,7 @@ async def accept_invite(
         raise NotFoundError("Invite", token)
     if invite.status != "pending":
         raise ConflictError("Invite already processed")
-    if invite.expires_at and invite.expires_at < datetime.utcnow():
+    if invite.expires_at and invite.expires_at < utc_now():
         invite.status = "expired"
         await session.commit()
         raise ConflictError("Invite has expired")
@@ -796,7 +801,7 @@ async def revoke_invite(
     )
     invite = await _get_invite_by_id(session, campaign_id, invite_id)
     invite.status = "revoked"
-    invite.updated_at = datetime.utcnow()
+    invite.updated_at = utc_now()
     session.add(invite)
     await session.commit()
     await session.refresh(invite)
@@ -819,10 +824,10 @@ async def resend_invite(
     invite = await _get_invite_by_id(session, campaign_id, invite_id)
     invite.status = "pending"
     if body.expires_in_hours:
-        invite.expires_at = datetime.utcnow() + timedelta(hours=body.expires_in_hours)
+        invite.expires_at = utc_now() + timedelta(hours=body.expires_in_hours)
     else:
         invite.expires_at = None
-    invite.updated_at = datetime.utcnow()
+    invite.updated_at = utc_now()
     session.add(invite)
     await session.commit()
     await session.refresh(invite)
@@ -1008,17 +1013,14 @@ async def upsert_campaign_lobby(
     if body.min_pilot_count > body.preferred_pilot_count:
         raise ConflictError("Minimum pilots cannot exceed preferred pilot count")
 
+    # Core types are used directly in CampaignLobbyUpdateRequest - no conversion needed
     mission_plan = MissionPrepPlan(
         mission_name=body.mission_name,
         operation_code=body.operation_code,
         theater=body.theater,
-        objectives=[
-            MissionObjectiveBrief(**obj.model_dump()) for obj in body.objectives
-        ],
-        stakes=MissionStakesBrief(**body.stakes.model_dump()) if body.stakes else None,
-        reserves=[
-            ReservePlanEntry(**reserve.model_dump()) for reserve in body.reserves
-        ],
+        objectives=body.objectives,
+        stakes=body.stakes,
+        reserves=body.reserves,
         briefing_notes=body.briefing_notes or "",
         support_assets=body.support_assets,
         threats=body.threats,
@@ -1033,7 +1035,7 @@ async def upsert_campaign_lobby(
     lobby_state.preferred_pilot_count = body.preferred_pilot_count
     lobby_state.min_pilot_count = body.min_pilot_count
     lobby_state.gm_notes = body.gm_notes or ""
-    lobby_state.last_ready_check = datetime.utcnow()
+    lobby_state.last_ready_check = utc_now()
     if body.status is not None:
         lobby_state.status = body.status
     core_campaign.lobby_state = lobby_state
@@ -1147,7 +1149,7 @@ async def launch_campaign_mission(
         session_number=len(core_campaign.sessions) + 1,
         mission_plan=lobby_state.mission_plan,
     )
-    now = datetime.utcnow()
+    now = utc_now()
     for checkpoint in new_session.lifecycle_checkpoints:
         if checkpoint.phase in {"downtime", "brief", "prep"}:
             checkpoint.status = "complete"
@@ -1198,7 +1200,7 @@ async def update_session_lifecycle(
             if body.gm_notes is not None:
                 checkpoint.gm_notes = body.gm_notes
             if body.status == "complete" and checkpoint.completed_at is None:
-                checkpoint.completed_at = datetime.utcnow()
+                checkpoint.completed_at = utc_now()
             break
     else:
         raise ConflictError(f"Unknown lifecycle phase: {body.phase}")
@@ -1346,7 +1348,7 @@ async def record_campaign_session_outcome(
         if checkpoint.phase == "mission":
             checkpoint.status = "complete"
             if checkpoint.completed_at is None:
-                checkpoint.completed_at = datetime.utcnow()
+                checkpoint.completed_at = utc_now()
             break
 
     mission_plan = session_entry.mission_plan
@@ -1397,7 +1399,7 @@ async def record_campaign_session_outcome(
         lobby_state.assigned_member_ids = []
         core_campaign.lobby_state = lobby_state
 
-    core_campaign.modified_at = datetime.utcnow()
+    core_campaign.modified_at = utc_now()
     _save_campaign_model(campaign_db, core_campaign)
     session.add(campaign_db)
     return campaign_db

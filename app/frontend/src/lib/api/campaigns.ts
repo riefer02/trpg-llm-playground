@@ -214,11 +214,28 @@ export interface SessionLifecycleUpdateRequest {
     gm_notes?: string | null;
 }
 
+export interface ReserveTemplate {
+    id: string;
+    name: string;
+    reserve_type: "narrative" | "mech" | "tactical";
+    d20_min: number;
+    d20_max: number;
+    description: string;
+    mechanical_effect?: Record<string, unknown> | null;
+    uses_modifier?: number | null;
+}
+
+export interface ReserveTemplateListResponse {
+    items: ReserveTemplate[];
+    total: number;
+}
+
 export const campaignKeys = {
 
   all: ["campaigns"] as const,
   lists: () => [...campaignKeys.all, "list"] as const,
   detail: (id: string) => [...campaignKeys.all, "detail", id] as const,
+  reserveTemplates: (category?: string) => [...campaignKeys.all, "reserve-templates", category] as const,
 };
 
 export function useCampaigns() {
@@ -233,6 +250,16 @@ export function useCampaign(id: string) {
     queryKey: campaignKeys.detail(id),
     queryFn: () => api.get<CampaignDetail>(`/campaigns/${id}`),
     enabled: !!id,
+  });
+}
+
+export function useReserveTemplates(category?: string) {
+  return useQuery({
+    queryKey: campaignKeys.reserveTemplates(category),
+    queryFn: () => {
+      const params = category ? `?category=${category}` : "";
+      return api.get<ReserveTemplateListResponse>(`/campaigns/reserve-templates${params}`);
+    },
   });
 }
 

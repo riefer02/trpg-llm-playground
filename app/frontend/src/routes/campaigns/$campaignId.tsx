@@ -13,7 +13,9 @@ import {
   useRecordCampaignSessionOutcome,
   useRevokeCampaignInvite,
   useResendCampaignInvite,
+  useReserveTemplates,
 } from "../../lib/api";
+import type { ReserveTemplate } from "../../lib/api";
 import type {
   Campaign as LancerCampaign,
   Session,
@@ -103,6 +105,9 @@ function CampaignDetailPage() {
   const [outcomeDrafts, setOutcomeDrafts] = useState<
     Record<string, { outcome: MissionOutcomeReport["outcome"]; completion_score: number; debrief_notes: string }>
   >({});
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateCategory, setTemplateCategory] = useState<string | undefined>(undefined);
+  const reserveTemplates = useReserveTemplates(templateCategory);
 
   const sortedInvites = useMemo(
     () =>
@@ -349,6 +354,22 @@ function CampaignDetailPage() {
       ...prev,
       reserves: prev.reserves.filter((_, idx) => idx !== index),
     }));
+  };
+
+  const addReserveFromTemplate = (template: ReserveTemplate) => {
+    setLobbyForm((prev) => ({
+      ...prev,
+      reserves: [
+        ...prev.reserves,
+        {
+          reserve_id: template.id,
+          assigned_character_id: null,
+          usage_notes: template.name,
+          status: "planned",
+        },
+      ],
+    }));
+    setShowTemplates(false);
   };
 
   const handleLobbySubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -975,9 +996,64 @@ function CampaignDetailPage() {
                   </div>
                 ))}
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={addReserveRow}>
-                Add reserve plan
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={addReserveRow}>
+                  Add reserve plan
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowTemplates(!showTemplates)}
+                >
+                  {showTemplates ? "Hide templates" : "Add from template"}
+                </Button>
+              </div>
+              {showTemplates && (
+                <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground">Filter by type:</label>
+                    <select
+                      className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                      value={templateCategory ?? ""}
+                      onChange={(event) => setTemplateCategory(event.target.value || undefined)}
+                    >
+                      <option value="">All ({reserveTemplates.data?.total ?? 0})</option>
+                      <option value="narrative">Narrative</option>
+                      <option value="mech">Mech</option>
+                      <option value="tactical">Tactical</option>
+                    </select>
+                  </div>
+                  {reserveTemplates.isLoading && (
+                    <p className="text-sm text-muted-foreground">Loading templates...</p>
+                  )}
+                  {reserveTemplates.data && (
+                    <div className="grid gap-2 md:grid-cols-2 max-h-64 overflow-y-auto">
+                      {reserveTemplates.data.items.map((template) => (
+                        <button
+                          key={template.id}
+                          type="button"
+                          className="text-left rounded-md border border-border/60 bg-background px-3 py-2 hover:border-primary/60 hover:bg-primary/5 transition-colors"
+                          onClick={() => addReserveFromTemplate(template)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm">{template.name}</span>
+                            <span className="px-1.5 py-0.5 text-xs rounded bg-muted text-muted-foreground">
+                              {template.reserve_type}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {template.description}
+                          </div>
+                          <div className="text-xs text-muted-foreground/70 mt-1">
+                            d20: {template.d20_min}-{template.d20_max}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">

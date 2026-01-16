@@ -35,6 +35,7 @@ from core.pilot import (
     ProgressionValidation,
     MissionCadenceRules,
     ReserveEntry,
+    ReserveDefinition,
     DowntimeActionDefinition,
     DowntimeActionUse,
     DowntimePlan,
@@ -249,6 +250,21 @@ from core.mech.combat_resolution import (
     OverheatResolution,
     ResolutionSettings,
 )
+from core.mech.combat_execution import (
+    ActionExecutionInput,
+    ActionExecutionResult,
+    TurnStartResult,
+    TurnEndResult,
+    ReactionInput,
+    ReactionResult,
+    AvailableAction,
+    AvailableActionsResult,
+    ResourceChange,
+)
+from core.mech.action_economy import (
+    ActionEconomyState,
+    ActionEconomyResult,
+)
 from core.character import (
     Character,
     MechConfiguration,
@@ -290,6 +306,7 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "ProgressionValidation": ProgressionValidation,
     "MissionCadenceRules": MissionCadenceRules,
     "ReserveEntry": ReserveEntry,
+    "ReserveDefinition": ReserveDefinition,
     "DowntimeActionDefinition": DowntimeActionDefinition,
     "DowntimeActionUse": DowntimeActionUse,
     "DowntimePlan": DowntimePlan,
@@ -501,6 +518,19 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "StructureResolution": StructureResolution,
     "OverheatResolution": OverheatResolution,
     "ResolutionSettings": ResolutionSettings,
+    # Combat execution
+    "ActionExecutionInput": ActionExecutionInput,
+    "ActionExecutionResult": ActionExecutionResult,
+    "TurnStartResult": TurnStartResult,
+    "TurnEndResult": TurnEndResult,
+    "ReactionInput": ReactionInput,
+    "ReactionResult": ReactionResult,
+    "AvailableAction": AvailableAction,
+    "AvailableActionsResult": AvailableActionsResult,
+    "ResourceChange": ResourceChange,
+    # Action economy
+    "ActionEconomyState": ActionEconomyState,
+    "ActionEconomyResult": ActionEconomyResult,
 }
 
 

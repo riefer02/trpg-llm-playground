@@ -551,11 +551,13 @@ core/ change → make test-core → add to export.py → make generate-types →
 - ✅ **JSON Schema Export**: Individual and combined schema files
 - ✅ **Validation System**: Pilot progression, mech builds, LL0 rules, license gating
 
-### Web Application (59 tests passing)
-- ✅ **Character API**: Full CRUD with unified pilot + mech (20 tests)
-- ✅ **Character Frontend**: List, create, detail routes
+### Web Application (79 backend + 19 frontend tests passing)
+- ✅ **Character API**: Full CRUD with unified pilot + mech, loadout updates, PDF export
+- ✅ **Character Frontend**: List, create, detail routes, loadout builder
 - ✅ **Pilot API**: Low-level primitive API (kept for internal use)
-- ✅ **Combat Session API**: CRUD foundation
+- ✅ **Combat Session API**: CRUD + campaign integration
+- ✅ **Campaign API**: Full lifecycle (create, invite, lobby, launch, outcome)
+- ✅ **Combat Canvas**: Hex grid visualization with AoE overlays
 - ✅ **Shared Utilities**: `validate_core_model()` for DRY API layer
 
 ### LLM
@@ -568,18 +570,23 @@ core/ change → make test-core → add to export.py → make generate-types →
 
 ## Roadmap
 
-### Current: Combat UI (Phase 6)
-- 🔲 Action execution endpoints
-- 🔲 Frontend combat UI (hex grid, action panel)
+### Current: Combat Turn Execution (Phase 8)
+- 🔲 Action execution endpoints (validate → resolve → apply)
+- 🔲 Turn management (start, end, initiative)
+- 🔲 Reaction handling
+- 🔲 Combat UI action panel
 
 ### Completed
-- ✅ Phase 1: Core type system (3277+ tests)
+- ✅ Phase 1: Core type system (3286 tests)
 - ✅ Phase 2: Code cleanliness (HexCoord, effects splitting)
 - ✅ Phase 3: App foundation (FastAPI, TanStack Start, type generation)
 - ✅ Phase 4: Pilot & Combat session CRUD APIs
 - ✅ Phase 5: Character system (core model + API + frontend)
+- ✅ Phase 6: Compendium + loadout builder + PDF export
+- ✅ Phase 7: Campaign system (lobby, lifecycle, invites, outcomes)
+- ✅ Combat canvas + render adapter + action log
 
 ### Future
-- Campaign persistence and GM tools
+- WebSocket for real-time combat updates
 - LLM integration for rules assistance
 - Mobile-responsive UI

@@ -24,6 +24,7 @@ export type LancerTTRPGSchema =
   | ProgressionValidation
   | MissionCadenceRules
   | ReserveEntry
+  | ReserveDefinition
   | DowntimeActionDefinition
   | DowntimeActionUse
   | DowntimePlan
@@ -27836,13 +27837,38 @@ export type UsesRemaining = number;
 export type Shared = boolean;
 export type ExpiresOnMissionEnd = boolean;
 /**
- * Unique downtime action identifier
+ * Reserve identifier (used in reserves table)
  */
 export type Id7 = string;
 /**
  * Display name
  */
 export type Name19 = string;
+export type ReserveType1 = "narrative" | "mech" | "tactical";
+/**
+ * Minimum d20 roll
+ */
+export type D20Min = number;
+/**
+ * Maximum d20 roll
+ */
+export type D20Max = number;
+/**
+ * Narrative description
+ */
+export type Description1 = string;
+/**
+ * Modifier to uses (e.g., +1/+2 for ammo)
+ */
+export type UsesModifier = number | null;
+/**
+ * Unique downtime action identifier
+ */
+export type Id8 = string;
+/**
+ * Display name
+ */
+export type Name20 = string;
 export type Category = "recovery" | "intel" | "resource" | "contact" | "project" | "tradeoff" | "other";
 export type Outcomes = ("reserve" | "info" | "contact" | "project" | "recovery" | "custom")[];
 /**
@@ -27854,7 +27880,7 @@ export type Tier = "failure" | "partial" | "success";
 /**
  * Narrative description of outcome
  */
-export type Description1 = string;
+export type Description2 = string;
 /**
  * Whether this outcome grants a reserve
  */
@@ -27914,11 +27940,11 @@ export type Issues1 = DowntimeIssue[];
 /**
  * Unique gear identifier
  */
-export type Id8 = string;
+export type Id9 = string;
 /**
  * Display name
  */
-export type Name20 = string;
+export type Name21 = string;
 export type Category1 = "clothing" | "armor" | "weapon" | "gear";
 export type LimitedUses1 = number | null;
 export type Tag1 = "sidearm" | "archaic" | "loading" | "ordnance" | "inaccurate";
@@ -27931,20 +27957,20 @@ export type Ap2 = boolean;
 export type DamageType7 = "kinetic" | "explosive" | "energy" | "burn";
 export type DamageTypeOptions = ("kinetic" | "explosive" | "energy" | "burn")[] | null;
 export type Loaded = boolean;
-export type Name21 = string;
+export type Name22 = string;
 export type Range12 = number;
 export type Pattern1 = "range" | "threat" | "thrown" | "line" | "cone" | "burst" | "blast" | "sensors";
 export type Size7 = number;
 export type AttackVs2 = ("evasion" | "e_defense") | null;
 export type ObjectsAutoHit = boolean;
 export type Grenades = PilotGrenadePayload[];
-export type Name22 = string;
+export type Name23 = string;
 export type PlantAction = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type DetonateAction = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type Charges = PilotChargePayload[];
 export type Mode2 = "move" | "boost" | "move_or_boost";
 export type MustEndOnSurface1 = boolean;
-export type Name23 = string;
+export type Name24 = string;
 export type Action = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type HealFraction = number;
 export type HealRoundUp = boolean;
@@ -27952,7 +27978,7 @@ export type CanHealDownAndOut = boolean;
 export type RestoresConsciousness = boolean;
 export type AppliesToAdjacent1 = boolean;
 export type AffectsMechs = boolean;
-export type Name24 = string;
+export type Name25 = string;
 export type Effect = "awake_alert" | "calm_emotional" | "heightened_senses";
 export type DurationHours = number | null;
 export type ActionType14 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
@@ -28027,7 +28053,7 @@ export type Hp1 = number;
 export type Evasion1 = number;
 export type EDefense1 = number;
 export type Speed1 = number;
-export type Name25 = "minor" | "major" | "lethal";
+export type Name26 = "minor" | "major" | "lethal";
 export type MinDamage = number;
 export type MaxDamage = number | null;
 export type RollDie = "1d6";
@@ -28047,15 +28073,15 @@ export type ArmorPiercingIgnoresArmor = boolean;
 /**
  * Unique character ID
  */
-export type Id9 = string;
+export type Id10 = string;
 /**
  * Unique mech configuration ID
  */
-export type Id10 = string;
+export type Id11 = string;
 /**
  * Custom name (e.g., 'RAIJIN')
  */
-export type Name26 = string;
+export type Name27 = string;
 /**
  * Frame definition ID
  */
@@ -28100,19 +28126,19 @@ export type AiSystemLimit = number;
 /**
  * Unique campaign identifier
  */
-export type Id11 = string;
+export type Id12 = string;
 /**
  * Campaign display name
  */
-export type Name27 = string;
+export type Name28 = string;
 /**
  * Campaign premise
  */
-export type Description2 = string;
+export type Description3 = string;
 /**
  * Unique session identifier
  */
-export type Id12 = string;
+export type Id13 = string;
 /**
  * Ordinal session number
  */
@@ -28140,7 +28166,7 @@ export type Theater = string | null;
 /**
  * Local identifier for this objective
  */
-export type Id13 = string;
+export type Id14 = string;
 /**
  * Display title for the objective
  */
@@ -28506,7 +28532,7 @@ export type ComplicationDescription = string | null;
 /**
  * Unique condition identifier
  */
-export type Id14 = string;
+export type Id15 = string;
 export type ConditionType =
   | "skill_check"
   | "position_reached"
@@ -28518,7 +28544,7 @@ export type ConditionType =
 /**
  * What must be true for this condition
  */
-export type Description3 = string;
+export type Description4 = string;
 /**
  * Tier needed if condition is check-based
  */
@@ -28538,11 +28564,11 @@ export type TargetId = string | null;
 /**
  * Unique goal identifier
  */
-export type Id15 = string;
+export type Id16 = string;
 /**
  * Pilot's stated goal
  */
-export type Description4 = string;
+export type Description5 = string;
 /**
  * Conditions that represent success
  */
@@ -28621,7 +28647,7 @@ export type RequirementType =
 /**
  * What clears this complication
  */
-export type Description5 = string;
+export type Description6 = string;
 /**
  * Narrative tier required (if resolution needs a check)
  */
@@ -28637,12 +28663,12 @@ export type RequiredAmount1 = number | null;
 /**
  * Unique complication identifier
  */
-export type Id16 = string;
+export type Id17 = string;
 export type ComplicationType1 = "harm" | "time" | "resources" | "collateral" | "position" | "effect";
 /**
  * What is going wrong
  */
-export type Description6 = string;
+export type Description7 = string;
 /**
  * Severity of the complication
  */
@@ -28688,7 +28714,7 @@ export type ProfileId = string;
 /**
  * Display name
  */
-export type Name28 = string;
+export type Name29 = string;
 /**
  * Primary damage type for the profile (if applicable)
  */
@@ -28736,11 +28762,11 @@ export type RerollActionType = "full";
 /**
  * Unique identifier
  */
-export type Id17 = string;
+export type Id18 = string;
 /**
  * Display name
  */
-export type Name29 = string;
+export type Name30 = string;
 export type ActionType15 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type Target83 = "self" | "enemy" | "ally" | "adjacent" | "object";
 export type UsesPer14 = "unlimited" | "round" | "scene" | "mission" | "rest" | "full_repair";
@@ -28755,11 +28781,11 @@ export type BenefitsFromTalents = boolean;
 /**
  * Unique weapon identifier
  */
-export type Id18 = string;
+export type Id19 = string;
 /**
  * Display name
  */
-export type Name30 = string;
+export type Name31 = string;
 export type Size10 = "aux" | "main" | "heavy" | "superheavy";
 export type WeaponType1 = "cqb" | "rifle" | "launcher" | "cannon" | "melee" | "nexus";
 /**
@@ -28787,11 +28813,11 @@ export type LimitedUses2 = number | null;
 /**
  * Unique system identifier
  */
-export type Id19 = string;
+export type Id20 = string;
 /**
  * Display name
  */
-export type Name31 = string;
+export type Name32 = string;
 export type SystemType = "system" | "tech" | "deployable" | "drone" | "shield" | "ai";
 export type SpCost1 = number;
 /**
@@ -28818,7 +28844,7 @@ export type Tag3 =
   | "mine";
 export type Value15 = number | null;
 export type Tags5 = SystemTag[];
-export type Name32 = string;
+export type Name33 = string;
 export type Range13 = number;
 export type Pattern2 = "range" | "threat" | "thrown" | "line" | "cone" | "burst" | "blast" | "sensors";
 export type Size11 = number;
@@ -28830,7 +28856,7 @@ export type Save1 = ("hull" | "agility" | "systems" | "engineering") | null;
 export type HalfOnSuccess = boolean;
 export type ObjectsAutoHit1 = boolean;
 export type Grenades1 = GrenadePayload[];
-export type Name33 = string;
+export type Name34 = string;
 export type Detonation = "adjacent_movement" | "ally_adjacent_movement" | "manual";
 export type CanAttachToTerrain = boolean;
 export type DetonationAction = ("free" | "quick" | "full" | "reaction" | "protocol" | "move") | null;
@@ -28846,12 +28872,12 @@ export type Cover5 = ("none" | "soft" | "hard") | null;
 export type Evasion3 = number;
 export type Hp3 = number;
 export type PickupAction = ("free" | "quick" | "full" | "reaction" | "protocol" | "move") | null;
-export type Name34 = string;
+export type Name35 = string;
 export type Size13 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
 export type Hp4 = number;
 export type Evasion4 = number;
 export type EDefense3 = number;
-export type Name35 = string;
+export type Name36 = string;
 export type Trigger25 = "ally_hit_target_within_range";
 export type Range15 = number;
 export type UsesPerRound = number;
@@ -28872,11 +28898,11 @@ export type IntegratedWeaponId = string | null;
 /**
  * Unique core system identifier
  */
-export type Id20 = string;
+export type Id21 = string;
 /**
  * Display name
  */
-export type Name36 = string;
+export type Name37 = string;
 export type MountlessWeapons = MountlessWeaponDefinition[];
 export type UsesPerMission = number;
 export type Size14 = "size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5";
@@ -28894,11 +28920,11 @@ export type Structure1 = number;
 /**
  * Unique frame identifier
  */
-export type Id21 = string;
+export type Id22 = string;
 /**
  * Display name
  */
-export type Name37 = string;
+export type Name38 = string;
 export type Manufacturer2 = "GMS" | "IPS-N" | "SSC" | "HORUS" | "HA";
 /**
  * License ID required to use this frame (None for GMS/general)
@@ -28913,7 +28939,7 @@ export type SystemPoints1 = number;
 /**
  * Display name
  */
-export type Name38 = string;
+export type Name39 = string;
 export type Traits = FrameTrait[];
 export type UnlicensedStatusPenalties = (
   | "braced"
@@ -29141,7 +29167,7 @@ export type ChooseDestroyedBy = "target" | "attacker";
 export type ExcludeLimitedNoCharges = boolean;
 export type FallbackToOtherIfNone = boolean;
 export type FallbackToDirectHitIfNone = boolean;
-export type Name39 = "glancing_blow" | "system_trauma" | "direct_hit" | "crushing_hit";
+export type Name40 = "glancing_blow" | "system_trauma" | "direct_hit" | "crushing_hit";
 export type ImpairedUntilEndNextTurn = boolean;
 export type DestroyMount = boolean;
 export type DestroySystem = boolean;
@@ -29163,7 +29189,7 @@ export type DangerZoneFraction = number;
 export type DangerZoneRounding = "up" | "down";
 export type RollMin2 = number;
 export type RollMax2 = number;
-export type Name40 = "emergency_shunt" | "power_plant_destabilize" | "meltdown" | "irreversible_meltdown";
+export type Name41 = "emergency_shunt" | "power_plant_destabilize" | "meltdown" | "irreversible_meltdown";
 export type ImpairedUntilEndNextTurn1 = boolean;
 export type ExposedUntilCleared = boolean;
 export type MeltdownImmediate = boolean;
@@ -29256,8 +29282,8 @@ export type CannotReactWhileDragging1 = boolean;
 export type CannotReactWhileLifting1 = boolean;
 export type SlowedWhileDragging = boolean;
 export type ImmobilizedWhileLifting = boolean;
-export type Id22 = string;
-export type Name41 = string;
+export type Id23 = string;
+export type Name42 = string;
 export type ActionType16 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type AlternateActionTypes = ("free" | "quick" | "full" | "reaction" | "protocol" | "move")[];
 export type Scope = "mech" | "pilot" | "both";
@@ -29436,7 +29462,7 @@ export type UsesPerRound1 = number;
 export type UsesPilotWeapon = boolean;
 export type SidearmCanBeQuick = boolean;
 export type ContestedCheck1 = "grit_vs_hull";
-export type Name42 = "distract" | "shred" | "damage";
+export type Name43 = "distract" | "shred" | "damage";
 export type InflictsConditions1 = (
   | "braced"
   | "immobilized"
@@ -29522,8 +29548,8 @@ export type HeatCap2 = number;
 export type StructureCurrent = number;
 export type StressCurrent = number;
 export type RepairsRemaining = number;
-export type Id23 = string;
-export type Name43 = string;
+export type Id24 = string;
+export type Name44 = string;
 export type Side = "players" | "hostiles" | "neutral";
 export type Kind = "mech" | "pilot" | "npc" | "object";
 export type Statuses1 = (
@@ -29872,8 +29898,8 @@ export type Combatants = CombatantState[];
 export type Grapples = GrappleLink[];
 export type Rounds = CombatRound[];
 export type Environment1 = "standard" | "zero_g" | "underwater";
-export type Id24 = string;
-export type Name44 = string;
+export type Id25 = string;
+export type Name45 = string;
 export type Kind1 = "drone" | "mine" | "deployable" | "other";
 export type OwnerId = string | null;
 export type Size17 = number;
@@ -32753,11 +32779,28 @@ export interface ReserveEntry {
   [k: string]: unknown;
 }
 /**
+ * Definition for a reserve type from the PR2 tables.
+ */
+export interface ReserveDefinition {
+  id: Id7;
+  name: Name19;
+  reserve_type: ReserveType1;
+  d20_min: D20Min;
+  d20_max: D20Max;
+  description: Description1;
+  /**
+   * Mechanical effect when granted/used
+   */
+  mechanical_effect?: MechanicalEffect | null;
+  uses_modifier?: UsesModifier;
+  [k: string]: unknown;
+}
+/**
  * Definition for a downtime action.
  */
 export interface DowntimeActionDefinition {
-  id: Id7;
-  name: Name19;
+  id: Id8;
+  name: Name20;
   category: Category;
   outcomes?: Outcomes;
   requires_skill_check?: RequiresSkillCheck;
@@ -32771,7 +32814,7 @@ export interface DowntimeActionDefinition {
  */
 export interface RollTierOutcome {
   tier: Tier;
-  description: Description1;
+  description: Description2;
   grants_reserve?: GrantsReserve1;
   reserve_id?: ReserveId;
   reserve_uses?: ReserveUses;
@@ -32842,8 +32885,8 @@ export interface DowntimeValidation {
  * Definition for a pilot gear item.
  */
 export interface PilotGearItemDefinition {
-  id: Id8;
-  name: Name20;
+  id: Id9;
+  name: Name21;
   category: Category1;
   limited_uses?: LimitedUses1;
   tags?: Tags2;
@@ -32898,7 +32941,7 @@ export interface PilotDamageSpec {
  * Grenade option for pilot gear.
  */
 export interface PilotGrenadePayload {
-  name: Name21;
+  name: Name22;
   range: Range12;
   area: PilotAreaEffect;
   [k: string]: unknown;
@@ -32919,7 +32962,7 @@ export interface PilotAreaEffect {
  * Planted explosive charge payload for pilot gear.
  */
 export interface PilotChargePayload {
-  name: Name22;
+  name: Name23;
   plant_action: PlantAction;
   detonate_action: DetonateAction;
   area: PilotAreaEffect;
@@ -32937,7 +32980,7 @@ export interface PilotFlightEffect {
  * Medical gear payload.
  */
 export interface PilotMedicalEffect {
-  name: Name23;
+  name: Name24;
   action: Action;
   heal_fraction?: HealFraction;
   heal_round_up?: HealRoundUp;
@@ -32951,7 +32994,7 @@ export interface PilotMedicalEffect {
  * Stim gear payload.
  */
 export interface PilotStimEffect {
-  name: Name24;
+  name: Name25;
   effect: Effect;
   duration_hours?: DurationHours;
   [k: string]: unknown;
@@ -33078,7 +33121,7 @@ export interface PilotCombatBaseStats {
  * Damage severity bands for pilots.
  */
 export interface PilotDamageSeverity {
-  name: Name25;
+  name: Name26;
   min_damage: MinDamage;
   max_damage?: MaxDamage;
   [k: string]: unknown;
@@ -33166,7 +33209,7 @@ export interface PilotRestRule1 {
  * - Provides holistic validation (pilot + mech + license gating)
  */
 export interface Character {
-  id?: Id9;
+  id?: Id10;
   pilot: Pilot1;
   mechs?: Mechs;
   active_mech_id?: ActiveMechId;
@@ -33234,8 +33277,8 @@ export interface Pilot1 {
  * grit, and core bonuses when accessed through the Character model.
  */
 export interface MechConfiguration {
-  id: Id10;
-  name: Name26;
+  id: Id11;
+  name: Name27;
   frame_id: FrameId1;
   build?: MechBuild;
   [k: string]: unknown;
@@ -33310,9 +33353,9 @@ export interface MechDerivedStats {
  *     modified_at: When the campaign was last modified
  */
 export interface Campaign {
-  id: Id11;
-  name: Name27;
-  description?: Description2;
+  id: Id12;
+  name: Name28;
+  description?: Description3;
   sessions?: Sessions;
   characters?: Characters;
   character_mech_links?: CharacterMechLinks;
@@ -33345,7 +33388,7 @@ export interface Campaign {
  *     downtime_plans: Downtime actions taken as dict list
  */
 export interface Session {
-  id: Id12;
+  id: Id13;
   session_number: SessionNumber;
   session_date?: SessionDate;
   debrief?: Debrief;
@@ -33382,7 +33425,7 @@ export interface MissionPrepPlan {
  * Lightweight mission objective summary for lobby/session prep.
  */
 export interface MissionObjectiveBrief {
-  id: Id13;
+  id: Id14;
   title: Title;
   success_condition: SuccessCondition;
   priority?: Priority;
@@ -33668,9 +33711,9 @@ export interface NarrativeGoalOutcome {
  * Condition that must be met to complete a narrative goal.
  */
 export interface NarrativeGoalCondition {
-  id: Id14;
+  id: Id15;
   condition_type: ConditionType;
-  description: Description3;
+  description: Description4;
   required_tier?: RequiredTier;
   required_skill?: RequiredSkill;
   required_amount?: RequiredAmount;
@@ -33681,8 +33724,8 @@ export interface NarrativeGoalCondition {
  * Goal definition for narrative combat.
  */
 export interface NarrativeGoal {
-  id: Id15;
-  description: Description4;
+  id: Id16;
+  description: Description5;
   success_conditions?: SuccessConditions;
   successes_required?: SuccessesRequired;
   failure_limit?: FailureLimit;
@@ -33742,7 +33785,7 @@ export interface NarrativeGoalTracker {
  */
 export interface NarrativeResolutionRequirement {
   requirement_type: RequirementType;
-  description: Description5;
+  description: Description6;
   required_tier?: RequiredTier1;
   required_skill?: RequiredSkill1;
   required_amount?: RequiredAmount1;
@@ -33752,9 +33795,9 @@ export interface NarrativeResolutionRequirement {
  * Complication that persists in narrative combat until resolved.
  */
 export interface NarrativeComplication {
-  id: Id16;
+  id: Id17;
   complication_type: ComplicationType1;
-  description: Description6;
+  description: Description7;
   severity?: Severity3;
   established_before_roll?: EstablishedBeforeRoll;
   trigger?: Trigger24;
@@ -33787,7 +33830,7 @@ export interface NarrativeCombatState {
  */
 export interface WeaponProfile {
   profile_id: ProfileId;
-  name: Name28;
+  name: Name29;
   damage_type?: DamageType8;
   ranges?: Ranges1;
   damage?: Damage1;
@@ -33869,8 +33912,8 @@ export interface DynamicWeaponDefinition {
  * Weapon-like profile that does not count as a weapon or occupy a mount.
  */
 export interface MountlessWeaponDefinition {
-  id: Id17;
-  name: Name29;
+  id: Id18;
+  name: Name30;
   profile: WeaponProfile;
   action_type?: ActionType15;
   target?: Target83;
@@ -33889,8 +33932,8 @@ export interface MountlessWeaponDefinition {
  * Definition for a mech weapon.
  */
 export interface MechWeaponDefinition {
-  id: Id18;
-  name: Name30;
+  id: Id19;
+  name: Name31;
   size: Size10;
   weapon_type: WeaponType1;
   damage_type?: DamageType10;
@@ -33911,8 +33954,8 @@ export interface MechWeaponDefinition {
  * Definition for a mech system or chassis mod.
  */
 export interface MechSystemDefinition {
-  id: Id19;
-  name: Name31;
+  id: Id20;
+  name: Name32;
   system_type?: SystemType;
   sp_cost?: SpCost1;
   license_id?: LicenseId2;
@@ -33940,7 +33983,7 @@ export interface SystemTag {
  * Grenade option for a system.
  */
 export interface GrenadePayload {
-  name: Name32;
+  name: Name33;
   range: Range13;
   area: AreaEffect;
   [k: string]: unknown;
@@ -33966,7 +34009,7 @@ export interface AreaEffect {
  * Mine option for a system.
  */
 export interface MinePayload {
-  name: Name33;
+  name: Name34;
   area: AreaEffect;
   detonation?: Detonation;
   can_attach_to_terrain?: CanAttachToTerrain;
@@ -34007,7 +34050,7 @@ export interface DeployableObject {
  * Drone system payload.
  */
 export interface DronePayload {
-  name: Name34;
+  name: Name35;
   size: Size13;
   hp?: Hp4;
   evasion?: Evasion4;
@@ -34027,7 +34070,7 @@ export interface DronePayload {
  * Reaction granted by a drone.
  */
 export interface DroneReaction {
-  name: Name35;
+  name: Name36;
   trigger: Trigger25;
   range: Range15;
   damage: DamageSpec;
@@ -34046,8 +34089,8 @@ export interface MountSlot {
  * Core system ability unique to a frame.
  */
 export interface CoreSystemDefinition {
-  id: Id20;
-  name: Name36;
+  id: Id21;
+  name: Name37;
   effects?: MechanicalEffect;
   mountless_weapons?: MountlessWeapons;
   uses_per_mission?: UsesPerMission;
@@ -34075,8 +34118,8 @@ export interface MechFrameBaseStats {
  * Definition for a mech frame.
  */
 export interface MechFrameDefinition {
-  id: Id21;
-  name: Name37;
+  id: Id22;
+  name: Name38;
   manufacturer: Manufacturer2;
   license_id?: LicenseId3;
   license_rank?: LicenseRank2;
@@ -34091,7 +34134,7 @@ export interface MechFrameDefinition {
  * Passive trait provided by a mech frame.
  */
 export interface FrameTrait {
-  name: Name38;
+  name: Name39;
   effects?: MechanicalEffect;
   [k: string]: unknown;
 }
@@ -34496,7 +34539,7 @@ export interface D6Range {
  * Outcome detail for structure damage.
  */
 export interface StructureOutcomeType {
-  name: Name39;
+  name: Name40;
   impaired_until_end_next_turn?: ImpairedUntilEndNextTurn;
   destroy_mount?: DestroyMount;
   destroy_system?: DestroySystem;
@@ -34553,7 +34596,7 @@ export interface OverheatTableEntry {
  * Outcome detail for overheat checks.
  */
 export interface OverheatOutcomeType {
-  name: Name40;
+  name: Name41;
   impaired_until_end_next_turn?: ImpairedUntilEndNextTurn1;
   exposed_until_cleared?: ExposedUntilCleared;
   meltdown_immediate?: MeltdownImmediate;
@@ -34810,8 +34853,8 @@ export interface LiftDragRules {
  * Rule definition for a combat action.
  */
 export interface ActionRule {
-  id: Id22;
-  name: Name41;
+  id: Id23;
+  name: Name42;
   action_type: ActionType16;
   alternate_action_types?: AlternateActionTypes;
   scope?: Scope;
@@ -35008,7 +35051,7 @@ export interface JockeyRule {
  * Jockey follow-up option.
  */
 export interface JockeyOption {
-  name: Name42;
+  name: Name43;
   inflicts_conditions?: InflictsConditions1;
   heat?: Heat;
   damage?: Damage3;
@@ -35091,8 +35134,8 @@ export interface CombatResources {
  * and convert to CombatantState using the helper functions.
  */
 export interface CombatantState {
-  id: Id23;
-  name: Name43;
+  id: Id24;
+  name: Name44;
   side: Side;
   kind: Kind;
   stats: CombatStats;
@@ -35469,8 +35512,8 @@ export interface Deployables {
  * Deployables: 10 HP/size, evasion 5, default armor 0
  */
 export interface DeployableState {
-  id: Id24;
-  name: Name44;
+  id: Id25;
+  name: Name45;
   kind: Kind1;
   owner_id?: OwnerId;
   position: HexPosition;

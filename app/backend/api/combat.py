@@ -25,9 +25,23 @@ from core.mech.combat_state import (
     CombatantState,
     CombatStats,
     CombatResources,
+    CombatTurn,
+    CombatRound,
 )
 from core.mech.grid import HexPosition, HexCoord
 from core.shared.campaign.campaign import MissionOutcomeReport
+from core.mech.action_economy import ActionEconomyState
+from core.mech.combat_execution import (
+    start_turn,
+    end_turn,
+    execute_action,
+    execute_reaction,
+    get_available_actions,
+    get_current_actor,
+    ActionExecutionInput,
+    ReactionInput,
+)
+from core.shared.enums import ActionType
 
 router = APIRouter(prefix="/combat", tags=["combat"])
 
@@ -508,3 +522,577 @@ async def remove_combatant(
     await session.refresh(combat_session)
 
     return _session_to_response(combat_session)
+
+
+# =============================================================================
+# Combat Turn Execution Request/Response Schemas
+# =============================================================================
+
+
+class TurnStartResponse(BaseModel):
+    """Response model for starting a combat turn."""
+
+    actor_id: str
+    actor_name: str
+    economy: dict[str, Any]
+    available_actions: list[str]
+    prepared_action_expired: bool
+    cooldowns_decremented: list[str]
+    scenario: dict[str, Any]
+
+
+class ActionRequest(BaseModel):
+    """Request body for executing a combat action."""
+
+    action_id: str = Field(..., description="Action identifier")
+    action_type: Literal["full", "quick", "free", "reaction", "protocol", "move"] = Field(
+        ..., description="Type of action"
+    )
+    target_ids: list[str] = Field(default_factory=list, description="Target combatant IDs")
+    target_position: dict[str, Any] | None = Field(default=None, description="Target position")
+    weapon_id: str | None = Field(default=None, description="Weapon to use")
+    system_id: str | None = Field(default=None, description="System to activate")
+    movement_path: list[dict[str, Any]] = Field(default_factory=list, description="Movement path")
+    is_overcharge: bool = Field(default=False, description="Whether this uses overcharge")
+
+
+class ActionResponse(BaseModel):
+    """Response model for executing a combat action."""
+
+    success: bool
+    error: str | None = None
+    action_use: dict[str, Any] | None = None
+    effects_applied: list[dict[str, Any]]
+    damage_dealt: int
+    heat_generated: int
+    economy: dict[str, Any]
+    scenario: dict[str, Any]
+
+
+class TurnEndResponse(BaseModel):
+    """Response model for ending a combat turn."""
+
+    actor_id: str
+    next_actor_id: str | None
+    next_actor_name: str | None
+    round_advanced: bool
+    new_round_number: int | None
+    end_of_turn_effects: list[dict[str, Any]]
+    scenario: dict[str, Any]
+
+
+class ReactionRequest(BaseModel):
+    """Request body for declaring a reaction."""
+
+    reactor_id: str = Field(..., description="ID of the reacting combatant")
+    reaction_type: Literal["brace", "overwatch"] = Field(..., description="Type of reaction")
+    trigger_action_id: str | None = Field(default=None, description="Action that triggered this")
+    target_ids: list[str] = Field(default_factory=list, description="Targets for the reaction")
+    weapon_id: str | None = Field(default=None, description="Weapon for overwatch")
+
+
+class ReactionResponse(BaseModel):
+    """Response model for declaring a reaction."""
+
+    success: bool
+    error: str | None = None
+    reaction_used: str | None = None
+    effects_applied: list[dict[str, Any]]
+    damage_dealt: int
+    scenario: dict[str, Any]
+
+
+class AvailableActionItem(BaseModel):
+    """Single available action."""
+
+    action_id: str
+    action_name: str
+    action_type: str
+    is_available: bool
+    unavailable_reason: str | None = None
+    requires_target: bool
+    requires_weapon: bool
+
+
+class AvailableActionsResponse(BaseModel):
+    """Response model for available actions."""
+
+    actor_id: str
+    economy: dict[str, Any]
+    full_actions: list[AvailableActionItem]
+    quick_actions: list[AvailableActionItem]
+    free_actions: list[AvailableActionItem]
+    reactions: list[AvailableActionItem]
+    protocols: list[AvailableActionItem]
+    can_overcharge: bool
+
+
+# =============================================================================
+# Session-scoped Economy Tracking
+# =============================================================================
+
+# In-memory economy state per session (for simplicity; production would use Redis/DB)
+_session_economy_cache: dict[str, ActionEconomyState] = {}
+
+
+def _get_session_economy(session_id: str) -> ActionEconomyState:
+    """Get or create economy state for a session."""
+    if session_id not in _session_economy_cache:
+        _session_economy_cache[session_id] = ActionEconomyState()
+    return _session_economy_cache[session_id]
+
+
+def _set_session_economy(session_id: str, economy: ActionEconomyState) -> None:
+    """Update economy state for a session."""
+    _session_economy_cache[session_id] = economy
+
+
+def _clear_session_economy(session_id: str) -> None:
+    """Clear economy state (on turn end/start)."""
+    _session_economy_cache.pop(session_id, None)
+
+
+# =============================================================================
+# Combat Turn Execution Endpoints
+# =============================================================================
+
+
+@router.post("/{session_id}/turns/start", response_model=TurnStartResponse)
+async def start_combat_turn(
+    session_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> TurnStartResponse:
+    """Initialize the current actor's turn.
+
+    This resets the action economy, expires prepared actions,
+    and decrements turn-start cooldowns.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    if combat_session.status != "active":
+        raise ValidationError(
+            f"Cannot start turn: session status is '{combat_session.status}'",
+            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+        )
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Get current actor from turn order
+    current_actor = get_current_actor(
+        scenario,
+        combat_session.current_round,
+        combat_session.current_turn_index,
+    )
+
+    if current_actor is None:
+        raise ValidationError(
+            "No current actor found",
+            errors=[{"loc": ["turn"], "msg": "Turn order not initialized", "type": "value_error"}],
+        )
+
+    # Start the turn using core helper
+    updated_scenario, turn_result = start_turn(scenario, current_actor.id)
+
+    # Persist updated scenario
+    combat_session.scenario = updated_scenario.model_dump(mode="json")
+    combat_session.updated_at = utc_now()
+
+    session.add(combat_session)
+    await session.commit()
+    await session.refresh(combat_session)
+
+    # Reset economy for this turn
+    _set_session_economy(session_id, turn_result.economy)
+
+    return TurnStartResponse(
+        actor_id=turn_result.actor_id,
+        actor_name=turn_result.actor_name,
+        economy=turn_result.economy.model_dump(),
+        available_actions=turn_result.available_actions,
+        prepared_action_expired=turn_result.prepared_action_expired,
+        cooldowns_decremented=turn_result.cooldowns_decremented,
+        scenario=combat_session.scenario,
+    )
+
+
+@router.post("/{session_id}/actions", response_model=ActionResponse)
+async def execute_combat_action(
+    session_id: str,
+    body: ActionRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> ActionResponse:
+    """Execute a combat action.
+
+    Validates the action against the current economy, resolves effects,
+    and records the action in the combat log.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    if combat_session.status != "active":
+        raise ValidationError(
+            f"Cannot execute action: session status is '{combat_session.status}'",
+            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+        )
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Get current actor
+    current_actor = get_current_actor(
+        scenario,
+        combat_session.current_round,
+        combat_session.current_turn_index,
+    )
+
+    if current_actor is None:
+        raise ValidationError(
+            "No current actor found",
+            errors=[{"loc": ["turn"], "msg": "Turn not started", "type": "value_error"}],
+        )
+
+    # Get or create current turn
+    round_idx = combat_session.current_round - 1
+    turn_idx = combat_session.current_turn_index
+    current_turn: CombatTurn
+
+    if round_idx < len(scenario.rounds) and turn_idx < len(scenario.rounds[round_idx].turns):
+        current_turn = scenario.rounds[round_idx].turns[turn_idx]
+    else:
+        current_turn = CombatTurn(actor_id=current_actor.id)
+
+    # Get current economy
+    economy = _get_session_economy(session_id)
+
+    # Parse target position if provided
+    target_position: HexPosition | None = None
+    if body.target_position:
+        try:
+            target_position = HexPosition.model_validate(body.target_position)
+        except Exception:
+            pass
+
+    # Parse movement path
+    movement_path: list[HexPosition] = []
+    for pos_dict in body.movement_path:
+        try:
+            movement_path.append(HexPosition.model_validate(pos_dict))
+        except Exception:
+            pass
+
+    # Build action input
+    action_input = ActionExecutionInput(
+        actor_id=current_actor.id,
+        action_id=body.action_id,
+        action_type=body.action_type,
+        target_ids=body.target_ids,
+        target_position=target_position,
+        weapon_id=body.weapon_id,
+        system_id=body.system_id,
+        movement_path=movement_path,
+        is_overcharge=body.is_overcharge,
+    )
+
+    # Execute action using core helper
+    updated_scenario, updated_turn, updated_economy, action_result = execute_action(
+        scenario, current_turn, economy, action_input
+    )
+
+    if not action_result.success:
+        return ActionResponse(
+            success=False,
+            error=action_result.error,
+            effects_applied=[],
+            damage_dealt=0,
+            heat_generated=0,
+            economy=economy.model_dump(),
+            scenario=combat_session.scenario,
+        )
+
+    # Update turn in round
+    updated_rounds = list(updated_scenario.rounds)
+    if round_idx < len(updated_rounds):
+        round_turns = list(updated_rounds[round_idx].turns)
+        if turn_idx < len(round_turns):
+            round_turns[turn_idx] = updated_turn
+        else:
+            round_turns.append(updated_turn)
+        updated_rounds[round_idx] = CombatRound(
+            round_index=updated_rounds[round_idx].round_index,
+            turns=round_turns,
+            reaction_counts_by_actor=dict(updated_rounds[round_idx].reaction_counts_by_actor),
+        )
+
+    final_scenario = MechCombatScenario(
+        combatants=list(updated_scenario.combatants),
+        grapples=list(updated_scenario.grapples),
+        rounds=updated_rounds,
+        terrain=updated_scenario.terrain,
+        environment=updated_scenario.environment,
+        deployables=dict(updated_scenario.deployables),
+    )
+
+    # Persist
+    combat_session.scenario = final_scenario.model_dump(mode="json")
+    combat_session.updated_at = utc_now()
+
+    session.add(combat_session)
+    await session.commit()
+    await session.refresh(combat_session)
+
+    # Update economy cache
+    _set_session_economy(session_id, updated_economy)
+
+    return ActionResponse(
+        success=True,
+        action_use=action_result.action_use.model_dump() if action_result.action_use else None,
+        effects_applied=action_result.effects_applied,
+        damage_dealt=action_result.damage_dealt,
+        heat_generated=action_result.heat_generated,
+        economy=updated_economy.model_dump(),
+        scenario=combat_session.scenario,
+    )
+
+
+@router.post("/{session_id}/turns/end", response_model=TurnEndResponse)
+async def end_combat_turn(
+    session_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> TurnEndResponse:
+    """Finalize the current turn and advance to the next actor.
+
+    Applies end-of-turn effects, decrements cooldowns,
+    and advances the turn index (or round if needed).
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    if combat_session.status != "active":
+        raise ValidationError(
+            f"Cannot end turn: session status is '{combat_session.status}'",
+            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+        )
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Get current turn
+    round_idx = combat_session.current_round - 1
+    turn_idx = combat_session.current_turn_index
+
+    if round_idx >= len(scenario.rounds):
+        raise ValidationError(
+            "Invalid round",
+            errors=[{"loc": ["round"], "msg": "Round not found", "type": "value_error"}],
+        )
+
+    current_round_data = scenario.rounds[round_idx]
+    if turn_idx >= len(current_round_data.turns):
+        raise ValidationError(
+            "Invalid turn index",
+            errors=[{"loc": ["turn"], "msg": "Turn not found", "type": "value_error"}],
+        )
+
+    current_turn = current_round_data.turns[turn_idx]
+
+    # End turn using core helper
+    updated_scenario, turn_end_result, new_round, new_turn_idx = end_turn(
+        scenario,
+        combat_session.current_round,
+        combat_session.current_turn_index,
+        current_turn,
+    )
+
+    # Persist
+    combat_session.scenario = updated_scenario.model_dump(mode="json")
+    combat_session.current_round = new_round
+    combat_session.current_turn_index = new_turn_idx
+    combat_session.updated_at = utc_now()
+
+    session.add(combat_session)
+    await session.commit()
+    await session.refresh(combat_session)
+
+    # Clear economy for this session (next turn will reset it)
+    _clear_session_economy(session_id)
+
+    return TurnEndResponse(
+        actor_id=turn_end_result.actor_id,
+        next_actor_id=turn_end_result.next_actor_id,
+        next_actor_name=turn_end_result.next_actor_name,
+        round_advanced=turn_end_result.round_advanced,
+        new_round_number=turn_end_result.new_round_number,
+        end_of_turn_effects=turn_end_result.end_of_turn_effects,
+        scenario=combat_session.scenario,
+    )
+
+
+@router.post("/{session_id}/reactions", response_model=ReactionResponse)
+async def submit_reaction(
+    session_id: str,
+    body: ReactionRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> ReactionResponse:
+    """Declare a reaction during another combatant's turn.
+
+    Brace grants resistance to the triggering attack.
+    Overwatch allows a skirmish attack against a moving enemy.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    if combat_session.status != "active":
+        raise ValidationError(
+            f"Cannot react: session status is '{combat_session.status}'",
+            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+        )
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Build reaction input
+    reaction_input = ReactionInput(
+        reactor_id=body.reactor_id,
+        reaction_type=body.reaction_type,
+        trigger_action_id=body.trigger_action_id,
+        target_ids=body.target_ids,
+        weapon_id=body.weapon_id,
+    )
+
+    # Get economy for the reactor (may be different from current actor)
+    reactor_economy = ActionEconomyState()  # Reactions have their own per-round tracking
+
+    # Execute reaction using core helper
+    updated_scenario, updated_economy, reaction_result = execute_reaction(
+        scenario, reactor_economy, reaction_input
+    )
+
+    if not reaction_result.success:
+        return ReactionResponse(
+            success=False,
+            error=reaction_result.error,
+            effects_applied=[],
+            damage_dealt=0,
+            scenario=combat_session.scenario,
+        )
+
+    # Persist
+    combat_session.scenario = updated_scenario.model_dump(mode="json")
+    combat_session.updated_at = utc_now()
+
+    session.add(combat_session)
+    await session.commit()
+    await session.refresh(combat_session)
+
+    return ReactionResponse(
+        success=True,
+        reaction_used=reaction_result.reaction_used,
+        effects_applied=reaction_result.effects_applied,
+        damage_dealt=reaction_result.damage_dealt,
+        scenario=combat_session.scenario,
+    )
+
+
+@router.get("/{session_id}/available-actions", response_model=AvailableActionsResponse)
+async def get_combat_available_actions(
+    session_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> AvailableActionsResponse:
+    """List valid actions for the current actor given economy and status.
+
+    Returns categorized lists of full, quick, free actions, reactions,
+    and protocols with availability status.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Get current actor
+    current_actor = get_current_actor(
+        scenario,
+        combat_session.current_round,
+        combat_session.current_turn_index,
+    )
+
+    if current_actor is None:
+        raise ValidationError(
+            "No current actor found",
+            errors=[{"loc": ["turn"], "msg": "Turn not started", "type": "value_error"}],
+        )
+
+    # Get current economy
+    economy = _get_session_economy(session_id)
+
+    # Get available actions using core helper
+    available = get_available_actions(scenario, current_actor.id, economy)
+
+    def to_item(a) -> AvailableActionItem:
+        return AvailableActionItem(
+            action_id=a.action_id,
+            action_name=a.action_name,
+            action_type=a.action_type,
+            is_available=a.is_available,
+            unavailable_reason=a.unavailable_reason,
+            requires_target=a.requires_target,
+            requires_weapon=a.requires_weapon,
+        )
+
+    return AvailableActionsResponse(
+        actor_id=available.actor_id,
+        economy=available.economy.model_dump(),
+        full_actions=[to_item(a) for a in available.full_actions],
+        quick_actions=[to_item(a) for a in available.quick_actions],
+        free_actions=[to_item(a) for a in available.free_actions],
+        reactions=[to_item(a) for a in available.reactions],
+        protocols=[to_item(a) for a in available.protocols],
+        can_overcharge=available.can_overcharge,
+    )

@@ -5,6 +5,61 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
+async def test_list_reserve_templates(client: AsyncClient) -> None:
+    """Test listing all reserve templates from PR2 tables."""
+    auth_headers = {"X-User-Id": "reserve_user"}
+
+    response = await client.get(
+        "/api/campaigns/reserve-templates",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 30  # 10 narrative + 10 mech + 10 tactical
+    assert len(data["items"]) == 30
+    assert all("id" in item for item in data["items"])
+    assert all("name" in item for item in data["items"])
+    assert all("reserve_type" in item for item in data["items"])
+    assert all("description" in item for item in data["items"])
+
+
+@pytest.mark.asyncio
+async def test_filter_templates_by_category(client: AsyncClient) -> None:
+    """Test filtering reserve templates by category."""
+    auth_headers = {"X-User-Id": "reserve_user"}
+
+    # Test tactical filter
+    response = await client.get(
+        "/api/campaigns/reserve-templates?category=tactical",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 10
+    assert all(item["reserve_type"] == "tactical" for item in data["items"])
+
+    # Test mech filter
+    response = await client.get(
+        "/api/campaigns/reserve-templates?category=mech",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 10
+    assert all(item["reserve_type"] == "mech" for item in data["items"])
+
+    # Test narrative filter
+    response = await client.get(
+        "/api/campaigns/reserve-templates?category=narrative",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 10
+    assert all(item["reserve_type"] == "narrative" for item in data["items"])
+
+
+@pytest.mark.asyncio
 async def test_campaign_invite_and_character_flow(client: AsyncClient) -> None:
     owner_headers = {"X-User-Id": "owner_user"}
     pilot_headers = {"X-User-Id": "pilot_user"}
