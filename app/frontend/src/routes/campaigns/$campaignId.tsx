@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 import {
   useCampaign,
@@ -702,13 +702,25 @@ function CampaignDetailPage() {
                 placeholder="Mission reminders, intel, or operator notes"
               />
             </div>
-            <Button
-              type="button"
-              disabled={!readiness.can_launch || launchMission.isPending}
-              onClick={handleLaunchMission}
-            >
-              {launchMission.isPending ? "Launching..." : "Launch mission"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                disabled={!readiness.can_launch || launchMission.isPending}
+                onClick={handleLaunchMission}
+              >
+                {launchMission.isPending ? "Launching..." : "Launch mission"}
+              </Button>
+              {lobbyState?.combat_session_id && (
+                <Link
+                  to="/combat/$combatId"
+                  params={{ combatId: lobbyState.combat_session_id }}
+                >
+                  <Button type="button" variant="outline">
+                    Open combat session
+                  </Button>
+                </Link>
+              )}
+            </div>
             {readiness.lobby_status && (
               <p className="text-xs text-muted-foreground">
                 Lobby status: {readiness.lobby_status}

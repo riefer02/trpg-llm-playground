@@ -17,6 +17,7 @@ import { Route as CampaignsIndexRouteImport } from './routes/campaigns/index'
 import { Route as PilotsNewRouteImport } from './routes/pilots/new'
 import { Route as PilotsPilotIdRouteImport } from './routes/pilots/$pilotId'
 import { Route as InvitesTokenRouteImport } from './routes/invites/$token'
+import { Route as CombatCombatIdRouteImport } from './routes/combat/$combatId'
 import { Route as CharactersNewRouteImport } from './routes/characters/new'
 import { Route as CharactersCharacterIdRouteImport } from './routes/characters/$characterId'
 import { Route as CampaignsCampaignIdRouteImport } from './routes/campaigns/$campaignId'
@@ -62,6 +63,11 @@ const InvitesTokenRoute = InvitesTokenRouteImport.update({
   path: '/invites/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CombatCombatIdRoute = CombatCombatIdRouteImport.update({
+  id: '/combat/$combatId',
+  path: '/combat/$combatId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CharactersNewRoute = CharactersNewRouteImport.update({
   id: '/characters/new',
   path: '/characters/new',
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
+  '/combat/$combatId': typeof CombatCombatIdRoute
   '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
+  '/combat/$combatId': typeof CombatCombatIdRoute
   '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
+  '/combat/$combatId': typeof CombatCombatIdRoute
   '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
+    | '/combat/$combatId'
     | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
+    | '/combat/$combatId'
     | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
+    | '/combat/$combatId'
     | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
@@ -177,6 +189,7 @@ export interface RootRouteChildren {
   CampaignsCampaignIdRoute: typeof CampaignsCampaignIdRoute
   CharactersCharacterIdRoute: typeof CharactersCharacterIdRouteWithChildren
   CharactersNewRoute: typeof CharactersNewRoute
+  CombatCombatIdRoute: typeof CombatCombatIdRoute
   InvitesTokenRoute: typeof InvitesTokenRoute
   PilotsPilotIdRoute: typeof PilotsPilotIdRoute
   PilotsNewRoute: typeof PilotsNewRoute
@@ -244,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InvitesTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/combat/$combatId': {
+      id: '/combat/$combatId'
+      path: '/combat/$combatId'
+      fullPath: '/combat/$combatId'
+      preLoaderRoute: typeof CombatCombatIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/characters/new': {
       id: '/characters/new'
       path: '/characters/new'
@@ -293,6 +313,7 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsCampaignIdRoute: CampaignsCampaignIdRoute,
   CharactersCharacterIdRoute: CharactersCharacterIdRouteWithChildren,
   CharactersNewRoute: CharactersNewRoute,
+  CombatCombatIdRoute: CombatCombatIdRoute,
   InvitesTokenRoute: InvitesTokenRoute,
   PilotsPilotIdRoute: PilotsPilotIdRoute,
   PilotsNewRoute: PilotsNewRoute,
