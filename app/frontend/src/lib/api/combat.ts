@@ -85,6 +85,22 @@ export interface AvailableActionsResponse {
   reactions: AvailableActionItem[];
   protocols: AvailableActionItem[];
   can_overcharge: boolean;
+  overcharge_level: number;
+}
+
+export interface ReactionTrigger {
+  trigger_type: "attack_incoming" | "enemy_movement";
+  triggering_actor_id: string;
+  triggering_actor_name: string;
+  triggering_action_id?: string;
+  available_reactions: ("brace" | "overwatch")[];
+}
+
+export interface ReactionOpportunityResponse {
+  combatant_id: string;
+  combatant_name: string;
+  has_reaction_available: boolean;
+  pending_triggers: ReactionTrigger[];
 }
 
 export interface ActionEconomyState {
@@ -245,5 +261,34 @@ export function useAvailableActions(
     queryFn: () =>
       api.get<AvailableActionsResponse>(`/combat/${sessionId}/available-actions`),
     enabled: Boolean(sessionId) && (options?.enabled ?? true),
+  });
+}
+
+// =============================================================================
+// Reaction Opportunity Query
+// =============================================================================
+
+export interface UseReactionOpportunityOptions {
+  enabled?: boolean;
+  pollingInterval?: number;
+}
+
+export function useReactionOpportunity(
+  sessionId: string,
+  combatantId: string | null,
+  options?: UseReactionOpportunityOptions,
+) {
+  return useQuery({
+    queryKey: [
+      ...combatKeys.detail(sessionId),
+      "reaction-opportunity",
+      combatantId,
+    ] as const,
+    queryFn: () =>
+      api.get<ReactionOpportunityResponse>(
+        `/combat/${sessionId}/reaction-opportunities/${combatantId}`
+      ),
+    enabled: Boolean(sessionId) && Boolean(combatantId) && (options?.enabled ?? true),
+    refetchInterval: options?.pollingInterval,
   });
 }

@@ -7,9 +7,12 @@ import {
   useEndTurn,
   useExecuteAction,
   useAvailableActions,
+  useSubmitReaction,
+  useReactionOpportunity,
   type ActionRequest,
   type ActionEconomyState,
   type AvailableActionItem,
+  type ReactionRequest,
 } from "../../lib/api";
 import { CombatCanvas, type TargetingMode } from "../../components/combat/CombatCanvas";
 import {
@@ -19,12 +22,14 @@ import {
 import { EconomyDisplay } from "../../components/combat/EconomyDisplay";
 import { TurnControls, type TurnState } from "../../components/combat/TurnControls";
 import { ActionPanel, type TargetMode } from "../../components/combat/ActionPanel";
+import { OverchargeConfirm } from "../../components/combat/OverchargeConfirm";
+import { ReactionPrompt } from "../../components/combat/ReactionPrompt";
 import {
   adaptCombatScenario,
   type CombatRenderAdapterOutput,
 } from "../../lib/combat-render/adapter";
 import { createHexLayout } from "../../lib/combat-render/hex";
-import type { HexCoord } from "../../lib/types/lancer";
+import type { HexCoord, AttackPatternDefinition } from "../../lib/types/lancer";
 import {
   Card,
   CardContent,
@@ -50,6 +55,7 @@ function CombatSessionPage() {
   const startTurn = useStartTurn(combatId);
   const endTurn = useEndTurn(combatId);
   const executeAction = useExecuteAction(combatId);
+  const submitReaction = useSubmitReaction(combatId);
 
   // Turn state tracking
   const [turnActive, setTurnActive] = useState(false);
@@ -70,6 +76,13 @@ function CombatSessionPage() {
   const [targetMode, setTargetMode] = useState<TargetMode | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
 
+  // Overcharge confirmation state
+  const [showOverchargeConfirm, setShowOverchargeConfirm] = useState(false);
+
+  // Area targeting state for line/cone attacks
+  const [areaPattern, setAreaPattern] = useState<AttackPatternDefinition | null>(null);
+  const [areaDirection, setAreaDirection] = useState<HexCoord | null>(null);
+
   const scenario = data?.scenario;
   const rounds = scenario?.rounds ?? [];
   const currentRound = data?.current_round ?? 1;
@@ -88,6 +101,23 @@ function CombatSessionPage() {
     // Fall back to first combatant if no turn data
     return combatants[0] ?? null;
   }, [scenario, currentRound, currentTurnIndex, combatants]);
+
+  // Get player combatants for reaction polling (when not our turn)
+  const playerCombatants = useMemo(
+    () => combatants.filter((c) => c.side === "players"),
+    [combatants]
+  );
+
+  // Poll for reaction opportunities when it's not our turn
+  const firstPlayerCombatant = playerCombatants[0];
+  const { data: reactionOpportunity } = useReactionOpportunity(
+    combatId,
+    firstPlayerCombatant?.id ?? null,
+    {
+      enabled: !turnActive && !!firstPlayerCombatant,
+      pollingInterval: 3000, // Poll every 3 seconds
+    }
+  );
 
   // Derive turn state
   const turnState: TurnState = useMemo(() => {
@@ -128,17 +158,52 @@ function CombatSessionPage() {
   // Handle action execution
   const handleExecuteAction = useCallback(
     (request: ActionRequest) => {
+      // Intercept overcharge to show confirmation modal
+      if (request.is_overcharge) {
+        setShowOverchargeConfirm(true);
+        return;
+      }
+
       executeAction.mutate(request, {
         onSuccess: (result) => {
           if (result.success) {
             setEconomy(result.economy);
             setTargetMode(null);
             setSelectedTargetId(null);
+            setAreaPattern(null);
+            setAreaDirection(null);
           }
         },
       });
     },
     [executeAction]
+  );
+
+  // Handle overcharge confirmation
+  const handleOverchargeConfirm = useCallback(() => {
+    setShowOverchargeConfirm(false);
+    executeAction.mutate(
+      {
+        action_id: "overcharge",
+        action_type: "free",
+        is_overcharge: true,
+      },
+      {
+        onSuccess: (result) => {
+          if (result.success) {
+            setEconomy(result.economy);
+          }
+        },
+      }
+    );
+  }, [executeAction]);
+
+  // Handle reaction submission
+  const handleReactionSubmit = useCallback(
+    (reaction: ReactionRequest) => {
+      submitReaction.mutate(reaction);
+    },
+    [submitReaction]
   );
 
   // Handle target mode changes from ActionPanel
@@ -200,8 +265,13 @@ function CombatSessionPage() {
       turn,
       action,
       hover: hovered,
+      // Include area targeting preview
+      attackPattern: areaPattern ?? undefined,
+      patternOrigin: currentActor?.position,
+      patternDirection: areaDirection ?? undefined,
+      actorId: currentActor?.id,
     });
-  }, [action, hovered, round, scenario, turn]);
+  }, [action, hovered, round, scenario, turn, areaPattern, areaDirection, currentActor]);
 
   if (isLoading) {
     return (
@@ -338,6 +408,19 @@ function CombatSessionPage() {
             <EconomyDisplay
               economy={economy}
               canOvercharge={availableActions?.can_overcharge ?? false}
+              overchargeLevel={availableActions?.overcharge_level ?? 0}
+            />
+          )}
+
+          {/* Overcharge Confirmation Modal */}
+          {showOverchargeConfirm && currentActor && (
+            <OverchargeConfirm
+              currentLevel={availableActions?.overcharge_level ?? 0}
+              heatCurrent={currentActor.resources?.heat_current ?? 0}
+              heatCap={currentActor.resources?.heat_cap ?? 6}
+              onConfirm={handleOverchargeConfirm}
+              onCancel={() => setShowOverchargeConfirm(false)}
+              isOpen={showOverchargeConfirm}
             />
           )}
 
@@ -351,8 +434,34 @@ function CombatSessionPage() {
               onTargetModeChange={handleTargetModeChange}
               isExecuting={executeAction.isPending}
               selectedTargetId={selectedTargetId}
+              actorInventory={currentActor?.inventory}
             />
           )}
+
+          {/* Reaction Prompt (when not our turn and reaction opportunity exists) */}
+          {!turnActive &&
+            reactionOpportunity?.pending_triggers?.length !== undefined &&
+            reactionOpportunity.pending_triggers.length > 0 &&
+            firstPlayerCombatant && (
+              <ReactionPrompt
+                triggerType={reactionOpportunity.pending_triggers[0].trigger_type}
+                reactorId={reactionOpportunity.combatant_id}
+                reactorName={reactionOpportunity.combatant_name}
+                triggeringActorName={reactionOpportunity.pending_triggers[0].triggering_actor_name}
+                availableReactions={reactionOpportunity.pending_triggers[0].available_reactions}
+                inventory={firstPlayerCombatant.inventory}
+                validTargets={combatants
+                  .filter((c) => c.side !== "players")
+                  .map((c) => ({ id: c.id, name: c.name }))}
+                onSubmit={handleReactionSubmit}
+                onDecline={() => {
+                  // User declined the reaction opportunity
+                  // Could track this if needed
+                }}
+                isOpen={true}
+                isSubmitting={submitReaction.isPending}
+              />
+            )}
 
           <Card>
             <CardHeader className="py-3">

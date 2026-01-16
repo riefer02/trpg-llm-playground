@@ -1,11 +1,13 @@
 import type { ActionEconomyState } from "../../lib/api/combat";
+import { getOverchargeCost } from "./OverchargeConfirm";
 
 export interface EconomyDisplayProps {
   economy: ActionEconomyState;
   canOvercharge: boolean;
+  overchargeLevel?: number;
 }
 
-export function EconomyDisplay({ economy, canOvercharge }: EconomyDisplayProps) {
+export function EconomyDisplay({ economy, canOvercharge, overchargeLevel = 0 }: EconomyDisplayProps) {
   const quickSlotsTotal = economy.quick_actions_available + economy.quick_actions_used;
   const quickSlotsRemaining = economy.quick_actions_available;
 
@@ -62,6 +64,11 @@ export function EconomyDisplay({ economy, canOvercharge }: EconomyDisplayProps) 
         {economy.overcharge_used && (
           <span className="px-2 py-0.5 rounded bg-destructive/20 text-destructive">
             Overcharged
+          </span>
+        )}
+        {overchargeLevel > 0 && (
+          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-500">
+            OC Level {overchargeLevel}: {getOverchargeCost(overchargeLevel)}
           </span>
         )}
       </div>

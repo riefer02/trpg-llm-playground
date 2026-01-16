@@ -130,6 +130,7 @@ export {
   useExecuteAction,
   useSubmitReaction,
   useAvailableActions,
+  useReactionOpportunity,
   combatKeys,
 } from './combat'
 export type {
@@ -145,6 +146,9 @@ export type {
   AvailableActionItem,
   ActionEconomyState,
   UseAvailableActionsOptions,
+  UseReactionOpportunityOptions,
+  ReactionOpportunityResponse,
+  ReactionTrigger,
 } from './combat'
 
 // Re-export generated core types for convenience

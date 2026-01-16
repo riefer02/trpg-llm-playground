@@ -625,6 +625,26 @@ class AvailableActionsResponse(BaseModel):
     reactions: list[AvailableActionItem]
     protocols: list[AvailableActionItem]
     can_overcharge: bool
+    overcharge_level: int = 0
+
+
+class ReactionTrigger(BaseModel):
+    """A pending reaction trigger for a combatant."""
+
+    trigger_type: Literal["attack_incoming", "enemy_movement"]
+    triggering_actor_id: str
+    triggering_actor_name: str
+    triggering_action_id: str | None = None
+    available_reactions: list[Literal["brace", "overwatch"]]
+
+
+class ReactionOpportunityResponse(BaseModel):
+    """Response model for checking reaction opportunities."""
+
+    combatant_id: str
+    combatant_name: str
+    has_reaction_available: bool
+    pending_triggers: list[ReactionTrigger]
 
 
 # =============================================================================
@@ -1086,6 +1106,11 @@ async def get_combat_available_actions(
             requires_weapon=a.requires_weapon,
         )
 
+    # Get overcharge level from combatant state
+    overcharge_level = 0
+    if current_actor.overcharge_state:
+        overcharge_level = current_actor.overcharge_state.level
+
     return AvailableActionsResponse(
         actor_id=available.actor_id,
         economy=available.economy.model_dump(),
@@ -1095,4 +1120,108 @@ async def get_combat_available_actions(
         reactions=[to_item(a) for a in available.reactions],
         protocols=[to_item(a) for a in available.protocols],
         can_overcharge=available.can_overcharge,
+        overcharge_level=overcharge_level,
+    )
+
+
+@router.get(
+    "/{session_id}/reaction-opportunities/{combatant_id}",
+    response_model=ReactionOpportunityResponse,
+)
+async def check_reaction_opportunity(
+    session_id: str,
+    combatant_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> ReactionOpportunityResponse:
+    """Check if a combatant has pending reaction triggers.
+
+    This endpoint is polled by clients during opponent turns to detect
+    when reaction opportunities arise.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Find the combatant
+    combatant = next(
+        (c for c in scenario.combatants if c.id == combatant_id),
+        None,
+    )
+    if combatant is None:
+        raise NotFoundError("Combatant", combatant_id)
+
+    # Get current actor (whose turn it is)
+    current_actor = get_current_actor(
+        scenario,
+        combat_session.current_round,
+        combat_session.current_turn_index,
+    )
+
+    # Check if combatant has reaction available (not used this round)
+    round_idx = combat_session.current_round - 1
+    reaction_counts = {}
+    if round_idx < len(scenario.rounds):
+        reaction_counts = scenario.rounds[round_idx].reaction_counts_by_actor or {}
+
+    has_reaction = reaction_counts.get(combatant_id, 0) == 0
+
+    # Build pending triggers based on current turn state
+    pending_triggers: list[ReactionTrigger] = []
+
+    if has_reaction and current_actor and current_actor.id != combatant_id:
+        # Check the current turn for triggering actions
+        if round_idx < len(scenario.rounds):
+            current_round = scenario.rounds[round_idx]
+            turn_idx = combat_session.current_turn_index
+            if turn_idx < len(current_round.turns):
+                current_turn = current_round.turns[turn_idx]
+
+                # Check each action in the current turn for triggers
+                for action in current_turn.actions or []:
+                    # Attack targeting this combatant
+                    target_ids = action.target_ids or []
+                    if action.target_id:
+                        target_ids = [action.target_id] + list(target_ids)
+
+                    if combatant_id in target_ids:
+                        # This is an attack targeting us - brace opportunity
+                        pending_triggers.append(
+                            ReactionTrigger(
+                                trigger_type="attack_incoming",
+                                triggering_actor_id=current_actor.id,
+                                triggering_actor_name=current_actor.name,
+                                triggering_action_id=action.action_id,
+                                available_reactions=["brace"],
+                            )
+                        )
+
+                # Check for movement that passed near us - overwatch opportunity
+                if current_turn.movement_path:
+                    # Simplified check: if enemy moved and we have ranged weapons
+                    pending_triggers.append(
+                        ReactionTrigger(
+                            trigger_type="enemy_movement",
+                            triggering_actor_id=current_actor.id,
+                            triggering_actor_name=current_actor.name,
+                            triggering_action_id=None,
+                            available_reactions=["overwatch"],
+                        )
+                    )
+
+    return ReactionOpportunityResponse(
+        combatant_id=combatant_id,
+        combatant_name=combatant.name,
+        has_reaction_available=has_reaction,
+        pending_triggers=pending_triggers,
     )

@@ -6,11 +6,14 @@ import type {
   AvailableActionItem,
   AvailableActionsResponse,
 } from "../../lib/api/combat";
+import type { MechInventory } from "../../lib/types/lancer";
 import { Button } from "../ui";
+import { WeaponPicker } from "./WeaponPicker";
 
 export type ActionPanelState =
   | "idle"
   | "selecting_target"
+  | "selecting_weapon"
   | "confirming"
   | "executing";
 
@@ -29,6 +32,7 @@ export interface ActionPanelProps {
   onTargetModeChange: (mode: TargetMode | null) => void;
   isExecuting?: boolean;
   selectedTargetId?: string | null;
+  actorInventory?: MechInventory | null;
 }
 
 export function ActionPanel({
@@ -39,9 +43,11 @@ export function ActionPanel({
   onTargetModeChange,
   isExecuting = false,
   selectedTargetId,
+  actorInventory,
 }: ActionPanelProps) {
   const [panelState, setPanelState] = useState<ActionPanelState>("idle");
   const [selectedAction, setSelectedAction] = useState<AvailableActionItem | null>(null);
+  const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
 
   if (!availableActions || !economy) {
     return (
@@ -57,9 +63,15 @@ export function ActionPanel({
     if (!action.is_available) return;
 
     setSelectedAction(action);
+    setSelectedWeaponId(null);
     onActionSelect(action);
 
-    if (action.requires_target) {
+    // Determine initial state based on requirements
+    if (action.requires_weapon) {
+      // Weapon selection comes first
+      setPanelState("selecting_weapon");
+      onTargetModeChange(null);
+    } else if (action.requires_target) {
       setPanelState("selecting_target");
       onTargetModeChange({
         actionId: action.action_id,
@@ -73,6 +85,24 @@ export function ActionPanel({
     }
   };
 
+  const handleWeaponSelect = (weaponId: string) => {
+    setSelectedWeaponId(weaponId);
+
+    if (selectedAction?.requires_target) {
+      // After weapon selection, move to target selection
+      setPanelState("selecting_target");
+      onTargetModeChange({
+        actionId: selectedAction.action_id,
+        actionType: selectedAction.action_type as ActionRequest["action_type"],
+        requiresTarget: selectedAction.requires_target,
+        requiresWeapon: selectedAction.requires_weapon,
+      });
+    } else {
+      // No target needed, go straight to confirming
+      setPanelState("confirming");
+    }
+  };
+
   const handleConfirmAction = () => {
     if (!selectedAction) return;
 
@@ -81,11 +111,13 @@ export function ActionPanel({
       action_id: selectedAction.action_id,
       action_type: selectedAction.action_type as ActionRequest["action_type"],
       target_ids: selectedTargetId ? [selectedTargetId] : [],
+      weapon_id: selectedWeaponId ?? undefined,
     });
   };
 
   const handleCancelAction = () => {
     setSelectedAction(null);
+    setSelectedWeaponId(null);
     setPanelState("idle");
     onTargetModeChange(null);
   };
@@ -93,9 +125,34 @@ export function ActionPanel({
   // Reset state when action completes
   const resetAfterExecution = () => {
     setSelectedAction(null);
+    setSelectedWeaponId(null);
     setPanelState("idle");
     onTargetModeChange(null);
   };
+
+  // Show weapon picker
+  if (panelState === "selecting_weapon") {
+    return (
+      <div className="space-y-3">
+        {selectedAction && (
+          <div className="rounded-md border border-border bg-muted/30 p-3">
+            <div className="text-sm font-medium text-foreground mb-2">
+              {selectedAction.action_name}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {selectedAction.action_type} action - Select a weapon
+            </div>
+          </div>
+        )}
+        <WeaponPicker
+          inventory={actorInventory}
+          onSelect={handleWeaponSelect}
+          onCancel={handleCancelAction}
+          isOpen={true}
+        />
+      </div>
+    );
+  }
 
   // Show confirmation UI
   if (panelState === "confirming" || panelState === "selecting_target") {
@@ -112,6 +169,7 @@ export function ActionPanel({
             </div>
             <div className="text-xs text-muted-foreground">
               {selectedAction.action_type} action
+              {selectedWeaponId && ` - ${formatWeaponId(selectedWeaponId)}`}
             </div>
           </div>
         )}
@@ -290,4 +348,22 @@ function ActionItem({ action, disabled, onClick }: ActionItemProps) {
       )}
     </button>
   );
+}
+
+/**
+ * Format weapon_id for display (e.g., "mw_assault_rifle" -> "Assault Rifle")
+ */
+function formatWeaponId(weaponId: string): string {
+  // Remove common prefixes
+  const cleaned = weaponId
+    .replace(/^mw_/, "")
+    .replace(/^cw_/, "")
+    .replace(/^heavy_/, "Heavy ")
+    .replace(/^aux_/, "Aux ");
+
+  // Convert snake_case to Title Case
+  return cleaned
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }

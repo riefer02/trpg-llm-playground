@@ -570,11 +570,11 @@ core/ change → make test-core → add to export.py → make generate-types →
 
 ## Roadmap
 
-### Current: Combat Turn Execution (Phase 8)
-- 🔲 Action execution endpoints (validate → resolve → apply)
-- 🔲 Turn management (start, end, initiative)
-- 🔲 Reaction handling
-- 🔲 Combat UI action panel
+### Current: Multi-player + Real-time (Phase 11)
+- 🔲 WebSocket for real-time combat updates
+- 🔲 Movement path drawing on canvas
+- 🔲 Multi-target selection (Barrage attacks)
+- 🔲 System activation UI
 
 ### Completed
 - ✅ Phase 1: Core type system (3286 tests)
@@ -584,9 +584,11 @@ core/ change → make test-core → add to export.py → make generate-types →
 - ✅ Phase 5: Character system (core model + API + frontend)
 - ✅ Phase 6: Compendium + loadout builder + PDF export
 - ✅ Phase 7: Campaign system (lobby, lifecycle, invites, outcomes)
-- ✅ Combat canvas + render adapter + action log
+- ✅ Phase 8: Combat turn execution (action/reaction execution, economy, API)
+- ✅ Phase 9: Combat UI action panel (turn controls, economy display, target selection)
+- ✅ Phase 10: Combat UI polish (weapon picker, area targeting, overcharge confirm, reaction prompts)
 
 ### Future
-- WebSocket for real-time combat updates
 - LLM integration for rules assistance
 - Mobile-responsive UI
+- NPC/AI decision automation
