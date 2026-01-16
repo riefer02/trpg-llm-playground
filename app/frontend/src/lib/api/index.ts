@@ -97,6 +97,7 @@ export {
   useRevokeCampaignInvite,
   useResendCampaignInvite,
   useRecordCampaignSessionOutcome,
+  useReserveTemplates,
   campaignKeys,
 } from './campaigns'
 export type {
@@ -118,11 +119,33 @@ export type {
   CampaignMember,
   CampaignInvite,
   CampaignCharacter,
+  ReserveTemplate,
 } from './campaigns'
 
 // Combat session hooks
-export { useCombatSession, combatKeys } from './combat'
-export type { CombatSessionResponse } from './combat'
+export {
+  useCombatSession,
+  useStartTurn,
+  useEndTurn,
+  useExecuteAction,
+  useSubmitReaction,
+  useAvailableActions,
+  combatKeys,
+} from './combat'
+export type {
+  CombatSessionResponse,
+  UseCombatSessionOptions,
+  TurnStartResponse,
+  TurnEndResponse,
+  ActionRequest,
+  ActionResponse,
+  ReactionRequest,
+  ReactionResponse,
+  AvailableActionsResponse,
+  AvailableActionItem,
+  ActionEconomyState,
+  UseAvailableActionsOptions,
+} from './combat'
 
 // Re-export generated core types for convenience
 // These are the source of truth - use these for domain data

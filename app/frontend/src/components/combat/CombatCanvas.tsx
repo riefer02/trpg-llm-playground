@@ -15,6 +15,11 @@ import type { HexLayout } from "../../lib/combat-render/hex";
 
 type LayoutResolver = HexLayout | ((size: CanvasSize) => HexLayout);
 
+export type TargetingMode = {
+  active: boolean;
+  validTargetIds?: string[];
+};
+
 export type CombatCanvasProps = {
   width: number;
   height: number;
@@ -23,9 +28,11 @@ export type CombatCanvasProps = {
   styles?: RenderStyles;
   className?: string;
   resizeToParent?: boolean;
+  targetingMode?: TargetingMode;
   onHover?: ClickCallbacks["onSelect"];
   onSelect?: ClickCallbacks["onSelect"];
   onTarget?: ClickCallbacks["onTarget"];
+  onTokenClick?: (tokenId: string) => void;
 };
 
 export function CombatCanvas({
@@ -36,9 +43,11 @@ export function CombatCanvas({
   styles,
   className,
   resizeToParent = false,
+  targetingMode,
   onHover,
   onSelect,
   onTarget,
+  onTokenClick,
 }: CombatCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width, height });
@@ -48,6 +57,25 @@ export function CombatCanvas({
     () => (typeof layout === "function" ? layout(canvasSize) : layout),
     [layout, canvasSize],
   );
+
+  // Modify render state to highlight valid targets when in targeting mode
+  const renderState = useMemo(() => {
+    if (!targetingMode?.active || !targetingMode.validTargetIds?.length) {
+      return state;
+    }
+
+    const validSet = new Set(targetingMode.validTargetIds);
+    return {
+      ...state,
+      tokens: state.tokens.map((token) => ({
+        ...token,
+        // Add pulsing ring effect for valid targets
+        color: validSet.has(token.id)
+          ? "#22c55e" // green for valid targets
+          : token.color,
+      })),
+    };
+  }, [state, targetingMode]);
 
   useEffect(() => {
     if (resizeToParent) {
@@ -120,8 +148,8 @@ export function CombatCanvas({
     canvas.height = Math.floor(canvasSize.height * devicePixelRatio);
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
 
-    renderCombatCanvas(ctx, resolvedLayout, state, styles, canvasSize);
-  }, [canvasSize, devicePixelRatio, resolvedLayout, state, styles]);
+    renderCombatCanvas(ctx, resolvedLayout, renderState, styles, canvasSize);
+  }, [canvasSize, devicePixelRatio, resolvedLayout, renderState, styles]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -134,10 +162,25 @@ export function CombatCanvas({
       cleanup.push(attachHoverHandlers(canvas, resolvedLayout, state.grid, onHover));
     }
 
-    if (onSelect || onTarget) {
+    // Wrap onSelect to also check for token clicks
+    const handleSelect: ClickCallbacks["onSelect"] = (coord, point) => {
+      // First, check if we clicked a token
+      if (coord && onTokenClick) {
+        const clickedToken = state.tokens.find(
+          (t) => t.coord.q === coord.q && t.coord.r === coord.r
+        );
+        if (clickedToken) {
+          onTokenClick(clickedToken.id);
+        }
+      }
+      // Then call the original onSelect
+      onSelect?.(coord, point);
+    };
+
+    if (handleSelect || onTarget) {
       cleanup.push(
         attachClickHandlers(canvas, resolvedLayout, state.grid, {
-          onSelect,
+          onSelect: handleSelect,
           onTarget,
         }),
       );
@@ -146,7 +189,10 @@ export function CombatCanvas({
     return () => {
       cleanup.forEach((fn) => fn());
     };
-  }, [onHover, onSelect, onTarget, resolvedLayout, state.grid]);
+  }, [onHover, onSelect, onTarget, onTokenClick, resolvedLayout, state.grid, state.tokens]);
 
-  return <canvas ref={canvasRef} className={className} />;
+  // Apply targeting mode cursor
+  const cursorClass = targetingMode?.active ? "cursor-crosshair" : "";
+
+  return <canvas ref={canvasRef} className={`${className ?? ""} ${cursorClass}`} />;
 }
