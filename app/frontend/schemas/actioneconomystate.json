@@ -1,0 +1,30 @@
+{
+  "description": "Tracks action usage for a single turn.\n\nPer PR2 3726-3728:\n- 1 move + (2 quick OR 1 full) + any free + any reactions\n- Overcharge: 1/turn, gains 1 quick action\n- Reactions: 1/turn, any number/round, reset at round boundary",
+  "properties": {
+    "full_actions_used": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Full Actions Used",
+      "type": "integer"
+    },
+    "quick_actions_used": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Quick Actions Used",
+      "type": "integer"
+    },
+    "overcharge_used": {
+      "default": false,
+      "title": "Overcharge Used",
+      "type": "boolean"
+    },
+    "reactions_used_this_turn": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Reactions Used This Turn",
+      "type": "integer"
+    }
+  },
+  "title": "ActionEconomyState",
+  "type": "object"
+}

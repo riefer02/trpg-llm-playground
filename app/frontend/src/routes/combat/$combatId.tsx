@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 
 import {
   useCombatSession,
+  useCombatWebSocket,
   useStartTurn,
   useEndTurn,
   useExecuteAction,
@@ -42,13 +43,18 @@ export const Route = createFileRoute("/combat/$combatId")({
   component: CombatSessionPage,
 });
 
-/** Polling interval when combat session is active (5 seconds) */
-const ACTIVE_POLLING_INTERVAL = 5000;
+/** Polling interval when WebSocket is disconnected (5 seconds) */
+const FALLBACK_POLLING_INTERVAL = 5000;
 
 function CombatSessionPage() {
   const { combatId } = Route.useParams();
+
+  // WebSocket connection for real-time updates
+  const { isConnected: wsConnected } = useCombatWebSocket(combatId);
+
+  // Fallback to polling if WebSocket is disconnected
   const { data, isLoading, error } = useCombatSession(combatId, {
-    pollingInterval: ACTIVE_POLLING_INTERVAL,
+    pollingInterval: wsConnected ? undefined : FALLBACK_POLLING_INTERVAL,
   });
 
   // Turn management mutations
@@ -74,7 +80,8 @@ function CombatSessionPage() {
 
   // Targeting mode state
   const [targetMode, setTargetMode] = useState<TargetMode | null>(null);
-  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
+  const [maxTargets, setMaxTargets] = useState<number>(1);
 
   // Overcharge confirmation state
   const [showOverchargeConfirm, setShowOverchargeConfirm] = useState(false);
@@ -82,6 +89,11 @@ function CombatSessionPage() {
   // Area targeting state for line/cone attacks
   const [areaPattern, setAreaPattern] = useState<AttackPatternDefinition | null>(null);
   const [areaDirection, setAreaDirection] = useState<HexCoord | null>(null);
+
+  // Movement path state
+  const [isPathMode, setIsPathMode] = useState(false);
+  const [movementPath, setMovementPath] = useState<HexCoord[]>([]);
+  const [pathHexClick, setPathHexClick] = useState<HexCoord | null>(null);
 
   const scenario = data?.scenario;
   const rounds = scenario?.rounds ?? [];
@@ -144,15 +156,17 @@ function CombatSessionPage() {
         setTurnActive(false);
         setEconomy(null);
         setTargetMode(null);
-        setSelectedTargetId(null);
+        setSelectedTargetIds([]);
+        setMaxTargets(1);
       },
     });
   }, [endTurn]);
 
   // Handle action selection from ActionPanel
-  const handleActionSelect = useCallback((_action: AvailableActionItem) => {
-    // Reset target when selecting new action
-    setSelectedTargetId(null);
+  const handleActionSelect = useCallback((action: AvailableActionItem) => {
+    // Reset targets when selecting new action and set max targets from action
+    setSelectedTargetIds([]);
+    setMaxTargets(action.max_targets);
   }, []);
 
   // Handle action execution
@@ -169,7 +183,8 @@ function CombatSessionPage() {
           if (result.success) {
             setEconomy(result.economy);
             setTargetMode(null);
-            setSelectedTargetId(null);
+            setSelectedTargetIds([]);
+            setMaxTargets(1);
             setAreaPattern(null);
             setAreaDirection(null);
           }
@@ -210,18 +225,46 @@ function CombatSessionPage() {
   const handleTargetModeChange = useCallback((mode: TargetMode | null) => {
     setTargetMode(mode);
     if (!mode) {
-      setSelectedTargetId(null);
+      setSelectedTargetIds([]);
+      setMaxTargets(1);
     }
   }, []);
 
-  // Handle token click for targeting
+  // Handle path mode changes from ActionPanel
+  const handlePathModeChange = useCallback((isActive: boolean, path: HexCoord[]) => {
+    setIsPathMode(isActive);
+    setMovementPath(path);
+    if (!isActive) {
+      setPathHexClick(null);
+    }
+  }, []);
+
+  // Handle hex click for path building (from CombatCanvas)
+  const handlePathHexClick = useCallback((coord: HexCoord) => {
+    if (isPathMode) {
+      setPathHexClick(coord);
+    }
+  }, [isPathMode]);
+
+  // Handle token click for targeting - toggle targets in array up to maxTargets
   const handleTokenClick = useCallback(
     (tokenId: string) => {
-      if (targetMode?.requiresTarget) {
-        setSelectedTargetId(tokenId);
-      }
+      if (!targetMode?.requiresTarget) return;
+
+      setSelectedTargetIds((prev) => {
+        // If already selected, remove it
+        if (prev.includes(tokenId)) {
+          return prev.filter((id) => id !== tokenId);
+        }
+        // If at max capacity, replace the last target
+        if (prev.length >= maxTargets) {
+          return [...prev.slice(0, -1), tokenId];
+        }
+        // Add to selection
+        return [...prev, tokenId];
+      });
     },
-    [targetMode]
+    [targetMode, maxTargets]
   );
 
   // Build targeting mode for canvas
@@ -237,8 +280,10 @@ function CombatSessionPage() {
     return {
       active: true,
       validTargetIds,
+      selectedTargetIds,
+      maxTargets,
     };
-  }, [targetMode, combatants, currentActor]);
+  }, [targetMode, combatants, currentActor, selectedTargetIds, maxTargets]);
 
   // Derive active indices from selectedAction or fall back to current position
   const activeRoundIndex = selectedAction?.roundIdx ?? clampIndex(currentRound - 1, rounds);
@@ -327,8 +372,16 @@ function CombatSessionPage() {
               Status: {data.status} · Round {data.current_round}
             </p>
           </div>
-          <div className="text-xs text-muted-foreground">
-            Session ID: {data.id}
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span
+                className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-500" : "bg-amber-500"}`}
+              />
+              {wsConnected ? "Live" : "Polling"}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Session ID: {data.id}
+            </div>
           </div>
         </div>
       </section>
@@ -338,9 +391,11 @@ function CombatSessionPage() {
           <CardHeader>
             <CardTitle>Combat Canvas</CardTitle>
             <CardDescription>
-              {targetMode?.requiresTarget
-                ? "Click a combatant to select as target"
-                : "Hover for hex highlight, left click to select, right click to target."}
+              {isPathMode
+                ? "Click adjacent hexes to build movement path. Click last hex to undo."
+                : targetMode?.requiresTarget
+                  ? "Click a combatant to select as target"
+                  : "Hover for hex highlight, left click to select, right click to target."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -369,10 +424,13 @@ function CombatSessionPage() {
                       },
                     }}
                     targetingMode={canvasTargetingMode}
+                    movementPath={isPathMode ? movementPath : undefined}
+                    isPathMode={isPathMode}
                     onHover={(coord) => setHovered(coord)}
                     onSelect={(coord) => setSelected(coord)}
                     onTarget={(coord) => setTargeted(coord)}
                     onTokenClick={handleTokenClick}
+                    onHexClick={handlePathHexClick}
                     className="h-full w-full"
                   />
                 ) : (
@@ -432,9 +490,13 @@ function CombatSessionPage() {
               onActionSelect={handleActionSelect}
               onExecuteAction={handleExecuteAction}
               onTargetModeChange={handleTargetModeChange}
+              onPathModeChange={handlePathModeChange}
               isExecuting={executeAction.isPending}
-              selectedTargetId={selectedTargetId}
+              selectedTargetIds={selectedTargetIds}
               actorInventory={currentActor?.inventory}
+              actorSpeed={currentActor?.stats?.speed ?? 4}
+              actorPosition={currentActor?.position?.coord ?? null}
+              hexClickCoord={pathHexClick}
             />
           )}
 
@@ -525,7 +587,7 @@ function CombatSessionPage() {
                       ? "border-primary bg-primary/10"
                       : "border-border bg-muted/40"
                   } ${
-                    selectedTargetId === combatant.id
+                    selectedTargetIds.includes(combatant.id)
                       ? "ring-2 ring-green-500"
                       : ""
                   }`}

@@ -1,107 +1,38 @@
 {
-  "$defs": {
-    "DiceExpression": {
-      "description": "Represents a dice expression like \"1d6\", \"2d6+2\", or \"1d20\".\n\nLancer primarily uses d6 and d20:\n- d20 for skill checks (roll high)\n- d6 for damage (1d6 per damage die)\n- d3 rarely used (typically 1d6/2)",
-      "properties": {
-        "count": {
-          "default": 1,
-          "title": "Count",
-          "type": "integer"
-        },
-        "size": {
-          "default": 6,
-          "enum": [
-            3,
-            6,
-            20
-          ],
-          "title": "Size",
-          "type": "integer"
-        },
-        "modifier": {
-          "default": 0,
-          "title": "Modifier",
-          "type": "integer"
-        }
-      },
-      "title": "DiceExpression",
-      "type": "object"
-    }
-  },
-  "description": "Change a resource value such as HP or heat.\n\nExamples:\n    ResourceChange(resource=\"hp\", amount=\"half_max\", target=\"ally\", cost_repairs=1)\n    ResourceChange(resource=\"heat\", amount=DiceExpression.parse(\"1d6\"), direction=\"lose\", target=\"self\")",
+  "description": "Change to a combatant's resources.",
   "properties": {
-    "resource": {
-      "enum": [
-        "hp",
-        "heat",
-        "repairs",
-        "structure",
-        "stress",
-        "core_power"
-      ],
-      "title": "Resource",
+    "combatant_id": {
+      "title": "Combatant Id",
       "type": "string"
     },
-    "amount": {
-      "anyOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "$ref": "#/$defs/DiceExpression"
-        },
-        {
-          "enum": [
-            "quarter_max",
-            "half_max",
-            "full"
-          ],
-          "type": "string"
-        }
-      ],
-      "title": "Amount"
-    },
-    "direction": {
-      "default": "gain",
-      "enum": [
-        "gain",
-        "lose",
-        "set"
-      ],
-      "title": "Direction",
-      "type": "string"
-    },
-    "target": {
-      "enum": [
-        "self",
-        "enemy",
-        "ally",
-        "adjacent"
-      ],
-      "title": "Target",
-      "type": "string"
-    },
-    "cost_repairs": {
+    "hp_change": {
       "default": 0,
-      "minimum": 0,
-      "title": "Cost Repairs",
+      "title": "Hp Change",
       "type": "integer"
     },
-    "cost_source": {
-      "default": "self",
-      "enum": [
-        "self",
-        "target",
-        "either"
-      ],
-      "title": "Cost Source",
-      "type": "string"
+    "heat_change": {
+      "default": 0,
+      "title": "Heat Change",
+      "type": "integer"
+    },
+    "structure_change": {
+      "default": 0,
+      "title": "Structure Change",
+      "type": "integer"
+    },
+    "stress_change": {
+      "default": 0,
+      "title": "Stress Change",
+      "type": "integer"
+    },
+    "repairs_change": {
+      "default": 0,
+      "title": "Repairs Change",
+      "type": "integer"
     }
   },
   "required": [
-    "resource",
-    "amount",
-    "target"
+    "combatant_id"
   ],
   "title": "ResourceChange",
   "type": "object"

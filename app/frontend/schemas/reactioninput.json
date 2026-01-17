@@ -1,0 +1,59 @@
+{
+  "description": "Input for declaring a reaction.",
+  "properties": {
+    "reactor_id": {
+      "description": "ID of the reacting combatant",
+      "title": "Reactor Id",
+      "type": "string"
+    },
+    "reaction_type": {
+      "description": "Type of reaction",
+      "enum": [
+        "brace",
+        "overwatch"
+      ],
+      "title": "Reaction Type",
+      "type": "string"
+    },
+    "trigger_action_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Action that triggered this reaction",
+      "title": "Trigger Action Id"
+    },
+    "target_ids": {
+      "description": "Targets for reaction (e.g., overwatch)",
+      "items": {
+        "type": "string"
+      },
+      "title": "Target Ids",
+      "type": "array"
+    },
+    "weapon_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Weapon for overwatch attack",
+      "title": "Weapon Id"
+    }
+  },
+  "required": [
+    "reactor_id",
+    "reaction_type"
+  ],
+  "title": "ReactionInput",
+  "type": "object"
+}

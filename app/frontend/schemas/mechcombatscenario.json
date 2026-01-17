@@ -5958,6 +5958,12 @@
           "default": 0,
           "title": "Tech Attack",
           "type": "integer"
+        },
+        "grit": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Grit",
+          "type": "integer"
         }
       },
       "required": [

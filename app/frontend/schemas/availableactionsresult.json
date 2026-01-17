@@ -1,0 +1,177 @@
+{
+  "$defs": {
+    "ActionEconomyState": {
+      "description": "Tracks action usage for a single turn.\n\nPer PR2 3726-3728:\n- 1 move + (2 quick OR 1 full) + any free + any reactions\n- Overcharge: 1/turn, gains 1 quick action\n- Reactions: 1/turn, any number/round, reset at round boundary",
+      "properties": {
+        "full_actions_used": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Full Actions Used",
+          "type": "integer"
+        },
+        "quick_actions_used": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Quick Actions Used",
+          "type": "integer"
+        },
+        "overcharge_used": {
+          "default": false,
+          "title": "Overcharge Used",
+          "type": "boolean"
+        },
+        "reactions_used_this_turn": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Reactions Used This Turn",
+          "type": "integer"
+        }
+      },
+      "title": "ActionEconomyState",
+      "type": "object"
+    },
+    "AvailableAction": {
+      "description": "An action available to the current actor.",
+      "properties": {
+        "action_id": {
+          "description": "Action identifier",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_name": {
+          "description": "Display name",
+          "title": "Action Name",
+          "type": "string"
+        },
+        "action_type": {
+          "description": "Action type (full/quick/free/reaction)",
+          "enum": [
+            "free",
+            "quick",
+            "full",
+            "reaction",
+            "protocol",
+            "move"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "is_available": {
+          "description": "Whether action can be taken now",
+          "title": "Is Available",
+          "type": "boolean"
+        },
+        "unavailable_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why action is unavailable",
+          "title": "Unavailable Reason"
+        },
+        "requires_target": {
+          "default": false,
+          "description": "Whether action needs a target",
+          "title": "Requires Target",
+          "type": "boolean"
+        },
+        "requires_weapon": {
+          "default": false,
+          "description": "Whether action needs a weapon",
+          "title": "Requires Weapon",
+          "type": "boolean"
+        },
+        "requires_system": {
+          "default": false,
+          "description": "Whether action needs a system",
+          "title": "Requires System",
+          "type": "boolean"
+        },
+        "requires_path": {
+          "default": false,
+          "description": "Whether action needs a movement path",
+          "title": "Requires Path",
+          "type": "boolean"
+        },
+        "max_targets": {
+          "default": 1,
+          "description": "Maximum number of targets (e.g., 2 for barrage)",
+          "title": "Max Targets",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action_id",
+        "action_name",
+        "action_type",
+        "is_available"
+      ],
+      "title": "AvailableAction",
+      "type": "object"
+    }
+  },
+  "description": "Available actions for the current actor.",
+  "properties": {
+    "actor_id": {
+      "description": "Actor these actions are for",
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "economy": {
+      "$ref": "#/$defs/ActionEconomyState",
+      "description": "Current action economy state"
+    },
+    "full_actions": {
+      "items": {
+        "$ref": "#/$defs/AvailableAction"
+      },
+      "title": "Full Actions",
+      "type": "array"
+    },
+    "quick_actions": {
+      "items": {
+        "$ref": "#/$defs/AvailableAction"
+      },
+      "title": "Quick Actions",
+      "type": "array"
+    },
+    "free_actions": {
+      "items": {
+        "$ref": "#/$defs/AvailableAction"
+      },
+      "title": "Free Actions",
+      "type": "array"
+    },
+    "reactions": {
+      "items": {
+        "$ref": "#/$defs/AvailableAction"
+      },
+      "title": "Reactions",
+      "type": "array"
+    },
+    "protocols": {
+      "items": {
+        "$ref": "#/$defs/AvailableAction"
+      },
+      "title": "Protocols",
+      "type": "array"
+    },
+    "can_overcharge": {
+      "default": true,
+      "description": "Whether overcharge is available",
+      "title": "Can Overcharge",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "actor_id",
+    "economy"
+  ],
+  "title": "AvailableActionsResult",
+  "type": "object"
+}

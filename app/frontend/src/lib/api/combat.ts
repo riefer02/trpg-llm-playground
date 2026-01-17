@@ -74,6 +74,9 @@ export interface AvailableActionItem {
   unavailable_reason?: string;
   requires_target: boolean;
   requires_weapon: boolean;
+  requires_system: boolean;
+  requires_path: boolean;
+  max_targets: number;
 }
 
 export interface AvailableActionsResponse {

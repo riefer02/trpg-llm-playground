@@ -327,3 +327,68 @@ function pointInPolygon(point: PixelPoint, polygon: PixelPoint[]): boolean {
 function hexKey(coord: HexCoord): string {
   return `${coord.q},${coord.r}`;
 }
+
+export type MovementPathStyle = {
+  startFillStyle?: string;
+  pathFillStyle?: string;
+  strokeStyle?: string;
+  lineWidth?: number;
+  lineDash?: number[];
+};
+
+/**
+ * Draw a movement path overlay on the canvas.
+ * Shows start hex in blue and path hexes in green with a dashed connecting line.
+ */
+export function drawMovementPath(
+  ctx: CanvasRenderingContext2D,
+  layout: HexLayout,
+  path: HexCoord[],
+  style: MovementPathStyle = {},
+): void {
+  if (path.length === 0) return;
+
+  const startFill = style.startFillStyle ?? "rgba(59, 130, 246, 0.3)";
+  const pathFill = style.pathFillStyle ?? "rgba(34, 197, 94, 0.3)";
+  const strokeColor = style.strokeStyle ?? "rgba(34, 197, 94, 0.8)";
+  const lineWidth = style.lineWidth ?? 2;
+
+  // Draw path hexes
+  path.forEach((coord, index) => {
+    const center = axialToPixel(coord, layout);
+    const corners = hexCorners(center, layout);
+
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < corners.length; i++) {
+      ctx.lineTo(corners[i].x, corners[i].y);
+    }
+    ctx.closePath();
+
+    // Fill with different color for start vs path
+    ctx.fillStyle = index === 0 ? startFill : pathFill;
+    ctx.fill();
+
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  });
+
+  // Draw connecting dashed line through hex centers
+  if (path.length > 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = style.strokeStyle ?? "rgba(34, 197, 94, 0.9)";
+    ctx.lineWidth = 3;
+    ctx.setLineDash(style.lineDash ?? [5, 5]);
+
+    const start = axialToPixel(path[0], layout);
+    ctx.moveTo(start.x, start.y);
+
+    for (let i = 1; i < path.length; i++) {
+      const point = axialToPixel(path[i], layout);
+      ctx.lineTo(point.x, point.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}

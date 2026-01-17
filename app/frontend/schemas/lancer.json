@@ -28321,80 +28321,40 @@
       "type": "object"
     },
     "ResourceChange": {
-      "description": "Change a resource value such as HP or heat.\n\nExamples:\n    ResourceChange(resource=\"hp\", amount=\"half_max\", target=\"ally\", cost_repairs=1)\n    ResourceChange(resource=\"heat\", amount=DiceExpression.parse(\"1d6\"), direction=\"lose\", target=\"self\")",
+      "description": "Change to a combatant's resources.",
       "properties": {
-        "resource": {
-          "enum": [
-            "hp",
-            "heat",
-            "repairs",
-            "structure",
-            "stress",
-            "core_power"
-          ],
-          "title": "Resource",
+        "combatant_id": {
+          "title": "Combatant Id",
           "type": "string"
         },
-        "amount": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "$ref": "#/$defs/DiceExpression"
-            },
-            {
-              "enum": [
-                "quarter_max",
-                "half_max",
-                "full"
-              ],
-              "type": "string"
-            }
-          ],
-          "title": "Amount"
-        },
-        "direction": {
-          "default": "gain",
-          "enum": [
-            "gain",
-            "lose",
-            "set"
-          ],
-          "title": "Direction",
-          "type": "string"
-        },
-        "target": {
-          "enum": [
-            "self",
-            "enemy",
-            "ally",
-            "adjacent"
-          ],
-          "title": "Target",
-          "type": "string"
-        },
-        "cost_repairs": {
+        "hp_change": {
           "default": 0,
-          "minimum": 0,
-          "title": "Cost Repairs",
+          "title": "Hp Change",
           "type": "integer"
         },
-        "cost_source": {
-          "default": "self",
-          "enum": [
-            "self",
-            "target",
-            "either"
-          ],
-          "title": "Cost Source",
-          "type": "string"
+        "heat_change": {
+          "default": 0,
+          "title": "Heat Change",
+          "type": "integer"
+        },
+        "structure_change": {
+          "default": 0,
+          "title": "Structure Change",
+          "type": "integer"
+        },
+        "stress_change": {
+          "default": 0,
+          "title": "Stress Change",
+          "type": "integer"
+        },
+        "repairs_change": {
+          "default": 0,
+          "title": "Repairs Change",
+          "type": "integer"
         }
       },
       "required": [
-        "resource",
-        "amount",
-        "target"
+        "combatant_id"
       ],
       "title": "ResourceChange",
       "type": "object"
@@ -48609,6 +48569,12 @@
           "default": 0,
           "title": "Tech Attack",
           "type": "integer"
+        },
+        "grit": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Grit",
+          "type": "integer"
         }
       },
       "required": [
@@ -50625,6 +50591,693 @@
       },
       "title": "ResolutionSettings",
       "type": "object"
+    },
+    "ActionExecutionInput": {
+      "description": "Input for executing a combat action.",
+      "properties": {
+        "actor_id": {
+          "description": "ID of the combatant taking action",
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "action_id": {
+          "description": "Action identifier (e.g., 'skirmish', 'barrage')",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "description": "Type of action",
+          "enum": [
+            "free",
+            "quick",
+            "full",
+            "reaction",
+            "protocol",
+            "move"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "target_ids": {
+          "description": "Target combatant IDs",
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "target_position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HexPosition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target position for area/movement"
+        },
+        "weapon_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Weapon being used",
+          "title": "Weapon Id"
+        },
+        "system_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "System being activated",
+          "title": "System Id"
+        },
+        "movement_path": {
+          "description": "Movement path for move actions",
+          "items": {
+            "$ref": "#/$defs/HexPosition"
+          },
+          "title": "Movement Path",
+          "type": "array"
+        },
+        "is_overcharge": {
+          "default": false,
+          "description": "Whether this action uses overcharge",
+          "title": "Is Overcharge",
+          "type": "boolean"
+        },
+        "granted_by_overcharge": {
+          "default": false,
+          "description": "Whether this action was granted by overcharge",
+          "title": "Granted By Overcharge",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "actor_id",
+        "action_id",
+        "action_type"
+      ],
+      "title": "ActionExecutionInput",
+      "type": "object"
+    },
+    "ActionExecutionResult": {
+      "description": "Result of executing a combat action.",
+      "properties": {
+        "success": {
+          "description": "Whether action executed successfully",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error"
+        },
+        "action_use": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ActionUse"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Recorded action for combat log"
+        },
+        "effects_applied": {
+          "description": "Effects that were applied",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Effects Applied",
+          "type": "array"
+        },
+        "damage_dealt": {
+          "default": 0,
+          "description": "Total damage dealt",
+          "title": "Damage Dealt",
+          "type": "integer"
+        },
+        "heat_generated": {
+          "default": 0,
+          "description": "Heat generated by this action",
+          "title": "Heat Generated",
+          "type": "integer"
+        },
+        "resource_changes": {
+          "description": "Resource changes to combatants",
+          "items": {
+            "$ref": "#/$defs/ResourceChange"
+          },
+          "title": "Resource Changes",
+          "type": "array"
+        },
+        "statuses_applied": {
+          "additionalProperties": {
+            "items": {
+              "enum": [
+                "braced",
+                "immobilized",
+                "impaired",
+                "jammed",
+                "lock_on",
+                "shredded",
+                "slowed",
+                "stunned",
+                "prone",
+                "hidden",
+                "invisible",
+                "shutdown",
+                "exposed",
+                "engaged",
+                "burn",
+                "unshackled"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": "Statuses applied to targets",
+          "title": "Statuses Applied",
+          "type": "object"
+        },
+        "structure_checks": {
+          "description": "Structure check results triggered by damage",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Structure Checks",
+          "type": "array"
+        },
+        "overheat_checks": {
+          "description": "Overheat check results triggered by heat",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Overheat Checks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "success"
+      ],
+      "title": "ActionExecutionResult",
+      "type": "object"
+    },
+    "ActionEconomyState": {
+      "description": "Tracks action usage for a single turn.\n\nPer PR2 3726-3728:\n- 1 move + (2 quick OR 1 full) + any free + any reactions\n- Overcharge: 1/turn, gains 1 quick action\n- Reactions: 1/turn, any number/round, reset at round boundary",
+      "properties": {
+        "full_actions_used": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Full Actions Used",
+          "type": "integer"
+        },
+        "quick_actions_used": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Quick Actions Used",
+          "type": "integer"
+        },
+        "overcharge_used": {
+          "default": false,
+          "title": "Overcharge Used",
+          "type": "boolean"
+        },
+        "reactions_used_this_turn": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Reactions Used This Turn",
+          "type": "integer"
+        }
+      },
+      "title": "ActionEconomyState",
+      "type": "object"
+    },
+    "TurnStartResult": {
+      "description": "Result of starting a combatant's turn.",
+      "properties": {
+        "actor_id": {
+          "description": "ID of the actor whose turn started",
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "actor_name": {
+          "description": "Name of the actor",
+          "title": "Actor Name",
+          "type": "string"
+        },
+        "economy": {
+          "$ref": "#/$defs/ActionEconomyState",
+          "description": "Fresh action economy for this turn"
+        },
+        "available_actions": {
+          "description": "Actions available to this actor",
+          "items": {
+            "type": "string"
+          },
+          "title": "Available Actions",
+          "type": "array"
+        },
+        "prepared_action_expired": {
+          "default": false,
+          "description": "Whether a prepared action expired",
+          "title": "Prepared Action Expired",
+          "type": "boolean"
+        },
+        "cooldowns_decremented": {
+          "description": "Effect IDs whose cooldowns were decremented",
+          "items": {
+            "type": "string"
+          },
+          "title": "Cooldowns Decremented",
+          "type": "array"
+        }
+      },
+      "required": [
+        "actor_id",
+        "actor_name",
+        "economy"
+      ],
+      "title": "TurnStartResult",
+      "type": "object"
+    },
+    "TurnEndResult": {
+      "description": "Result of ending a combatant's turn.",
+      "properties": {
+        "actor_id": {
+          "description": "ID of the actor whose turn ended",
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "next_actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of next actor, None if round ends",
+          "title": "Next Actor Id"
+        },
+        "next_actor_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of next actor",
+          "title": "Next Actor Name"
+        },
+        "round_advanced": {
+          "default": false,
+          "description": "Whether we advanced to a new round",
+          "title": "Round Advanced",
+          "type": "boolean"
+        },
+        "new_round_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New round number if advanced",
+          "title": "New Round Number"
+        },
+        "end_of_turn_effects": {
+          "description": "Effects applied at turn end",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "End Of Turn Effects",
+          "type": "array"
+        },
+        "cooldowns_decremented": {
+          "description": "Effect IDs whose cooldowns were decremented",
+          "items": {
+            "type": "string"
+          },
+          "title": "Cooldowns Decremented",
+          "type": "array"
+        }
+      },
+      "required": [
+        "actor_id"
+      ],
+      "title": "TurnEndResult",
+      "type": "object"
+    },
+    "ReactionInput": {
+      "description": "Input for declaring a reaction.",
+      "properties": {
+        "reactor_id": {
+          "description": "ID of the reacting combatant",
+          "title": "Reactor Id",
+          "type": "string"
+        },
+        "reaction_type": {
+          "description": "Type of reaction",
+          "enum": [
+            "brace",
+            "overwatch"
+          ],
+          "title": "Reaction Type",
+          "type": "string"
+        },
+        "trigger_action_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Action that triggered this reaction",
+          "title": "Trigger Action Id"
+        },
+        "target_ids": {
+          "description": "Targets for reaction (e.g., overwatch)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "weapon_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Weapon for overwatch attack",
+          "title": "Weapon Id"
+        }
+      },
+      "required": [
+        "reactor_id",
+        "reaction_type"
+      ],
+      "title": "ReactionInput",
+      "type": "object"
+    },
+    "ReactionResult": {
+      "description": "Result of declaring a reaction.",
+      "properties": {
+        "success": {
+          "description": "Whether reaction was valid",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if failed",
+          "title": "Error"
+        },
+        "reaction_used": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reaction type that was used",
+          "title": "Reaction Used"
+        },
+        "effects_applied": {
+          "description": "Effects from the reaction",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Effects Applied",
+          "type": "array"
+        },
+        "damage_dealt": {
+          "default": 0,
+          "description": "Damage dealt by overwatch",
+          "title": "Damage Dealt",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "success"
+      ],
+      "title": "ReactionResult",
+      "type": "object"
+    },
+    "AvailableAction": {
+      "description": "An action available to the current actor.",
+      "properties": {
+        "action_id": {
+          "description": "Action identifier",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_name": {
+          "description": "Display name",
+          "title": "Action Name",
+          "type": "string"
+        },
+        "action_type": {
+          "description": "Action type (full/quick/free/reaction)",
+          "enum": [
+            "free",
+            "quick",
+            "full",
+            "reaction",
+            "protocol",
+            "move"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "is_available": {
+          "description": "Whether action can be taken now",
+          "title": "Is Available",
+          "type": "boolean"
+        },
+        "unavailable_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why action is unavailable",
+          "title": "Unavailable Reason"
+        },
+        "requires_target": {
+          "default": false,
+          "description": "Whether action needs a target",
+          "title": "Requires Target",
+          "type": "boolean"
+        },
+        "requires_weapon": {
+          "default": false,
+          "description": "Whether action needs a weapon",
+          "title": "Requires Weapon",
+          "type": "boolean"
+        },
+        "requires_system": {
+          "default": false,
+          "description": "Whether action needs a system",
+          "title": "Requires System",
+          "type": "boolean"
+        },
+        "requires_path": {
+          "default": false,
+          "description": "Whether action needs a movement path",
+          "title": "Requires Path",
+          "type": "boolean"
+        },
+        "max_targets": {
+          "default": 1,
+          "description": "Maximum number of targets (e.g., 2 for barrage)",
+          "title": "Max Targets",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action_id",
+        "action_name",
+        "action_type",
+        "is_available"
+      ],
+      "title": "AvailableAction",
+      "type": "object"
+    },
+    "AvailableActionsResult": {
+      "description": "Available actions for the current actor.",
+      "properties": {
+        "actor_id": {
+          "description": "Actor these actions are for",
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "economy": {
+          "$ref": "#/$defs/ActionEconomyState",
+          "description": "Current action economy state"
+        },
+        "full_actions": {
+          "items": {
+            "$ref": "#/$defs/AvailableAction"
+          },
+          "title": "Full Actions",
+          "type": "array"
+        },
+        "quick_actions": {
+          "items": {
+            "$ref": "#/$defs/AvailableAction"
+          },
+          "title": "Quick Actions",
+          "type": "array"
+        },
+        "free_actions": {
+          "items": {
+            "$ref": "#/$defs/AvailableAction"
+          },
+          "title": "Free Actions",
+          "type": "array"
+        },
+        "reactions": {
+          "items": {
+            "$ref": "#/$defs/AvailableAction"
+          },
+          "title": "Reactions",
+          "type": "array"
+        },
+        "protocols": {
+          "items": {
+            "$ref": "#/$defs/AvailableAction"
+          },
+          "title": "Protocols",
+          "type": "array"
+        },
+        "can_overcharge": {
+          "default": true,
+          "description": "Whether overcharge is available",
+          "title": "Can Overcharge",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "actor_id",
+        "economy"
+      ],
+      "title": "AvailableActionsResult",
+      "type": "object"
+    },
+    "ActionEconomyResult": {
+      "description": "Result of action economy validation.",
+      "properties": {
+        "can_take_action": {
+          "description": "Whether action can be taken",
+          "title": "Can Take Action",
+          "type": "boolean"
+        },
+        "can_take_full_action": {
+          "description": "Whether full action is available",
+          "title": "Can Take Full Action",
+          "type": "boolean"
+        },
+        "can_take_quick_action": {
+          "description": "Whether quick action is available",
+          "title": "Can Take Quick Action",
+          "type": "boolean"
+        },
+        "can_overcharge": {
+          "description": "Whether overcharge is available",
+          "title": "Can Overcharge",
+          "type": "boolean"
+        },
+        "can_take_reaction": {
+          "description": "Whether reaction can be taken",
+          "title": "Can Take Reaction",
+          "type": "boolean"
+        },
+        "errors": {
+          "description": "Blocking errors if any",
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "warnings": {
+          "description": "Non-blocking warnings",
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "can_take_action",
+        "can_take_full_action",
+        "can_take_quick_action",
+        "can_overcharge",
+        "can_take_reaction"
+      ],
+      "title": "ActionEconomyResult",
+      "type": "object"
     }
   },
   "oneOf": [
@@ -51299,6 +51952,36 @@
     },
     {
       "$ref": "#/$defs/ResolutionSettings"
+    },
+    {
+      "$ref": "#/$defs/ActionExecutionInput"
+    },
+    {
+      "$ref": "#/$defs/ActionExecutionResult"
+    },
+    {
+      "$ref": "#/$defs/TurnStartResult"
+    },
+    {
+      "$ref": "#/$defs/TurnEndResult"
+    },
+    {
+      "$ref": "#/$defs/ReactionInput"
+    },
+    {
+      "$ref": "#/$defs/ReactionResult"
+    },
+    {
+      "$ref": "#/$defs/AvailableAction"
+    },
+    {
+      "$ref": "#/$defs/AvailableActionsResult"
+    },
+    {
+      "$ref": "#/$defs/ActionEconomyState"
+    },
+    {
+      "$ref": "#/$defs/ActionEconomyResult"
     }
   ]
 }

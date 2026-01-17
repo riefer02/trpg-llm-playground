@@ -1,0 +1,84 @@
+{
+  "description": "An action available to the current actor.",
+  "properties": {
+    "action_id": {
+      "description": "Action identifier",
+      "title": "Action Id",
+      "type": "string"
+    },
+    "action_name": {
+      "description": "Display name",
+      "title": "Action Name",
+      "type": "string"
+    },
+    "action_type": {
+      "description": "Action type (full/quick/free/reaction)",
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol",
+        "move"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "is_available": {
+      "description": "Whether action can be taken now",
+      "title": "Is Available",
+      "type": "boolean"
+    },
+    "unavailable_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Why action is unavailable",
+      "title": "Unavailable Reason"
+    },
+    "requires_target": {
+      "default": false,
+      "description": "Whether action needs a target",
+      "title": "Requires Target",
+      "type": "boolean"
+    },
+    "requires_weapon": {
+      "default": false,
+      "description": "Whether action needs a weapon",
+      "title": "Requires Weapon",
+      "type": "boolean"
+    },
+    "requires_system": {
+      "default": false,
+      "description": "Whether action needs a system",
+      "title": "Requires System",
+      "type": "boolean"
+    },
+    "requires_path": {
+      "default": false,
+      "description": "Whether action needs a movement path",
+      "title": "Requires Path",
+      "type": "boolean"
+    },
+    "max_targets": {
+      "default": 1,
+      "description": "Maximum number of targets (e.g., 2 for barrage)",
+      "title": "Max Targets",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "action_id",
+    "action_name",
+    "action_type",
+    "is_available"
+  ],
+  "title": "AvailableAction",
+  "type": "object"
+}

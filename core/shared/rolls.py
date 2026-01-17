@@ -166,6 +166,22 @@ def _roll_d6(count: int, forced_rolls: list[int] | None = None) -> list[int]:
     return DiceExpression.parse(f"{count}d6").roll()
 
 
+def _roll_d20(forced_roll: int | None = None) -> int:
+    """Roll a d20, using forced roll if available.
+
+    Args:
+        forced_roll: Optional forced roll value for deterministic testing
+
+    Returns:
+        Roll result (1-20)
+    """
+    if forced_roll is not None:
+        return forced_roll
+    from core.shared.dice import DiceExpression
+
+    return DiceExpression.parse("1d20").roll()[0]
+
+
 def resolve_attack(
     attack_bonus: int,
     target_defense: int,
@@ -198,7 +214,7 @@ def resolve_attack(
     Returns:
         AttackResolutionResult with full breakdown of the attack
     """
-    roll = forced_roll if forced_roll is not None else _roll_d6(1)[0]
+    roll = _roll_d20(forced_roll)
 
     accuracy_dice = _roll_d6(accuracy_bonus, forced_accuracy_rolls)
     difficulty_dice = _roll_d6(difficulty_bonus, forced_difficulty_rolls)

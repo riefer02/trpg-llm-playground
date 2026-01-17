@@ -5,19 +5,24 @@ import type {
   ClickCallbacks,
   CombatRenderState,
   RenderStyles,
+  MovementPathStyle,
 } from "../../lib/combat-render/canvas";
 import {
   attachClickHandlers,
   attachHoverHandlers,
   renderCombatCanvas,
+  drawMovementPath,
 } from "../../lib/combat-render/canvas";
 import type { HexLayout } from "../../lib/combat-render/hex";
+import type { HexCoord } from "../../lib/types/lancer";
 
 type LayoutResolver = HexLayout | ((size: CanvasSize) => HexLayout);
 
 export type TargetingMode = {
   active: boolean;
   validTargetIds?: string[];
+  selectedTargetIds?: string[];
+  maxTargets?: number;
 };
 
 export type CombatCanvasProps = {
@@ -29,10 +34,14 @@ export type CombatCanvasProps = {
   className?: string;
   resizeToParent?: boolean;
   targetingMode?: TargetingMode;
+  movementPath?: HexCoord[];
+  movementPathStyle?: MovementPathStyle;
+  isPathMode?: boolean;
   onHover?: ClickCallbacks["onSelect"];
   onSelect?: ClickCallbacks["onSelect"];
   onTarget?: ClickCallbacks["onTarget"];
   onTokenClick?: (tokenId: string) => void;
+  onHexClick?: (coord: HexCoord) => void;
 };
 
 export function CombatCanvas({
@@ -44,10 +53,14 @@ export function CombatCanvas({
   className,
   resizeToParent = false,
   targetingMode,
+  movementPath,
+  movementPathStyle,
+  isPathMode = false,
   onHover,
   onSelect,
   onTarget,
   onTokenClick,
+  onHexClick,
 }: CombatCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width, height });
@@ -58,21 +71,25 @@ export function CombatCanvas({
     [layout, canvasSize],
   );
 
-  // Modify render state to highlight valid targets when in targeting mode
+  // Modify render state to highlight valid/selected targets when in targeting mode
   const renderState = useMemo(() => {
     if (!targetingMode?.active || !targetingMode.validTargetIds?.length) {
       return state;
     }
 
     const validSet = new Set(targetingMode.validTargetIds);
+    const selectedSet = new Set(targetingMode.selectedTargetIds ?? []);
+
     return {
       ...state,
       tokens: state.tokens.map((token) => ({
         ...token,
-        // Add pulsing ring effect for valid targets
-        color: validSet.has(token.id)
-          ? "#22c55e" // green for valid targets
-          : token.color,
+        // Selected targets get blue, valid targets get green, others keep original
+        color: selectedSet.has(token.id)
+          ? "#3b82f6" // blue for selected
+          : validSet.has(token.id)
+            ? "#22c55e" // green for valid
+            : token.color,
       })),
     };
   }, [state, targetingMode]);
@@ -149,7 +166,12 @@ export function CombatCanvas({
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
 
     renderCombatCanvas(ctx, resolvedLayout, renderState, styles, canvasSize);
-  }, [canvasSize, devicePixelRatio, resolvedLayout, renderState, styles]);
+
+    // Draw movement path overlay if present
+    if (movementPath && movementPath.length > 0) {
+      drawMovementPath(ctx, resolvedLayout, movementPath, movementPathStyle);
+    }
+  }, [canvasSize, devicePixelRatio, resolvedLayout, renderState, styles, movementPath, movementPathStyle]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -162,8 +184,14 @@ export function CombatCanvas({
       cleanup.push(attachHoverHandlers(canvas, resolvedLayout, state.grid, onHover));
     }
 
-    // Wrap onSelect to also check for token clicks
+    // Wrap onSelect to also check for token clicks and hex clicks in path mode
     const handleSelect: ClickCallbacks["onSelect"] = (coord, point) => {
+      // In path mode, call onHexClick for any hex click
+      if (isPathMode && coord && onHexClick) {
+        onHexClick(coord);
+        return; // Don't process other handlers in path mode
+      }
+
       // First, check if we clicked a token
       if (coord && onTokenClick) {
         const clickedToken = state.tokens.find(
@@ -189,10 +217,14 @@ export function CombatCanvas({
     return () => {
       cleanup.forEach((fn) => fn());
     };
-  }, [onHover, onSelect, onTarget, onTokenClick, resolvedLayout, state.grid, state.tokens]);
+  }, [onHover, onSelect, onTarget, onTokenClick, onHexClick, isPathMode, resolvedLayout, state.grid, state.tokens]);
 
-  // Apply targeting mode cursor
-  const cursorClass = targetingMode?.active ? "cursor-crosshair" : "";
+  // Apply targeting/path mode cursor
+  const cursorClass = isPathMode
+    ? "cursor-pointer"
+    : targetingMode?.active
+      ? "cursor-crosshair"
+      : "";
 
   return <canvas ref={canvasRef} className={`${className ?? ""} ${cursorClass}`} />;
 }

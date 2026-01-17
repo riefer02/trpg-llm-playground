@@ -1,0 +1,55 @@
+{
+  "description": "Result of action economy validation.",
+  "properties": {
+    "can_take_action": {
+      "description": "Whether action can be taken",
+      "title": "Can Take Action",
+      "type": "boolean"
+    },
+    "can_take_full_action": {
+      "description": "Whether full action is available",
+      "title": "Can Take Full Action",
+      "type": "boolean"
+    },
+    "can_take_quick_action": {
+      "description": "Whether quick action is available",
+      "title": "Can Take Quick Action",
+      "type": "boolean"
+    },
+    "can_overcharge": {
+      "description": "Whether overcharge is available",
+      "title": "Can Overcharge",
+      "type": "boolean"
+    },
+    "can_take_reaction": {
+      "description": "Whether reaction can be taken",
+      "title": "Can Take Reaction",
+      "type": "boolean"
+    },
+    "errors": {
+      "description": "Blocking errors if any",
+      "items": {
+        "type": "string"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "warnings": {
+      "description": "Non-blocking warnings",
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "can_take_action",
+    "can_take_full_action",
+    "can_take_quick_action",
+    "can_overcharge",
+    "can_take_reaction"
+  ],
+  "title": "ActionEconomyResult",
+  "type": "object"
+}

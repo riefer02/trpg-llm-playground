@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "ActionEconomyState": {
+      "description": "Tracks action usage for a single turn.\n\nPer PR2 3726-3728:\n- 1 move + (2 quick OR 1 full) + any free + any reactions\n- Overcharge: 1/turn, gains 1 quick action\n- Reactions: 1/turn, any number/round, reset at round boundary",
+      "properties": {
+        "full_actions_used": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Full Actions Used",
+          "type": "integer"
+        },
+        "quick_actions_used": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Quick Actions Used",
+          "type": "integer"
+        },
+        "overcharge_used": {
+          "default": false,
+          "title": "Overcharge Used",
+          "type": "boolean"
+        },
+        "reactions_used_this_turn": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Reactions Used This Turn",
+          "type": "integer"
+        }
+      },
+      "title": "ActionEconomyState",
+      "type": "object"
+    }
+  },
+  "description": "Result of starting a combatant's turn.",
+  "properties": {
+    "actor_id": {
+      "description": "ID of the actor whose turn started",
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "actor_name": {
+      "description": "Name of the actor",
+      "title": "Actor Name",
+      "type": "string"
+    },
+    "economy": {
+      "$ref": "#/$defs/ActionEconomyState",
+      "description": "Fresh action economy for this turn"
+    },
+    "available_actions": {
+      "description": "Actions available to this actor",
+      "items": {
+        "type": "string"
+      },
+      "title": "Available Actions",
+      "type": "array"
+    },
+    "prepared_action_expired": {
+      "default": false,
+      "description": "Whether a prepared action expired",
+      "title": "Prepared Action Expired",
+      "type": "boolean"
+    },
+    "cooldowns_decremented": {
+      "description": "Effect IDs whose cooldowns were decremented",
+      "items": {
+        "type": "string"
+      },
+      "title": "Cooldowns Decremented",
+      "type": "array"
+    }
+  },
+  "required": [
+    "actor_id",
+    "actor_name",
+    "economy"
+  ],
+  "title": "TurnStartResult",
+  "type": "object"
+}

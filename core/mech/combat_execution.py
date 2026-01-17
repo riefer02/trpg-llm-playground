@@ -11,11 +11,15 @@ The API layer handles persistence.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 
 from core.shared.enums import ActionType, StatusType
+
+if TYPE_CHECKING:
+    from core.shared.structure import StructureResolutionResult
+    from core.shared.heat import OverheatResolutionResult
 from core.mech.combat_state import (
     MechCombatScenario,
     CombatantState,
@@ -42,6 +46,8 @@ from core.mech.combat_resolution import (
     increment_overcharge_on_turn_start,
 )
 from core.mech.grid import HexPosition
+from core.mech.compendium import get_weapon_definition
+from core.shared.dice import roll_dice
 
 
 # =============================================================================
@@ -89,6 +95,14 @@ class ActionExecutionResult(FrozenModel):
     )
     statuses_applied: dict[str, list[StatusType]] = Field(
         default_factory=dict, description="Statuses applied to targets"
+    )
+    structure_checks: list[dict] = Field(
+        default_factory=list,
+        description="Structure check results triggered by damage"
+    )
+    overheat_checks: list[dict] = Field(
+        default_factory=list,
+        description="Overheat check results triggered by heat"
     )
 
 
@@ -149,6 +163,9 @@ class AvailableAction(FrozenModel):
     unavailable_reason: str | None = Field(default=None, description="Why action is unavailable")
     requires_target: bool = Field(default=False, description="Whether action needs a target")
     requires_weapon: bool = Field(default=False, description="Whether action needs a weapon")
+    requires_system: bool = Field(default=False, description="Whether action needs a system")
+    requires_path: bool = Field(default=False, description="Whether action needs a movement path")
+    max_targets: int = Field(default=1, description="Maximum number of targets (e.g., 2 for barrage)")
 
 
 class AvailableActionsResult(FrozenModel):
@@ -410,6 +427,45 @@ def end_turn(
 # =============================================================================
 
 
+def lookup_weapon_damage_and_ap(weapon_id: str | None) -> tuple[int, int]:
+    """Look up weapon damage and AP value from compendium.
+
+    Rolls the weapon's damage dice and extracts the AP tag value.
+
+    Args:
+        weapon_id: Weapon ID to look up, or None for default damage
+
+    Returns:
+        Tuple of (damage_rolled, armor_piercing)
+        Falls back to (6, 0) if weapon not found.
+    """
+    if weapon_id is None:
+        return 6, 0
+
+    weapon_def = get_weapon_definition(weapon_id)
+    if weapon_def is None:
+        return 6, 0  # Graceful fallback for unknown weapons
+
+    # Roll damage from all damage components
+    total_damage = 0
+    for damage_component in weapon_def.damage:
+        if damage_component.dice is not None:
+            total_damage += roll_dice(damage_component.dice)
+        total_damage += damage_component.flat
+
+    if total_damage == 0:
+        total_damage = 6  # Fallback for weapons with no damage
+
+    # Extract AP tag value
+    armor_piercing = 0
+    for tag in weapon_def.tags:
+        if tag.tag == "ap":
+            armor_piercing = tag.value if tag.value is not None else 1
+            break
+
+    return total_damage, armor_piercing
+
+
 def execute_action(
     scenario: MechCombatScenario,
     current_turn: CombatTurn,
@@ -487,12 +543,70 @@ def execute_action(
         actions=updated_actions,
     )
 
-    # Apply action effects (simplified - real implementation would call combat_helpers)
+    # Initialize effect tracking
     resource_changes: list[ResourceChange] = []
     effects_applied: list[dict] = []
     damage_dealt = 0
     heat_generated = 0
     statuses_applied: dict[str, list[StatusType]] = {}
+    structure_checks: list[dict] = []
+    overheat_checks: list[dict] = []
+
+    # Check if this is an attack action with targets
+    is_attack = action_input.action_id in ("skirmish", "barrage", "fight") or \
+                action_input.weapon_id is not None
+
+    if is_attack and action_input.target_ids:
+        from core.shared.rolls import resolve_attack
+
+        # Look up weapon damage and AP from compendium
+        base_damage, armor_piercing = lookup_weapon_damage_and_ap(action_input.weapon_id)
+
+        for target_id in action_input.target_ids:
+            target = next((c for c in scenario.combatants if c.id == target_id), None)
+            if target is None:
+                continue
+
+            # Get attack bonus from actor's grit
+            attack_bonus = actor.stats.grit if actor.stats else 0
+
+            # Resolve attack roll
+            attack_result = resolve_attack(
+                attack_bonus=attack_bonus,
+                target_defense=target.stats.evasion if target.stats else 10,
+            )
+
+            effects_applied.append({
+                "type": "attack",
+                "target_id": target_id,
+                "roll": attack_result.roll,
+                "total": attack_result.total_accuracy,
+                "hit": attack_result.hit,
+                "critical": attack_result.is_critical,
+            })
+
+            if attack_result.hit:
+                # Calculate damage (double on crit)
+                final_damage = base_damage * 2 if attack_result.is_critical else base_damage
+
+                # Apply damage using existing helper
+                scenario, change, structure_result = apply_damage(
+                    scenario, target_id, final_damage, armor_piercing
+                )
+                resource_changes.append(change)
+                damage_dealt += abs(change.hp_change or 0)
+
+                # Record structure check if triggered
+                if structure_result:
+                    structure_checks.append({
+                        "type": "structure_check",
+                        "target_id": target_id,
+                        "outcome": structure_result.outcome,
+                        "mech_destroyed": structure_result.mech_destroyed,
+                        "statuses": [str(s) for s in structure_result.statuses_to_apply],
+                        "dice_rolls": structure_result.dice_rolls,
+                        "lowest_roll": structure_result.lowest_roll,
+                    })
 
     # Handle overcharge heat
     if action_input.is_overcharge and actor.overcharge_state is not None:
@@ -510,6 +624,22 @@ def execute_action(
                 "resources": new_resources,
             }
         )
+
+        # Check for overheat cascade if heat meets or exceeds cap
+        overheat_result = None
+        if new_heat >= updated_actor.resources.heat_cap:
+            updated_actor, overheat_result = check_overheat_cascade(updated_actor)
+            if overheat_result:
+                overheat_checks.append({
+                    "type": "overheat_check",
+                    "target_id": actor.id,
+                    "outcome": overheat_result.outcome,
+                    "statuses": [str(s) for s in overheat_result.statuses_to_apply],
+                    "dice_rolls": overheat_result.dice_rolls,
+                    "lowest_roll": overheat_result.lowest_roll,
+                    "meltdown_state": overheat_result.meltdown_state is not None,
+                })
+
         updated_combatants = list(scenario.combatants)
         updated_combatants[actor_idx] = updated_actor
 
@@ -522,9 +652,18 @@ def execute_action(
             deployables=dict(scenario.deployables),
         )
 
+        # Calculate heat change (may be negative if heat was cleared by overheat)
+        final_heat_change = heat_generated
+        stress_change = 0
+        if overheat_result:
+            # Heat was cleared by overheat
+            final_heat_change = updated_actor.resources.heat_current - actor.resources.heat_current
+            stress_change = -overheat_result.stress_damage
+
         resource_changes.append(ResourceChange(
             combatant_id=actor.id,
-            heat_change=heat_generated,
+            heat_change=final_heat_change,
+            stress_change=stress_change,
         ))
         effects_applied.append({
             "type": "overcharge",
@@ -540,6 +679,8 @@ def execute_action(
         heat_generated=heat_generated,
         resource_changes=resource_changes,
         statuses_applied=statuses_applied,
+        structure_checks=structure_checks,
+        overheat_checks=overheat_checks,
     )
 
     return scenario, updated_turn, updated_economy, result
@@ -690,6 +831,7 @@ def get_available_actions(
                 is_available=True,
                 requires_target=True,
                 requires_weapon=True,
+                max_targets=2,  # Barrage can attack up to 2 targets
             ),
             AvailableAction(
                 action_id="full_tech",
@@ -728,6 +870,7 @@ def get_available_actions(
                 unavailable_reason="Full action already used",
                 requires_target=True,
                 requires_weapon=True,
+                max_targets=2,  # Barrage can attack up to 2 targets
             ),
         ])
 
@@ -748,6 +891,7 @@ def get_available_actions(
                 action_name="Boost",
                 action_type="quick",
                 is_available=True,
+                requires_path=True,
             ),
             AvailableAction(
                 action_id="ram",
@@ -782,6 +926,13 @@ def get_available_actions(
                 action_type="quick",
                 is_available=True,
             ),
+            AvailableAction(
+                action_id="activate",
+                action_name="Activate",
+                action_type="quick",
+                is_available=True,
+                requires_system=True,
+            ),
         ])
     else:
         quick_actions.extend([
@@ -794,10 +945,25 @@ def get_available_actions(
                 requires_target=True,
                 requires_weapon=True,
             ),
+            AvailableAction(
+                action_id="activate",
+                action_name="Activate",
+                action_type="quick",
+                is_available=False,
+                unavailable_reason="No quick actions remaining",
+                requires_system=True,
+            ),
         ])
 
     # Free actions (always available)
     free_actions: list[AvailableAction] = [
+        AvailableAction(
+            action_id="move",
+            action_name="Move",
+            action_type="free",
+            is_available=True,
+            requires_path=True,
+        ),
         AvailableAction(
             action_id="overcharge",
             action_name="Overcharge",
@@ -849,6 +1015,128 @@ def get_available_actions(
 
 
 # =============================================================================
+# Cascade Resolution Helpers
+# =============================================================================
+
+
+def check_structure_cascade(
+    combatant: CombatantState,
+    excess_damage: int,
+) -> tuple[CombatantState, "StructureResolutionResult | None"]:
+    """Check for structure damage when HP reaches 0.
+
+    Per PR2 4592-4637: When HP reaches 0, roll structure check.
+    Results can be glancing blow, system trauma, direct hit, or crushing hit.
+
+    Args:
+        combatant: The combatant that took damage
+        excess_damage: Damage that exceeded remaining HP
+
+    Returns:
+        Tuple of (updated combatant, resolution result or None if no check triggered)
+    """
+    from core.shared.structure import resolve_structure_damage, StructureInput
+    from core.mech.combat_rules import DEFAULT_STRUCTURE_DAMAGE_RULES
+
+    # Only trigger if HP is at 0
+    if combatant.resources.hp_current > 0:
+        return combatant, None
+
+    # Don't trigger if already at 0 structure
+    if combatant.resources.structure_current <= 0:
+        return combatant, None
+
+    # Resolve structure check
+    result = resolve_structure_damage(StructureInput(
+        damage_dealt=excess_damage,
+        remaining_structure=combatant.resources.structure_current,
+        inventory=combatant.inventory,
+        rules=DEFAULT_STRUCTURE_DAMAGE_RULES,
+    ))
+
+    # Apply result to combatant
+    new_structure = combatant.resources.structure_current - 1
+    # If not destroyed, reset HP to max; if destroyed, HP stays at 0
+    new_hp = combatant.stats.hp_max if new_structure > 0 and not result.mech_destroyed else 0
+
+    new_resources = combatant.resources.model_copy(update={
+        "structure_current": max(0, new_structure),
+        "hp_current": new_hp,
+    })
+
+    # Apply statuses from outcome
+    new_statuses = list(combatant.statuses)
+    for status in result.statuses_to_apply:
+        if status not in new_statuses:
+            new_statuses.append(status)
+
+    updated_combatant = combatant.model_copy(update={
+        "resources": new_resources,
+        "statuses": new_statuses,
+        "inventory": result.inventory_update or combatant.inventory,
+    })
+
+    return updated_combatant, result
+
+
+def check_overheat_cascade(
+    combatant: CombatantState,
+) -> tuple[CombatantState, "OverheatResolutionResult | None"]:
+    """Check for stress when heat exceeds capacity.
+
+    Per PR2 4660-4706: When heat exceeds cap, mark stress and roll overheat check.
+    Results can be emergency shunt, power plant destabilize, meltdown, or irreversible meltdown.
+
+    Args:
+        combatant: The combatant that gained heat
+
+    Returns:
+        Tuple of (updated combatant, resolution result or None if no check triggered)
+    """
+    from core.shared.heat import resolve_overheat, OverheatInput
+    from core.mech.combat_rules import DEFAULT_OVERHEAT_RULES
+
+    # Only trigger if heat meets or exceeds cap
+    if combatant.resources.heat_current < combatant.resources.heat_cap:
+        return combatant, None
+
+    # Don't trigger if already at 0 stress
+    if combatant.resources.stress_current <= 0:
+        return combatant, None
+
+    # Resolve overheat check
+    result = resolve_overheat(OverheatInput(
+        stress_marked=combatant.resources.stress_current,
+        remaining_stress=combatant.resources.stress_current,
+        rules=DEFAULT_OVERHEAT_RULES,
+    ))
+
+    # Apply result to combatant
+    new_stress = max(0, combatant.resources.stress_current - result.stress_damage)
+    # Per PR2: heat always clears on overheat
+    new_heat = 0
+
+    new_resources = combatant.resources.model_copy(update={
+        "stress_current": new_stress,
+        "heat_current": new_heat,
+    })
+
+    # Apply statuses from outcome
+    new_statuses = list(combatant.statuses)
+    for status in result.statuses_to_apply:
+        if status not in new_statuses:
+            new_statuses.append(status)
+
+    updated_combatant = combatant.model_copy(update={
+        "resources": new_resources,
+        "statuses": new_statuses,
+        "meltdown_state": result.meltdown_state,
+    })
+
+    return updated_combatant, result
+
+
+# =============================================================================
 # Resource Mutation Helpers
 # =============================================================================
 
@@ -858,8 +1146,8 @@ def apply_damage(
     target_id: str,
     damage: int,
     armor_piercing: int = 0,
-) -> tuple[MechCombatScenario, ResourceChange]:
-    """Apply damage to a combatant.
+) -> tuple[MechCombatScenario, ResourceChange, "StructureResolutionResult | None"]:
+    """Apply damage to a combatant, triggering structure check if HP reaches 0.
 
     Args:
         scenario: Current combat scenario
@@ -868,7 +1156,7 @@ def apply_damage(
         armor_piercing: AP value to bypass armor
 
     Returns:
-        Tuple of (updated scenario, ResourceChange record)
+        Tuple of (updated scenario, ResourceChange record, structure result or None)
     """
     # Find target
     target: CombatantState | None = None
@@ -880,11 +1168,14 @@ def apply_damage(
             break
 
     if target is None:
-        return scenario, ResourceChange(combatant_id=target_id)
+        return scenario, ResourceChange(combatant_id=target_id), None
 
     # Calculate effective damage
     effective_armor = max(0, target.stats.armor - armor_piercing)
     net_damage = max(0, damage - effective_armor)
+
+    # Calculate excess damage for structure check (damage beyond current HP)
+    excess_damage = max(0, net_damage - target.resources.hp_current)
 
     # Apply to HP
     new_hp = max(0, target.resources.hp_current - net_damage)
@@ -893,6 +1184,13 @@ def apply_damage(
     new_resources = target.resources.model_copy(update={"hp_current": new_hp})
     updated_target = target.model_copy(update={"resources": new_resources})
 
+    # Check for structure cascade if HP reached 0
+    structure_result: "StructureResolutionResult | None" = None
+    if new_hp == 0:
+        updated_target, structure_result = check_structure_cascade(
+            updated_target, excess_damage
+        )
+
     updated_combatants = list(scenario.combatants)
     updated_combatants[target_idx] = updated_target
 
@@ -905,18 +1203,24 @@ def apply_damage(
         deployables=dict(scenario.deployables),
     )
 
+    # Calculate structure change for resource change record
+    structure_change = 0
+    if structure_result:
+        structure_change = -1  # Structure always decrements by 1 on structure check
+
     return updated_scenario, ResourceChange(
         combatant_id=target_id,
         hp_change=-hp_change,
-    )
+        structure_change=structure_change,
+    ), structure_result
 
 
 def apply_heat(
     scenario: MechCombatScenario,
     target_id: str,
     heat: int,
-) -> tuple[MechCombatScenario, ResourceChange]:
-    """Apply heat to a combatant.
+) -> tuple[MechCombatScenario, ResourceChange, "OverheatResolutionResult | None"]:
+    """Apply heat to a combatant, triggering stress check if heat exceeds cap.
 
     Args:
         scenario: Current combat scenario
@@ -924,7 +1228,7 @@ def apply_heat(
         heat: Amount of heat
 
     Returns:
-        Tuple of (updated scenario, ResourceChange record)
+        Tuple of (updated scenario, ResourceChange record, overheat result or None)
     """
     # Find target
     target: CombatantState | None = None
@@ -936,13 +1240,18 @@ def apply_heat(
             break
 
     if target is None:
-        return scenario, ResourceChange(combatant_id=target_id)
+        return scenario, ResourceChange(combatant_id=target_id), None
 
     # Apply heat (can exceed cap - triggers overheat check)
     new_heat = target.resources.heat_current + heat
 
     new_resources = target.resources.model_copy(update={"heat_current": new_heat})
     updated_target = target.model_copy(update={"resources": new_resources})
+
+    # Check for overheat cascade if heat meets or exceeds cap
+    overheat_result: "OverheatResolutionResult | None" = None
+    if new_heat >= target.resources.heat_cap:
+        updated_target, overheat_result = check_overheat_cascade(updated_target)
 
     updated_combatants = list(scenario.combatants)
     updated_combatants[target_idx] = updated_target
@@ -956,10 +1265,19 @@ def apply_heat(
         deployables=dict(scenario.deployables),
     )
 
+    # Calculate stress change for resource change record
+    stress_change = 0
+    final_heat_change = heat
+    if overheat_result:
+        stress_change = -overheat_result.stress_damage
+        # Heat was cleared by overheat, so actual heat change is negative
+        final_heat_change = -target.resources.heat_current  # Cleared all original heat
+
     return updated_scenario, ResourceChange(
         combatant_id=target_id,
-        heat_change=heat,
-    )
+        heat_change=final_heat_change if not overheat_result else -target.resources.heat_current,
+        stress_change=stress_change,
+    ), overheat_result
 
 
 def clear_heat(
@@ -1040,6 +1358,7 @@ def _get_basic_available_actions(actor: CombatantState) -> list[str]:
         "quick_tech",
         "hide",
         "search",
+        "activate",
         # Free actions
         "overcharge",
         "mount_dismount",

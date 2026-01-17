@@ -1,0 +1,56 @@
+{
+  "description": "Result of declaring a reaction.",
+  "properties": {
+    "success": {
+      "description": "Whether reaction was valid",
+      "title": "Success",
+      "type": "boolean"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Error message if failed",
+      "title": "Error"
+    },
+    "reaction_used": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Reaction type that was used",
+      "title": "Reaction Used"
+    },
+    "effects_applied": {
+      "description": "Effects from the reaction",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Effects Applied",
+      "type": "array"
+    },
+    "damage_dealt": {
+      "default": 0,
+      "description": "Damage dealt by overwatch",
+      "title": "Damage Dealt",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "success"
+  ],
+  "title": "ReactionResult",
+  "type": "object"
+}

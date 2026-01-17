@@ -92,6 +92,7 @@ class CombatStats(FrozenModel):
     speed: int = Field(default=0, ge=0)
     sensor_range: int = Field(default=0, ge=0)
     tech_attack: int = Field(default=0)
+    grit: int = Field(default=0, ge=0)
 
 
 class CombatResources(FrozenModel):

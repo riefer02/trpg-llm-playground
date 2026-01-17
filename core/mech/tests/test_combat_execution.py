@@ -20,6 +20,9 @@ from core.mech.combat_execution import (
     apply_damage,
     apply_heat,
     clear_heat,
+    lookup_weapon_damage_and_ap,
+    check_structure_cascade,
+    check_overheat_cascade,
 )
 from core.mech.action_economy import (
     ActionEconomyState,
@@ -52,6 +55,7 @@ def make_combatant(
     hp_current: int = 10,
     heat_current: int = 0,
     heat_cap: int = 6,
+    grit: int = 0,
     **kwargs,
 ) -> CombatantState:
     """Create a test combatant."""
@@ -68,6 +72,7 @@ def make_combatant(
             armor=0,
             speed=4,
             sensor_range=10,
+            grit=grit,
         ),
         resources=CombatResources(
             hp_current=hp_current,
@@ -447,6 +452,93 @@ class TestExecuteAction:
         assert len(updated_turn.actions) == 1
         assert updated_turn.actions[0].action_id == "skirmish"
 
+    def test_execute_attack_deals_damage(self):
+        """Attack action should resolve hit/miss and apply damage."""
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(id="defender", name="Defender", side="hostiles", hp_current=10)
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="assault_rifle",
+        )
+
+        updated_scenario, updated_turn, updated_economy, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success is True
+        assert len(result.effects_applied) == 1
+        assert result.effects_applied[0]["type"] == "attack"
+        assert result.effects_applied[0]["target_id"] == "defender"
+        assert "roll" in result.effects_applied[0]
+        assert "hit" in result.effects_applied[0]
+
+        # If hit, damage should be applied
+        if result.effects_applied[0]["hit"]:
+            assert result.damage_dealt > 0
+            defender_after = next(
+                c for c in updated_scenario.combatants if c.id == "defender"
+            )
+            assert defender_after.resources.hp_current < 10  # Started with 10 HP
+
+    def test_execute_attack_with_forced_hit(self):
+        """Attack with natural 20 should always hit and deal double damage."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        # Defender with enough HP to take full crit damage
+        defender = make_combatant(id="defender", name="Defender", side="hostiles", hp_max=20, hp_current=20)
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+        )
+
+        # Force a natural 20 (critical hit)
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force roll of 20
+
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success is True
+        assert result.effects_applied[0]["hit"] is True
+        assert result.effects_applied[0]["critical"] is True
+        # Crit damage = base_damage * 2 = 6 * 2 = 12
+        assert result.damage_dealt == 12
+
+    def test_execute_attack_missing_target(self):
+        """Attack with non-existent target should not error."""
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        scenario = make_scenario(combatants=[attacker])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["nonexistent"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        # Should succeed (action executes) but no attack effects (target not found)
+        assert result.success is True
+        assert len(result.effects_applied) == 0
+
 
 # =============================================================================
 # Reaction Tests
@@ -614,11 +706,12 @@ class TestApplyDamage:
         combatant = make_combatant(id="target_1", hp_current=10)
         scenario = make_scenario(combatants=[combatant])
 
-        updated_scenario, change = apply_damage(scenario, "target_1", damage=3)
+        updated_scenario, change, structure_result = apply_damage(scenario, "target_1", damage=3)
 
         updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
         assert updated_target.resources.hp_current == 7
         assert change.hp_change == -3
+        assert structure_result is None  # No structure check triggered
 
     def test_apply_damage_respects_armor(self):
         """Test that armor reduces damage."""
@@ -647,11 +740,12 @@ class TestApplyDamage:
         )
         scenario = make_scenario(combatants=[combatant])
 
-        updated_scenario, change = apply_damage(scenario, "target_1", damage=5)
+        updated_scenario, change, structure_result = apply_damage(scenario, "target_1", damage=5)
 
         updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
         assert updated_target.resources.hp_current == 7  # 10 - (5 - 2 armor) = 7
         assert change.hp_change == -3
+        assert structure_result is None
 
     def test_apply_damage_armor_piercing(self):
         """Test that AP bypasses armor."""
@@ -680,21 +774,28 @@ class TestApplyDamage:
         )
         scenario = make_scenario(combatants=[combatant])
 
-        updated_scenario, change = apply_damage(scenario, "target_1", damage=5, armor_piercing=2)
+        updated_scenario, change, _ = apply_damage(scenario, "target_1", damage=5, armor_piercing=2)
 
         updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
         assert updated_target.resources.hp_current == 5  # Full 5 damage, armor bypassed
 
-    def test_apply_damage_minimum_zero(self):
-        """Test that HP cannot go below zero."""
+    def test_apply_damage_minimum_zero_triggers_cascade(self):
+        """Test that damage to 0 HP triggers structure cascade."""
         combatant = make_combatant(id="target_1", hp_current=5)
         scenario = make_scenario(combatants=[combatant])
 
-        updated_scenario, change = apply_damage(scenario, "target_1", damage=10)
+        updated_scenario, change, structure_result = apply_damage(scenario, "target_1", damage=10)
+
+        # Structure check should trigger when HP reaches 0
+        assert structure_result is not None
+        assert change.hp_change == -5  # Original HP change before cascade
+        assert change.structure_change == -1  # Structure decremented
 
         updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
-        assert updated_target.resources.hp_current == 0
-        assert change.hp_change == -5
+        # If not destroyed, HP resets to max; structure decremented
+        if not structure_result.mech_destroyed:
+            assert updated_target.resources.hp_current == 10  # Reset to max
+            assert updated_target.resources.structure_current == 3  # 4 - 1
 
 
 class TestApplyHeat:
@@ -705,21 +806,30 @@ class TestApplyHeat:
         combatant = make_combatant(id="target_1", heat_current=2)
         scenario = make_scenario(combatants=[combatant])
 
-        updated_scenario, change = apply_heat(scenario, "target_1", heat=3)
+        updated_scenario, change, overheat_result = apply_heat(scenario, "target_1", heat=3)
 
         updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
         assert updated_target.resources.heat_current == 5
         assert change.heat_change == 3
+        assert overheat_result is None  # No overheat triggered
 
-    def test_apply_heat_can_exceed_cap(self):
-        """Test that heat can exceed heat cap (triggers overheat)."""
+    def test_apply_heat_triggers_overheat_cascade(self):
+        """Test that heat exceeding cap triggers overheat cascade."""
         combatant = make_combatant(id="target_1", heat_current=5, heat_cap=6)
         scenario = make_scenario(combatants=[combatant])
 
-        updated_scenario, change = apply_heat(scenario, "target_1", heat=3)
+        updated_scenario, change, overheat_result = apply_heat(scenario, "target_1", heat=3)
 
         updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
-        assert updated_target.resources.heat_current == 8  # Exceeds cap of 6
+        # Heat was cleared by overheat cascade
+        assert updated_target.resources.heat_current == 0
+        # Stress was decremented
+        assert updated_target.resources.stress_current == 3  # Started at 4, lost 1
+        # Overheat result should be present
+        assert overheat_result is not None
+        assert overheat_result.outcome in (
+            "emergency_shunt", "power_plant_destabilize", "meltdown", "irreversible_meltdown"
+        )
 
 
 class TestClearHeat:
@@ -811,3 +921,424 @@ class TestGetCurrentActor:
         actor = get_current_actor(scenario, current_round=1, current_turn_index=5)
 
         assert actor is None
+
+
+# =============================================================================
+# Weapon Damage Lookup Tests
+# =============================================================================
+
+
+class TestWeaponDamageLookup:
+    """Tests for weapon damage lookup in combat execution."""
+
+    def test_lookup_returns_default_for_none_weapon(self):
+        """Lookup with None weapon_id should return default damage."""
+        damage, ap = lookup_weapon_damage_and_ap(None)
+
+        assert damage == 6
+        assert ap == 0
+
+    def test_lookup_returns_default_for_unknown_weapon(self):
+        """Lookup with unknown weapon should fall back to default damage."""
+        damage, ap = lookup_weapon_damage_and_ap("nonexistent_weapon_xyz")
+
+        assert damage == 6
+        assert ap == 0
+
+    def test_lookup_with_known_weapon_returns_damage(self):
+        """Lookup with compendium weapon should return rolled damage."""
+        # assault_rifle has 1d6 kinetic damage
+        damage, ap = lookup_weapon_damage_and_ap("assault_rifle")
+
+        # Should be in valid d6 range (1-6)
+        assert 1 <= damage <= 6
+        assert ap == 0  # Assault rifle has no AP
+
+    def test_attack_uses_actor_grit_for_attack_bonus(self):
+        """Attack bonus should come from actor's grit stat."""
+        from unittest.mock import patch
+
+        # Create attacker with grit=3
+        attacker = make_combatant(id="attacker", name="Attacker", side="players", grit=3)
+        defender = make_combatant(id="defender", name="Defender", side="hostiles", hp_max=20, hp_current=20)
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+        )
+
+        # Force a roll of 10, with grit 3 the total should be 13
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 10
+
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success is True
+        assert len(result.effects_applied) == 1
+        # With grit 3 and roll 10, total should be 13
+        # Defender evasion is 8, so 13 >= 8 should hit
+        assert result.effects_applied[0]["total"] == 13
+        assert result.effects_applied[0]["hit"] is True
+
+    def test_attack_with_compendium_weapon_uses_weapon_damage(self):
+        """Attack with compendium weapon should use its damage."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(id="defender", name="Defender", side="hostiles", hp_max=30, hp_current=30)
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # Use assault_rifle (1d6 kinetic)
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="assault_rifle",
+        )
+
+        # Force hit with a natural 20 (crit)
+        with patch("core.shared.rolls._roll_d20") as mock_d20, \
+             patch("core.shared.dice.random.randint") as mock_dice:
+            mock_d20.return_value = 20  # Crit
+            mock_dice.return_value = 4  # Roll 4 on the d6
+
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success is True
+        assert result.effects_applied[0]["hit"] is True
+        assert result.effects_applied[0]["critical"] is True
+        # Crit doubles damage: 4 * 2 = 8
+        assert result.damage_dealt == 8
+
+        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+        assert defender_after.resources.hp_current == 22  # 30 - 8
+
+    def test_attack_with_unknown_weapon_uses_default_damage(self):
+        """Attack with unknown weapon should fall back to default damage."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(id="defender", name="Defender", side="hostiles", hp_max=20, hp_current=20)
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="nonexistent_weapon",  # Unknown weapon
+        )
+
+        # Force a natural 20 (crit) to ensure hit
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20
+
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success is True
+        assert result.effects_applied[0]["critical"] is True
+        # Default damage is 6, doubled for crit = 12
+        assert result.damage_dealt == 12
+
+        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+        assert defender_after.resources.hp_current == 8  # 20 - 12
+
+
+# =============================================================================
+# Structure Cascade Tests
+# =============================================================================
+
+
+class TestStructureCascade:
+    """Tests for structure damage cascade on HP=0."""
+
+    def test_damage_to_zero_hp_triggers_structure_check(self):
+        """When HP reaches 0, structure check should trigger."""
+        combatant = make_combatant(id="target_1", hp_current=5, hp_max=10)
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, change, structure_result = apply_damage(
+            scenario, "target_1", damage=10
+        )
+
+        # Structure check should have triggered
+        assert structure_result is not None
+        assert structure_result.outcome in (
+            "glancing_blow", "system_trauma", "direct_hit", "crushing_hit"
+        )
+
+    def test_structure_check_reduces_structure(self):
+        """Structure check should decrement structure_current."""
+        combatant = make_combatant(id="target_1", hp_current=5, hp_max=10)
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, change, structure_result = apply_damage(
+            scenario, "target_1", damage=10
+        )
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        # Structure should have decremented from 4 to 3
+        assert updated_target.resources.structure_current == 3
+        assert change.structure_change == -1
+
+    def test_structure_check_resets_hp_to_max(self):
+        """After structure loss (non-destruction), HP should reset to max."""
+        from unittest.mock import patch
+
+        combatant = make_combatant(id="target_1", hp_current=5, hp_max=10)
+        scenario = make_scenario(combatants=[combatant])
+
+        # Force a roll of 5-6 (glancing blow) to avoid destruction
+        with patch("core.shared.dice.DiceExpression.roll") as mock_roll:
+            mock_roll.return_value = [5]  # Glancing blow
+
+            updated_scenario, change, structure_result = apply_damage(
+                scenario, "target_1", damage=10
+            )
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        # HP should reset to max after non-destroying structure check
+        assert updated_target.resources.hp_current == 10
+        assert structure_result.mech_destroyed is False
+
+    def test_structure_check_applies_statuses(self):
+        """Structure outcomes should apply appropriate statuses."""
+        from unittest.mock import patch
+
+        combatant = make_combatant(id="target_1", hp_current=5, hp_max=10)
+        scenario = make_scenario(combatants=[combatant])
+
+        # Force a roll of 5-6 (glancing blow) which applies impaired
+        with patch("core.shared.dice.DiceExpression.roll") as mock_roll:
+            mock_roll.return_value = [5]
+
+            updated_scenario, _, structure_result = apply_damage(
+                scenario, "target_1", damage=10
+            )
+
+        assert structure_result.outcome == "glancing_blow"
+        assert "impaired" in structure_result.statuses_to_apply
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert "impaired" in updated_target.statuses
+
+    def test_zero_structure_means_destruction(self):
+        """When structure reaches 0 via direct hit, mech is destroyed."""
+        from unittest.mock import patch
+
+        # Start with 1 structure
+        combatant = CombatantState(
+            id="target_1",
+            name="Almost Dead",
+            side="hostiles",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+            ),
+            resources=CombatResources(
+                hp_current=5,
+                structure_current=1,
+                stress_current=4,
+            ),
+        )
+        scenario = make_scenario(combatants=[combatant])
+
+        # Force a roll of 1 (direct hit at 1 structure = destroyed)
+        with patch("core.shared.dice.DiceExpression.roll") as mock_roll:
+            mock_roll.return_value = [1]
+
+            updated_scenario, _, structure_result = apply_damage(
+                scenario, "target_1", damage=10
+            )
+
+        assert structure_result.mech_destroyed is True
+        assert structure_result.outcome == "direct_hit"
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert updated_target.resources.structure_current == 0
+        assert updated_target.resources.hp_current == 0
+
+    def test_no_cascade_when_hp_above_zero(self):
+        """Structure check should not trigger when HP stays above 0."""
+        combatant = make_combatant(id="target_1", hp_current=10, hp_max=10)
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, change, structure_result = apply_damage(
+            scenario, "target_1", damage=5
+        )
+
+        # No structure check because HP didn't reach 0
+        assert structure_result is None
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert updated_target.resources.hp_current == 5
+        assert updated_target.resources.structure_current == 4  # Unchanged
+
+
+# =============================================================================
+# Overheat Cascade Tests
+# =============================================================================
+
+
+class TestOverheatCascade:
+    """Tests for stress cascade on heat overflow."""
+
+    def test_heat_over_cap_triggers_stress_check(self):
+        """When heat exceeds cap, stress check should trigger."""
+        combatant = make_combatant(id="target_1", heat_current=5, heat_cap=6)
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, change, overheat_result = apply_heat(
+            scenario, "target_1", heat=3
+        )
+
+        # Overheat check should have triggered
+        assert overheat_result is not None
+        assert overheat_result.outcome in (
+            "emergency_shunt", "power_plant_destabilize",
+            "meltdown", "irreversible_meltdown"
+        )
+
+    def test_stress_check_clears_heat(self):
+        """Overheat should clear all heat."""
+        combatant = make_combatant(id="target_1", heat_current=5, heat_cap=6)
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, _, overheat_result = apply_heat(
+            scenario, "target_1", heat=3
+        )
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        # Heat should be cleared
+        assert updated_target.resources.heat_current == 0
+        assert overheat_result.heat_cleared is True
+
+    def test_stress_check_decrements_stress(self):
+        """Overheat should decrement stress."""
+        combatant = make_combatant(id="target_1", heat_current=5, heat_cap=6)
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, change, overheat_result = apply_heat(
+            scenario, "target_1", heat=3
+        )
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        # Stress should have decremented from 4 to 3
+        assert updated_target.resources.stress_current == 3
+        assert change.stress_change == -1
+
+    def test_meltdown_sets_meltdown_state(self):
+        """Meltdown outcome at low stress should set meltdown_state on combatant."""
+        from unittest.mock import patch
+
+        # Start with 1 stress (meltdown at 1 stress = immediate meltdown)
+        combatant = CombatantState(
+            id="target_1",
+            name="Hot Stuff",
+            side="hostiles",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=5,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=1,
+            ),
+        )
+        scenario = make_scenario(combatants=[combatant])
+
+        # Force a roll of 1 (meltdown) at 1 stress = immediate
+        with patch("core.shared.dice.DiceExpression.roll") as mock_roll:
+            mock_roll.return_value = [1]
+
+            updated_scenario, _, overheat_result = apply_heat(
+                scenario, "target_1", heat=3
+            )
+
+        # Should have meltdown state
+        assert overheat_result.outcome == "meltdown"
+        assert overheat_result.meltdown_state is not None
+        assert overheat_result.meltdown_state.is_immediate is True
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert updated_target.meltdown_state is not None
+
+    def test_no_cascade_when_below_cap(self):
+        """Overheat check should not trigger when heat stays below cap."""
+        combatant = make_combatant(id="target_1", heat_current=2, heat_cap=6)
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, change, overheat_result = apply_heat(
+            scenario, "target_1", heat=2
+        )
+
+        # No overheat check because heat didn't meet cap
+        assert overheat_result is None
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert updated_target.resources.heat_current == 4
+        assert updated_target.resources.stress_current == 4  # Unchanged
+
+    def test_overheat_applies_statuses(self):
+        """Overheat outcomes should apply appropriate statuses."""
+        from unittest.mock import patch
+
+        combatant = make_combatant(id="target_1", heat_current=5, heat_cap=6)
+        scenario = make_scenario(combatants=[combatant])
+
+        # Force a roll of 5-6 (emergency shunt) which applies impaired
+        with patch("core.shared.dice.DiceExpression.roll") as mock_roll:
+            mock_roll.return_value = [5]
+
+            updated_scenario, _, overheat_result = apply_heat(
+                scenario, "target_1", heat=3
+            )
+
+        assert overheat_result.outcome == "emergency_shunt"
+        assert "impaired" in overheat_result.statuses_to_apply
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert "impaired" in updated_target.statuses

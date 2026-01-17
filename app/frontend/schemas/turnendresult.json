@@ -1,0 +1,77 @@
+{
+  "description": "Result of ending a combatant's turn.",
+  "properties": {
+    "actor_id": {
+      "description": "ID of the actor whose turn ended",
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "next_actor_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ID of next actor, None if round ends",
+      "title": "Next Actor Id"
+    },
+    "next_actor_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Name of next actor",
+      "title": "Next Actor Name"
+    },
+    "round_advanced": {
+      "default": false,
+      "description": "Whether we advanced to a new round",
+      "title": "Round Advanced",
+      "type": "boolean"
+    },
+    "new_round_number": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "New round number if advanced",
+      "title": "New Round Number"
+    },
+    "end_of_turn_effects": {
+      "description": "Effects applied at turn end",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "End Of Turn Effects",
+      "type": "array"
+    },
+    "cooldowns_decremented": {
+      "description": "Effect IDs whose cooldowns were decremented",
+      "items": {
+        "type": "string"
+      },
+      "title": "Cooldowns Decremented",
+      "type": "array"
+    }
+  },
+  "required": [
+    "actor_id"
+  ],
+  "title": "TurnEndResult",
+  "type": "object"
+}

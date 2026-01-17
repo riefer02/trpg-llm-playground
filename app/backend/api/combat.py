@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -18,6 +18,7 @@ from app.backend.db.models import CombatSessionDB, utc_now
 from app.backend.dependencies import get_current_user
 from app.backend.exceptions import ConflictError, NotFoundError, ValidationError
 from app.backend.api.campaigns import record_campaign_session_outcome
+from app.backend.api.combat_ws import combat_ws_manager
 
 # Import core combat models - use directly, don't duplicate!
 from core.mech.combat_state import (
@@ -612,6 +613,9 @@ class AvailableActionItem(BaseModel):
     unavailable_reason: str | None = None
     requires_target: bool
     requires_weapon: bool
+    requires_system: bool = False
+    requires_path: bool = False
+    max_targets: int = 1
 
 
 class AvailableActionsResponse(BaseModel):
@@ -734,6 +738,13 @@ async def start_combat_turn(
 
     # Reset economy for this turn
     _set_session_economy(session_id, turn_result.economy)
+
+    # Broadcast state update to all connected WebSocket clients
+    response = _session_to_response(combat_session)
+    await combat_ws_manager.broadcast(
+        session_id,
+        {"type": "state", "data": response.model_dump(mode="json")},
+    )
 
     return TurnStartResponse(
         actor_id=turn_result.actor_id,
@@ -883,6 +894,13 @@ async def execute_combat_action(
     # Update economy cache
     _set_session_economy(session_id, updated_economy)
 
+    # Broadcast state update to all connected WebSocket clients
+    ws_response = _session_to_response(combat_session)
+    await combat_ws_manager.broadcast(
+        session_id,
+        {"type": "state", "data": ws_response.model_dump(mode="json")},
+    )
+
     return ActionResponse(
         success=True,
         action_use=action_result.action_use.model_dump() if action_result.action_use else None,
@@ -965,6 +983,13 @@ async def end_combat_turn(
     # Clear economy for this session (next turn will reset it)
     _clear_session_economy(session_id)
 
+    # Broadcast state update to all connected WebSocket clients
+    ws_response = _session_to_response(combat_session)
+    await combat_ws_manager.broadcast(
+        session_id,
+        {"type": "state", "data": ws_response.model_dump(mode="json")},
+    )
+
     return TurnEndResponse(
         actor_id=turn_end_result.actor_id,
         next_actor_id=turn_end_result.next_actor_id,
@@ -1042,6 +1067,13 @@ async def submit_reaction(
     await session.commit()
     await session.refresh(combat_session)
 
+    # Broadcast state update to all connected WebSocket clients
+    ws_response = _session_to_response(combat_session)
+    await combat_ws_manager.broadcast(
+        session_id,
+        {"type": "state", "data": ws_response.model_dump(mode="json")},
+    )
+
     return ReactionResponse(
         success=True,
         reaction_used=reaction_result.reaction_used,
@@ -1104,6 +1136,9 @@ async def get_combat_available_actions(
             unavailable_reason=a.unavailable_reason,
             requires_target=a.requires_target,
             requires_weapon=a.requires_weapon,
+            requires_system=a.requires_system,
+            requires_path=a.requires_path,
+            max_targets=a.max_targets,
         )
 
     # Get overcharge level from combatant state
@@ -1225,3 +1260,55 @@ async def check_reaction_opportunity(
         has_reaction_available=has_reaction,
         pending_triggers=pending_triggers,
     )
+
+
+# =============================================================================
+# WebSocket Endpoint for Real-time Updates
+# =============================================================================
+
+
+@router.websocket("/{session_id}/ws")
+async def combat_websocket(
+    websocket: WebSocket,
+    session_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """WebSocket endpoint for real-time combat state updates.
+
+    Connects to a combat session and receives state updates whenever
+    any player executes an action. Also supports ping/pong for keep-alive.
+
+    Message protocol:
+    - Server -> Client: {"type": "state", "data": CombatSessionResponse}
+    - Server -> Client: {"type": "pong"}
+    - Client -> Server: {"type": "ping"}
+    """
+    # Verify session exists
+    result = await session.exec(
+        select(CombatSessionDB).where(CombatSessionDB.id == session_id)
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        await websocket.close(code=4004, reason="Session not found")
+        return
+
+    await combat_ws_manager.connect(session_id, websocket)
+    try:
+        # Send initial state
+        response = _session_to_response(combat_session)
+        await websocket.send_json({
+            "type": "state",
+            "data": response.model_dump(mode="json"),
+        })
+
+        # Keep connection alive and handle client messages
+        while True:
+            data = await websocket.receive_json()
+            if data.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        combat_ws_manager.disconnect(session_id, websocket)
+    except Exception:
+        # Handle any other exceptions by cleaning up
+        combat_ws_manager.disconnect(session_id, websocket)

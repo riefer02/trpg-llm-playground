@@ -227,7 +227,17 @@ export type LancerTTRPGSchema =
   | DiceRollResult
   | StructureResolution
   | OverheatResolution
-  | ResolutionSettings;
+  | ResolutionSettings
+  | ActionExecutionInput
+  | ActionExecutionResult
+  | TurnStartResult
+  | TurnEndResult
+  | ReactionInput
+  | ReactionResult
+  | AvailableAction
+  | AvailableActionsResult
+  | ActionEconomyState2
+  | ActionEconomyResult;
 export type Id = string;
 /**
  * The pilot's callsign
@@ -16283,17 +16293,17 @@ export type Condition60 =
   | ConditionGroup
   | null;
 export type DamageNegations = DamageNegationEffect[];
+export type CombatantId = string;
+export type HpChange = number;
+export type HeatChange = number;
+export type StructureChange = number;
+export type StressChange = number;
+export type RepairsChange = number;
+export type ResourceChanges = ResourceChange[];
 export type Resource = "hp" | "heat" | "repairs" | "structure" | "stress" | "core_power";
-export type Amount2 = number | DiceExpression | ("quarter_max" | "half_max" | "full");
+export type Multiplier3 = number;
 export type Direction1 = "gain" | "lose" | "set";
 export type Target52 = "self" | "enemy" | "ally" | "adjacent";
-export type CostRepairs1 = number;
-export type CostSource = "self" | "target" | "either";
-export type ResourceChanges = ResourceChange[];
-export type Resource1 = "hp" | "heat" | "repairs" | "structure" | "stress" | "core_power";
-export type Multiplier3 = number;
-export type Direction2 = "gain" | "lose" | "set";
-export type Target53 = "self" | "enemy" | "ally" | "adjacent";
 export type Rounding = "floor" | "ceil" | "round";
 export type Condition61 =
   | (
@@ -16524,7 +16534,7 @@ export type Condition61 =
   | null;
 export type ScaledResourceChanges = ScaledResourceChange[];
 export type MaxCost = number | DiceExpression;
-export type Target54 = "self" | "enemy" | "ally" | "adjacent";
+export type Target53 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition62 =
   | (
       | "target_prone"
@@ -16754,7 +16764,7 @@ export type Condition62 =
   | null;
 export type OverchargeCostCaps = OverchargeCostCapEffect[];
 export type StructureRepairCost = number | null;
-export type Target55 = "self" | "enemy" | "ally" | "adjacent";
+export type Target54 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition63 =
   | (
       | "target_prone"
@@ -16983,7 +16993,7 @@ export type Condition63 =
   | ConditionGroup
   | null;
 export type RepairCostMods = RepairCostModifier[];
-export type Target56 = "self" | "enemy" | "ally" | "adjacent";
+export type Target55 = "self" | "enemy" | "ally" | "adjacent";
 export type Range4 = number | null;
 export type RequiresAdjacent1 = boolean;
 export type RequiresChoice = boolean;
@@ -17219,7 +17229,7 @@ export type RepairShareEffects = RepairShareEffect[];
 export type Name10 = string;
 export type ActionType6 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type RepairsCost = number;
-export type Target57 = "self" | "enemy" | "ally" | "adjacent";
+export type Target56 = "self" | "enemy" | "ally" | "adjacent";
 export type Range5 = number | null;
 export type RequiresAdjacent2 = boolean;
 export type RequiresLineOfSight8 = boolean;
@@ -17506,7 +17516,7 @@ export type SuccessThreshold = number;
 export type IgnoreStructureDamage = boolean;
 export type HealHpTo = number | null;
 export type UsesPer8 = "unlimited" | "round" | "scene" | "mission" | "rest" | "full_repair";
-export type Target58 = "self" | "enemy" | "ally" | "adjacent";
+export type Target57 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition66 =
   | (
       | "target_prone"
@@ -17788,7 +17798,7 @@ export type PreventDestructionAtZeroHp = boolean;
 export type StructureCheckOnDamage = boolean;
 export type BlockHpRegain = boolean;
 export type Duration16 = "until_cleared" | "until_rest" | "scene" | "mission" | "start_of_next_turn";
-export type Target59 = "self" | "enemy" | "ally" | "adjacent";
+export type Target58 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition67 =
   | (
       | "target_prone"
@@ -18300,7 +18310,7 @@ export type Condition68 =
 export type AttackSequenceMods = AttackSequenceModifierEffect[];
 export type AttackVs1 = "evasion" | "e_defense";
 export type FixedTargetDefense = number | null;
-export type Target60 = "self" | "enemy" | "ally" | "adjacent" | "all";
+export type Target59 = "self" | "enemy" | "ally" | "adjacent" | "all";
 export type AllowedAttackTypes = ("melee" | "ranged" | "tech")[];
 export type RespectsCover = boolean;
 export type RespectsLineOfSight = boolean;
@@ -19362,7 +19372,7 @@ export type Trigger11 =
   | "on_any_damage";
 export type UpgradeToCrit = boolean;
 export type ForceMiss = boolean;
-export type Target61 = "self" | "enemy" | "ally" | "adjacent" | "all";
+export type Target60 = "self" | "enemy" | "ally" | "adjacent" | "all";
 export type Attacker = "self" | "enemy" | "ally" | "adjacent" | "all";
 export type UsesReaction1 = boolean;
 export type Duration19 = "end_of_turn" | "start_of_next_turn" | "end_of_next_turn" | "until_cleared" | "scene";
@@ -19647,7 +19657,7 @@ export type Trigger12 =
 export type AppliesTo8 = ("melee" | "ranged" | "tech")[];
 export type Mode = "max";
 export type RequiresNatural20 = boolean;
-export type Target62 = "self" | "enemy" | "ally" | "adjacent" | "all";
+export type Target61 = "self" | "enemy" | "ally" | "adjacent" | "all";
 export type Attacker1 = "self" | "enemy" | "ally" | "adjacent" | "all";
 export type Condition74 =
   | (
@@ -19879,7 +19889,7 @@ export type Condition74 =
 export type CriticalDamageOverrides = CriticalDamageOverrideEffect[];
 export type Mode1 = "average";
 export type Optional1 = boolean;
-export type Target63 = "self" | "enemy" | "ally" | "adjacent";
+export type Target62 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition75 =
   | (
       | "target_prone"
@@ -20416,7 +20426,7 @@ export type Tags1 = WeaponTagGrant[];
 export type LimitedUses = number | null;
 export type Unique = boolean;
 export type IntegratedMount = boolean;
-export type Target64 = "self" | "enemy" | "ally" | "adjacent";
+export type Target63 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition77 =
   | (
       | "target_prone"
@@ -21834,7 +21844,7 @@ export type CanDeactivate = boolean;
 export type Deployments = DeploymentEffect[];
 export type ActionType8 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type Range7 = number;
-export type Target65 = "self" | "enemy" | "ally" | "adjacent";
+export type Target64 = "self" | "enemy" | "ally" | "adjacent";
 export type RequiresLineOfSight10 = boolean;
 export type MaxInstancesPerTarget = number | null;
 export type Duration20 = ("end_of_turn" | "start_of_next_turn" | "end_of_next_turn" | "until_cleared" | "scene") | null;
@@ -22069,7 +22079,7 @@ export type Attachments = AttachmentEffect[];
 export type ActionType9 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type Range8 = number | null;
 export type RangeType6 = "sensors" | "range";
-export type Target66 = "self" | "enemy" | "ally" | "adjacent";
+export type Target65 = "self" | "enemy" | "ally" | "adjacent";
 export type RequiresLineOfSight11 = boolean;
 export type Duration21 = ("end_of_turn" | "start_of_next_turn" | "end_of_next_turn" | "until_cleared" | "scene") | null;
 export type MaxLinksPerSource = number | null;
@@ -22630,7 +22640,7 @@ export type DeactivateOnEffectCap = boolean;
 export type EndsOnSourceDestroyed = boolean;
 export type MaxInstancesPerSource = number | null;
 export type Trigger14 = "enter" | "start_turn" | "end_turn" | "turn_start" | "turn_end";
-export type Target67 = "self" | "enemy" | "ally" | "adjacent" | "all";
+export type Target66 = "self" | "enemy" | "ally" | "adjacent" | "all";
 export type EndScope = "zone" | "triggered_space";
 export type Condition85 =
   | (
@@ -23088,14 +23098,14 @@ export type Condition86 =
   | ConditionGroup
   | null;
 export type Zones = ZoneEffect[];
-export type Target68 = "self" | "enemy" | "ally" | "adjacent";
+export type Target67 = "self" | "enemy" | "ally" | "adjacent";
 export type Count6 = number | "all";
 export type RequiresTag2 = string | null;
 export type ConsumesSource = boolean;
 export type Reloads = ReloadEffect[];
 export type AppliesTo10 = "limited" | "all";
 export type DisallowReload = boolean;
-export type Target69 = "self" | "enemy" | "ally" | "adjacent";
+export type Target68 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition87 =
   | (
       | "target_prone"
@@ -23324,7 +23334,7 @@ export type Condition87 =
   | ConditionGroup
   | null;
 export type ReloadRestrictions = ReloadRestrictionEffect[];
-export type Target70 = "self" | "enemy" | "ally" | "adjacent";
+export type Target69 = "self" | "enemy" | "ally" | "adjacent";
 export type BaseHp = number;
 export type BonusHpPerGrit = number;
 export type MaxInstancesPerTarget1 = number;
@@ -23334,7 +23344,7 @@ export type Duration23 = "scene" | "until_destroyed";
 export type DamageAbsorptions = DamageAbsorption[];
 export type ShareFraction = number;
 export type Source1 = "self" | "enemy" | "ally" | "adjacent";
-export type Target71 = "self" | "enemy" | "ally" | "adjacent";
+export type Target70 = "self" | "enemy" | "ally" | "adjacent";
 export type Timing = "before_armor_and_reduction" | "after_armor_and_reduction";
 export type RequiresAdjacent3 = boolean;
 export type BreaksOnSeparation = boolean;
@@ -23566,7 +23576,7 @@ export type Condition88 =
   | ConditionGroup
   | null;
 export type DamageShares = DamageShareEffect[];
-export type Target72 = "self" | "enemy" | "ally" | "adjacent";
+export type Target71 = "self" | "enemy" | "ally" | "adjacent";
 export type Duration24 = "until_cleared" | "until_rest" | "scene" | "mission" | "start_of_next_turn";
 export type ReturnToPreviousSpace = boolean;
 export type FallbackToNearestFree = boolean;
@@ -24572,7 +24582,7 @@ export type Condition92 =
   | ConditionGroup
   | null;
 export type Save = "hull" | "agility" | "systems" | "engineering";
-export type Target73 = "self" | "enemy" | "ally" | "adjacent" | "all";
+export type Target72 = "self" | "enemy" | "ally" | "adjacent" | "all";
 export type SaveChecks = SaveCheck[];
 export type Trigger16 =
   | "on_hit"
@@ -24624,7 +24634,7 @@ export type Trigger16 =
   | "on_first_adjacent_turn"
   | "on_any_damage";
 export type SuccessThreshold1 = number;
-export type Target74 = "self" | "enemy" | "ally" | "adjacent";
+export type Target73 = "self" | "enemy" | "ally" | "adjacent";
 export type UsesPer11 = "unlimited" | "round" | "scene" | "mission" | "rest" | "full_repair";
 export type Condition93 =
   | (
@@ -24904,7 +24914,7 @@ export type Trigger17 =
   | "on_first_adjacent_turn"
   | "on_any_damage";
 export type Pattern = "triples" | "doubles";
-export type Target75 = "self" | "enemy" | "ally" | "adjacent";
+export type Target74 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition94 =
   | (
       | "target_prone"
@@ -25429,7 +25439,7 @@ export type Status7 =
   | "engaged"
   | "burn"
   | "unshackled";
-export type Target76 = "self" | "enemy" | "ally" | "adjacent";
+export type Target75 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition96 =
   | (
       | "target_prone"
@@ -26064,7 +26074,7 @@ export type PhaseShifts = PhaseShiftEffect[];
 export type ActionType13 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type CheckType = ("hull" | "agility" | "systems" | "engineering") | null;
 export type CheckKind = "check" | "save";
-export type Target77 = "self" | "enemy" | "ally" | "adjacent";
+export type Target76 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition98 =
   | (
       | "target_prone"
@@ -26549,7 +26559,7 @@ export type Duration30 = "end_of_turn" | "start_of_next_turn" | "end_of_next_tur
 export type HologramTrails = HologramTrailEffect[];
 export type Duration31 = "end_of_turn" | "start_of_next_turn" | "end_of_next_turn" | "until_cleared" | "scene";
 export type BreaksOnHit = boolean;
-export type Target78 = "self" | "enemy" | "ally" | "adjacent";
+export type Target77 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition100 =
   | (
       | "target_prone"
@@ -28464,11 +28474,11 @@ export type Net = number;
  * Number of d6 rolled after canceling.
  */
 export type DiceCount1 = number;
-export type Direction3 = "accuracy" | "difficulty" | "none";
+export type Direction2 = "accuracy" | "difficulty" | "none";
 export type Source3 = "trigger" | "mech_skill" | "grit";
 export type Value12 = number;
 export type RollType = "skill_check";
-export type Target79 = number;
+export type Target78 = number;
 /**
  * Adds +1 difficulty per PR2 rules
  */
@@ -28477,12 +28487,12 @@ export type RollType1 = "attack";
 /**
  * Target defense value
  */
-export type Target80 = number;
+export type Target79 = number;
 export type RollType2 = "save";
 /**
  * Attacker save target
  */
-export type Target81 = number;
+export type Target80 = number;
 export type TieBreaker = "attacker";
 export type Tier1 = "standard" | "difficult" | "risky" | "heroic";
 export type SuccessThreshold3 = number;
@@ -28590,7 +28600,7 @@ export type HarmInvolved1 = boolean;
  */
 export type RepeatRequiresChange = boolean;
 export type RollResult1 = number;
-export type Target82 = number;
+export type Target81 = number;
 export type Modifiers = number;
 export type DifficultyModifier = number;
 export type Tier2 = "standard" | "difficult" | "risky" | "heroic";
@@ -28768,7 +28778,7 @@ export type Id18 = string;
  */
 export type Name30 = string;
 export type ActionType15 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
-export type Target83 = "self" | "enemy" | "ally" | "adjacent" | "object";
+export type Target82 = "self" | "enemy" | "ally" | "adjacent" | "object";
 export type UsesPer14 = "unlimited" | "round" | "scene" | "mission" | "rest" | "full_repair";
 export type RequiresLineOfSight13 = boolean;
 export type CountsAsAttack = boolean;
@@ -29542,6 +29552,7 @@ export type Armor4 = number;
 export type Speed4 = number;
 export type SensorRange2 = number;
 export type TechAttack2 = number;
+export type Grit2 = number;
 export type HpCurrent = number;
 export type HeatCurrent = number;
 export type HeatCap2 = number;
@@ -29940,6 +29951,257 @@ export type SpilloverDamage = number;
 export type StressDamage = number;
 export type ForcedRolls = number[] | null;
 export type ForcedSystemTraumaRoll = number | null;
+/**
+ * ID of the combatant taking action
+ */
+export type ActorId1 = string;
+/**
+ * Action identifier (e.g., 'skirmish', 'barrage')
+ */
+export type ActionId3 = string;
+/**
+ * Type of action
+ */
+export type ActionType18 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
+/**
+ * Target combatant IDs
+ */
+export type TargetIds2 = string[];
+/**
+ * Weapon being used
+ */
+export type WeaponId4 = string | null;
+/**
+ * System being activated
+ */
+export type SystemId2 = string | null;
+/**
+ * Movement path for move actions
+ */
+export type MovementPath1 = HexPosition[];
+/**
+ * Whether this action uses overcharge
+ */
+export type IsOvercharge = boolean;
+/**
+ * Whether this action was granted by overcharge
+ */
+export type GrantedByOvercharge1 = boolean;
+/**
+ * Whether action executed successfully
+ */
+export type Success2 = boolean;
+/**
+ * Error message if failed
+ */
+export type Error = string | null;
+/**
+ * Effects that were applied
+ */
+export type EffectsApplied = {
+  [k: string]: unknown;
+}[];
+/**
+ * Total damage dealt
+ */
+export type DamageDealt = number;
+/**
+ * Heat generated by this action
+ */
+export type HeatGenerated1 = number;
+/**
+ * Resource changes to combatants
+ */
+export type ResourceChanges1 = ResourceChange[];
+/**
+ * Structure check results triggered by damage
+ */
+export type StructureChecks = {
+  [k: string]: unknown;
+}[];
+/**
+ * Overheat check results triggered by heat
+ */
+export type OverheatChecks = {
+  [k: string]: unknown;
+}[];
+/**
+ * ID of the actor whose turn started
+ */
+export type ActorId2 = string;
+/**
+ * Name of the actor
+ */
+export type ActorName = string;
+export type FullActionsUsed = number;
+export type QuickActionsUsed = number;
+export type OverchargeUsed = boolean;
+export type ReactionsUsedThisTurn = number;
+/**
+ * Actions available to this actor
+ */
+export type AvailableActions = string[];
+/**
+ * Whether a prepared action expired
+ */
+export type PreparedActionExpired = boolean;
+/**
+ * Effect IDs whose cooldowns were decremented
+ */
+export type CooldownsDecremented = string[];
+/**
+ * ID of the actor whose turn ended
+ */
+export type ActorId3 = string;
+/**
+ * ID of next actor, None if round ends
+ */
+export type NextActorId = string | null;
+/**
+ * Name of next actor
+ */
+export type NextActorName = string | null;
+/**
+ * Whether we advanced to a new round
+ */
+export type RoundAdvanced = boolean;
+/**
+ * New round number if advanced
+ */
+export type NewRoundNumber = number | null;
+/**
+ * Effects applied at turn end
+ */
+export type EndOfTurnEffects = {
+  [k: string]: unknown;
+}[];
+/**
+ * Effect IDs whose cooldowns were decremented
+ */
+export type CooldownsDecremented1 = string[];
+/**
+ * ID of the reacting combatant
+ */
+export type ReactorId = string;
+/**
+ * Type of reaction
+ */
+export type ReactionType = "brace" | "overwatch";
+/**
+ * Action that triggered this reaction
+ */
+export type TriggerActionId = string | null;
+/**
+ * Targets for reaction (e.g., overwatch)
+ */
+export type TargetIds3 = string[];
+/**
+ * Weapon for overwatch attack
+ */
+export type WeaponId5 = string | null;
+/**
+ * Whether reaction was valid
+ */
+export type Success3 = boolean;
+/**
+ * Error message if failed
+ */
+export type Error1 = string | null;
+/**
+ * Reaction type that was used
+ */
+export type ReactionUsed = string | null;
+/**
+ * Effects from the reaction
+ */
+export type EffectsApplied1 = {
+  [k: string]: unknown;
+}[];
+/**
+ * Damage dealt by overwatch
+ */
+export type DamageDealt1 = number;
+/**
+ * Action identifier
+ */
+export type ActionId4 = string;
+/**
+ * Display name
+ */
+export type ActionName = string;
+/**
+ * Action type (full/quick/free/reaction)
+ */
+export type ActionType19 = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
+/**
+ * Whether action can be taken now
+ */
+export type IsAvailable = boolean;
+/**
+ * Why action is unavailable
+ */
+export type UnavailableReason = string | null;
+/**
+ * Whether action needs a target
+ */
+export type RequiresTarget1 = boolean;
+/**
+ * Whether action needs a weapon
+ */
+export type RequiresWeapon = boolean;
+/**
+ * Whether action needs a system
+ */
+export type RequiresSystem = boolean;
+/**
+ * Whether action needs a movement path
+ */
+export type RequiresPath = boolean;
+/**
+ * Maximum number of targets (e.g., 2 for barrage)
+ */
+export type MaxTargets = number;
+/**
+ * Actor these actions are for
+ */
+export type ActorId4 = string;
+export type FullActions = AvailableAction[];
+export type QuickActions = AvailableAction[];
+export type FreeActions = AvailableAction[];
+export type Reactions2 = AvailableAction[];
+export type Protocols1 = AvailableAction[];
+/**
+ * Whether overcharge is available
+ */
+export type CanOvercharge = boolean;
+/**
+ * Whether action can be taken
+ */
+export type CanTakeAction = boolean;
+/**
+ * Whether full action is available
+ */
+export type CanTakeFullAction = boolean;
+/**
+ * Whether quick action is available
+ */
+export type CanTakeQuickAction = boolean;
+/**
+ * Whether overcharge is available
+ */
+export type CanOvercharge1 = boolean;
+/**
+ * Whether reaction can be taken
+ */
+export type CanTakeReaction = boolean;
+/**
+ * Blocking errors if any
+ */
+export type Errors = string[];
+/**
+ * Non-blocking warnings
+ */
+export type Warnings = string[];
 
 /**
  * A Lancer pilot character.
@@ -31446,19 +31708,15 @@ export interface DamageNegationEffect {
   [k: string]: unknown;
 }
 /**
- * Change a resource value such as HP or heat.
- *
- * Examples:
- *     ResourceChange(resource="hp", amount="half_max", target="ally", cost_repairs=1)
- *     ResourceChange(resource="heat", amount=DiceExpression.parse("1d6"), direction="lose", target="self")
+ * Change to a combatant's resources.
  */
 export interface ResourceChange {
-  resource: Resource;
-  amount: Amount2;
-  direction?: Direction1;
-  target: Target52;
-  cost_repairs?: CostRepairs1;
-  cost_source?: CostSource;
+  combatant_id: CombatantId;
+  hp_change?: HpChange;
+  heat_change?: HeatChange;
+  structure_change?: StructureChange;
+  stress_change?: StressChange;
+  repairs_change?: RepairsChange;
   [k: string]: unknown;
 }
 /**
@@ -31468,11 +31726,11 @@ export interface ResourceChange {
  *     ScaledResourceChange(resource="heat", roll=DiceExpression.parse("1d6"), multiplier=0.5)
  */
 export interface ScaledResourceChange {
-  resource: Resource1;
+  resource: Resource;
   roll: DiceExpression;
   multiplier?: Multiplier3;
-  direction?: Direction2;
-  target?: Target53;
+  direction?: Direction1;
+  target?: Target52;
   rounding?: Rounding;
   condition?: Condition61;
   [k: string]: unknown;
@@ -31485,7 +31743,7 @@ export interface ScaledResourceChange {
  */
 export interface OverchargeCostCapEffect {
   max_cost: MaxCost;
-  target?: Target54;
+  target?: Target53;
   condition?: Condition62;
   [k: string]: unknown;
 }
@@ -31497,7 +31755,7 @@ export interface OverchargeCostCapEffect {
  */
 export interface RepairCostModifier {
   structure_repair_cost?: StructureRepairCost;
-  target?: Target55;
+  target?: Target54;
   condition?: Condition63;
   [k: string]: unknown;
 }
@@ -31508,7 +31766,7 @@ export interface RepairCostModifier {
  *     RepairShareEffect(target="ally", range=1, requires_adjacent=True, requires_choice=True)
  */
 export interface RepairShareEffect {
-  target?: Target56;
+  target?: Target55;
   range?: Range4;
   requires_adjacent?: RequiresAdjacent1;
   requires_choice?: RequiresChoice;
@@ -31535,7 +31793,7 @@ export interface RepairActionEffect {
   name: Name10;
   action_type: ActionType6;
   repairs_cost: RepairsCost;
-  target?: Target57;
+  target?: Target56;
   range?: Range5;
   requires_adjacent?: RequiresAdjacent2;
   requires_line_of_sight?: RequiresLineOfSight8;
@@ -31563,7 +31821,7 @@ export interface StructureDamageAvoidanceEffect {
   ignore_structure_damage?: IgnoreStructureDamage;
   heal_hp_to?: HealHpTo;
   uses_per?: UsesPer8;
-  target?: Target58;
+  target?: Target57;
   condition?: Condition66;
   [k: string]: unknown;
 }
@@ -31579,7 +31837,7 @@ export interface ZeroHpSurvivalEffect {
   structure_check_on_damage?: StructureCheckOnDamage;
   block_hp_regain?: BlockHpRegain;
   duration?: Duration16;
-  target?: Target59;
+  target?: Target58;
   condition?: Condition67;
   [k: string]: unknown;
 }
@@ -31617,7 +31875,7 @@ export interface AttackSequenceModifierEffect {
 export interface AttackRollOverrideEffect {
   attack_vs?: AttackVs1;
   fixed_target_defense?: FixedTargetDefense;
-  target?: Target60;
+  target?: Target59;
   allowed_attack_types?: AllowedAttackTypes;
   respects_cover?: RespectsCover;
   respects_line_of_sight?: RespectsLineOfSight;
@@ -31742,7 +32000,7 @@ export interface AttackOutcomeEffect {
   trigger: Trigger11;
   upgrade_to_crit?: UpgradeToCrit;
   force_miss?: ForceMiss;
-  target?: Target61;
+  target?: Target60;
   attacker?: Attacker;
   uses_reaction?: UsesReaction1;
   duration?: Duration19;
@@ -31761,7 +32019,7 @@ export interface CriticalDamageOverrideEffect {
   applies_to?: AppliesTo8;
   mode?: Mode;
   requires_natural_20?: RequiresNatural20;
-  target?: Target62;
+  target?: Target61;
   attacker?: Attacker1;
   condition?: Condition74;
   [k: string]: unknown;
@@ -31775,7 +32033,7 @@ export interface CriticalDamageOverrideEffect {
 export interface DamageRollOverrideEffect {
   mode?: Mode1;
   optional?: Optional1;
-  target?: Target63;
+  target?: Target62;
   condition?: Condition75;
   [k: string]: unknown;
 }
@@ -31844,7 +32102,7 @@ export interface WeaponGrantEffect {
   limited_uses?: LimitedUses;
   unique?: Unique;
   integrated_mount?: IntegratedMount;
-  target?: Target64;
+  target?: Target63;
   condition?: Condition77;
   [k: string]: unknown;
 }
@@ -32017,7 +32275,7 @@ export interface DeploymentEffect {
 export interface AttachmentEffect {
   action_type: ActionType8;
   range: Range7;
-  target?: Target65;
+  target?: Target64;
   requires_line_of_sight?: RequiresLineOfSight10;
   max_instances_per_target?: MaxInstancesPerTarget;
   duration?: Duration20;
@@ -32040,7 +32298,7 @@ export interface SystemLinkEffect {
   action_type: ActionType9;
   range?: Range8;
   range_type?: RangeType6;
-  target?: Target66;
+  target?: Target65;
   requires_line_of_sight?: RequiresLineOfSight11;
   duration?: Duration21;
   max_links_per_source?: MaxLinksPerSource;
@@ -32147,7 +32405,7 @@ export interface AttackCaptureEffect {
  */
 export interface ZoneEndCondition {
   trigger: Trigger14;
-  target?: Target67;
+  target?: Target66;
   end_scope?: EndScope;
   condition?: Condition85;
   [k: string]: unknown;
@@ -32163,7 +32421,7 @@ export interface ZoneEndCondition {
  *     ReloadEffect(target="self", count="all", requires_tag="loading")
  */
 export interface ReloadEffect {
-  target: Target68;
+  target: Target67;
   count?: Count6;
   requires_tag?: RequiresTag2;
   consumes_source?: ConsumesSource;
@@ -32178,7 +32436,7 @@ export interface ReloadEffect {
 export interface ReloadRestrictionEffect {
   applies_to?: AppliesTo10;
   disallow_reload?: DisallowReload;
-  target?: Target69;
+  target?: Target68;
   condition?: Condition87;
   [k: string]: unknown;
 }
@@ -32189,7 +32447,7 @@ export interface ReloadRestrictionEffect {
  *     DamageAbsorption(target="ally", base_hp=4, bonus_hp_per_grit=1)
  */
 export interface DamageAbsorption {
-  target: Target70;
+  target: Target69;
   base_hp: BaseHp;
   bonus_hp_per_grit?: BonusHpPerGrit;
   max_instances_per_target?: MaxInstancesPerTarget1;
@@ -32207,7 +32465,7 @@ export interface DamageAbsorption {
 export interface DamageShareEffect {
   share_fraction: ShareFraction;
   source?: Source1;
-  target?: Target71;
+  target?: Target70;
   timing?: Timing;
   requires_adjacent?: RequiresAdjacent3;
   breaks_on_separation?: BreaksOnSeparation;
@@ -32221,7 +32479,7 @@ export interface DamageShareEffect {
  *     OutOfPlayEffect(target="self", duration="until_rest", gm_may_override=True)
  */
 export interface OutOfPlayEffect {
-  target?: Target72;
+  target?: Target71;
   duration?: Duration24;
   return_to_previous_space?: ReturnToPreviousSpace;
   fallback_to_nearest_free?: FallbackToNearestFree;
@@ -32321,7 +32579,7 @@ export interface SaveCheck {
   trigger?: Trigger15;
   condition?: Condition92;
   save: Save;
-  target?: Target73;
+  target?: Target72;
   on_success?: MechanicalEffect | null;
   on_failure?: MechanicalEffect | null;
   [k: string]: unknown;
@@ -32341,7 +32599,7 @@ export interface RandomCheckEffect {
   trigger: Trigger16;
   roll: DiceExpression;
   success_threshold: SuccessThreshold1;
-  target?: Target74;
+  target?: Target73;
   on_success?: MechanicalEffect | null;
   on_failure?: MechanicalEffect | null;
   uses_per?: UsesPer11;
@@ -32359,7 +32617,7 @@ export interface RollPatternEffect {
   trigger: Trigger17;
   roll: DiceExpression;
   pattern: Pattern;
-  target?: Target75;
+  target?: Target74;
   effect: MechanicalEffect;
   condition?: Condition94;
   [k: string]: unknown;
@@ -32391,7 +32649,7 @@ export interface TriggeredEffect {
 export interface StatusTrigger {
   trigger: Trigger19;
   status: Status7;
-  target?: Target76;
+  target?: Target75;
   effect: MechanicalEffect;
   condition?: Condition96;
   uses_per?: UsesPer13;
@@ -32496,7 +32754,7 @@ export interface EffectRemoval {
   action_type: ActionType13;
   check_type?: CheckType;
   check_kind?: CheckKind;
-  target?: Target77;
+  target?: Target76;
   condition?: Condition98;
   [k: string]: unknown;
 }
@@ -32563,7 +32821,7 @@ export interface HologramTrailEffect {
 export interface HolographicDuplicateEffect {
   duration?: Duration31;
   breaks_on_hit?: BreaksOnHit;
-  target?: Target78;
+  target?: Target77;
   condition?: Condition100;
   [k: string]: unknown;
 }
@@ -33599,7 +33857,7 @@ export interface AccuracyDifficulty {
   difficulty?: Difficulty;
   net: Net;
   dice_count: DiceCount1;
-  direction: Direction3;
+  direction: Direction2;
   [k: string]: unknown;
 }
 /**
@@ -33623,7 +33881,7 @@ export interface RollModifiers {
  */
 export interface SkillCheck {
   roll_type?: RollType;
-  target?: Target79;
+  target?: Target78;
   modifiers?: RollModifiers;
   is_difficult?: IsDifficult;
   [k: string]: unknown;
@@ -33633,7 +33891,7 @@ export interface SkillCheck {
  */
 export interface AttackRoll {
   roll_type?: RollType1;
-  target: Target80;
+  target: Target79;
   modifiers?: RollModifiers;
   [k: string]: unknown;
 }
@@ -33642,7 +33900,7 @@ export interface AttackRoll {
  */
 export interface SaveRoll {
   roll_type?: RollType2;
-  target: Target81;
+  target: Target80;
   modifiers?: RollModifiers;
   [k: string]: unknown;
 }
@@ -33738,7 +33996,7 @@ export interface NarrativeGoal {
  */
 export interface NarrativeGoalAttempt {
   roll_result: RollResult1;
-  target?: Target82;
+  target?: Target81;
   modifiers?: Modifiers;
   difficulty_modifier?: DifficultyModifier;
   tier?: Tier2;
@@ -33916,7 +34174,7 @@ export interface MountlessWeaponDefinition {
   name: Name30;
   profile: WeaponProfile;
   action_type?: ActionType15;
-  target?: Target83;
+  target?: Target82;
   uses_per?: UsesPer14;
   requires_line_of_sight?: RequiresLineOfSight13;
   counts_as_attack?: CountsAsAttack;
@@ -35113,6 +35371,7 @@ export interface CombatStats {
   speed?: Speed4;
   sensor_range?: SensorRange2;
   tech_attack?: TechAttack2;
+  grit?: Grit2;
   [k: string]: unknown;
 }
 /**
@@ -35611,5 +35870,191 @@ export interface OverheatResolution {
 export interface ResolutionSettings {
   forced_rolls?: ForcedRolls;
   forced_system_trauma_roll?: ForcedSystemTraumaRoll;
+  [k: string]: unknown;
+}
+/**
+ * Input for executing a combat action.
+ */
+export interface ActionExecutionInput {
+  actor_id: ActorId1;
+  action_id: ActionId3;
+  action_type: ActionType18;
+  target_ids?: TargetIds2;
+  /**
+   * Target position for area/movement
+   */
+  target_position?: HexPosition | null;
+  weapon_id?: WeaponId4;
+  system_id?: SystemId2;
+  movement_path?: MovementPath1;
+  is_overcharge?: IsOvercharge;
+  granted_by_overcharge?: GrantedByOvercharge1;
+  [k: string]: unknown;
+}
+/**
+ * Result of executing a combat action.
+ */
+export interface ActionExecutionResult {
+  success: Success2;
+  error?: Error;
+  /**
+   * Recorded action for combat log
+   */
+  action_use?: ActionUse | null;
+  effects_applied?: EffectsApplied;
+  damage_dealt?: DamageDealt;
+  heat_generated?: HeatGenerated1;
+  resource_changes?: ResourceChanges1;
+  statuses_applied?: StatusesApplied;
+  structure_checks?: StructureChecks;
+  overheat_checks?: OverheatChecks;
+  [k: string]: unknown;
+}
+/**
+ * Statuses applied to targets
+ */
+export interface StatusesApplied {
+  [k: string]: (
+    | "braced"
+    | "immobilized"
+    | "impaired"
+    | "jammed"
+    | "lock_on"
+    | "shredded"
+    | "slowed"
+    | "stunned"
+    | "prone"
+    | "hidden"
+    | "invisible"
+    | "shutdown"
+    | "exposed"
+    | "engaged"
+    | "burn"
+    | "unshackled"
+  )[];
+}
+/**
+ * Result of starting a combatant's turn.
+ */
+export interface TurnStartResult {
+  actor_id: ActorId2;
+  actor_name: ActorName;
+  economy: ActionEconomyState;
+  available_actions?: AvailableActions;
+  prepared_action_expired?: PreparedActionExpired;
+  cooldowns_decremented?: CooldownsDecremented;
+  [k: string]: unknown;
+}
+/**
+ * Fresh action economy for this turn
+ */
+export interface ActionEconomyState {
+  full_actions_used?: FullActionsUsed;
+  quick_actions_used?: QuickActionsUsed;
+  overcharge_used?: OverchargeUsed;
+  reactions_used_this_turn?: ReactionsUsedThisTurn;
+  [k: string]: unknown;
+}
+/**
+ * Result of ending a combatant's turn.
+ */
+export interface TurnEndResult {
+  actor_id: ActorId3;
+  next_actor_id?: NextActorId;
+  next_actor_name?: NextActorName;
+  round_advanced?: RoundAdvanced;
+  new_round_number?: NewRoundNumber;
+  end_of_turn_effects?: EndOfTurnEffects;
+  cooldowns_decremented?: CooldownsDecremented1;
+  [k: string]: unknown;
+}
+/**
+ * Input for declaring a reaction.
+ */
+export interface ReactionInput {
+  reactor_id: ReactorId;
+  reaction_type: ReactionType;
+  trigger_action_id?: TriggerActionId;
+  target_ids?: TargetIds3;
+  weapon_id?: WeaponId5;
+  [k: string]: unknown;
+}
+/**
+ * Result of declaring a reaction.
+ */
+export interface ReactionResult {
+  success: Success3;
+  error?: Error1;
+  reaction_used?: ReactionUsed;
+  effects_applied?: EffectsApplied1;
+  damage_dealt?: DamageDealt1;
+  [k: string]: unknown;
+}
+/**
+ * An action available to the current actor.
+ */
+export interface AvailableAction {
+  action_id: ActionId4;
+  action_name: ActionName;
+  action_type: ActionType19;
+  is_available: IsAvailable;
+  unavailable_reason?: UnavailableReason;
+  requires_target?: RequiresTarget1;
+  requires_weapon?: RequiresWeapon;
+  requires_system?: RequiresSystem;
+  requires_path?: RequiresPath;
+  max_targets?: MaxTargets;
+  [k: string]: unknown;
+}
+/**
+ * Available actions for the current actor.
+ */
+export interface AvailableActionsResult {
+  actor_id: ActorId4;
+  economy: ActionEconomyState1;
+  full_actions?: FullActions;
+  quick_actions?: QuickActions;
+  free_actions?: FreeActions;
+  reactions?: Reactions2;
+  protocols?: Protocols1;
+  can_overcharge?: CanOvercharge;
+  [k: string]: unknown;
+}
+/**
+ * Current action economy state
+ */
+export interface ActionEconomyState1 {
+  full_actions_used?: FullActionsUsed;
+  quick_actions_used?: QuickActionsUsed;
+  overcharge_used?: OverchargeUsed;
+  reactions_used_this_turn?: ReactionsUsedThisTurn;
+  [k: string]: unknown;
+}
+/**
+ * Tracks action usage for a single turn.
+ *
+ * Per PR2 3726-3728:
+ * - 1 move + (2 quick OR 1 full) + any free + any reactions
+ * - Overcharge: 1/turn, gains 1 quick action
+ * - Reactions: 1/turn, any number/round, reset at round boundary
+ */
+export interface ActionEconomyState2 {
+  full_actions_used?: FullActionsUsed;
+  quick_actions_used?: QuickActionsUsed;
+  overcharge_used?: OverchargeUsed;
+  reactions_used_this_turn?: ReactionsUsedThisTurn;
+  [k: string]: unknown;
+}
+/**
+ * Result of action economy validation.
+ */
+export interface ActionEconomyResult {
+  can_take_action: CanTakeAction;
+  can_take_full_action: CanTakeFullAction;
+  can_take_quick_action: CanTakeQuickAction;
+  can_overcharge: CanOvercharge1;
+  can_take_reaction: CanTakeReaction;
+  errors?: Errors;
+  warnings?: Warnings;
   [k: string]: unknown;
 }

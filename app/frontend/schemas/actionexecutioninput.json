@@ -1,0 +1,151 @@
+{
+  "$defs": {
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    },
+    "HexPosition": {
+      "description": "Hex position with optional elevation.",
+      "properties": {
+        "coord": {
+          "$ref": "#/$defs/HexCoord"
+        },
+        "elevation": {
+          "default": 0,
+          "description": "Vertical elevation in spaces",
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "coord"
+      ],
+      "title": "HexPosition",
+      "type": "object"
+    }
+  },
+  "description": "Input for executing a combat action.",
+  "properties": {
+    "actor_id": {
+      "description": "ID of the combatant taking action",
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "action_id": {
+      "description": "Action identifier (e.g., 'skirmish', 'barrage')",
+      "title": "Action Id",
+      "type": "string"
+    },
+    "action_type": {
+      "description": "Type of action",
+      "enum": [
+        "free",
+        "quick",
+        "full",
+        "reaction",
+        "protocol",
+        "move"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "target_ids": {
+      "description": "Target combatant IDs",
+      "items": {
+        "type": "string"
+      },
+      "title": "Target Ids",
+      "type": "array"
+    },
+    "target_position": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HexPosition"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Target position for area/movement"
+    },
+    "weapon_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Weapon being used",
+      "title": "Weapon Id"
+    },
+    "system_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "System being activated",
+      "title": "System Id"
+    },
+    "movement_path": {
+      "description": "Movement path for move actions",
+      "items": {
+        "$ref": "#/$defs/HexPosition"
+      },
+      "title": "Movement Path",
+      "type": "array"
+    },
+    "is_overcharge": {
+      "default": false,
+      "description": "Whether this action uses overcharge",
+      "title": "Is Overcharge",
+      "type": "boolean"
+    },
+    "granted_by_overcharge": {
+      "default": false,
+      "description": "Whether this action was granted by overcharge",
+      "title": "Granted By Overcharge",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "actor_id",
+    "action_id",
+    "action_type"
+  ],
+  "title": "ActionExecutionInput",
+  "type": "object"
+}

@@ -82,3 +82,43 @@ function cubeRound(cube: CubeCoord): CubeCoord {
 
   return { x: rx, y: ry, z: rz };
 }
+
+/**
+ * Calculate the distance between two hexes in axial coordinates.
+ * Uses the cube coordinate formula: (|dx| + |dy| + |dz|) / 2
+ */
+export function hexDistance(a: HexCoord, b: HexCoord): number {
+  return (
+    (Math.abs(a.q - b.q) +
+      Math.abs(a.q + a.r - b.q - b.r) +
+      Math.abs(a.r - b.r)) /
+    2
+  );
+}
+
+/**
+ * Check if two hexes are adjacent (distance === 1).
+ */
+export function isAdjacent(a: HexCoord, b: HexCoord): boolean {
+  return hexDistance(a, b) === 1;
+}
+
+/**
+ * Calculate the total distance of a movement path.
+ * Sums the distance between consecutive hexes.
+ */
+export function calculatePathDistance(path: HexCoord[]): number {
+  if (path.length < 2) return 0;
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    total += hexDistance(path[i - 1], path[i]);
+  }
+  return total;
+}
+
+/**
+ * Check if two hex coordinates are equal.
+ */
+export function hexEquals(a: HexCoord, b: HexCoord): boolean {
+  return a.q === b.q && a.r === b.r;
+}

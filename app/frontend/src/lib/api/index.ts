@@ -151,6 +151,13 @@ export type {
   ReactionTrigger,
 } from './combat'
 
+// Combat WebSocket hook for real-time updates
+export { useCombatWebSocket } from './combat-ws'
+export type {
+  CombatWebSocketState,
+  UseCombatWebSocketOptions,
+} from './combat-ws'
+
 // Re-export generated core types for convenience
 // These are the source of truth - use these for domain data
 export type {
