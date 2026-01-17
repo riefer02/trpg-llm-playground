@@ -12,6 +12,7 @@ The API layer handles persistence.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
+import random
 from pydantic import Field
 from core.shared.models import FrozenModel
 
@@ -46,7 +47,17 @@ from core.mech.combat_resolution import (
     increment_overcharge_on_turn_start,
 )
 from core.mech.grid import HexPosition
+from core.mech.grid import (
+    HexCoord,
+    hex_cone,
+    hex_cone_centered,
+    hex_line_from_direction,
+    hexes_in_radius,
+    normalize_hex_direction,
+)
 from core.mech.compendium import get_weapon_definition
+from core.mech.combat_rules import AttackPatternDefinition
+from core.mech.weapon import WeaponProfile, WeaponTag, resolve_weapon_profile
 from core.mech.tech_actions import (
     ScanResult,
     BolsterResult,
@@ -474,9 +485,11 @@ def lookup_weapon_damage_and_ap(weapon_id: str | None) -> tuple[int, int]:
     if weapon_def is None:
         return 6, 0  # Graceful fallback for unknown weapons
 
+    profile = resolve_weapon_profile(weapon_def)
+
     # Roll damage from all damage components
     total_damage = 0
-    for damage_component in weapon_def.damage:
+    for damage_component in profile.damage:
         if damage_component.dice is not None:
             total_damage += roll_dice(damage_component.dice)
         total_damage += damage_component.flat
@@ -486,12 +499,84 @@ def lookup_weapon_damage_and_ap(weapon_id: str | None) -> tuple[int, int]:
 
     # Extract AP tag value
     armor_piercing = 0
-    for tag in weapon_def.tags:
+    for tag in profile.tags:
         if tag.tag == "ap":
             armor_piercing = tag.value if tag.value is not None else 1
             break
 
     return total_damage, armor_piercing
+
+
+def _resolve_weapon_profile(weapon_id: str | None) -> WeaponProfile | None:
+    if weapon_id is None:
+        return None
+    weapon_def = get_weapon_definition(weapon_id)
+    if weapon_def is None:
+        return None
+    return resolve_weapon_profile(weapon_def)
+
+
+def _extract_tag_value(tags: list[WeaponTag], tag_name: str) -> int | None:
+    values = [tag.value for tag in tags if tag.tag == tag_name and tag.value is not None]
+    if not values:
+        return None
+    return max(values)
+
+
+def _extract_area_pattern(profile: WeaponProfile) -> AttackPatternDefinition | None:
+    for range_entry in profile.ranges:
+        if range_entry.range_type in ("line", "cone", "blast", "burst"):
+            return AttackPatternDefinition(
+                pattern=range_entry.range_type,
+                size=range_entry.value,
+            )
+    for tag in profile.tags:
+        if tag.tag in {"line", "cone", "blast", "burst"} and tag.value is not None:
+            return AttackPatternDefinition(pattern=tag.tag, size=tag.value)
+    return None
+
+
+def _roll_damage_with_overkill(
+    damage_expr,
+    apply_overkill: bool,
+) -> tuple[list[int], int]:
+    rolls: list[int] = []
+    overkill_heat = 0
+    for _ in range(damage_expr.count):
+        roll = random.randint(1, damage_expr.size)
+        if apply_overkill:
+            while roll == 1:
+                overkill_heat += 1
+                roll = random.randint(1, damage_expr.size)
+        rolls.append(roll)
+    return rolls, overkill_heat
+
+
+def _roll_weapon_damage(
+    profile: WeaponProfile | None,
+    apply_overkill: bool,
+) -> tuple[int, int]:
+    if profile is None:
+        return 6, 0
+
+    total_damage = 0
+    overkill_heat = 0
+    for damage_component in profile.damage:
+        component_total = 0
+        if damage_component.dice is not None:
+            rolls, component_overkill = _roll_damage_with_overkill(
+                damage_component.dice,
+                apply_overkill,
+            )
+            component_total += sum(rolls) + damage_component.dice.modifier
+            overkill_heat += component_overkill
+        component_total += damage_component.flat
+        total_damage += component_total
+
+    if total_damage == 0:
+        total_damage = 6
+
+    return total_damage, overkill_heat
 
 
 def _build_full_tech_option(
@@ -719,8 +804,114 @@ def execute_action(
     elif action_input.is_overcharge:
         updated_economy = mark_overcharge_used(economy)
 
+    # Resolve attack metadata and area targets (if applicable)
+    is_attack = action_input.action_id in ("skirmish", "barrage", "fight") or \
+                action_input.weapon_id is not None
+    attack_target_ids = list(action_input.target_ids)
+    area_pattern: AttackPatternDefinition | None = None
+    area_origin: HexPosition | None = None
+    area_direction: HexCoord | None = None
+    area_affected: list[HexCoord] = []
+    weapon_profile = _resolve_weapon_profile(action_input.weapon_id)
+    weapon_tags: list[WeaponTag] = list(weapon_profile.tags) if weapon_profile else []
+    accuracy_bonus = sum(1 for tag in weapon_tags if tag.tag == "accurate")
+    difficulty_bonus = sum(1 for tag in weapon_tags if tag.tag == "inaccurate")
+    armor_piercing = _extract_tag_value(weapon_tags, "ap") or 0
+    reliable_value = _extract_tag_value(weapon_tags, "reliable")
+    heat_self = _extract_tag_value(weapon_tags, "heat_self") or 0
+    heat_target = _extract_tag_value(weapon_tags, "heat_target") or 0
+    burn_value = _extract_tag_value(weapon_tags, "burn")
+    has_overkill = any(tag.tag == "overkill" for tag in weapon_tags)
+    smart_attack = any(tag.tag == "smart" for tag in weapon_tags)
+
+    if is_attack and weapon_profile is not None:
+        area_pattern = _extract_area_pattern(weapon_profile)
+        if area_pattern is not None:
+            if actor.position is None:
+                return scenario, current_turn, economy, ActionExecutionResult(
+                    success=False,
+                    error="Area attack requires actor position",
+                )
+
+            if area_pattern.pattern == "burst":
+                area_origin = actor.position
+            elif area_pattern.pattern == "blast":
+                area_origin = action_input.target_position
+                if area_origin is None and action_input.target_ids:
+                    target = next(
+                        (c for c in scenario.combatants if c.id == action_input.target_ids[0]),
+                        None,
+                    )
+                    if target is not None:
+                        area_origin = target.position
+            else:
+                area_origin = actor.position
+
+            if area_origin is None:
+                return scenario, current_turn, economy, ActionExecutionResult(
+                    success=False,
+                    error="Area attack requires a target position",
+                )
+
+            if area_pattern.pattern in ("line", "cone"):
+                direction_source = action_input.target_position
+                if direction_source is None and action_input.target_ids:
+                    target = next(
+                        (c for c in scenario.combatants if c.id == action_input.target_ids[0]),
+                        None,
+                    )
+                    if target is not None:
+                        direction_source = target.position
+                if direction_source is None:
+                    return scenario, current_turn, economy, ActionExecutionResult(
+                        success=False,
+                        error="Line/cone attacks require a target position",
+                    )
+                area_direction = HexCoord(
+                    q=direction_source.coord.q - area_origin.coord.q,
+                    r=direction_source.coord.r - area_origin.coord.r,
+                )
+                if normalize_hex_direction(area_direction) is None:
+                    return scenario, current_turn, economy, ActionExecutionResult(
+                        success=False,
+                        error="Line/cone attacks require a straight-line direction",
+                    )
+
+            if area_pattern.pattern == "line" and area_direction is not None:
+                area_affected = hex_line_from_direction(
+                    area_origin.coord,
+                    area_direction,
+                    area_pattern.size,
+                )
+            elif area_pattern.pattern == "cone" and area_direction is not None:
+                if area_pattern.cone_mode == "axis":
+                    area_affected = hex_cone_centered(
+                        area_origin.coord,
+                        area_direction,
+                        area_pattern.size,
+                    )
+                else:
+                    area_affected = hex_cone(
+                        area_origin.coord,
+                        area_direction,
+                        area_pattern.size,
+                    )
+            elif area_pattern.pattern in ("blast", "burst"):
+                area_affected = hexes_in_radius(
+                    area_origin.coord,
+                    area_pattern.size,
+                )
+
+            area_coords = {(coord.q, coord.r) for coord in area_affected}
+            attack_target_ids = [
+                combatant.id
+                for combatant in scenario.combatants
+                if combatant.position
+                and (combatant.position.coord.q, combatant.position.coord.r) in area_coords
+            ]
+
     # Create action record
-    action_target_ids = action_input.target_ids
+    action_target_ids = list(attack_target_ids)
     if action_input.action_id == "full_tech" and full_tech_targets:
         action_target_ids = full_tech_targets
 
@@ -729,6 +920,11 @@ def execute_action(
         action_type=action_input.action_type,
         target_ids=action_target_ids,
         target_position=action_input.target_position,
+        weapon_tags=[tag.tag for tag in weapon_tags],
+        area_pattern=area_pattern,
+        area_origin=area_origin,
+        area_direction=area_direction,
+        area_affected=area_affected,
         granted_by_overcharge=action_input.granted_by_overcharge,
     )
 
@@ -752,28 +948,30 @@ def execute_action(
     overheat_checks: list[dict] = []
 
     # Check if this is an attack action with targets
-    is_attack = action_input.action_id in ("skirmish", "barrage", "fight") or \
-                action_input.weapon_id is not None
-
-    if is_attack and action_input.target_ids:
+    if is_attack and attack_target_ids:
         from core.shared.rolls import resolve_attack
 
-        # Look up weapon damage and AP from compendium
-        base_damage, armor_piercing = lookup_weapon_damage_and_ap(action_input.weapon_id)
+        # Get attack bonus from actor's grit
+        attack_bonus = actor.stats.grit if actor.stats else 0
+        self_overkill_heat = 0
 
-        for target_id in action_input.target_ids:
+        attack_results: list[tuple[str, CombatantState, "AttackResolutionResult"]] = []
+        for target_id in attack_target_ids:
             target = next((c for c in scenario.combatants if c.id == target_id), None)
             if target is None:
                 continue
 
-            # Get attack bonus from actor's grit
-            attack_bonus = actor.stats.grit if actor.stats else 0
+            target_defense = target.stats.e_defense if smart_attack else target.stats.evasion
+            if target.stats is None:
+                target_defense = 8 if smart_attack else 10
 
-            # Resolve attack roll
             attack_result = resolve_attack(
                 attack_bonus=attack_bonus,
-                target_defense=target.stats.evasion if target.stats else 10,
+                target_defense=target_defense,
+                accuracy_bonus=accuracy_bonus,
+                difficulty_bonus=difficulty_bonus,
             )
+            attack_results.append((target_id, target, attack_result))
 
             effects_applied.append({
                 "type": "attack",
@@ -782,20 +980,40 @@ def execute_action(
                 "total": attack_result.total_accuracy,
                 "hit": attack_result.hit,
                 "critical": attack_result.is_critical,
+                "accuracy_bonus": accuracy_bonus,
+                "difficulty_bonus": difficulty_bonus,
             })
 
-            if attack_result.hit:
-                # Calculate damage (double on crit)
-                final_damage = base_damage * 2 if attack_result.is_critical else base_damage
+        single_damage_roll = area_pattern.single_damage_roll if area_pattern else False
+        shared_damage = 0
+        if single_damage_roll and any(result.hit for _, _, result in attack_results):
+            shared_damage, shared_overkill_heat = _roll_weapon_damage(
+                weapon_profile,
+                apply_overkill=has_overkill,
+            )
+            self_overkill_heat += shared_overkill_heat
 
-                # Apply damage using existing helper
+        for target_id, target, attack_result in attack_results:
+            if attack_result.hit:
+                if single_damage_roll:
+                    base_damage = shared_damage
+                else:
+                    base_damage, overkill_heat = _roll_weapon_damage(
+                        weapon_profile,
+                        apply_overkill=has_overkill,
+                    )
+                    self_overkill_heat += overkill_heat
+
+                final_damage = base_damage * 2 if attack_result.is_critical else base_damage
+                if reliable_value is not None and final_damage < reliable_value:
+                    final_damage = reliable_value
+
                 scenario, change, structure_result = apply_damage(
                     scenario, target_id, final_damage, armor_piercing
                 )
                 resource_changes.append(change)
                 damage_dealt += abs(change.hp_change or 0)
 
-                # Record structure check if triggered
                 if structure_result:
                     structure_checks.append({
                         "type": "structure_check",
@@ -806,6 +1024,102 @@ def execute_action(
                         "dice_rolls": structure_result.dice_rolls,
                         "lowest_roll": structure_result.lowest_roll,
                     })
+
+                if burn_value is not None and burn_value > 0:
+                    scenario, burn_change, burn_structure = apply_damage(
+                        scenario,
+                        target_id,
+                        burn_value,
+                        armor_piercing=target.stats.armor if target.stats else 0,
+                    )
+                    resource_changes.append(burn_change)
+                    damage_dealt += abs(burn_change.hp_change or 0)
+
+                    if burn_structure:
+                        structure_checks.append({
+                            "type": "structure_check",
+                            "target_id": target_id,
+                            "outcome": burn_structure.outcome,
+                            "mech_destroyed": burn_structure.mech_destroyed,
+                            "statuses": [str(s) for s in burn_structure.statuses_to_apply],
+                            "dice_rolls": burn_structure.dice_rolls,
+                            "lowest_roll": burn_structure.lowest_roll,
+                        })
+
+                    scenario, added_statuses = _apply_statuses_to_target(
+                        scenario, target_id, ["burn"]
+                    )
+                    _record_statuses_applied(statuses_applied, target_id, added_statuses)
+                    effects_applied.append({
+                        "type": "burn",
+                        "target_id": target_id,
+                        "amount": burn_value,
+                    })
+
+                if heat_target > 0:
+                    scenario, change, overheat_result = apply_heat(
+                        scenario, target_id, heat_target
+                    )
+                    resource_changes.append(change)
+                    heat_generated += heat_target
+
+                    if overheat_result:
+                        overheat_checks.append({
+                            "type": "overheat_check",
+                            "target_id": target_id,
+                            "outcome": overheat_result.outcome,
+                            "statuses": [str(s) for s in overheat_result.statuses_to_apply],
+                            "dice_rolls": overheat_result.dice_rolls,
+                            "lowest_roll": overheat_result.lowest_roll,
+                            "meltdown_state": overheat_result.meltdown_state is not None,
+                        })
+            elif reliable_value is not None:
+                scenario, change, structure_result = apply_damage(
+                    scenario, target_id, reliable_value, armor_piercing
+                )
+                resource_changes.append(change)
+                damage_dealt += abs(change.hp_change or 0)
+                effects_applied.append({
+                    "type": "reliable_damage",
+                    "target_id": target_id,
+                    "amount": reliable_value,
+                })
+
+                if structure_result:
+                    structure_checks.append({
+                        "type": "structure_check",
+                        "target_id": target_id,
+                        "outcome": structure_result.outcome,
+                        "mech_destroyed": structure_result.mech_destroyed,
+                        "statuses": [str(s) for s in structure_result.statuses_to_apply],
+                        "dice_rolls": structure_result.dice_rolls,
+                        "lowest_roll": structure_result.lowest_roll,
+                    })
+
+        if heat_self > 0 or self_overkill_heat > 0:
+            total_self_heat = heat_self + self_overkill_heat
+            scenario, change, overheat_result = apply_heat(
+                scenario, actor.id, total_self_heat
+            )
+            resource_changes.append(change)
+            heat_generated += total_self_heat
+            effects_applied.append({
+                "type": "heat_self",
+                "target_id": actor.id,
+                "amount": total_self_heat,
+                "overkill": self_overkill_heat,
+            })
+
+            if overheat_result:
+                overheat_checks.append({
+                    "type": "overheat_check",
+                    "target_id": actor.id,
+                    "outcome": overheat_result.outcome,
+                    "statuses": [str(s) for s in overheat_result.statuses_to_apply],
+                    "dice_rolls": overheat_result.dice_rolls,
+                    "lowest_roll": overheat_result.lowest_roll,
+                    "meltdown_state": overheat_result.meltdown_state is not None,
+                })
 
     # Handle tech actions (scan, bolster, lock on, invade)
     if action_input.action_id in ("scan", "bolster", "lock_on", "invade") and action_input.target_ids:

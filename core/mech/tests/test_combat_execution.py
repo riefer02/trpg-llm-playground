@@ -41,6 +41,7 @@ from core.mech.combat_state import (
 from core.mech.grid import HexPosition, HexCoord
 from core.shared.effects import CooldownState
 from core.shared.full_tech import FullTechOptionSelection
+from core.shared.rolls import AttackResolutionResult
 
 
 # =============================================================================
@@ -61,6 +62,7 @@ def make_combatant(
     **kwargs,
 ) -> CombatantState:
     """Create a test combatant."""
+    position = kwargs.pop("position", HexPosition(coord=HexCoord(q=0, r=0), elevation=0))
     return CombatantState(
         id=id,
         name=name,
@@ -85,7 +87,7 @@ def make_combatant(
             stress_current=4,
             repairs_remaining=4,
         ),
-        position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        position=position,
         **kwargs,
     )
 
@@ -476,7 +478,6 @@ class TestExecuteAction:
         )
 
         assert result.success is True
-        assert len(result.effects_applied) == 1
         assert result.effects_applied[0]["type"] == "attack"
         assert result.effects_applied[0]["target_id"] == "defender"
         assert "roll" in result.effects_applied[0]
@@ -1136,7 +1137,7 @@ class TestWeaponDamageLookup:
 
         # Force hit with a natural 20 (crit)
         with patch("core.shared.rolls._roll_d20") as mock_d20, \
-             patch("core.shared.dice.random.randint") as mock_dice:
+             patch("core.mech.combat_execution.random.randint") as mock_dice:
             mock_d20.return_value = 20  # Crit
             mock_dice.return_value = 4  # Roll 4 on the d6
 
@@ -1186,6 +1187,357 @@ class TestWeaponDamageLookup:
 
         defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
         assert defender_after.resources.hp_current == 8  # 20 - 12
+
+
+# =============================================================================
+# Weapon Tag + AoE Tests
+# =============================================================================
+
+
+class TestWeaponTagEffects:
+    """Tests for weapon tag-driven combat behavior."""
+
+    def test_reliable_damage_on_miss(self):
+        """Reliable weapons should deal damage even on a miss."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            hp_current=10,
+            hp_max=10,
+        )
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="assault_rifle",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 1  # Force miss
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        assert defender_after.resources.hp_current == 8
+        assert any(effect["type"] == "reliable_damage" for effect in result.effects_applied)
+
+    def test_accurate_tag_passes_accuracy_bonus(self):
+        """Accurate tag should pass +1 accuracy to attack roll."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(id="defender", name="Defender", side="hostiles")
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="anti_material_rifle",
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=10,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=10,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            execute_action(scenario, turn, economy, action_input)
+
+        assert mock_resolve.call_args.kwargs["accuracy_bonus"] == 1
+
+    def test_inaccurate_tag_passes_difficulty_bonus(self):
+        """Inaccurate tag should pass +1 difficulty to attack roll."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(id="defender", name="Defender", side="hostiles")
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="howitzer",
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=10,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=10,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            execute_action(scenario, turn, economy, action_input)
+
+        assert mock_resolve.call_args.kwargs["difficulty_bonus"] == 1
+
+    def test_smart_weapon_targets_e_defense(self):
+        """Smart weapons should target e-defense instead of evasion."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            hp_current=10,
+            hp_max=10,
+        )
+        defender = defender.model_copy(update={
+            "stats": defender.stats.model_copy(update={"evasion": 20, "e_defense": 5})
+        })
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="horus_seeker_swarm_nexus",
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=10,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=10,
+                target_defense=5,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            execute_action(scenario, turn, economy, action_input)
+
+        assert mock_resolve.call_args.kwargs["target_defense"] == 5
+
+    def test_overkill_adds_heat(self):
+        """Overkill should add heat when damage dice roll 1s."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(id="defender", name="Defender", side="hostiles")
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="progressive_knife",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll, \
+            patch("core.mech.combat_execution.random.randint") as mock_rand:
+            mock_roll.return_value = 20  # Force hit
+            mock_rand.side_effect = [1, 2]  # Trigger overkill once, then reroll
+
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        attacker_after = next(
+            c for c in updated_scenario.combatants if c.id == "attacker"
+        )
+        assert attacker_after.resources.heat_current == 1
+        assert any(effect["type"] == "heat_self" for effect in result.effects_applied)
+
+    def test_burn_tag_applies_burn_status(self):
+        """Burn tag should apply burn status on hit."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(id="defender", name="Defender", side="hostiles")
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="horus_seeker_swarm_nexus",
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=10,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=10,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        assert "burn" in defender_after.statuses
+        assert any(effect["type"] == "burn" for effect in result.effects_applied)
+
+
+class TestAreaAttackResolution:
+    """Tests for AoE targeting from weapon ranges."""
+
+    def test_blast_targets_all_in_area(self):
+        """Blast weapons should target all combatants within radius."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target_in = make_combatant(
+            id="target_in",
+            name="Target In",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=3, r=0)),
+            hp_current=10,
+            hp_max=10,
+        )
+        target_out = make_combatant(
+            id="target_out",
+            name="Target Out",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=6, r=0)),
+            hp_current=10,
+            hp_max=10,
+        )
+        scenario = make_scenario(combatants=[attacker, target_in, target_out])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="howitzer",
+            target_position=HexPosition(coord=HexCoord(q=3, r=0)),
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=10,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=10,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert any(effect["target_id"] == "target_in" for effect in result.effects_applied)
+        assert not any(effect["target_id"] == "target_out" for effect in result.effects_applied)
+        target_out_after = next(
+            c for c in updated_scenario.combatants if c.id == "target_out"
+        )
+        assert target_out_after.resources.hp_current == 10
+
+    def test_line_targets_along_direction(self):
+        """Line weapons should target along the chosen direction."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target_in = make_combatant(
+            id="target_in",
+            name="Target In",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+        target_off = make_combatant(
+            id="target_off",
+            name="Target Off",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=0, r=1)),
+        )
+        scenario = make_scenario(combatants=[attacker, target_in, target_off])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="thermal_lance",
+            target_position=HexPosition(coord=HexCoord(q=3, r=0)),
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=10,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=10,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert any(effect["target_id"] == "target_in" for effect in result.effects_applied)
+        assert not any(effect["target_id"] == "target_off" for effect in result.effects_applied)
 
 
 # =============================================================================
