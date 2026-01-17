@@ -49,9 +49,11 @@ from core.mech.combat_resolution import (
 from core.mech.grid import HexPosition
 from core.mech.grid import (
     HexCoord,
+    hex_add,
     hex_cone,
     hex_cone_centered,
     hex_line_from_direction,
+    hex_scale,
     hexes_in_radius,
     normalize_hex_direction,
 )
@@ -88,6 +90,10 @@ from core.shared.state_helpers import add_statuses
 # =============================================================================
 
 
+StabilizePrimary = Literal["cool_heat", "spend_repair_full_hp"]
+StabilizeSecondary = Literal["reload_loading", "clear_burn", "clear_condition"]
+
+
 class ActionExecutionInput(FrozenModel):
     """Input for executing a combat action."""
 
@@ -107,6 +113,19 @@ class ActionExecutionInput(FrozenModel):
     movement_path: list[HexPosition] = Field(default_factory=list, description="Movement path for move actions")
     is_overcharge: bool = Field(default=False, description="Whether this action uses overcharge")
     granted_by_overcharge: bool = Field(default=False, description="Whether this action was granted by overcharge")
+    # Stabilize options (PR2 4275-4286)
+    stabilize_primary: StabilizePrimary | None = Field(
+        default=None, description="Primary stabilize option: cool heat OR spend repair for full HP"
+    )
+    stabilize_secondary: StabilizeSecondary | None = Field(
+        default=None, description="Secondary stabilize option: reload/clear burn/clear condition"
+    )
+    # Ram knockback preference
+    apply_knockback: bool = Field(default=True, description="Whether to apply knockback on successful ram")
+    # Eject direction (for eject action)
+    eject_direction: HexCoord | None = Field(
+        default=None, description="Direction for eject (pilot flies 6 spaces in this direction)"
+    )
 
 
 class ResourceChange(FrozenModel):
@@ -955,7 +974,21 @@ def execute_action(
         attack_bonus = actor.stats.grit if actor.stats else 0
         self_overkill_heat = 0
 
-        attack_results: list[tuple[str, CombatantState, "AttackResolutionResult"]] = []
+        # Determine if attack is ranged (check weapon ranges)
+        is_ranged_attack = True  # Default to ranged
+        if weapon_profile is not None:
+            for range_entry in weapon_profile.ranges:
+                if range_entry.range_type == "threat":
+                    is_ranged_attack = False
+                    break
+
+        # Get attacker status modifiers
+        attacker_acc_mod, attacker_diff_mod = _get_attacker_status_modifiers(actor)
+
+        # Track lock-on targets for consumption after resolution
+        targets_with_lock_on: list[str] = []
+
+        attack_results: list[tuple[str, CombatantState, "AttackResolutionResult", bool]] = []
         for target_id in attack_target_ids:
             target = next((c for c in scenario.combatants if c.id == target_id), None)
             if target is None:
@@ -965,13 +998,35 @@ def execute_action(
             if target.stats is None:
                 target_defense = 8 if smart_attack else 10
 
+            # Get target status modifiers
+            target_acc_mod, target_diff_mod, has_lock_on = _get_target_status_modifiers(
+                target, is_ranged_attack
+            )
+
+            # Combine all accuracy/difficulty modifiers
+            final_accuracy_bonus = accuracy_bonus + attacker_acc_mod + target_acc_mod
+            final_difficulty_bonus = difficulty_bonus + attacker_diff_mod + target_diff_mod
+
             attack_result = resolve_attack(
                 attack_bonus=attack_bonus,
                 target_defense=target_defense,
-                accuracy_bonus=accuracy_bonus,
-                difficulty_bonus=difficulty_bonus,
+                accuracy_bonus=final_accuracy_bonus,
+                difficulty_bonus=final_difficulty_bonus,
             )
-            attack_results.append((target_id, target, attack_result))
+
+            # Check for invisibility miss (50% miss chance)
+            invisibility_miss = False
+            if attack_result.hit and _check_invisibility_miss(target):
+                invisibility_miss = True
+                # Create a modified attack result with hit=False
+                attack_result = attack_result.model_copy(update={"hit": False})
+                effects_applied.append({
+                    "type": "invisibility_miss",
+                    "target_id": target_id,
+                    "reason": "50% miss chance from invisible status",
+                })
+
+            attack_results.append((target_id, target, attack_result, has_lock_on))
 
             effects_applied.append({
                 "type": "attack",
@@ -980,20 +1035,30 @@ def execute_action(
                 "total": attack_result.total_accuracy,
                 "hit": attack_result.hit,
                 "critical": attack_result.is_critical,
-                "accuracy_bonus": accuracy_bonus,
-                "difficulty_bonus": difficulty_bonus,
+                "accuracy_bonus": final_accuracy_bonus,
+                "difficulty_bonus": final_difficulty_bonus,
+                "status_modifiers": {
+                    "attacker_acc": attacker_acc_mod,
+                    "attacker_diff": attacker_diff_mod,
+                    "target_acc": target_acc_mod,
+                    "target_diff": target_diff_mod,
+                },
             })
+
+            # Track lock-on for consumption if hit
+            if attack_result.hit and has_lock_on:
+                targets_with_lock_on.append(target_id)
 
         single_damage_roll = area_pattern.single_damage_roll if area_pattern else False
         shared_damage = 0
-        if single_damage_roll and any(result.hit for _, _, result in attack_results):
+        if single_damage_roll and any(result.hit for _, _, result, _ in attack_results):
             shared_damage, shared_overkill_heat = _roll_weapon_damage(
                 weapon_profile,
                 apply_overkill=has_overkill,
             )
             self_overkill_heat += shared_overkill_heat
 
-        for target_id, target, attack_result in attack_results:
+        for target_id, target, attack_result, _ in attack_results:
             if attack_result.hit:
                 if single_damage_roll:
                     base_damage = shared_damage
@@ -1121,6 +1186,15 @@ def execute_action(
                     "meltdown_state": overheat_result.meltdown_state is not None,
                 })
 
+        # Consume lock-on status from targets that were hit
+        for lock_on_target_id in targets_with_lock_on:
+            scenario = _remove_status_from_target(scenario, lock_on_target_id, "lock_on")
+            effects_applied.append({
+                "type": "lock_on_consumed",
+                "target_id": lock_on_target_id,
+                "reason": "Consumed after successful hit",
+            })
+
     # Handle tech actions (scan, bolster, lock on, invade)
     if action_input.action_id in ("scan", "bolster", "lock_on", "invade") and action_input.target_ids:
         target_id = action_input.target_ids[0]
@@ -1190,6 +1264,78 @@ def execute_action(
             )
             heat_generated += added_heat
 
+    # Handle Stabilize action (PR2 4275-4286)
+    if action_input.action_id == "stabilize":
+        scenario, stab_effects, stab_changes = _resolve_stabilize(
+            scenario,
+            actor,
+            action_input.stabilize_primary,
+            action_input.stabilize_secondary,
+            action_input.target_ids[0] if action_input.target_ids else None,
+        )
+        effects_applied.extend(stab_effects)
+        resource_changes.extend(stab_changes)
+
+    # Handle Disengage action (PR2 4288-4291)
+    if action_input.action_id == "disengage":
+        effects_applied.append({
+            "type": "disengage",
+            "effect": "ignore_engagement_and_reactions",
+            "duration": "until_end_of_turn",
+        })
+
+    # Handle Hide action (PR2 4221-4237)
+    if action_input.action_id == "hide":
+        scenario, hide_success, hide_reason = _resolve_hide(scenario, actor)
+        if hide_success:
+            scenario, added_statuses = _apply_statuses_to_target(
+                scenario, actor.id, ["hidden"]
+            )
+            _record_statuses_applied(statuses_applied, actor.id, added_statuses)
+        effects_applied.append({
+            "type": "hide",
+            "success": hide_success,
+            "reason": hide_reason,
+        })
+
+    # Handle Ram action (PR2 4152-4155)
+    if action_input.action_id == "ram" and action_input.target_ids:
+        target_id = action_input.target_ids[0]
+        target = next((c for c in scenario.combatants if c.id == target_id), None)
+        if target is not None:
+            scenario, ram_effects = _resolve_ram(
+                scenario,
+                actor,
+                target,
+                apply_knockback=action_input.apply_knockback,
+            )
+            effects_applied.extend(ram_effects)
+            # Apply prone status if ram hit
+            if any(e.get("target_becomes_prone") for e in ram_effects):
+                scenario, added_statuses = _apply_statuses_to_target(
+                    scenario, target_id, ["prone"]
+                )
+                _record_statuses_applied(statuses_applied, target_id, added_statuses)
+
+    # Handle Grapple action (PR2 4157-4177)
+    if action_input.action_id == "grapple" and action_input.target_ids:
+        target_id = action_input.target_ids[0]
+        target = next((c for c in scenario.combatants if c.id == target_id), None)
+        if target is not None:
+            scenario, grapple_effects = _resolve_grapple(scenario, actor, target)
+            effects_applied.extend(grapple_effects)
+
+    # Handle Search action (PR2 4241-4249)
+    if action_input.action_id == "search" and action_input.target_ids:
+        target_id = action_input.target_ids[0]
+        target = next((c for c in scenario.combatants if c.id == target_id), None)
+        if target is not None:
+            scenario, search_effects = _resolve_search(scenario, actor, target)
+            effects_applied.extend(search_effects)
+            # Remove hidden status if search succeeded
+            if any(e.get("search_success") for e in search_effects):
+                scenario = _remove_status_from_target(scenario, target_id, "hidden")
+
     # Handle overcharge heat
     if action_input.is_overcharge and actor.overcharge_state is not None:
         from core.mech.combat_resolution import use_overcharge as apply_overcharge
@@ -1252,6 +1398,35 @@ def execute_action(
             "heat": heat_generated,
             "new_level": new_overcharge_state.current_level,
         })
+
+    # Handle movement actions (move, boost)
+    if action_input.action_id in ("move", "boost") and action_input.movement_path:
+        # Re-fetch actor from scenario as it may have been updated
+        actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
+        scenario, move_effects = _resolve_movement(
+            scenario,
+            actor,
+            action_input.movement_path,
+            is_boost=(action_input.action_id == "boost"),
+        )
+        effects_applied.extend(move_effects)
+
+    # Handle mount/dismount/eject actions
+    if action_input.action_id == "mount" and action_input.target_ids:
+        actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
+        target_mech_id = action_input.target_ids[0]
+        scenario, mount_effects = _resolve_mount(scenario, actor, target_mech_id)
+        effects_applied.extend(mount_effects)
+
+    if action_input.action_id == "dismount":
+        actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
+        scenario, dismount_effects = _resolve_dismount(scenario, actor)
+        effects_applied.extend(dismount_effects)
+
+    if action_input.action_id == "eject":
+        actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
+        scenario, eject_effects = _resolve_eject(scenario, actor, action_input.eject_direction)
+        effects_applied.extend(eject_effects)
 
     result = ActionExecutionResult(
         success=True,
@@ -2036,3 +2211,1107 @@ def _get_basic_available_actions(actor: CombatantState) -> list[str]:
         actions = [a for a in actions if a in ["improvised_attack", "grapple", "mount_dismount", "brace"]]
 
     return actions
+
+
+# =============================================================================
+# Action Resolution Helpers (PR2 Combat Actions)
+# =============================================================================
+
+
+def _resolve_stabilize(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+    primary_option: "StabilizePrimary | None",
+    secondary_option: "StabilizeSecondary | None",
+    condition_target_id: str | None,
+) -> tuple[MechCombatScenario, list[dict], list[ResourceChange]]:
+    """Resolve Stabilize action (PR2 4275-4286).
+
+    Stabilize is a full action with two choices:
+    - Primary: Cool heat to 0 OR Spend 1 repair to refill HP to max
+    - Secondary: Reload all Loading weapons OR End all Burn OR Clear one condition
+
+    Args:
+        scenario: Current combat scenario
+        actor: The actor stabilizing
+        primary_option: "cool_heat" or "spend_repair_full_hp"
+        secondary_option: "reload_loading", "clear_burn", or "clear_condition"
+        condition_target_id: Target for condition clear (self or adjacent ally)
+
+    Returns:
+        Tuple of (updated scenario, effects list, resource changes list)
+    """
+    effects: list[dict] = []
+    resource_changes: list[ResourceChange] = []
+
+    # Find actor in scenario for updates
+    actor_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
+    if actor_idx < 0:
+        return scenario, effects, resource_changes
+
+    updated_actor = actor
+
+    # Primary option
+    if primary_option == "cool_heat":
+        # Reset heat to 0, end exposed condition
+        heat_cleared = updated_actor.resources.heat_current
+        new_resources = updated_actor.resources.model_copy(update={"heat_current": 0})
+        new_statuses = [s for s in updated_actor.statuses if s != "exposed"]
+        updated_actor = updated_actor.model_copy(update={
+            "resources": new_resources,
+            "statuses": new_statuses,
+        })
+        resource_changes.append(ResourceChange(
+            combatant_id=actor.id,
+            heat_change=-heat_cleared,
+        ))
+        effects.append({
+            "type": "stabilize_primary",
+            "option": "cool_heat",
+            "heat_cleared": heat_cleared,
+            "exposed_ended": "exposed" in actor.statuses,
+        })
+
+    elif primary_option == "spend_repair_full_hp":
+        # Spend 1 repair to refill HP to max
+        if updated_actor.resources.repairs_remaining > 0:
+            hp_restored = updated_actor.stats.hp_max - updated_actor.resources.hp_current
+            new_resources = updated_actor.resources.model_copy(update={
+                "hp_current": updated_actor.stats.hp_max,
+                "repairs_remaining": updated_actor.resources.repairs_remaining - 1,
+            })
+            updated_actor = updated_actor.model_copy(update={"resources": new_resources})
+            resource_changes.append(ResourceChange(
+                combatant_id=actor.id,
+                hp_change=hp_restored,
+                repairs_change=-1,
+            ))
+            effects.append({
+                "type": "stabilize_primary",
+                "option": "spend_repair_full_hp",
+                "hp_restored": hp_restored,
+                "repairs_remaining": updated_actor.resources.repairs_remaining,
+            })
+        else:
+            effects.append({
+                "type": "stabilize_primary",
+                "option": "spend_repair_full_hp",
+                "failed": True,
+                "reason": "No repairs remaining",
+            })
+
+    # Secondary option
+    if secondary_option == "reload_loading":
+        # Reload all Loading weapons - mark in inventory
+        effects.append({
+            "type": "stabilize_secondary",
+            "option": "reload_loading",
+            "weapons_reloaded": True,
+        })
+
+    elif secondary_option == "clear_burn":
+        # End all Burn on self
+        new_statuses = [s for s in updated_actor.statuses if s != "burn"]
+        updated_actor = updated_actor.model_copy(update={"statuses": new_statuses})
+        effects.append({
+            "type": "stabilize_secondary",
+            "option": "clear_burn",
+            "burn_cleared": "burn" in actor.statuses,
+        })
+
+    elif secondary_option == "clear_condition":
+        # Clear one condition on self or adjacent ally
+        target_id = condition_target_id or actor.id
+        clearable_conditions: list[StatusType] = [
+            "impaired", "shredded", "jammed", "slowed", "immobilized", "stunned", "lock_on"
+        ]
+
+        target_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == target_id), -1)
+        if target_idx >= 0:
+            target = scenario.combatants[target_idx]
+            # Find first clearable condition
+            condition_to_clear = next(
+                (s for s in target.statuses if s in clearable_conditions), None
+            )
+            if condition_to_clear:
+                new_target_statuses = [s for s in target.statuses if s != condition_to_clear]
+                updated_target = target.model_copy(update={"statuses": new_target_statuses})
+
+                # Update combatants list
+                updated_combatants = list(scenario.combatants)
+                updated_combatants[target_idx] = updated_target
+                if target_id == actor.id:
+                    updated_actor = updated_target
+
+                scenario = MechCombatScenario(
+                    combatants=updated_combatants,
+                    grapples=list(scenario.grapples),
+                    rounds=list(scenario.rounds),
+                    terrain=scenario.terrain,
+                    environment=scenario.environment,
+                    deployables=dict(scenario.deployables),
+                )
+
+                effects.append({
+                    "type": "stabilize_secondary",
+                    "option": "clear_condition",
+                    "target_id": target_id,
+                    "condition_cleared": condition_to_clear,
+                })
+            else:
+                effects.append({
+                    "type": "stabilize_secondary",
+                    "option": "clear_condition",
+                    "target_id": target_id,
+                    "failed": True,
+                    "reason": "No clearable conditions",
+                })
+
+    # Update scenario with actor changes
+    updated_combatants = list(scenario.combatants)
+    updated_combatants[actor_idx] = updated_actor
+    scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+    return scenario, effects, resource_changes
+
+
+def _resolve_hide(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+) -> tuple[MechCombatScenario, bool, str]:
+    """Resolve Hide action (PR2 4221-4237).
+
+    Hide is a quick action that always succeeds if:
+    - Actor has hard cover, OR
+    - Actor is in soft cover (smoke, etc.), OR
+    - Actor is invisible
+
+    Args:
+        scenario: Current combat scenario
+        actor: The actor hiding
+
+    Returns:
+        Tuple of (updated scenario, success, reason)
+    """
+    # Check if actor is invisible (can always hide)
+    if "invisible" in actor.statuses:
+        return scenario, True, "Invisible mechs can always hide"
+
+    # Check if actor is engaged (cannot hide while engaged)
+    if "engaged" in actor.statuses:
+        return scenario, False, "Cannot hide while engaged"
+
+    # Check for cover at actor's position
+    # For now, assume hiding is allowed (terrain/cover checks would go here)
+    # A full implementation would check scenario.terrain for cover
+    has_cover = True  # Simplified - assume cover available
+
+    if has_cover:
+        return scenario, True, "Hidden in cover"
+
+    return scenario, False, "No cover available for hiding"
+
+
+def _resolve_ram(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+    target: CombatantState,
+    apply_knockback: bool = True,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Resolve Ram action (PR2 4152-4155).
+
+    Ram is a quick action melee attack:
+    - On hit: target becomes Prone
+    - May knock target back up to 1 space directly away
+
+    Args:
+        scenario: Current combat scenario
+        actor: The actor ramming
+        target: The target being rammed
+        apply_knockback: Whether to apply knockback on success
+
+    Returns:
+        Tuple of (updated scenario, effects list)
+    """
+    from core.shared.grapple import RamAttempt, attempt_ram
+    from core.shared.rolls import resolve_attack
+
+    effects: list[dict] = []
+
+    # Roll melee attack (grit vs evasion)
+    attack_bonus = actor.stats.grit if actor.stats else 0
+    target_evasion = target.stats.evasion if target.stats else 10
+
+    attack_result = resolve_attack(
+        attack_bonus=attack_bonus,
+        target_defense=target_evasion,
+    )
+
+    effects.append({
+        "type": "ram_attack",
+        "roll": attack_result.roll,
+        "total": attack_result.total_accuracy,
+        "hit": attack_result.hit,
+        "target_evasion": target_evasion,
+    })
+
+    if not attack_result.hit:
+        return scenario, effects
+
+    # Resolve ram effects
+    ram_attempt = RamAttempt(
+        attacker_size=actor.stats.size,
+        target_size=target.stats.size,
+        hit=True,
+        knockback_bonus=0,
+    )
+
+    # Get terrain occupancies for knockback blocking
+    terrain_occupancies: dict[HexCoord, bool] = {}
+    for c in scenario.combatants:
+        if c.position and c.id != actor.id and c.id != target.id:
+            terrain_occupancies[c.position.coord] = True
+
+    ram_result = attempt_ram(
+        ram_attempt,
+        terrain_occupancies=terrain_occupancies if apply_knockback else None,
+        attacker_position=actor.position.coord if actor.position else None,
+        target_position=target.position.coord if target.position else None,
+    )
+
+    effects.append({
+        "type": "ram_result",
+        "target_becomes_prone": ram_result.target_becomes_prone,
+        "knockback_spaces": ram_result.knockback_spaces if apply_knockback else 0,
+        "knockback_blocked": ram_result.knockback_blocked,
+        "reason": ram_result.reason,
+    })
+
+    # Apply knockback position change if applicable
+    if apply_knockback and ram_result.knockback_spaces > 0 and target.position and actor.position:
+        from core.shared.grapple import get_knockback_direction
+        direction = get_knockback_direction(actor.position.coord, target.position.coord)
+        new_coord = HexCoord(
+            q=target.position.coord.q + (direction.q * ram_result.knockback_spaces),
+            r=target.position.coord.r + (direction.r * ram_result.knockback_spaces),
+        )
+        new_position = target.position.model_copy(update={"coord": new_coord})
+
+        target_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == target.id), -1)
+        if target_idx >= 0:
+            updated_target = target.model_copy(update={"position": new_position})
+            updated_combatants = list(scenario.combatants)
+            updated_combatants[target_idx] = updated_target
+            scenario = MechCombatScenario(
+                combatants=updated_combatants,
+                grapples=list(scenario.grapples),
+                rounds=list(scenario.rounds),
+                terrain=scenario.terrain,
+                environment=scenario.environment,
+                deployables=dict(scenario.deployables),
+            )
+
+    return scenario, effects
+
+
+def _resolve_grapple(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+    target: CombatantState,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Resolve Grapple action (PR2 4157-4177).
+
+    Grapple is a quick action melee attack:
+    - On hit: both parties become engaged, neither can boost/react
+    - Smaller party is immobilized, moves when larger moves
+    - Same size: contested HULL check at start of turn
+
+    Args:
+        scenario: Current combat scenario
+        actor: The actor grappling
+        target: The target being grappled
+
+    Returns:
+        Tuple of (updated scenario, effects list)
+    """
+    from core.shared.grapple import GrappleAttempt, attempt_grapple
+    from core.shared.rolls import resolve_attack
+
+    effects: list[dict] = []
+
+    # Roll melee attack (grit vs evasion)
+    attack_bonus = actor.stats.grit if actor.stats else 0
+    target_evasion = target.stats.evasion if target.stats else 10
+
+    attack_result = resolve_attack(
+        attack_bonus=attack_bonus,
+        target_defense=target_evasion,
+    )
+
+    effects.append({
+        "type": "grapple_attack",
+        "roll": attack_result.roll,
+        "total": attack_result.total_accuracy,
+        "hit": attack_result.hit,
+        "target_evasion": target_evasion,
+    })
+
+    if not attack_result.hit:
+        return scenario, effects
+
+    # Resolve grapple effects
+    grapple_attempt = GrappleAttempt(
+        attacker_size=actor.stats.size,
+        target_size=target.stats.size,
+        hit=True,
+        attacker_hull_bonus=0,  # Would come from pilot skills
+        target_hull_bonus=0,
+    )
+
+    grapple_result = attempt_grapple(grapple_attempt)
+
+    effects.append({
+        "type": "grapple_result",
+        "grapple_initiated": grapple_result.grapple_initiated,
+        "attacker_engaged": grapple_result.attacker_engaged,
+        "target_engaged": grapple_result.target_engaged,
+        "smaller_party": grapple_result.smaller_party,
+        "target_becomes_immobilized": grapple_result.target_becomes_immobilized,
+        "attacker_becomes_immobilized": grapple_result.attacker_becomes_immobilized,
+        "contested_check_required": grapple_result.contested_check_required,
+        "contested_check_winner": grapple_result.contested_check_winner,
+        "reason": grapple_result.reason,
+    })
+
+    if grapple_result.grapple_initiated:
+        # Add engaged status to both parties
+        actor_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
+        target_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == target.id), -1)
+
+        updated_combatants = list(scenario.combatants)
+
+        if actor_idx >= 0:
+            actor_statuses = list(actor.statuses)
+            if "engaged" not in actor_statuses:
+                actor_statuses.append("engaged")
+            if grapple_result.attacker_becomes_immobilized and "immobilized" not in actor_statuses:
+                actor_statuses.append("immobilized")
+            updated_combatants[actor_idx] = actor.model_copy(update={"statuses": actor_statuses})
+
+        if target_idx >= 0:
+            target_statuses = list(target.statuses)
+            if "engaged" not in target_statuses:
+                target_statuses.append("engaged")
+            if grapple_result.target_becomes_immobilized and "immobilized" not in target_statuses:
+                target_statuses.append("immobilized")
+            updated_combatants[target_idx] = target.model_copy(update={"statuses": target_statuses})
+
+        # Add grapple link
+        from core.mech.combat_state import GrappleLink
+        new_grapple = GrappleLink(
+            grappler_id=actor.id,
+            target_id=target.id,
+        )
+        updated_grapples = list(scenario.grapples) + [new_grapple]
+
+        scenario = MechCombatScenario(
+            combatants=updated_combatants,
+            grapples=updated_grapples,
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+        )
+
+    return scenario, effects
+
+
+def _resolve_search(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+    target: CombatantState,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Resolve Search action (PR2 4241-4249).
+
+    Search is a quick action contested check:
+    - Searching party: Systems check
+    - Hidden mech target: Agility check
+    - On success: target loses Hidden status
+
+    Args:
+        scenario: Current combat scenario
+        actor: The actor searching
+        target: The hidden target
+
+    Returns:
+        Tuple of (updated scenario, effects list)
+    """
+    from core.shared.dice import roll_dice
+
+    effects: list[dict] = []
+
+    # Check if target is actually hidden
+    if "hidden" not in target.statuses:
+        effects.append({
+            "type": "search",
+            "search_success": False,
+            "reason": "Target is not hidden",
+        })
+        return scenario, effects
+
+    # Contested check: Systems (searcher) vs Agility (hider)
+    # Using tech_attack as systems bonus, speed as rough agility proxy
+    searcher_systems = actor.stats.tech_attack if actor.stats else 0
+    target_agility = (target.stats.speed // 2) if target.stats else 0  # Rough approximation
+
+    searcher_roll = roll_dice("1d20")
+    target_roll = roll_dice("1d20")
+
+    searcher_total = searcher_roll + searcher_systems
+    target_total = target_roll + target_agility
+
+    search_success = searcher_total > target_total
+
+    effects.append({
+        "type": "search",
+        "searcher_roll": searcher_roll,
+        "searcher_systems": searcher_systems,
+        "searcher_total": searcher_total,
+        "target_roll": target_roll,
+        "target_agility": target_agility,
+        "target_total": target_total,
+        "search_success": search_success,
+        "reason": f"Contested check: {searcher_total} vs {target_total}",
+    })
+
+    return scenario, effects
+
+
+def _remove_status_from_target(
+    scenario: MechCombatScenario,
+    target_id: str,
+    status: StatusType,
+) -> MechCombatScenario:
+    """Remove a status from a target combatant.
+
+    Args:
+        scenario: Current combat scenario
+        target_id: ID of the target
+        status: Status to remove
+
+    Returns:
+        Updated scenario
+    """
+    target_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == target_id), -1)
+    if target_idx < 0:
+        return scenario
+
+    target = scenario.combatants[target_idx]
+    if status not in target.statuses:
+        return scenario
+
+    new_statuses = [s for s in target.statuses if s != status]
+    updated_target = target.model_copy(update={"statuses": new_statuses})
+
+    updated_combatants = list(scenario.combatants)
+    updated_combatants[target_idx] = updated_target
+
+    return MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+
+# =============================================================================
+# Status Effect Modifiers for Combat Resolution
+# =============================================================================
+
+
+def _get_attacker_status_modifiers(actor: CombatantState) -> tuple[int, int]:
+    """Get accuracy and difficulty modifiers from attacker's statuses.
+
+    Per PR2 Status Effects:
+    - Impaired: +1 difficulty to all attacks, saves, and skill checks
+
+    Args:
+        actor: The attacking combatant
+
+    Returns:
+        Tuple of (accuracy_mod, difficulty_mod)
+    """
+    accuracy_mod = 0
+    difficulty_mod = 0
+
+    if "impaired" in actor.statuses:
+        difficulty_mod += 1  # All attacks harder
+
+    return accuracy_mod, difficulty_mod
+
+
+def _get_target_status_modifiers(
+    target: CombatantState,
+    is_ranged: bool,
+) -> tuple[int, int, bool]:
+    """Get accuracy and difficulty modifiers from target's statuses.
+
+    Per PR2 Status Effects:
+    - Prone: +1 accuracy (easier to hit)
+    - Braced: -1 accuracy (harder to hit, attacker's perspective)
+    - Lock On: +1 consumable accuracy (consumed on successful hit)
+    - Engaged: +1 difficulty for ranged attacks
+
+    Args:
+        target: The target combatant
+        is_ranged: Whether this is a ranged attack
+
+    Returns:
+        Tuple of (accuracy_mod, difficulty_mod, has_lock_on)
+    """
+    accuracy_mod = 0
+    difficulty_mod = 0
+    has_lock_on = False
+
+    if "prone" in target.statuses:
+        accuracy_mod += 1  # Easier to hit
+
+    if "braced" in target.statuses:
+        accuracy_mod -= 1  # Harder to hit
+
+    if "lock_on" in target.statuses:
+        accuracy_mod += 1
+        has_lock_on = True
+
+    if "engaged" in target.statuses and is_ranged:
+        difficulty_mod += 1  # Ranged attacks harder when target engaged
+
+    return accuracy_mod, difficulty_mod, has_lock_on
+
+
+def _check_invisibility_miss(target: CombatantState) -> bool:
+    """Check if invisible target causes attack to miss.
+
+    Per PR2: Invisible targets have 50% miss chance.
+
+    Args:
+        target: The target combatant
+
+    Returns:
+        True if invisibility causes miss, False otherwise
+    """
+    if "invisible" not in target.statuses:
+        return False
+
+    return random.random() < 0.5
+
+
+# =============================================================================
+# Movement Resolution
+# =============================================================================
+
+
+def _resolve_movement(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+    path: list["HexPosition"],
+    is_boost: bool = False,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Resolve movement action - validate path, apply terrain effects, update position.
+
+    Per PR2:
+    - Move: Free action, move up to Speed in spaces
+    - Boost: Quick action, move up to 2x Speed in spaces
+    - Difficult terrain costs 2 spaces per 1 space moved
+    - Dangerous terrain triggers engineering check (DC 10), 5 damage on failure
+
+    Args:
+        scenario: Current combat scenario
+        actor: The moving combatant
+        path: List of hex positions to move through
+        is_boost: Whether this is a boost action (2x speed)
+
+    Returns:
+        Tuple of (updated scenario, effects list)
+    """
+    from core.shared.terrain import (
+        terrain_index,
+        calculate_movement_cost,
+        resolve_dangerous_terrain,
+    )
+
+    effects: list[dict] = []
+
+    if not path:
+        effects.append({
+            "type": "movement",
+            "success": False,
+            "reason": "Empty movement path",
+        })
+        return scenario, effects
+
+    # Calculate total movement cost with terrain
+    total_cost = 0
+    terrain_idx = terrain_index(scenario.terrain)
+
+    for hex_pos in path:
+        cost = calculate_movement_cost(1, scenario.terrain, hex_pos.coord)
+        total_cost += cost
+
+    # Check speed budget (boost = 2x speed)
+    base_speed = actor.stats.speed if actor.stats else 4
+    speed = base_speed * (2 if is_boost else 1)
+
+    if total_cost > speed:
+        effects.append({
+            "type": "movement",
+            "success": False,
+            "reason": "exceeds_speed",
+            "speed": speed,
+            "cost": total_cost,
+        })
+        return scenario, effects
+
+    # Check dangerous terrain and resolve checks
+    # Get current round for tracking checks
+    current_round = len(scenario.rounds) if scenario.rounds else 1
+
+    for hex_pos in path:
+        terrain_hex = terrain_idx.get(hex_pos.coord)
+        if terrain_hex and terrain_hex.dangerous:
+            # Engineering skill bonus (use tech_attack as proxy)
+            skill_bonus = actor.stats.tech_attack if actor.stats else 0
+
+            danger_result = resolve_dangerous_terrain(
+                terrain=scenario.terrain,
+                coord=hex_pos.coord,
+                skill_bonus=skill_bonus,
+                round_checked=current_round,
+            )
+
+            effects.append({
+                "type": "dangerous_terrain",
+                "coord": {"q": hex_pos.coord.q, "r": hex_pos.coord.r},
+                "check_passed": danger_result.check_passed,
+                "roll": danger_result.roll_result,
+                "damage": danger_result.damage_dealt,
+            })
+
+            # Apply damage if check failed
+            if danger_result.check_passed is False and danger_result.damage_dealt > 0:
+                scenario, change, structure_result = apply_damage(
+                    scenario, actor.id, danger_result.damage_dealt, armor_piercing=0
+                )
+                effects.append({
+                    "type": "damage",
+                    "target_id": actor.id,
+                    "amount": danger_result.damage_dealt,
+                    "source": "dangerous_terrain",
+                })
+
+    # Update actor position to final hex
+    final_position = path[-1]
+    actor_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
+
+    if actor_idx >= 0:
+        updated_actor = actor.model_copy(update={"position": final_position})
+        updated_combatants = list(scenario.combatants)
+        updated_combatants[actor_idx] = updated_actor
+
+        scenario = MechCombatScenario(
+            combatants=updated_combatants,
+            grapples=list(scenario.grapples),
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+        )
+
+    effects.append({
+        "type": "movement",
+        "success": True,
+        "spaces": len(path),
+        "cost": total_cost,
+        "final_position": {
+            "q": final_position.coord.q,
+            "r": final_position.coord.r,
+            "elevation": final_position.elevation,
+        },
+    })
+
+    return scenario, effects
+
+
+# =============================================================================
+# Mount/Dismount/Eject Resolution
+# =============================================================================
+
+
+def _resolve_mount(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+    target_mech_id: str,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Resolve Mount action - pilot enters a mech.
+
+    Per PR2 4318-4327:
+    - Mount is a Full action
+    - Pilot must be adjacent to mech to mount
+    - Pilot enters mech, no longer on the battlefield separately
+
+    Args:
+        scenario: Current combat scenario
+        actor: The pilot mounting
+        target_mech_id: ID of the mech to mount
+
+    Returns:
+        Tuple of (updated scenario, effects list)
+    """
+    effects: list[dict] = []
+
+    # Validate actor is a pilot
+    if actor.kind != "pilot":
+        effects.append({
+            "type": "mount",
+            "success": False,
+            "reason": "Only pilots can mount mechs",
+        })
+        return scenario, effects
+
+    # Find target mech
+    target_mech = next(
+        (c for c in scenario.combatants if c.id == target_mech_id),
+        None
+    )
+    if target_mech is None:
+        effects.append({
+            "type": "mount",
+            "success": False,
+            "reason": f"Mech {target_mech_id} not found",
+        })
+        return scenario, effects
+
+    # Validate target is a mech
+    if target_mech.kind != "mech":
+        effects.append({
+            "type": "mount",
+            "success": False,
+            "reason": "Can only mount mechs",
+        })
+        return scenario, effects
+
+    # Check adjacency (pilot must be adjacent to mech)
+    if actor.position is not None and target_mech.position is not None:
+        distance = actor.position.coord.distance_to(target_mech.position.coord)
+        if distance > 1:
+            effects.append({
+                "type": "mount",
+                "success": False,
+                "reason": "Must be adjacent to mount mech",
+            })
+            return scenario, effects
+
+    # Check if mech already has a pilot
+    if target_mech.mounted_pilot_id is not None:
+        effects.append({
+            "type": "mount",
+            "success": False,
+            "reason": "Mech already has a pilot mounted",
+        })
+        return scenario, effects
+
+    # Update pilot and mech state
+    actor_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
+    mech_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == target_mech_id), -1)
+
+    if actor_idx >= 0 and mech_idx >= 0:
+        updated_combatants = list(scenario.combatants)
+
+        # Pilot now piloting the mech
+        updated_pilot = actor.model_copy(update={
+            "piloting_mech_id": target_mech_id,
+            "position": None,  # Pilot is no longer on the battlefield separately
+        })
+        updated_combatants[actor_idx] = updated_pilot
+
+        # Mech now has pilot mounted
+        updated_mech = target_mech.model_copy(update={
+            "mounted_pilot_id": actor.id,
+        })
+        updated_combatants[mech_idx] = updated_mech
+
+        scenario = MechCombatScenario(
+            combatants=updated_combatants,
+            grapples=list(scenario.grapples),
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+        )
+
+    effects.append({
+        "type": "mount",
+        "success": True,
+        "pilot_id": actor.id,
+        "mech_id": target_mech_id,
+    })
+
+    return scenario, effects
+
+
+def _resolve_dismount(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Resolve Dismount action - pilot exits a mech.
+
+    Per PR2 4318-4327:
+    - Dismount is a Full action
+    - Pilot is placed in an adjacent space
+    - Pilot becomes a separate combatant on the battlefield
+
+    Args:
+        scenario: Current combat scenario
+        actor: The mech being dismounted from
+
+    Returns:
+        Tuple of (updated scenario, effects list)
+    """
+    effects: list[dict] = []
+
+    # Validate actor is a mech with a mounted pilot
+    if actor.kind != "mech":
+        effects.append({
+            "type": "dismount",
+            "success": False,
+            "reason": "Dismount can only be done from a mech",
+        })
+        return scenario, effects
+
+    if actor.mounted_pilot_id is None:
+        effects.append({
+            "type": "dismount",
+            "success": False,
+            "reason": "No pilot mounted in this mech",
+        })
+        return scenario, effects
+
+    # Find the mounted pilot
+    pilot = next(
+        (c for c in scenario.combatants if c.id == actor.mounted_pilot_id),
+        None
+    )
+    if pilot is None:
+        effects.append({
+            "type": "dismount",
+            "success": False,
+            "reason": f"Pilot {actor.mounted_pilot_id} not found",
+        })
+        return scenario, effects
+
+    # Calculate adjacent position for pilot
+    pilot_position = None
+    if actor.position is not None:
+        # Find first free adjacent hex
+        for neighbor in actor.position.coord.neighbors():
+            # Check if any combatant is in this position
+            occupied = any(
+                c.position is not None and c.position.coord == neighbor
+                for c in scenario.combatants if c.id != pilot.id
+            )
+            if not occupied:
+                pilot_position = HexPosition(coord=neighbor, elevation=actor.position.elevation)
+                break
+
+    if pilot_position is None and actor.position is not None:
+        effects.append({
+            "type": "dismount",
+            "success": False,
+            "reason": "No free adjacent space for pilot",
+        })
+        return scenario, effects
+
+    # Update pilot and mech state
+    pilot_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == pilot.id), -1)
+    mech_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
+
+    if pilot_idx >= 0 and mech_idx >= 0:
+        updated_combatants = list(scenario.combatants)
+
+        # Pilot exits mech
+        updated_pilot = pilot.model_copy(update={
+            "piloting_mech_id": None,
+            "position": pilot_position,
+        })
+        updated_combatants[pilot_idx] = updated_pilot
+
+        # Mech no longer has pilot
+        updated_mech = actor.model_copy(update={
+            "mounted_pilot_id": None,
+        })
+        updated_combatants[mech_idx] = updated_mech
+
+        scenario = MechCombatScenario(
+            combatants=updated_combatants,
+            grapples=list(scenario.grapples),
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+        )
+
+    effects.append({
+        "type": "dismount",
+        "success": True,
+        "pilot_id": pilot.id,
+        "mech_id": actor.id,
+        "pilot_position": {
+            "q": pilot_position.coord.q,
+            "r": pilot_position.coord.r,
+            "elevation": pilot_position.elevation,
+        } if pilot_position else None,
+    })
+
+    return scenario, effects
+
+
+def _resolve_eject(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+    eject_direction: HexCoord | None,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Resolve Eject action - pilot emergency ejects from mech.
+
+    Per PR2 4318-4327:
+    - Eject is a Quick action
+    - Pilot flies 6 spaces in chosen direction
+    - One-way system: cannot eject again until full repair
+    - Pilot is PERMANENTLY impaired until full repair
+
+    Args:
+        scenario: Current combat scenario
+        actor: The mech being ejected from
+        eject_direction: Direction to eject (HexCoord representing direction)
+
+    Returns:
+        Tuple of (updated scenario, effects list)
+    """
+    effects: list[dict] = []
+
+    # Validate actor is a mech
+    if actor.kind != "mech":
+        effects.append({
+            "type": "eject",
+            "success": False,
+            "reason": "Eject can only be done from a mech",
+        })
+        return scenario, effects
+
+    # Check if eject was already used
+    if actor.eject_used:
+        effects.append({
+            "type": "eject",
+            "success": False,
+            "reason": "Eject system already used this combat",
+        })
+        return scenario, effects
+
+    # Check if there's a mounted pilot
+    if actor.mounted_pilot_id is None:
+        effects.append({
+            "type": "eject",
+            "success": False,
+            "reason": "No pilot mounted in this mech",
+        })
+        return scenario, effects
+
+    # Find the mounted pilot
+    pilot = next(
+        (c for c in scenario.combatants if c.id == actor.mounted_pilot_id),
+        None
+    )
+    if pilot is None:
+        effects.append({
+            "type": "eject",
+            "success": False,
+            "reason": f"Pilot {actor.mounted_pilot_id} not found",
+        })
+        return scenario, effects
+
+    # Calculate final position (6 spaces in direction)
+    pilot_position = None
+    if actor.position is not None:
+        if eject_direction is not None:
+            # Scale direction by 6 spaces
+            final_coord = hex_add(actor.position.coord, hex_scale(eject_direction, 6))
+            pilot_position = HexPosition(coord=final_coord, elevation=actor.position.elevation)
+        else:
+            # Default: adjacent to mech
+            for neighbor in actor.position.coord.neighbors():
+                occupied = any(
+                    c.position is not None and c.position.coord == neighbor
+                    for c in scenario.combatants if c.id != pilot.id
+                )
+                if not occupied:
+                    pilot_position = HexPosition(coord=neighbor, elevation=actor.position.elevation)
+                    break
+
+    # Update pilot and mech state
+    pilot_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == pilot.id), -1)
+    mech_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
+
+    if pilot_idx >= 0 and mech_idx >= 0:
+        updated_combatants = list(scenario.combatants)
+
+        # Pilot ejects with impaired status
+        pilot_statuses = list(pilot.statuses)
+        if "impaired" not in pilot_statuses:
+            pilot_statuses.append("impaired")
+
+        updated_pilot = pilot.model_copy(update={
+            "piloting_mech_id": None,
+            "position": pilot_position,
+            "statuses": pilot_statuses,
+        })
+        updated_combatants[pilot_idx] = updated_pilot
+
+        # Mech: pilot ejected, mark eject as used
+        updated_mech = actor.model_copy(update={
+            "mounted_pilot_id": None,
+            "eject_used": True,
+        })
+        updated_combatants[mech_idx] = updated_mech
+
+        scenario = MechCombatScenario(
+            combatants=updated_combatants,
+            grapples=list(scenario.grapples),
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+        )
+
+    effects.append({
+        "type": "eject",
+        "success": True,
+        "pilot_id": pilot.id,
+        "mech_id": actor.id,
+        "impaired_applied": True,
+        "eject_used_set": True,
+        "pilot_position": {
+            "q": pilot_position.coord.q,
+            "r": pilot_position.coord.r,
+            "elevation": pilot_position.elevation,
+        } if pilot_position else None,
+    })
+
+    return scenario, effects

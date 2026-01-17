@@ -219,6 +219,16 @@ class CombatantState(FrozenModel):
     turn_end_effects: dict[str, "TurnEndEffectState"] = Field(
         default_factory=dict, description="Effects expiring at turn boundaries"
     )
+    # Mount/Dismount/Eject state
+    piloting_mech_id: str | None = Field(
+        default=None, description="ID of mech this pilot is piloting (pilot only)"
+    )
+    mounted_pilot_id: str | None = Field(
+        default=None, description="ID of pilot mounted in this mech (mech only)"
+    )
+    eject_used: bool = Field(
+        default=False, description="Whether eject has been used this combat (mech only)"
+    )
 
     def in_danger_zone(
         self, danger_zone_fraction: float = 0.5, rounding: Literal["up", "down"] = "up"

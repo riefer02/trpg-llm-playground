@@ -1822,3 +1822,1399 @@ class TestOverheatCascade:
             c for c in updated_scenario.combatants if c.id == "target_1"
         )
         assert "impaired" in updated_target.statuses
+
+
+# =============================================================================
+# Tests for New Action Resolution (Phase 15)
+# =============================================================================
+
+
+class TestStabilizeAction:
+    """Tests for Stabilize action resolution (PR2 4275-4286)."""
+
+    def test_stabilize_cool_heat(self):
+        """Stabilize with cool_heat option should reset heat to 0 and end exposed."""
+        actor = make_combatant(
+            id="actor_1", heat_current=4, heat_cap=6, statuses=["exposed"]
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cool_heat",
+        )
+
+        updated_scenario, updated_turn, updated_economy, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.resources.heat_current == 0
+        assert "exposed" not in updated_actor.statuses
+
+        # Check effects
+        primary_effect = next(
+            e for e in result.effects_applied if e.get("type") == "stabilize_primary"
+        )
+        assert primary_effect["option"] == "cool_heat"
+        assert primary_effect["heat_cleared"] == 4
+        assert primary_effect["exposed_ended"] is True
+
+    def test_stabilize_spend_repair_full_hp(self):
+        """Stabilize with spend_repair_full_hp should restore HP and consume repair."""
+        actor = make_combatant(id="actor_1", hp_current=5, hp_max=10)
+        # Ensure repairs_remaining > 0
+        actor = actor.model_copy(
+            update={"resources": actor.resources.model_copy(update={"repairs_remaining": 3})}
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="spend_repair_full_hp",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.resources.hp_current == 10
+        assert updated_actor.resources.repairs_remaining == 2
+
+    def test_stabilize_clear_burn(self):
+        """Stabilize with clear_burn secondary should remove burn status."""
+        actor = make_combatant(id="actor_1", statuses=["burn"])
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cool_heat",
+            stabilize_secondary="clear_burn",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert "burn" not in updated_actor.statuses
+
+    def test_stabilize_clear_condition(self):
+        """Stabilize with clear_condition should remove one clearable condition."""
+        actor = make_combatant(id="actor_1", statuses=["impaired", "slowed"])
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cool_heat",
+            stabilize_secondary="clear_condition",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        # Either impaired or slowed should be cleared (first found)
+        assert "impaired" not in updated_actor.statuses or "slowed" not in updated_actor.statuses
+
+
+class TestDisengageAction:
+    """Tests for Disengage action resolution (PR2 4288-4291)."""
+
+    def test_disengage_adds_effect(self):
+        """Disengage should add effect indicating engagement ignored until end of turn."""
+        actor = make_combatant(id="actor_1", statuses=["engaged"])
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="disengage",
+            action_type="full",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        disengage_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "disengage"), None
+        )
+        assert disengage_effect is not None
+        assert disengage_effect["effect"] == "ignore_engagement_and_reactions"
+        assert disengage_effect["duration"] == "until_end_of_turn"
+
+
+class TestHideAction:
+    """Tests for Hide action resolution (PR2 4221-4237)."""
+
+    def test_hide_applies_hidden_status(self):
+        """Hide should apply hidden status when successful."""
+        actor = make_combatant(id="actor_1")
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="hide",
+            action_type="quick",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert "hidden" in updated_actor.statuses
+
+    def test_hide_fails_when_engaged(self):
+        """Hide should fail when actor is engaged."""
+        actor = make_combatant(id="actor_1", statuses=["engaged"])
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="hide",
+            action_type="quick",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success  # Action executed, but hide failed
+        hide_effect = next(e for e in result.effects_applied if e.get("type") == "hide")
+        assert hide_effect["success"] is False
+        assert "engaged" in hide_effect["reason"]
+
+    def test_invisible_mech_can_always_hide(self):
+        """Invisible mechs can always hide, even without cover."""
+        actor = make_combatant(id="actor_1", statuses=["invisible"])
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="hide",
+            action_type="quick",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert "hidden" in updated_actor.statuses
+
+
+class TestRamAction:
+    """Tests for Ram action resolution (PR2 4152-4155)."""
+
+    def test_ram_applies_prone_on_hit(self):
+        """Ram on hit should apply prone status to target."""
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1", grit=2,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0)
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0)
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="ram",
+            action_type="quick",
+            target_ids=["target_1"],
+        )
+
+        # Force a hit
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert "prone" in updated_target.statuses
+
+    def test_ram_miss_no_effect(self):
+        """Ram miss should not apply prone or knockback."""
+        from unittest.mock import patch
+
+        actor = make_combatant(id="actor_1", grit=0)
+        target = make_combatant(id="target_1")
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="ram",
+            action_type="quick",
+            target_ids=["target_1"],
+        )
+
+        # Force a miss
+        with patch("core.shared.rolls._roll_d20", return_value=2):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert "prone" not in updated_target.statuses
+
+    def test_ram_knockback_moves_target(self):
+        """Ram knockback should move target away from attacker."""
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1", grit=2,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0)
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0)
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="ram",
+            action_type="quick",
+            target_ids=["target_1"],
+            apply_knockback=True,
+        )
+
+        # Force a hit
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        # Target should have moved away from (0,0) to (2,0)
+        assert updated_target.position.coord.q == 2
+        assert updated_target.position.coord.r == 0
+
+
+class TestGrappleAction:
+    """Tests for Grapple action resolution (PR2 4157-4177)."""
+
+    def test_grapple_on_hit_engages_both(self):
+        """Grapple on hit should apply engaged status to both parties."""
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1", grit=2,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0)
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0)
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="grapple",
+            action_type="quick",
+            target_ids=["target_1"],
+        )
+
+        # Force a hit
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert "engaged" in updated_actor.statuses
+        assert "engaged" in updated_target.statuses
+
+    def test_grapple_adds_grapple_link(self):
+        """Grapple on hit should add a GrappleLink to scenario."""
+        from unittest.mock import patch
+
+        actor = make_combatant(id="actor_1", grit=2)
+        target = make_combatant(id="target_1")
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="grapple",
+            action_type="quick",
+            target_ids=["target_1"],
+        )
+
+        # Force a hit
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        assert len(updated_scenario.grapples) == 1
+        assert updated_scenario.grapples[0].grappler_id == "actor_1"
+        assert updated_scenario.grapples[0].target_id == "target_1"
+
+    def test_grapple_miss_no_effect(self):
+        """Grapple miss should not engage or create grapple link."""
+        from unittest.mock import patch
+
+        actor = make_combatant(id="actor_1", grit=0)
+        target = make_combatant(id="target_1")
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="grapple",
+            action_type="quick",
+            target_ids=["target_1"],
+        )
+
+        # Force a miss
+        with patch("core.shared.rolls._roll_d20", return_value=2):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert "engaged" not in updated_actor.statuses
+        assert "engaged" not in updated_target.statuses
+        assert len(updated_scenario.grapples) == 0
+
+
+class TestSearchAction:
+    """Tests for Search action resolution (PR2 4241-4249)."""
+
+    def test_search_reveals_hidden_target(self):
+        """Search should remove hidden status on success."""
+        from unittest.mock import patch
+
+        actor = make_combatant(id="actor_1", tech_attack=3)
+        target = make_combatant(id="target_1", statuses=["hidden"])
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="search",
+            action_type="quick",
+            target_ids=["target_1"],
+        )
+
+        # Force searcher to win contested check
+        with patch("core.shared.dice.roll_dice", side_effect=[15, 5]):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert "hidden" not in updated_target.statuses
+
+    def test_search_fails_against_higher_roll(self):
+        """Search should fail when target rolls higher."""
+        from unittest.mock import patch
+
+        actor = make_combatant(id="actor_1", tech_attack=0)
+        target = make_combatant(id="target_1", statuses=["hidden"])
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="search",
+            action_type="quick",
+            target_ids=["target_1"],
+        )
+
+        # Force target to win contested check
+        with patch("core.shared.dice.roll_dice", side_effect=[5, 15]):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert "hidden" in updated_target.statuses
+
+    def test_search_against_non_hidden_target(self):
+        """Search against non-hidden target should fail gracefully."""
+        actor = make_combatant(id="actor_1", tech_attack=3)
+        target = make_combatant(id="target_1")  # Not hidden
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="search",
+            action_type="quick",
+            target_ids=["target_1"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        search_effect = next(e for e in result.effects_applied if e.get("type") == "search")
+        assert search_effect["search_success"] is False
+        assert "not hidden" in search_effect["reason"]
+
+
+# =============================================================================
+# Status Effect Modifier Tests
+# =============================================================================
+
+
+class TestStatusEffectModifiers:
+    """Tests for status effect modifiers in attack resolution."""
+
+    def test_impaired_attacker_adds_difficulty(self):
+        """Impaired attacker should have +1 difficulty on attacks."""
+        actor = make_combatant(id="actor_1", grit=5, statuses=["impaired"])
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        # Check that status modifiers include the +1 difficulty from impaired
+        assert attack_effect["status_modifiers"]["attacker_diff"] == 1
+
+    def test_prone_target_gives_accuracy_bonus(self):
+        """Prone target should give +1 accuracy to attacker."""
+        actor = make_combatant(id="actor_1", grit=5)
+        target = make_combatant(
+            id="target_1",
+            statuses=["prone"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        # Prone gives +1 accuracy
+        assert attack_effect["status_modifiers"]["target_acc"] >= 1
+
+    def test_braced_target_reduces_accuracy(self):
+        """Braced target should give -1 accuracy to attacker."""
+        actor = make_combatant(id="actor_1", grit=5)
+        target = make_combatant(
+            id="target_1",
+            statuses=["braced"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        # Braced gives -1 accuracy
+        assert attack_effect["status_modifiers"]["target_acc"] <= -1
+
+    def test_lock_on_gives_accuracy_and_consumed_on_hit(self):
+        """Lock On should give +1 accuracy and be consumed on successful hit."""
+        from unittest.mock import patch
+
+        actor = make_combatant(id="actor_1", grit=5)
+        target = make_combatant(
+            id="target_1",
+            statuses=["lock_on"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        # Force a hit with high roll
+        with patch("core.shared.rolls._roll_d20", return_value=20):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        # Lock on gives +1 accuracy
+        assert attack_effect["status_modifiers"]["target_acc"] >= 1
+        assert attack_effect["hit"] is True
+
+        # Lock on should be consumed
+        lock_on_consumed = any(
+            e.get("type") == "lock_on_consumed"
+            for e in result.effects_applied
+        )
+        assert lock_on_consumed
+
+        # Target should no longer have lock_on status
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert "lock_on" not in updated_target.statuses
+
+    def test_lock_on_not_consumed_on_miss(self):
+        """Lock On should not be consumed if the attack misses."""
+        from unittest.mock import patch
+
+        actor = make_combatant(id="actor_1", grit=0)
+        target = make_combatant(
+            id="target_1",
+            statuses=["lock_on"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        # Force a miss with low roll
+        with patch("core.shared.rolls._roll_d20", return_value=1):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        assert attack_effect["hit"] is False
+
+        # Lock on should NOT be consumed on miss
+        lock_on_consumed = any(
+            e.get("type") == "lock_on_consumed"
+            for e in result.effects_applied
+        )
+        assert not lock_on_consumed
+
+        # Target should still have lock_on status
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert "lock_on" in updated_target.statuses
+
+    def test_engaged_target_ranged_attack_difficulty(self):
+        """Engaged target should add +1 difficulty to ranged attacks."""
+        actor = make_combatant(id="actor_1", grit=5)
+        target = make_combatant(
+            id="target_1",
+            statuses=["engaged"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        # Use a ranged weapon
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        # Engaged adds +1 difficulty for ranged attacks
+        assert attack_effect["status_modifiers"]["target_diff"] == 1
+
+    def test_engaged_target_melee_no_difficulty(self):
+        """Engaged target should NOT add difficulty to melee attacks."""
+        actor = make_combatant(id="actor_1", grit=5)
+        target = make_combatant(
+            id="target_1",
+            statuses=["engaged"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        # Use a melee weapon (charged_blade has Threat 1)
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="charged_blade",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        # Engaged does NOT add difficulty for melee attacks
+        assert attack_effect["status_modifiers"]["target_diff"] == 0
+
+    def test_invisible_target_fifty_percent_miss(self):
+        """Invisible target should have 50% miss chance after hit."""
+        from unittest.mock import patch
+
+        actor = make_combatant(id="actor_1", grit=5)
+        target = make_combatant(
+            id="target_1",
+            statuses=["invisible"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        # Force a hit on attack roll, but invisibility causes miss
+        with patch("core.shared.rolls._roll_d20", return_value=20):
+            with patch("core.mech.combat_execution.random.random", return_value=0.3):  # < 0.5 means miss
+                _, _, _, result = execute_action(
+                    scenario, turn, economy, action_input
+                )
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        # Attack would have hit but invisibility causes miss
+        assert attack_effect["hit"] is False
+
+        # Should have invisibility_miss effect
+        invis_miss = any(
+            e.get("type") == "invisibility_miss"
+            for e in result.effects_applied
+        )
+        assert invis_miss
+
+    def test_invisible_target_can_still_be_hit(self):
+        """Invisible target 50% miss chance means 50% still hit."""
+        from unittest.mock import patch
+
+        actor = make_combatant(id="actor_1", grit=5)
+        target = make_combatant(
+            id="target_1",
+            statuses=["invisible"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        # Force a hit on attack roll, and invisibility roll > 0.5 means no miss
+        with patch("core.shared.rolls._roll_d20", return_value=20):
+            with patch("core.mech.combat_execution.random.random", return_value=0.7):  # >= 0.5 means no miss
+                _, _, _, result = execute_action(
+                    scenario, turn, economy, action_input
+                )
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        # Attack should still hit
+        assert attack_effect["hit"] is True
+
+        # Should NOT have invisibility_miss effect
+        invis_miss = any(
+            e.get("type") == "invisibility_miss"
+            for e in result.effects_applied
+        )
+        assert not invis_miss
+
+
+# =============================================================================
+# Movement Position Update Tests
+# =============================================================================
+
+
+class TestMovementPositionUpdates:
+    """Tests for movement position updates with terrain costs."""
+
+    def test_move_action_updates_position(self):
+        """Move action should update actor's position to final path position."""
+        actor = make_combatant(
+            id="actor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        # Create movement path
+        movement_path = [
+            HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+        ]
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="move",
+            action_type="free",
+            movement_path=movement_path,
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        move_effect = next(e for e in result.effects_applied if e.get("type") == "movement")
+        assert move_effect["success"] is True
+        assert move_effect["spaces"] == 2
+
+        # Check actor position was updated
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.position.coord.q == 2
+        assert updated_actor.position.coord.r == 0
+
+    def test_move_with_difficult_terrain_costs_double(self):
+        """Movement through difficult terrain should cost 2 spaces per space moved."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+
+        # Create terrain with difficult terrain at (1,0)
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), difficult=True),
+        ])
+
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        # Movement path through difficult terrain
+        movement_path = [
+            HexPosition(coord=HexCoord(q=1, r=0), elevation=0),  # Difficult terrain
+            HexPosition(coord=HexCoord(q=2, r=0), elevation=0),  # Normal terrain
+        ]
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="move",
+            action_type="free",
+            movement_path=movement_path,
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        move_effect = next(e for e in result.effects_applied if e.get("type") == "movement")
+        assert move_effect["success"] is True
+        # Cost should be 3 (2 for difficult + 1 for normal)
+        assert move_effect["cost"] == 3
+
+    def test_move_exceeding_speed_fails(self):
+        """Movement exceeding speed should fail."""
+        actor = make_combatant(
+            id="actor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Default speed is 4 spaces
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        # Create a path of 6 spaces (exceeds speed of 4)
+        movement_path = [
+            HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=3, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=4, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=5, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=6, r=0), elevation=0),
+        ]
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="move",
+            action_type="free",
+            movement_path=movement_path,
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success  # Action itself succeeds
+        move_effect = next(e for e in result.effects_applied if e.get("type") == "movement")
+        assert move_effect["success"] is False
+        assert move_effect["reason"] == "exceeds_speed"
+
+        # Actor position should not have changed
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.position.coord.q == 0
+
+    def test_boost_doubles_speed(self):
+        """Boost action should allow movement up to 2x speed."""
+        actor = make_combatant(
+            id="actor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Default speed is 4, boost allows 8
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        # Create a path of 6 spaces (exceeds move speed of 4 but within boost)
+        movement_path = [
+            HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=3, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=4, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=5, r=0), elevation=0),
+            HexPosition(coord=HexCoord(q=6, r=0), elevation=0),
+        ]
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="boost",
+            action_type="quick",
+            movement_path=movement_path,
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        move_effect = next(e for e in result.effects_applied if e.get("type") == "movement")
+        assert move_effect["success"] is True
+
+        # Actor should be at final position
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.position.coord.q == 6
+
+    def test_dangerous_terrain_triggers_check(self):
+        """Moving through dangerous terrain should trigger engineering check."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1",
+            tech_attack=2,  # Engineering skill bonus
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+
+        # Create terrain with dangerous terrain at (1,0)
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), dangerous=True),
+        ])
+
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        movement_path = [
+            HexPosition(coord=HexCoord(q=1, r=0), elevation=0),  # Dangerous terrain
+        ]
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="move",
+            action_type="free",
+            movement_path=movement_path,
+        )
+
+        # Force a failed check (roll 5 + 2 skill = 7 < 10)
+        with patch("core.shared.terrain.roll_dice", return_value=5):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+
+        # Check for dangerous terrain effect
+        danger_effects = [e for e in result.effects_applied if e.get("type") == "dangerous_terrain"]
+        assert len(danger_effects) >= 1
+        assert danger_effects[0]["check_passed"] is False
+        assert danger_effects[0]["damage"] == 5
+
+        # Check for damage effect
+        damage_effects = [e for e in result.effects_applied if e.get("type") == "damage"]
+        assert len(damage_effects) >= 1
+        assert damage_effects[0]["source"] == "dangerous_terrain"
+
+
+# =============================================================================
+# Mount/Dismount/Eject Tests
+# =============================================================================
+
+
+class TestMountDismountEject:
+    """Tests for mount, dismount, and eject actions."""
+
+    def test_mount_action_succeeds_when_adjacent(self):
+        """Mount should succeed when pilot is adjacent to mech."""
+        pilot = CombatantState(
+            id="pilot_1",
+            name="Test Pilot",
+            side="players",
+            kind="pilot",
+            stats=CombatStats(
+                size="size_half",
+                hp_max=6,
+                evasion=10,
+                e_defense=10,
+                armor=0,
+                speed=4,
+                sensor_range=5,
+                tech_attack=0,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=6,
+                heat_current=0,
+                heat_cap=0,
+                structure_current=1,
+                stress_current=1,
+                repairs_remaining=0,
+            ),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        mech = make_combatant(
+            id="mech_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[pilot, mech])
+        turn = CombatTurn(actor_id="pilot_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="pilot_1",
+            action_id="mount",
+            action_type="full",
+            target_ids=["mech_1"],
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        mount_effect = next(e for e in result.effects_applied if e.get("type") == "mount")
+        assert mount_effect["success"] is True
+        assert mount_effect["pilot_id"] == "pilot_1"
+        assert mount_effect["mech_id"] == "mech_1"
+
+        # Check pilot is now piloting the mech
+        updated_pilot = next(c for c in updated_scenario.combatants if c.id == "pilot_1")
+        assert updated_pilot.piloting_mech_id == "mech_1"
+        assert updated_pilot.position is None  # Pilot no longer on battlefield
+
+        # Check mech has pilot mounted
+        updated_mech = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert updated_mech.mounted_pilot_id == "pilot_1"
+
+    def test_mount_action_fails_when_not_adjacent(self):
+        """Mount should fail when pilot is not adjacent to mech."""
+        pilot = CombatantState(
+            id="pilot_1",
+            name="Test Pilot",
+            side="players",
+            kind="pilot",
+            stats=CombatStats(
+                size="size_half",
+                hp_max=6,
+                evasion=10,
+                e_defense=10,
+                armor=0,
+                speed=4,
+                sensor_range=5,
+                tech_attack=0,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=6,
+                heat_current=0,
+                heat_cap=0,
+                structure_current=1,
+                stress_current=1,
+                repairs_remaining=0,
+            ),
+            position=HexPosition(coord=HexCoord(q=5, r=0), elevation=0),  # Too far
+        )
+        mech = make_combatant(
+            id="mech_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[pilot, mech])
+        turn = CombatTurn(actor_id="pilot_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="pilot_1",
+            action_id="mount",
+            action_type="full",
+            target_ids=["mech_1"],
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success  # Action succeeds but mount fails
+        mount_effect = next(e for e in result.effects_applied if e.get("type") == "mount")
+        assert mount_effect["success"] is False
+        assert "adjacent" in mount_effect["reason"]
+
+    def test_dismount_creates_pilot_combatant(self):
+        """Dismount should place pilot in adjacent space."""
+        pilot = CombatantState(
+            id="pilot_1",
+            name="Test Pilot",
+            side="players",
+            kind="pilot",
+            stats=CombatStats(
+                size="size_half",
+                hp_max=6,
+                evasion=10,
+                e_defense=10,
+                armor=0,
+                speed=4,
+                sensor_range=5,
+                tech_attack=0,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=6,
+                heat_current=0,
+                heat_cap=0,
+                structure_current=1,
+                stress_current=1,
+                repairs_remaining=0,
+            ),
+            position=None,  # Inside mech
+            piloting_mech_id="mech_1",
+        )
+        mech = make_combatant(
+            id="mech_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            mounted_pilot_id="pilot_1",
+        )
+        scenario = make_scenario(combatants=[pilot, mech])
+        turn = CombatTurn(actor_id="mech_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="dismount",
+            action_type="full",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        dismount_effect = next(e for e in result.effects_applied if e.get("type") == "dismount")
+        assert dismount_effect["success"] is True
+
+        # Check pilot is now on battlefield
+        updated_pilot = next(c for c in updated_scenario.combatants if c.id == "pilot_1")
+        assert updated_pilot.piloting_mech_id is None
+        assert updated_pilot.position is not None
+
+        # Check mech no longer has pilot
+        updated_mech = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert updated_mech.mounted_pilot_id is None
+
+    def test_eject_moves_pilot_six_spaces(self):
+        """Eject should move pilot 6 spaces in chosen direction."""
+        pilot = CombatantState(
+            id="pilot_1",
+            name="Test Pilot",
+            side="players",
+            kind="pilot",
+            stats=CombatStats(
+                size="size_half",
+                hp_max=6,
+                evasion=10,
+                e_defense=10,
+                armor=0,
+                speed=4,
+                sensor_range=5,
+                tech_attack=0,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=6,
+                heat_current=0,
+                heat_cap=0,
+                structure_current=1,
+                stress_current=1,
+                repairs_remaining=0,
+            ),
+            position=None,  # Inside mech
+            piloting_mech_id="mech_1",
+        )
+        mech = make_combatant(
+            id="mech_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            mounted_pilot_id="pilot_1",
+        )
+        scenario = make_scenario(combatants=[pilot, mech])
+        turn = CombatTurn(actor_id="mech_1", actions=[])
+        economy = ActionEconomyState()
+
+        # Eject in direction (1, 0) - should end at (6, 0)
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="eject",
+            action_type="quick",
+            eject_direction=HexCoord(q=1, r=0),
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        eject_effect = next(e for e in result.effects_applied if e.get("type") == "eject")
+        assert eject_effect["success"] is True
+        assert eject_effect["pilot_position"]["q"] == 6
+        assert eject_effect["pilot_position"]["r"] == 0
+
+        # Check pilot position
+        updated_pilot = next(c for c in updated_scenario.combatants if c.id == "pilot_1")
+        assert updated_pilot.position is not None
+        assert updated_pilot.position.coord.q == 6
+        assert updated_pilot.position.coord.r == 0
+
+    def test_eject_applies_impaired_status(self):
+        """Eject should apply permanent impaired status to pilot."""
+        pilot = CombatantState(
+            id="pilot_1",
+            name="Test Pilot",
+            side="players",
+            kind="pilot",
+            stats=CombatStats(
+                size="size_half",
+                hp_max=6,
+                evasion=10,
+                e_defense=10,
+                armor=0,
+                speed=4,
+                sensor_range=5,
+                tech_attack=0,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=6,
+                heat_current=0,
+                heat_cap=0,
+                structure_current=1,
+                stress_current=1,
+                repairs_remaining=0,
+            ),
+            position=None,
+            piloting_mech_id="mech_1",
+            statuses=[],
+        )
+        mech = make_combatant(
+            id="mech_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            mounted_pilot_id="pilot_1",
+        )
+        scenario = make_scenario(combatants=[pilot, mech])
+        turn = CombatTurn(actor_id="mech_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="eject",
+            action_type="quick",
+            eject_direction=HexCoord(q=1, r=0),
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        eject_effect = next(e for e in result.effects_applied if e.get("type") == "eject")
+        assert eject_effect["impaired_applied"] is True
+
+        # Check pilot has impaired status
+        updated_pilot = next(c for c in updated_scenario.combatants if c.id == "pilot_1")
+        assert "impaired" in updated_pilot.statuses
+
+    def test_eject_cannot_be_used_twice(self):
+        """Eject should fail if already used this combat."""
+        pilot = CombatantState(
+            id="pilot_1",
+            name="Test Pilot",
+            side="players",
+            kind="pilot",
+            stats=CombatStats(
+                size="size_half",
+                hp_max=6,
+                evasion=10,
+                e_defense=10,
+                armor=0,
+                speed=4,
+                sensor_range=5,
+                tech_attack=0,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=6,
+                heat_current=0,
+                heat_cap=0,
+                structure_current=1,
+                stress_current=1,
+                repairs_remaining=0,
+            ),
+            position=None,
+            piloting_mech_id="mech_1",
+        )
+        mech = make_combatant(
+            id="mech_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            mounted_pilot_id="pilot_1",
+            eject_used=True,  # Already used
+        )
+        scenario = make_scenario(combatants=[pilot, mech])
+        turn = CombatTurn(actor_id="mech_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="eject",
+            action_type="quick",
+            eject_direction=HexCoord(q=1, r=0),
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success  # Action succeeds but eject fails
+        eject_effect = next(e for e in result.effects_applied if e.get("type") == "eject")
+        assert eject_effect["success"] is False
+        assert "already used" in eject_effect["reason"]
