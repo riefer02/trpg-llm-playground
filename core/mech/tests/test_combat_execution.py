@@ -40,6 +40,7 @@ from core.mech.combat_state import (
 )
 from core.mech.grid import HexPosition, HexCoord
 from core.shared.effects import CooldownState
+from core.shared.full_tech import FullTechOptionSelection
 
 
 # =============================================================================
@@ -56,6 +57,7 @@ def make_combatant(
     heat_current: int = 0,
     heat_cap: int = 6,
     grit: int = 0,
+    tech_attack: int = 0,
     **kwargs,
 ) -> CombatantState:
     """Create a test combatant."""
@@ -72,6 +74,7 @@ def make_combatant(
             armor=0,
             speed=4,
             sensor_range=10,
+            tech_attack=tech_attack,
             grit=grit,
         ),
         resources=CombatResources(
@@ -538,6 +541,131 @@ class TestExecuteAction:
         # Should succeed (action executes) but no attack effects (target not found)
         assert result.success is True
         assert len(result.effects_applied) == 0
+
+    def test_execute_lock_on_applies_status(self):
+        """Lock On should apply the lock_on status to the target."""
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(id="defender", name="Defender", side="hostiles")
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="lock_on",
+            action_type="quick",
+            target_ids=["defender"],
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert result.effects_applied[0]["type"] == "lock_on"
+        assert "defender" in result.statuses_applied
+        assert "lock_on" in result.statuses_applied["defender"]
+
+        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+        assert "lock_on" in defender_after.statuses
+
+    def test_execute_invade_hits_and_applies_heat(self):
+        """Invade should apply heat and conditions on a hit."""
+        attacker = make_combatant(id="attacker", name="Attacker", side="players", tech_attack=10)
+        defender = make_combatant(id="defender", name="Defender", side="hostiles", heat_cap=20)
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="invade",
+            action_type="quick",
+            target_ids=["defender"],
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert result.effects_applied[0]["type"] == "invade"
+        assert result.effects_applied[0]["hit"] is True
+        assert result.heat_generated == 2
+
+        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+        assert defender_after.resources.heat_current == 2
+        assert "impaired" in defender_after.statuses
+        assert "slowed" in defender_after.statuses
+
+    def test_execute_invade_miss_no_heat(self):
+        """Invade should not apply heat on a miss."""
+        attacker = make_combatant(id="attacker", name="Attacker", side="players", tech_attack=0)
+        defender = make_combatant(id="defender", name="Defender", side="hostiles", heat_cap=20)
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="invade",
+            action_type="quick",
+            target_ids=["defender"],
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert result.effects_applied[0]["type"] == "invade"
+        assert result.effects_applied[0]["hit"] is False
+        assert result.heat_generated == 0
+
+        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+        assert defender_after.resources.heat_current == 0
+
+    def test_execute_full_tech_scan_lock_on(self):
+        """Full Tech should apply two tech options in sequence."""
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        defender = make_combatant(id="defender", name="Defender", side="hostiles")
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="full_tech",
+            action_type="full",
+            full_tech_first=FullTechOptionSelection(option="scan", target_id="defender"),
+            full_tech_second=FullTechOptionSelection(option="lock_on", target_id="defender"),
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert {effect["type"] for effect in result.effects_applied} >= {"scan", "lock_on"}
+
+        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+        assert "lock_on" in defender_after.statuses
+
+    def test_execute_full_tech_invade_applies_heat(self):
+        """Full Tech invade should apply heat on a hit."""
+        attacker = make_combatant(id="attacker", name="Attacker", side="players", tech_attack=10)
+        defender = make_combatant(id="defender", name="Defender", side="hostiles", heat_cap=20)
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="full_tech",
+            action_type="full",
+            full_tech_first=FullTechOptionSelection(option="invade", target_id="defender"),
+            full_tech_second=FullTechOptionSelection(option="scan", target_id="defender"),
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert result.heat_generated == 2
+
+        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+        assert defender_after.resources.heat_current == 2
 
 
 # =============================================================================

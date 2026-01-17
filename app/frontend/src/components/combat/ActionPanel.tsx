@@ -6,11 +6,16 @@ import type {
   AvailableActionItem,
   AvailableActionsResponse,
 } from "../../lib/api/combat";
-import type { HexCoord, MechInventory } from "../../lib/types/lancer";
+import type { FullTechOptionSelection, HexCoord, MechInventory } from "../../lib/types/lancer";
 import { calculatePathDistance, hexEquals, isAdjacent } from "../../lib/combat-render/hex";
 import { Button } from "../ui";
 import { SystemPicker } from "./SystemPicker";
 import { WeaponPicker } from "./WeaponPicker";
+
+type FullTechOption = FullTechOptionSelection["option"];
+type FullTechStep = 1 | 2;
+
+const FULL_TECH_OPTIONS: FullTechOption[] = ["scan", "bolster", "lock_on", "invade"];
 
 export type ActionPanelState =
   | "idle"
@@ -18,8 +23,18 @@ export type ActionPanelState =
   | "selecting_weapon"
   | "selecting_system"
   | "selecting_path"
+  | "selecting_full_tech_option"
+  | "selecting_full_tech_target"
+  | "confirming_full_tech"
   | "confirming"
   | "executing";
+
+interface FullTechSelectionState {
+  firstOption?: FullTechOption;
+  firstTargetId?: string;
+  secondOption?: FullTechOption;
+  secondTargetId?: string;
+}
 
 export interface TargetMode {
   actionId: string;
@@ -64,6 +79,8 @@ export function ActionPanel({
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
   const [movementPath, setMovementPath] = useState<HexCoord[]>([]);
   const [lastProcessedClick, setLastProcessedClick] = useState<HexCoord | null>(null);
+  const [fullTechStep, setFullTechStep] = useState<FullTechStep>(1);
+  const [fullTechSelections, setFullTechSelections] = useState<FullTechSelectionState>({});
 
   // Handle incoming hex clicks from the canvas when in path mode
   useEffect(() => {
@@ -113,6 +130,13 @@ export function ActionPanel({
     );
   }
 
+  const techOptions = FULL_TECH_OPTIONS.map((option) => ({
+    id: option,
+    name:
+      availableActions.quick_actions.find((action) => action.action_id === option)?.action_name ??
+      formatTechOption(option),
+  }));
+
   const handleActionClick = (action: AvailableActionItem) => {
     if (!action.is_available) return;
 
@@ -120,7 +144,16 @@ export function ActionPanel({
     setSelectedWeaponId(null);
     setSelectedSystemId(null);
     setMovementPath([]);
+    setFullTechStep(1);
+    setFullTechSelections({});
     onActionSelect(action);
+
+    if (action.action_id === "full_tech") {
+      setPanelState("selecting_full_tech_option");
+      onTargetModeChange(null);
+      onPathModeChange(false, []);
+      return;
+    }
 
     // Determine initial state based on requirements
     if (action.requires_weapon) {
@@ -192,6 +225,65 @@ export function ActionPanel({
     }
   };
 
+  const handleFullTechOptionSelect = (option: FullTechOption) => {
+    if (fullTechStep === 1) {
+      setFullTechSelections((prev) => ({ ...prev, firstOption: option }));
+    } else {
+      setFullTechSelections((prev) => ({ ...prev, secondOption: option }));
+    }
+
+    setPanelState("selecting_full_tech_target");
+    onTargetModeChange({
+      actionId: option,
+      actionType: "full",
+      requiresTarget: true,
+      requiresWeapon: false,
+    });
+    onPathModeChange(false, []);
+  };
+
+  const handleFullTechTargetConfirm = () => {
+    const targetId = selectedTargetIds[0];
+    if (!targetId) return;
+
+    if (fullTechStep === 1) {
+      setFullTechSelections((prev) => ({ ...prev, firstTargetId: targetId }));
+      setFullTechStep(2);
+      setPanelState("selecting_full_tech_option");
+      onTargetModeChange(null);
+    } else {
+      setFullTechSelections((prev) => ({ ...prev, secondTargetId: targetId }));
+      setPanelState("confirming_full_tech");
+      onTargetModeChange(null);
+    }
+  };
+
+  const handleConfirmFullTech = () => {
+    if (!selectedAction || selectedAction.action_id !== "full_tech") return;
+    if (
+      !fullTechSelections.firstOption ||
+      !fullTechSelections.firstTargetId ||
+      !fullTechSelections.secondOption ||
+      !fullTechSelections.secondTargetId
+    ) {
+      return;
+    }
+
+    setPanelState("executing");
+    onExecuteAction({
+      action_id: selectedAction.action_id,
+      action_type: selectedAction.action_type as ActionRequest["action_type"],
+      full_tech_first: {
+        option: fullTechSelections.firstOption,
+        target_id: fullTechSelections.firstTargetId,
+      },
+      full_tech_second: {
+        option: fullTechSelections.secondOption,
+        target_id: fullTechSelections.secondTargetId,
+      },
+    });
+  };
+
   const handleConfirmAction = () => {
     if (!selectedAction) return;
 
@@ -210,6 +302,8 @@ export function ActionPanel({
     setSelectedWeaponId(null);
     setSelectedSystemId(null);
     setMovementPath([]);
+    setFullTechStep(1);
+    setFullTechSelections({});
     setPanelState("idle");
     onTargetModeChange(null);
     onPathModeChange(false, []);
@@ -221,6 +315,8 @@ export function ActionPanel({
     setSelectedWeaponId(null);
     setSelectedSystemId(null);
     setMovementPath([]);
+    setFullTechStep(1);
+    setFullTechSelections({});
     setPanelState("idle");
     onTargetModeChange(null);
     onPathModeChange(false, []);
@@ -291,6 +387,127 @@ export function ActionPanel({
           onCancel={handleCancelAction}
           isOpen={true}
         />
+      </div>
+    );
+  }
+
+  if (panelState === "selecting_full_tech_option") {
+    return (
+      <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+        <div className="text-sm font-medium text-foreground">
+          Full Tech - Choose {fullTechStep === 1 ? "First" : "Second"} Option
+        </div>
+
+        {fullTechStep === 2 && fullTechSelections.firstOption && fullTechSelections.firstTargetId && (
+          <div className="text-xs text-muted-foreground">
+            First: {formatTechOption(fullTechSelections.firstOption)} → {fullTechSelections.firstTargetId}
+          </div>
+        )}
+
+        <div className="grid gap-2">
+          {techOptions.map((option) => (
+            <Button
+              key={option.id}
+              variant="outline"
+              size="sm"
+              onClick={() => handleFullTechOptionSelect(option.id)}
+            >
+              {option.name}
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={handleCancelAction}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (panelState === "selecting_full_tech_target") {
+    const currentOption =
+      fullTechStep === 1 ? fullTechSelections.firstOption : fullTechSelections.secondOption;
+
+    return (
+      <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+        <div className="text-sm font-medium text-foreground">
+          Select Target for {currentOption ? formatTechOption(currentOption) : "Tech Option"}
+        </div>
+
+        <div className="text-xs text-muted-foreground">
+          Click a combatant on the canvas to select target
+        </div>
+
+        {selectedTargetIds.length > 0 && (
+          <div className="text-xs text-primary">
+            Target: {selectedTargetIds[0]}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleFullTechTargetConfirm}
+            disabled={isExecuting || selectedTargetIds.length === 0}
+          >
+            Confirm Target
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setPanelState("selecting_full_tech_option");
+              onTargetModeChange(null);
+            }}
+          >
+            Back
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleCancelAction}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (panelState === "confirming_full_tech") {
+    const isReady =
+      fullTechSelections.firstOption &&
+      fullTechSelections.firstTargetId &&
+      fullTechSelections.secondOption &&
+      fullTechSelections.secondTargetId;
+
+    return (
+      <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+        <div className="text-sm font-medium text-foreground">
+          Confirm Full Tech
+        </div>
+
+        <div className="text-xs text-muted-foreground">
+          First: {fullTechSelections.firstOption ? formatTechOption(fullTechSelections.firstOption) : "--"} →{" "}
+          {fullTechSelections.firstTargetId ?? "--"}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Second: {fullTechSelections.secondOption ? formatTechOption(fullTechSelections.secondOption) : "--"} →{" "}
+          {fullTechSelections.secondTargetId ?? "--"}
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleConfirmFullTech}
+            disabled={isExecuting || !isReady}
+          >
+            {isExecuting ? "Executing..." : "Execute"}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleCancelAction} disabled={isExecuting}>
+            Cancel
+          </Button>
+        </div>
       </div>
     );
   }
@@ -547,6 +764,13 @@ function ActionItem({ action, disabled, onClick }: ActionItemProps) {
       )}
     </button>
   );
+}
+
+function formatTechOption(optionId: string): string {
+  return optionId
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 /**

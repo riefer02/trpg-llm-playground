@@ -29975,6 +29975,9 @@ export type WeaponId4 = string | null;
  * System being activated
  */
 export type SystemId2 = string | null;
+export type Option = "scan" | "bolster" | "lock_on" | "invade";
+export type TargetId9 = string;
+export type ScanOptions1 = ("stats" | "hidden_info" | "public_info")[] | null;
 /**
  * Movement path for move actions
  */
@@ -35886,9 +35889,26 @@ export interface ActionExecutionInput {
   target_position?: HexPosition | null;
   weapon_id?: WeaponId4;
   system_id?: SystemId2;
+  /**
+   * First Full Tech option selection
+   */
+  full_tech_first?: FullTechOptionSelection | null;
+  /**
+   * Second Full Tech option selection
+   */
+  full_tech_second?: FullTechOptionSelection | null;
   movement_path?: MovementPath1;
   is_overcharge?: IsOvercharge;
   granted_by_overcharge?: GrantedByOvercharge1;
+  [k: string]: unknown;
+}
+/**
+ * Minimal selection for a Full Tech option (option + target).
+ */
+export interface FullTechOptionSelection {
+  option: Option;
+  target_id: TargetId9;
+  scan_options?: ScanOptions1;
   [k: string]: unknown;
 }
 /**

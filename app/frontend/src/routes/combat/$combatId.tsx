@@ -224,8 +224,8 @@ function CombatSessionPage() {
   // Handle target mode changes from ActionPanel
   const handleTargetModeChange = useCallback((mode: TargetMode | null) => {
     setTargetMode(mode);
+    setSelectedTargetIds([]);
     if (!mode) {
-      setSelectedTargetIds([]);
       setMaxTargets(1);
     }
   }, []);

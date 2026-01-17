@@ -19,6 +19,7 @@ from core.shared.enums import StatusType
 from core.shared.id_helpers import CombatantIdField
 
 from core.mech.tech_actions import (
+    ScanInfoType,
     ScanResult,
     BolsterResult,
     LockOnResult,
@@ -33,6 +34,14 @@ from core.mech.combat_resolution import ResolutionSettings
 
 
 FullTechOption = Literal["scan", "bolster", "lock_on", "invade"]
+
+
+class FullTechOptionSelection(FrozenModel):
+    """Minimal selection for a Full Tech option (option + target)."""
+
+    option: FullTechOption
+    target_id: CombatantIdField
+    scan_options: list[ScanInfoType] | None = None
 
 
 class ScanTechParams(FrozenModel):

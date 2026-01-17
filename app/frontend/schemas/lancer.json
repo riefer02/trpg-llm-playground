@@ -50592,6 +50592,51 @@
       "title": "ResolutionSettings",
       "type": "object"
     },
+    "FullTechOptionSelection": {
+      "description": "Minimal selection for a Full Tech option (option + target).",
+      "properties": {
+        "option": {
+          "enum": [
+            "scan",
+            "bolster",
+            "lock_on",
+            "invade"
+          ],
+          "title": "Option",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "scan_options": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "stats",
+                  "hidden_info",
+                  "public_info"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scan Options"
+        }
+      },
+      "required": [
+        "option",
+        "target_id"
+      ],
+      "title": "FullTechOptionSelection",
+      "type": "object"
+    },
     "ActionExecutionInput": {
       "description": "Input for executing a combat action.",
       "properties": {
@@ -50663,6 +50708,30 @@
           "default": null,
           "description": "System being activated",
           "title": "System Id"
+        },
+        "full_tech_first": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FullTechOptionSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "First Full Tech option selection"
+        },
+        "full_tech_second": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FullTechOptionSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Second Full Tech option selection"
         },
         "movement_path": {
           "description": "Movement path for move actions",

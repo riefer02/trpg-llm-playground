@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./client";
-import type { MechCombatScenario } from "../types/lancer";
+import type { FullTechOptionSelection, MechCombatScenario } from "../types/lancer";
 
 // =============================================================================
 // Request/Response Types for Combat Execution
@@ -24,6 +24,8 @@ export interface ActionRequest {
   target_position?: { coord: { q: number; r: number } };
   weapon_id?: string;
   system_id?: string;
+  full_tech_first?: FullTechOptionSelection;
+  full_tech_second?: FullTechOptionSelection;
   movement_path?: { coord: { q: number; r: number } }[];
   is_overcharge?: boolean;
 }

@@ -47,7 +47,29 @@ from core.mech.combat_resolution import (
 )
 from core.mech.grid import HexPosition
 from core.mech.compendium import get_weapon_definition
+from core.mech.tech_actions import (
+    ScanResult,
+    BolsterResult,
+    LockOnResult,
+    InvadeResult,
+    resolve_scan,
+    resolve_bolster,
+    resolve_lock_on,
+    resolve_invade,
+)
+from core.shared.full_tech import (
+    FullTechOptionSelection,
+    FullTechInput,
+    FullTechFirstOption,
+    FullTechSecondOption,
+    ScanTechParams,
+    BolsterTechParams,
+    LockOnTechParams,
+    InvadeTechParams,
+    resolve_full_tech,
+)
 from core.shared.dice import roll_dice
+from core.shared.state_helpers import add_statuses
 
 
 # =============================================================================
@@ -65,6 +87,12 @@ class ActionExecutionInput(FrozenModel):
     target_position: HexPosition | None = Field(default=None, description="Target position for area/movement")
     weapon_id: str | None = Field(default=None, description="Weapon being used")
     system_id: str | None = Field(default=None, description="System being activated")
+    full_tech_first: FullTechOptionSelection | None = Field(
+        default=None, description="First Full Tech option selection"
+    )
+    full_tech_second: FullTechOptionSelection | None = Field(
+        default=None, description="Second Full Tech option selection"
+    )
     movement_path: list[HexPosition] = Field(default_factory=list, description="Movement path for move actions")
     is_overcharge: bool = Field(default=False, description="Whether this action uses overcharge")
     granted_by_overcharge: bool = Field(default=False, description="Whether this action was granted by overcharge")
@@ -466,6 +494,127 @@ def lookup_weapon_damage_and_ap(weapon_id: str | None) -> tuple[int, int]:
     return total_damage, armor_piercing
 
 
+def _build_full_tech_option(
+    selection: FullTechOptionSelection,
+    actor: CombatantState,
+    target: CombatantState,
+    option_cls: type[FullTechFirstOption] | type[FullTechSecondOption],
+) -> FullTechFirstOption | FullTechSecondOption:
+    """Build a Full Tech option payload using actor/target stats."""
+    attacker_systems = actor.stats.tech_attack if actor.stats else 0
+    target_e_defense = target.stats.e_defense if target.stats else 10
+
+    if selection.option == "scan":
+        if selection.scan_options is None:
+            scan_params = ScanTechParams(target_id=selection.target_id)
+        else:
+            scan_params = ScanTechParams(
+                target_id=selection.target_id,
+                scan_options=selection.scan_options,
+            )
+        return option_cls(option="scan", scan_params=scan_params)
+    if selection.option == "bolster":
+        bolster_params = BolsterTechParams(
+            target_id=selection.target_id,
+            attacker_systems=attacker_systems,
+        )
+        return option_cls(option="bolster", bolster_params=bolster_params)
+    if selection.option == "lock_on":
+        lock_on_params = LockOnTechParams(target_id=selection.target_id)
+        return option_cls(option="lock_on", lock_on_params=lock_on_params)
+    if selection.option == "invade":
+        invade_params = InvadeTechParams(
+            target_id=selection.target_id,
+            attacker_systems=attacker_systems,
+            target_e_defense=target_e_defense,
+        )
+        return option_cls(option="invade", invade_params=invade_params)
+
+    return option_cls(option=selection.option)
+
+
+def _apply_tech_result(
+    scenario: MechCombatScenario,
+    result: ScanResult | BolsterResult | LockOnResult | InvadeResult,
+    effects_applied: list[dict],
+    resource_changes: list[ResourceChange],
+    statuses_applied: dict[str, list[StatusType]],
+    overheat_checks: list[dict],
+) -> tuple[MechCombatScenario, int]:
+    """Apply a tech action result to the scenario and collect effects."""
+    heat_generated = 0
+
+    if isinstance(result, ScanResult):
+        effects_applied.append({
+            "type": "scan",
+            "target_id": result.target_id,
+            "revealed": result.revealed_info,
+        })
+        return scenario, heat_generated
+
+    if isinstance(result, BolsterResult):
+        effects_applied.append({
+            "type": "bolster",
+            "target_id": result.target_id,
+            "rolls": result.systems_roll.rolls if result.systems_roll else [],
+            "total": result.check_total,
+            "accuracy_bonus": result.accuracy_bonus,
+            "duration": result.duration,
+        })
+        return scenario, heat_generated
+
+    if isinstance(result, LockOnResult):
+        scenario, added_statuses = _apply_statuses_to_target(
+            scenario, result.target_id, [result.status_granted]
+        )
+        _record_statuses_applied(statuses_applied, result.target_id, added_statuses)
+        effects_applied.append({
+            "type": "lock_on",
+            "target_id": result.target_id,
+            "status": result.status_granted,
+            "accuracy_bonus": result.accuracy_bonus,
+            "duration": result.duration,
+        })
+        return scenario, heat_generated
+
+    if isinstance(result, InvadeResult):
+        effects_applied.append({
+            "type": "invade",
+            "target_id": result.target_id,
+            "rolls": result.systems_roll.rolls if result.systems_roll else [],
+            "total": result.check_total,
+            "target_e_defense": result.target_e_defense,
+            "hit": result.hit,
+        })
+
+        if result.hit and result.heat_applied:
+            scenario, change, overheat_result = apply_heat(
+                scenario, result.target_id, result.heat_applied
+            )
+            resource_changes.append(change)
+            heat_generated += result.heat_applied
+
+            if overheat_result:
+                overheat_checks.append({
+                    "type": "overheat_check",
+                    "target_id": result.target_id,
+                    "outcome": overheat_result.outcome,
+                    "statuses": [str(s) for s in overheat_result.statuses_to_apply],
+                    "dice_rolls": overheat_result.dice_rolls,
+                    "lowest_roll": overheat_result.lowest_roll,
+                    "meltdown_state": overheat_result.meltdown_state is not None,
+                })
+
+            scenario, added_statuses = _apply_statuses_to_target(
+                scenario, result.target_id, result.conditions_applied
+            )
+            _record_statuses_applied(statuses_applied, result.target_id, added_statuses)
+
+        return scenario, heat_generated
+
+    return scenario, heat_generated
+
+
 def execute_action(
     scenario: MechCombatScenario,
     current_turn: CombatTurn,
@@ -515,6 +664,52 @@ def execute_action(
             error=f"Actor {action_input.actor_id} not found",
         )
 
+    full_tech_result = None
+    full_tech_targets: list[str] = []
+    if action_input.action_id == "full_tech":
+        if not action_input.full_tech_first or not action_input.full_tech_second:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Full Tech requires two tech options",
+            )
+
+        first_target = next(
+            (c for c in scenario.combatants if c.id == action_input.full_tech_first.target_id),
+            None,
+        )
+        if first_target is None:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error=f"Full Tech target {action_input.full_tech_first.target_id} not found",
+            )
+
+        second_target = next(
+            (c for c in scenario.combatants if c.id == action_input.full_tech_second.target_id),
+            None,
+        )
+        if second_target is None:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error=f"Full Tech target {action_input.full_tech_second.target_id} not found",
+            )
+
+        full_tech_targets = [first_target.id, second_target.id]
+        full_tech_input = FullTechInput(
+            actor_id=actor.id,
+            first_option=_build_full_tech_option(
+                action_input.full_tech_first, actor, first_target, FullTechFirstOption
+            ),
+            second_option=_build_full_tech_option(
+                action_input.full_tech_second, actor, second_target, FullTechSecondOption
+            ),
+        )
+        full_tech_result = resolve_full_tech(full_tech_input)
+        if not full_tech_result.is_valid:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Full Tech options invalid: " + "; ".join(full_tech_result.validation_errors),
+            )
+
     # Update economy based on action type
     updated_economy = economy
     if action_input.action_type == "full":
@@ -525,10 +720,14 @@ def execute_action(
         updated_economy = mark_overcharge_used(economy)
 
     # Create action record
+    action_target_ids = action_input.target_ids
+    if action_input.action_id == "full_tech" and full_tech_targets:
+        action_target_ids = full_tech_targets
+
     action_use = ActionUse(
         action_id=action_input.action_id,
         action_type=action_input.action_type,
-        target_ids=action_input.target_ids,
+        target_ids=action_target_ids,
         target_position=action_input.target_position,
         granted_by_overcharge=action_input.granted_by_overcharge,
     )
@@ -607,6 +806,75 @@ def execute_action(
                         "dice_rolls": structure_result.dice_rolls,
                         "lowest_roll": structure_result.lowest_roll,
                     })
+
+    # Handle tech actions (scan, bolster, lock on, invade)
+    if action_input.action_id in ("scan", "bolster", "lock_on", "invade") and action_input.target_ids:
+        target_id = action_input.target_ids[0]
+        target = next((c for c in scenario.combatants if c.id == target_id), None)
+
+        if target is not None:
+            tech_result: ScanResult | BolsterResult | LockOnResult | InvadeResult | None = None
+            if action_input.action_id == "scan":
+                tech_result = resolve_scan(
+                    actor_id=actor.id,
+                    target_id=target_id,
+                    scan_options=["stats", "hidden_info", "public_info"],
+                )
+            elif action_input.action_id == "bolster":
+                tech_result = resolve_bolster(
+                    actor_id=actor.id,
+                    target_id=target_id,
+                    attacker_systems=actor.stats.tech_attack if actor.stats else 0,
+                    settings=None,
+                )
+            elif action_input.action_id == "lock_on":
+                tech_result = resolve_lock_on(
+                    actor_id=actor.id,
+                    target_id=target_id,
+                    accuracy_bonus=1,
+                )
+            elif action_input.action_id == "invade":
+                tech_result = resolve_invade(
+                    actor_id=actor.id,
+                    target_id=target_id,
+                    attacker_systems=actor.stats.tech_attack if actor.stats else 0,
+                    target_e_defense=target.stats.e_defense if target.stats else 10,
+                    settings=None,
+                )
+
+            if tech_result is not None:
+                scenario, added_heat = _apply_tech_result(
+                    scenario,
+                    tech_result,
+                    effects_applied,
+                    resource_changes,
+                    statuses_applied,
+                    overheat_checks,
+                )
+                heat_generated += added_heat
+
+    # Handle Full Tech (two tech options in sequence)
+    if action_input.action_id == "full_tech" and full_tech_result is not None:
+        if full_tech_result.first_result is not None:
+            scenario, added_heat = _apply_tech_result(
+                scenario,
+                full_tech_result.first_result,
+                effects_applied,
+                resource_changes,
+                statuses_applied,
+                overheat_checks,
+            )
+            heat_generated += added_heat
+        if full_tech_result.second_result is not None:
+            scenario, added_heat = _apply_tech_result(
+                scenario,
+                full_tech_result.second_result,
+                effects_applied,
+                resource_changes,
+                statuses_applied,
+                overheat_checks,
+            )
+            heat_generated += added_heat
 
     # Handle overcharge heat
     if action_input.is_overcharge and actor.overcharge_state is not None:
@@ -838,7 +1106,6 @@ def get_available_actions(
                 action_name="Full Tech",
                 action_type="full",
                 is_available=True,
-                requires_target=True,
             ),
             AvailableAction(
                 action_id="improvised_attack",
@@ -908,8 +1175,29 @@ def get_available_actions(
                 requires_target=True,
             ),
             AvailableAction(
-                action_id="quick_tech",
-                action_name="Quick Tech",
+                action_id="scan",
+                action_name="Scan",
+                action_type="quick",
+                is_available=True,
+                requires_target=True,
+            ),
+            AvailableAction(
+                action_id="bolster",
+                action_name="Bolster",
+                action_type="quick",
+                is_available=True,
+                requires_target=True,
+            ),
+            AvailableAction(
+                action_id="lock_on",
+                action_name="Lock On",
+                action_type="quick",
+                is_available=True,
+                requires_target=True,
+            ),
+            AvailableAction(
+                action_id="invade",
+                action_name="Invade",
                 action_type="quick",
                 is_available=True,
                 requires_target=True,
@@ -1337,6 +1625,61 @@ def clear_heat(
 # =============================================================================
 
 
+def _record_statuses_applied(
+    statuses_applied: dict[str, list[StatusType]],
+    target_id: str,
+    statuses: list[StatusType],
+) -> None:
+    """Record applied statuses for response output."""
+    if not statuses:
+        return
+    existing = statuses_applied.setdefault(target_id, [])
+    for status in statuses:
+        if status not in existing:
+            existing.append(status)
+
+
+def _apply_statuses_to_target(
+    scenario: MechCombatScenario,
+    target_id: str,
+    statuses: list[StatusType],
+) -> tuple[MechCombatScenario, list[StatusType]]:
+    """Apply statuses to a target combatant and return added statuses."""
+    if not statuses:
+        return scenario, []
+
+    target: CombatantState | None = None
+    target_idx: int = -1
+    for i, c in enumerate(scenario.combatants):
+        if c.id == target_id:
+            target = c
+            target_idx = i
+            break
+
+    if target is None:
+        return scenario, []
+
+    existing = set(target.statuses)
+    new_statuses = [status for status in statuses if status not in existing]
+    if not new_statuses:
+        return scenario, []
+
+    updated_target = add_statuses(target, new_statuses)
+    updated_combatants = list(scenario.combatants)
+    updated_combatants[target_idx] = updated_target
+
+    updated_scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+    return updated_scenario, new_statuses
+
+
 def _get_basic_available_actions(actor: CombatantState) -> list[str]:
     """Get basic list of available action IDs for an actor.
 
@@ -1355,7 +1698,10 @@ def _get_basic_available_actions(actor: CombatantState) -> list[str]:
         "boost",
         "ram",
         "grapple",
-        "quick_tech",
+        "scan",
+        "bolster",
+        "lock_on",
+        "invade",
         "hide",
         "search",
         "activate",

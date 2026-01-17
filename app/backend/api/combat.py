@@ -42,6 +42,7 @@ from core.mech.combat_execution import (
     ActionExecutionInput,
     ReactionInput,
 )
+from core.shared.full_tech import FullTechOptionSelection
 from core.shared.enums import ActionType
 
 router = APIRouter(prefix="/combat", tags=["combat"])
@@ -553,6 +554,12 @@ class ActionRequest(BaseModel):
     target_position: dict[str, Any] | None = Field(default=None, description="Target position")
     weapon_id: str | None = Field(default=None, description="Weapon to use")
     system_id: str | None = Field(default=None, description="System to activate")
+    full_tech_first: FullTechOptionSelection | None = Field(
+        default=None, description="First Full Tech option"
+    )
+    full_tech_second: FullTechOptionSelection | None = Field(
+        default=None, description="Second Full Tech option"
+    )
     movement_path: list[dict[str, Any]] = Field(default_factory=list, description="Movement path")
     is_overcharge: bool = Field(default=False, description="Whether this uses overcharge")
 
@@ -831,15 +838,24 @@ async def execute_combat_action(
         except Exception:
             pass
 
+    action_target_ids = body.target_ids
+    if body.action_id == "full_tech" and body.full_tech_first and body.full_tech_second:
+        action_target_ids = [
+            body.full_tech_first.target_id,
+            body.full_tech_second.target_id,
+        ]
+
     # Build action input
     action_input = ActionExecutionInput(
         actor_id=current_actor.id,
         action_id=body.action_id,
         action_type=body.action_type,
-        target_ids=body.target_ids,
+        target_ids=action_target_ids,
         target_position=target_position,
         weapon_id=body.weapon_id,
         system_id=body.system_id,
+        full_tech_first=body.full_tech_first,
+        full_tech_second=body.full_tech_second,
         movement_path=movement_path,
         is_overcharge=body.is_overcharge,
     )

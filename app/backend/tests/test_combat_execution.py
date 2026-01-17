@@ -9,7 +9,13 @@ Tests the turn management lifecycle:
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from app.backend.db.models import CombatSessionDB
+from app.backend.db.engine import get_session
+from app.backend.main import create_app
 
 
 # =============================================================================
@@ -219,6 +225,71 @@ async def test_execute_action_no_current_actor(client: AsyncClient) -> None:
         json={"action_id": "skirmish", "action_type": "quick"},
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_execute_full_tech_action(session: AsyncSession) -> None:
+    """Full Tech should execute two tech options and apply status."""
+    app = create_app()
+
+    async def override_get_session() -> AsyncSession:
+        yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        combatants = [
+            make_combatant(id="attacker", side="players"),
+            make_combatant(id="defender", side="hostiles"),
+        ]
+        create_resp = await client.post(
+            "/api/combat",
+            json={"name": "Test", "combatants": combatants},
+        )
+        assert create_resp.status_code == 201
+        session_id = create_resp.json()["id"]
+
+        result = await session.exec(
+            select(CombatSessionDB).where(CombatSessionDB.id == session_id)
+        )
+        combat_session = result.first()
+        assert combat_session is not None
+
+        scenario = dict(combat_session.scenario)
+        scenario["rounds"] = [
+            make_round(round_index=1, turns=[make_turn("attacker"), make_turn("defender")])
+        ]
+        combat_session.scenario = scenario
+        await session.commit()
+
+        start_resp = await client.post(f"/api/combat/{session_id}/turns/start")
+        assert start_resp.status_code == 200
+        start_payload = start_resp.json()
+        assert start_payload["scenario"]["rounds"], "Scenario rounds missing after start_turn"
+
+        response = await client.post(
+            f"/api/combat/{session_id}/actions",
+            json={
+                "action_id": "full_tech",
+                "action_type": "full",
+                "full_tech_first": {"option": "scan", "target_id": "defender"},
+                "full_tech_second": {"option": "lock_on", "target_id": "defender"},
+            },
+        )
+        assert response.status_code == 200, response.json()
+        payload = response.json()
+        assert payload["success"] is True
+        assert {effect["type"] for effect in payload["effects_applied"]} >= {"scan", "lock_on"}
+
+        defender_after = next(
+            combatant
+            for combatant in payload["scenario"]["combatants"]
+            if combatant["id"] == "defender"
+        )
+        assert "lock_on" in defender_after["statuses"]
 
 
 # =============================================================================
