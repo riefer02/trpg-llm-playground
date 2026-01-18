@@ -35,6 +35,7 @@ from core.mech.combat_state import (
     MechCombatScenario,
     CombatantState,
     GrappleLink,
+    WeaponState,
 )
 from core.shared.los import LOSCheckRequest, check_line_of_sight
 
@@ -160,6 +161,156 @@ def _is_melee_weapon(weapon_id: str | None) -> bool:
             return True
 
     return False
+
+
+def _get_weapon_state(
+    actor: CombatantState,
+    weapon_id: str,
+) -> WeaponState | None:
+    """Find weapon state in actor's inventory by weapon ID.
+
+    Args:
+        actor: The combatant to search
+        weapon_id: Weapon ID to find
+
+    Returns:
+        WeaponState if found, None otherwise
+    """
+    if not actor.inventory:
+        return None
+    for mount in actor.inventory.mounts:
+        for weapon in mount.weapons:
+            if weapon.weapon_id == weapon_id:
+                return weapon
+    return None
+
+
+def _validate_weapon_usable(
+    weapon_state: WeaponState | None,
+    weapon_id: str | None,
+    actor: CombatantState,
+    has_moved_or_acted: bool,
+) -> tuple[bool, str | None]:
+    """Check if a weapon can be used (loading, limited, ordnance restrictions).
+
+    Per PR2 rules:
+    - Loading (5029-5030): Must reload before using again
+    - Limited (5080-5081): Finite charges per full repair
+    - Ordnance (5035-5037): Must fire before moving/acting, not while engaged
+
+    Args:
+        weapon_state: The weapon's current state from inventory
+        weapon_id: Weapon ID for tag lookup
+        actor: The attacking combatant
+        has_moved_or_acted: Whether actor has moved or taken non-protocol actions
+
+    Returns:
+        Tuple of (valid, error_message). If valid=True, error_message is None.
+    """
+    if weapon_state is None and weapon_id is None:
+        return (True, None)  # No weapon to validate
+
+    # Check destroyed
+    if weapon_state is not None and weapon_state.destroyed:
+        return (False, "Weapon is destroyed")
+
+    # Check loading - needs reload
+    if weapon_state is not None and weapon_state.needs_reload:
+        return (False, "Weapon needs reload (Stabilize action)")
+
+    # Check limited - no charges remaining
+    if weapon_state is not None and weapon_state.limited_charges_remaining is not None:
+        if weapon_state.limited_charges_remaining <= 0:
+            return (False, "Weapon has no charges remaining")
+
+    # Check ordnance - must fire before moving/acting
+    # Check both compendium tags and weapon state tags
+    has_ordnance = _has_weapon_tag(weapon_id, "ordnance")
+    if weapon_state is not None and "ordnance" in weapon_state.tags:
+        has_ordnance = True
+
+    if has_ordnance:
+        if has_moved_or_acted:
+            return (False, "Ordnance weapons must fire before other actions/movement")
+        # Check engaged status - ordnance cannot target enemies while engaged
+        if "engaged" in (actor.statuses or []):
+            return (False, "Ordnance weapons cannot be used while engaged")
+
+    return (True, None)
+
+
+def _update_weapon_after_attack(
+    actor: CombatantState,
+    weapon_id: str,
+) -> CombatantState:
+    """Update weapon state after attack (set needs_reload, decrement limited).
+
+    Per PR2 rules:
+    - Loading weapons need reload after firing
+    - Limited weapons consume one charge per attack
+
+    Args:
+        actor: The attacking combatant
+        weapon_id: ID of the weapon that was fired
+
+    Returns:
+        Updated CombatantState with modified weapon state
+    """
+    if not actor.inventory or not weapon_id:
+        return actor
+
+    new_mounts = []
+    for mount in actor.inventory.mounts:
+        new_weapons = []
+        for weapon in mount.weapons:
+            if weapon.weapon_id == weapon_id:
+                updates: dict = {}
+                # Set needs_reload for loading weapons
+                if "loading" in weapon.tags:
+                    updates["needs_reload"] = True
+                # Decrement limited charges
+                if weapon.limited_charges_remaining is not None:
+                    updates["limited_charges_remaining"] = max(
+                        0, weapon.limited_charges_remaining - 1
+                    )
+                if updates:
+                    weapon = weapon.model_copy(update=updates)
+            new_weapons.append(weapon)
+        new_mounts.append(mount.model_copy(update={"weapons": new_weapons}))
+
+    new_inventory = actor.inventory.model_copy(update={"mounts": new_mounts})
+    return actor.model_copy(update={"inventory": new_inventory})
+
+
+def _reload_all_loading_weapons(
+    actor: CombatantState,
+) -> tuple[CombatantState, list[str]]:
+    """Reset needs_reload for all loading weapons.
+
+    Called when Stabilize action is used with reload_loading option.
+
+    Args:
+        actor: The combatant performing stabilize
+
+    Returns:
+        Tuple of (updated CombatantState, list of reloaded weapon IDs)
+    """
+    if not actor.inventory:
+        return actor, []
+
+    reloaded_weapons: list[str] = []
+    new_mounts = []
+    for mount in actor.inventory.mounts:
+        new_weapons = []
+        for weapon in mount.weapons:
+            if "loading" in weapon.tags and weapon.needs_reload:
+                weapon = weapon.model_copy(update={"needs_reload": False})
+                reloaded_weapons.append(weapon.weapon_id)
+            new_weapons.append(weapon)
+        new_mounts.append(mount.model_copy(update={"weapons": new_weapons}))
+
+    new_inventory = actor.inventory.model_copy(update={"mounts": new_mounts})
+    return actor.model_copy(update={"inventory": new_inventory}), reloaded_weapons
 
 
 def _validate_attack_range_and_los(
@@ -742,11 +893,13 @@ def _resolve_stabilize(
 
     # Secondary option
     if secondary_option == "reload_loading":
-        # Reload all Loading weapons - mark in inventory
+        # Reload all Loading weapons - clear needs_reload flag
+        updated_actor, reloaded_weapon_ids = _reload_all_loading_weapons(updated_actor)
         effects.append({
             "type": "stabilize_secondary",
             "option": "reload_loading",
-            "weapons_reloaded": True,
+            "weapons_reloaded": len(reloaded_weapon_ids) > 0,
+            "reloaded_weapon_ids": reloaded_weapon_ids,
         })
 
     elif secondary_option == "clear_burn":
@@ -1710,6 +1863,11 @@ __all__ = [
     "_has_weapon_tag",
     "_is_melee_weapon",
     "_validate_attack_range_and_los",
+    # Weapon Tag Enforcement
+    "_get_weapon_state",
+    "_validate_weapon_usable",
+    "_update_weapon_after_attack",
+    "_reload_all_loading_weapons",
     # Tech Actions
     "_build_full_tech_option",
     "_apply_tech_result",

@@ -115,6 +115,10 @@ class WeaponState(FrozenModel):
     tags: list[WeaponTagType] = Field(default_factory=list)
     destroyed: bool = False
     limited_charges_remaining: int | None = Field(default=None, ge=0)
+    needs_reload: bool = Field(
+        default=False,
+        description="True after firing a loading weapon, cleared by Stabilize",
+    )
 
 
 class WeaponMountState(FrozenModel):
@@ -326,6 +330,10 @@ class CombatTurn(FrozenModel):
     movement_mode: Literal["ground", "flight", "hover", "teleport"] = "ground"
     movement_path: list[HexPosition] = Field(default_factory=list)
     actions: list[ActionUse] = Field(default_factory=list)
+    has_moved_or_acted: bool = Field(
+        default=False,
+        description="True after any non-protocol action/movement (blocks ordnance)",
+    )
 
 
 class CombatRound(FrozenModel):

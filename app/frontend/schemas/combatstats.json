@@ -56,6 +56,14 @@
       "minimum": 0,
       "title": "Grit",
       "type": "integer"
+    },
+    "engineering_skill": {
+      "default": 0,
+      "description": "Engineering skill for saves",
+      "maximum": 6,
+      "minimum": 0,
+      "title": "Engineering Skill",
+      "type": "integer"
     }
   },
   "required": [

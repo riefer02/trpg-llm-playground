@@ -655,6 +655,12 @@
       },
       "title": "Actions",
       "type": "array"
+    },
+    "has_moved_or_acted": {
+      "default": false,
+      "description": "True after any non-protocol action/movement (blocks ordnance)",
+      "title": "Has Moved Or Acted",
+      "type": "boolean"
     }
   },
   "required": [

@@ -1,4 +1,69 @@
 {
+  "$defs": {
+    "BurnTickResult": {
+      "description": "Result of burn damage tick at end of turn.",
+      "properties": {
+        "target_id": {
+          "description": "Combatant who took the burn tick",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "burn_amount": {
+          "description": "Total burn marked before resolution",
+          "title": "Burn Amount",
+          "type": "integer"
+        },
+        "engineering_roll": {
+          "description": "1d20 roll",
+          "title": "Engineering Roll",
+          "type": "integer"
+        },
+        "engineering_bonus": {
+          "description": "Engineering skill bonus",
+          "title": "Engineering Bonus",
+          "type": "integer"
+        },
+        "total": {
+          "description": "Roll + bonus",
+          "title": "Total",
+          "type": "integer"
+        },
+        "dc": {
+          "default": 10,
+          "description": "Difficulty class (always 10)",
+          "title": "Dc",
+          "type": "integer"
+        },
+        "success": {
+          "description": "Whether check succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "damage_taken": {
+          "default": 0,
+          "description": "Damage taken (0 if success)",
+          "title": "Damage Taken",
+          "type": "integer"
+        },
+        "burn_cleared": {
+          "description": "Whether burn was cleared",
+          "title": "Burn Cleared",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "target_id",
+        "burn_amount",
+        "engineering_roll",
+        "engineering_bonus",
+        "total",
+        "success",
+        "burn_cleared"
+      ],
+      "title": "BurnTickResult",
+      "type": "object"
+    }
+  },
   "description": "Result of ending a combatant's turn.",
   "properties": {
     "actor_id": {
@@ -67,6 +132,18 @@
       },
       "title": "Cooldowns Decremented",
       "type": "array"
+    },
+    "burn_tick_result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BurnTickResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Burn tick resolution if actor had burn"
     }
   },
   "required": [

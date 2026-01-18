@@ -48575,6 +48575,14 @@
           "minimum": 0,
           "title": "Grit",
           "type": "integer"
+        },
+        "engineering_skill": {
+          "default": 0,
+          "description": "Engineering skill for saves",
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Engineering Skill",
+          "type": "integer"
         }
       },
       "required": [
@@ -48622,6 +48630,13 @@
           "default": 0,
           "minimum": 0,
           "title": "Repairs Remaining",
+          "type": "integer"
+        },
+        "burn_marked": {
+          "default": 0,
+          "description": "Accumulated burn damage",
+          "minimum": 0,
+          "title": "Burn Marked",
           "type": "integer"
         }
       },
@@ -49298,6 +49313,12 @@
           ],
           "default": null,
           "title": "Limited Charges Remaining"
+        },
+        "needs_reload": {
+          "default": false,
+          "description": "True after firing a loading weapon, cleared by Stabilize",
+          "title": "Needs Reload",
+          "type": "boolean"
         }
       },
       "required": [
@@ -49575,6 +49596,38 @@
           "description": "Effects expiring at turn boundaries",
           "title": "Turn End Effects",
           "type": "object"
+        },
+        "piloting_mech_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of mech this pilot is piloting (pilot only)",
+          "title": "Piloting Mech Id"
+        },
+        "mounted_pilot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of pilot mounted in this mech (mech only)",
+          "title": "Mounted Pilot Id"
+        },
+        "eject_used": {
+          "default": false,
+          "description": "Whether eject has been used this combat (mech only)",
+          "title": "Eject Used",
+          "type": "boolean"
         }
       },
       "required": [
@@ -50037,6 +50090,12 @@
           },
           "title": "Actions",
           "type": "array"
+        },
+        "has_moved_or_acted": {
+          "default": false,
+          "description": "True after any non-protocol action/movement (blocks ordnance)",
+          "title": "Has Moved Or Acted",
+          "type": "boolean"
         }
       },
       "required": [
@@ -50752,6 +50811,59 @@
           "description": "Whether this action was granted by overcharge",
           "title": "Granted By Overcharge",
           "type": "boolean"
+        },
+        "stabilize_primary": {
+          "anyOf": [
+            {
+              "enum": [
+                "cool_heat",
+                "spend_repair_full_hp"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Primary stabilize option: cool heat OR spend repair for full HP",
+          "title": "Stabilize Primary"
+        },
+        "stabilize_secondary": {
+          "anyOf": [
+            {
+              "enum": [
+                "reload_loading",
+                "clear_burn",
+                "clear_condition"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Secondary stabilize option: reload/clear burn/clear condition",
+          "title": "Stabilize Secondary"
+        },
+        "apply_knockback": {
+          "default": true,
+          "description": "Whether to apply knockback on successful ram",
+          "title": "Apply Knockback",
+          "type": "boolean"
+        },
+        "eject_direction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HexCoord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Direction for eject (pilot flies 6 spaces in this direction)"
         }
       },
       "required": [
@@ -50956,6 +51068,69 @@
       "title": "TurnStartResult",
       "type": "object"
     },
+    "BurnTickResult": {
+      "description": "Result of burn damage tick at end of turn.",
+      "properties": {
+        "target_id": {
+          "description": "Combatant who took the burn tick",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "burn_amount": {
+          "description": "Total burn marked before resolution",
+          "title": "Burn Amount",
+          "type": "integer"
+        },
+        "engineering_roll": {
+          "description": "1d20 roll",
+          "title": "Engineering Roll",
+          "type": "integer"
+        },
+        "engineering_bonus": {
+          "description": "Engineering skill bonus",
+          "title": "Engineering Bonus",
+          "type": "integer"
+        },
+        "total": {
+          "description": "Roll + bonus",
+          "title": "Total",
+          "type": "integer"
+        },
+        "dc": {
+          "default": 10,
+          "description": "Difficulty class (always 10)",
+          "title": "Dc",
+          "type": "integer"
+        },
+        "success": {
+          "description": "Whether check succeeded",
+          "title": "Success",
+          "type": "boolean"
+        },
+        "damage_taken": {
+          "default": 0,
+          "description": "Damage taken (0 if success)",
+          "title": "Damage Taken",
+          "type": "integer"
+        },
+        "burn_cleared": {
+          "description": "Whether burn was cleared",
+          "title": "Burn Cleared",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "target_id",
+        "burn_amount",
+        "engineering_roll",
+        "engineering_bonus",
+        "total",
+        "success",
+        "burn_cleared"
+      ],
+      "title": "BurnTickResult",
+      "type": "object"
+    },
     "TurnEndResult": {
       "description": "Result of ending a combatant's turn.",
       "properties": {
@@ -51025,6 +51200,18 @@
           },
           "title": "Cooldowns Decremented",
           "type": "array"
+        },
+        "burn_tick_result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BurnTickResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Burn tick resolution if actor had burn"
         }
       },
       "required": [

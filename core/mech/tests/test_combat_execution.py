@@ -37,6 +37,9 @@ from core.mech.combat_state import (
     CombatTurn,
     CombatRound,
     OverchargeState,
+    WeaponState,
+    WeaponMountState,
+    MechInventory,
 )
 from core.mech.grid import HexPosition, HexCoord
 from core.shared.effects import CooldownState
@@ -4405,3 +4408,424 @@ class TestRangeAndLOS:
 
         assert result.success is True
 
+
+# =============================================================================
+# Weapon Tag Enforcement Tests
+# =============================================================================
+
+
+class TestWeaponTagEnforcement:
+    """Tests for weapon tag enforcement (loading, limited, ordnance)."""
+
+    def make_combatant_with_weapon(
+        self,
+        id: str = "mech_1",
+        weapon_id: str = "test_weapon",
+        tags: list[str] = None,
+        needs_reload: bool = False,
+        limited_charges: int | None = None,
+        statuses: list[str] = None,
+    ) -> CombatantState:
+        """Create a test combatant with a weapon in inventory."""
+        weapon_state = WeaponState(
+            weapon_id=weapon_id,
+            tags=tags or [],
+            destroyed=False,
+            limited_charges_remaining=limited_charges,
+            needs_reload=needs_reload,
+        )
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=False,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+
+        return CombatantState(
+            id=id,
+            name="Test Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            statuses=statuses or [],
+            inventory=inventory,
+        )
+
+    # =========================================================================
+    # Loading Tag Tests
+    # =========================================================================
+
+    def test_loading_weapon_fires_first_time(self):
+        """First attack with loading weapon succeeds."""
+        combatant = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="loading_gun",
+            tags=["loading"],
+            needs_reload=False,
+        )
+        target = make_combatant(id="target", position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0))
+        scenario = make_scenario(combatants=[combatant, target])
+        turn = CombatTurn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="loading_gun",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+    def test_loading_weapon_needs_reload_after_fire(self):
+        """Loading weapon requires reload after firing."""
+        from unittest.mock import patch
+
+        combatant = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="loading_gun",
+            tags=["loading"],
+            needs_reload=False,
+        )
+        target = make_combatant(id="target", position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0))
+        scenario = make_scenario(combatants=[combatant, target])
+        turn = CombatTurn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="loading_gun",
+            target_ids=["target"],
+        )
+
+        # Mock the attack to succeed
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15, attack_bonus=0, accuracy_dice_rolls=[], difficulty_dice_rolls=[],
+                net_accuracy=0, total_accuracy=15, target_defense=8, hit=True, is_critical=False, miss_by=0,
+            )
+            updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+        # Check weapon state was updated
+        updated_attacker = next(c for c in updated_scenario.combatants if c.id == "attacker")
+        weapon_state = updated_attacker.inventory.mounts[0].weapons[0]
+        assert weapon_state.needs_reload is True
+
+    def test_loading_weapon_blocked_when_needs_reload(self):
+        """Loading weapon cannot fire when needs_reload is True."""
+        combatant = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="loading_gun",
+            tags=["loading"],
+            needs_reload=True,  # Already needs reload
+        )
+        target = make_combatant(id="target", position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0))
+        scenario = make_scenario(combatants=[combatant, target])
+        turn = CombatTurn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="loading_gun",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "needs reload" in result.error.lower()
+
+    def test_stabilize_reloads_loading_weapons(self):
+        """Stabilize with reload_loading clears needs_reload."""
+        combatant = self.make_combatant_with_weapon(
+            id="actor",
+            weapon_id="loading_gun",
+            tags=["loading"],
+            needs_reload=True,
+        )
+        scenario = make_scenario(combatants=[combatant])
+        turn = CombatTurn(actor_id="actor")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cool_heat",
+            stabilize_secondary="reload_loading",
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+        # Check weapon was reloaded
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor")
+        weapon_state = updated_actor.inventory.mounts[0].weapons[0]
+        assert weapon_state.needs_reload is False
+
+    # =========================================================================
+    # Limited Tag Tests
+    # =========================================================================
+
+    def test_limited_weapon_decrements_charges(self):
+        """Each attack decrements limited_charges_remaining."""
+        from unittest.mock import patch
+
+        combatant = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="limited_missile",
+            tags=["limited"],
+            limited_charges=3,
+        )
+        target = make_combatant(id="target", position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0))
+        scenario = make_scenario(combatants=[combatant, target])
+        turn = CombatTurn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="limited_missile",
+            target_ids=["target"],
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15, attack_bonus=0, accuracy_dice_rolls=[], difficulty_dice_rolls=[],
+                net_accuracy=0, total_accuracy=15, target_defense=8, hit=True, is_critical=False, miss_by=0,
+            )
+            updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+        # Check charges decremented
+        updated_attacker = next(c for c in updated_scenario.combatants if c.id == "attacker")
+        weapon_state = updated_attacker.inventory.mounts[0].weapons[0]
+        assert weapon_state.limited_charges_remaining == 2
+
+    def test_limited_weapon_blocked_at_zero_charges(self):
+        """Attack fails when limited_charges_remaining is 0."""
+        combatant = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="limited_missile",
+            tags=["limited"],
+            limited_charges=0,  # No charges left
+        )
+        target = make_combatant(id="target", position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0))
+        scenario = make_scenario(combatants=[combatant, target])
+        turn = CombatTurn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="limited_missile",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "no charges" in result.error.lower()
+
+    # =========================================================================
+    # Ordnance Tag Tests
+    # =========================================================================
+
+    def test_ordnance_fires_before_movement(self):
+        """Ordnance attack succeeds when has_moved_or_acted is False."""
+        combatant = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="ordnance_cannon",
+            tags=["ordnance"],
+        )
+        target = make_combatant(id="target", position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0))
+        scenario = make_scenario(combatants=[combatant, target])
+        turn = CombatTurn(actor_id="attacker", has_moved_or_acted=False)
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="ordnance_cannon",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+    def test_ordnance_blocked_after_movement(self):
+        """Ordnance attack fails after move/boost action."""
+        combatant = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="ordnance_cannon",
+            tags=["ordnance"],
+        )
+        target = make_combatant(id="target", position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0))
+        scenario = make_scenario(combatants=[combatant, target])
+        turn = CombatTurn(actor_id="attacker", has_moved_or_acted=True)  # Already moved
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="ordnance_cannon",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "ordnance" in result.error.lower()
+
+    def test_ordnance_blocked_after_other_action(self):
+        """Ordnance attack fails after any non-protocol action."""
+        combatant = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="ordnance_cannon",
+            tags=["ordnance"],
+        )
+        target = make_combatant(id="target", position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0))
+        scenario = make_scenario(combatants=[combatant, target])
+        turn = CombatTurn(actor_id="attacker", has_moved_or_acted=False)
+        economy = ActionEconomyState()
+
+        # First, do a quick action (hide) which should set has_moved_or_acted
+        hide_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="hide",
+            action_type="quick",
+        )
+        _, updated_turn, _, _ = execute_action(scenario, turn, economy, hide_input)
+
+        # Now has_moved_or_acted should be True
+        assert updated_turn.has_moved_or_acted is True
+
+    def test_ordnance_blocked_while_engaged(self):
+        """Ordnance attack fails when actor has engaged status."""
+        combatant = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="ordnance_cannon",
+            tags=["ordnance"],
+            statuses=["engaged"],  # Actor is engaged
+        )
+        target = make_combatant(id="target", position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0))
+        scenario = make_scenario(combatants=[combatant, target])
+        turn = CombatTurn(actor_id="attacker", has_moved_or_acted=False)
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="ordnance_cannon",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "engaged" in result.error.lower()
+
+    def test_ordnance_blocked_in_overwatch(self):
+        """Ordnance weapon cannot be used for overwatch reaction."""
+        combatant = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="ordnance_cannon",
+            tags=["ordnance"],
+        )
+        scenario = make_scenario(combatants=[combatant])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            weapon_id="ordnance_cannon",
+            target_ids=["target"],
+        )
+
+        _, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is False
+        assert "ordnance" in result.error.lower()
+        assert "overwatch" in result.error.lower()
+
+    # =========================================================================
+    # Turn State Tracking Tests
+    # =========================================================================
+
+    def test_has_moved_or_acted_set_by_quick_action(self):
+        """Quick actions set has_moved_or_acted to True."""
+        combatant = make_combatant(id="actor")
+        scenario = make_scenario(combatants=[combatant])
+        turn = CombatTurn(actor_id="actor", has_moved_or_acted=False)
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor",
+            action_id="hide",
+            action_type="quick",
+        )
+
+        _, updated_turn, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert updated_turn.has_moved_or_acted is True
+
+    def test_has_moved_or_acted_set_by_full_action(self):
+        """Full actions set has_moved_or_acted to True."""
+        combatant = make_combatant(id="actor")
+        scenario = make_scenario(combatants=[combatant])
+        turn = CombatTurn(actor_id="actor", has_moved_or_acted=False)
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cool_heat",
+        )
+
+        _, updated_turn, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert updated_turn.has_moved_or_acted is True
+
+    def test_fresh_turn_has_moved_or_acted_false(self):
+        """A fresh CombatTurn has has_moved_or_acted=False."""
+        turn = CombatTurn(actor_id="actor")
+        assert turn.has_moved_or_acted is False

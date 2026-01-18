@@ -29553,12 +29553,20 @@ export type Speed4 = number;
 export type SensorRange2 = number;
 export type TechAttack2 = number;
 export type Grit2 = number;
+/**
+ * Engineering skill for saves
+ */
+export type EngineeringSkill = number;
 export type HpCurrent = number;
 export type HeatCurrent = number;
 export type HeatCap2 = number;
 export type StructureCurrent = number;
 export type StressCurrent = number;
 export type RepairsRemaining = number;
+/**
+ * Accumulated burn damage
+ */
+export type BurnMarked = number;
 export type Id24 = string;
 export type Name44 = string;
 export type Side = "players" | "hostiles" | "neutral";
@@ -29627,6 +29635,10 @@ export type Tags6 = (
 )[];
 export type Destroyed1 = boolean;
 export type LimitedChargesRemaining = number | null;
+/**
+ * True after firing a loading weapon, cleared by Stabilize
+ */
+export type NeedsReload = boolean;
 export type Weapons3 = WeaponState[];
 export type Destroyed2 = boolean;
 export type Mounts1 = WeaponMountState[];
@@ -29833,6 +29845,18 @@ export type DurationType1 = "end_of_turn" | "start_of_next_turn" | "end_of_next_
  * Actor who applied this effect
  */
 export type AppliedBy = string;
+/**
+ * ID of mech this pilot is piloting (pilot only)
+ */
+export type PilotingMechId = string | null;
+/**
+ * ID of pilot mounted in this mech (mech only)
+ */
+export type MountedPilotId = string | null;
+/**
+ * Whether eject has been used this combat (mech only)
+ */
+export type EjectUsed = boolean;
 export type GrapplerId = string;
 export type TargetId6 = string;
 export type GrapplerTotalSize = number;
@@ -29903,6 +29927,10 @@ export type MoveUsed = boolean;
 export type MovementMode = "ground" | "flight" | "hover" | "teleport";
 export type MovementPath = HexPosition[];
 export type Actions1 = ActionUse[];
+/**
+ * True after any non-protocol action/movement (blocks ordnance)
+ */
+export type HasMovedOrActed = boolean;
 export type RoundIndex = number;
 export type Turns = CombatTurn[];
 export type Combatants = CombatantState[];
@@ -29990,6 +30018,18 @@ export type IsOvercharge = boolean;
  * Whether this action was granted by overcharge
  */
 export type GrantedByOvercharge1 = boolean;
+/**
+ * Primary stabilize option: cool heat OR spend repair for full HP
+ */
+export type StabilizePrimary1 = ("cool_heat" | "spend_repair_full_hp") | null;
+/**
+ * Secondary stabilize option: reload/clear burn/clear condition
+ */
+export type StabilizeSecondary1 = ("reload_loading" | "clear_burn" | "clear_condition") | null;
+/**
+ * Whether to apply knockback on successful ram
+ */
+export type ApplyKnockback = boolean;
 /**
  * Whether action executed successfully
  */
@@ -30083,6 +30123,42 @@ export type EndOfTurnEffects = {
  */
 export type CooldownsDecremented1 = string[];
 /**
+ * Combatant who took the burn tick
+ */
+export type TargetId10 = string;
+/**
+ * Total burn marked before resolution
+ */
+export type BurnAmount = number;
+/**
+ * 1d20 roll
+ */
+export type EngineeringRoll = number;
+/**
+ * Engineering skill bonus
+ */
+export type EngineeringBonus = number;
+/**
+ * Roll + bonus
+ */
+export type Total = number;
+/**
+ * Difficulty class (always 10)
+ */
+export type Dc = number;
+/**
+ * Whether check succeeded
+ */
+export type Success3 = boolean;
+/**
+ * Damage taken (0 if success)
+ */
+export type DamageTaken = number;
+/**
+ * Whether burn was cleared
+ */
+export type BurnCleared = boolean;
+/**
  * ID of the reacting combatant
  */
 export type ReactorId = string;
@@ -30105,7 +30181,7 @@ export type WeaponId5 = string | null;
 /**
  * Whether reaction was valid
  */
-export type Success3 = boolean;
+export type Success4 = boolean;
 /**
  * Error message if failed
  */
@@ -35375,6 +35451,7 @@ export interface CombatStats {
   sensor_range?: SensorRange2;
   tech_attack?: TechAttack2;
   grit?: Grit2;
+  engineering_skill?: EngineeringSkill;
   [k: string]: unknown;
 }
 /**
@@ -35387,6 +35464,7 @@ export interface CombatResources {
   structure_current?: StructureCurrent;
   stress_current?: StressCurrent;
   repairs_remaining?: RepairsRemaining;
+  burn_marked?: BurnMarked;
   [k: string]: unknown;
 }
 /**
@@ -35432,6 +35510,9 @@ export interface CombatantState {
   meltdown_state?: MeltdownState | null;
   active_protocols?: ActiveProtocols;
   turn_end_effects?: TurnEndEffects;
+  piloting_mech_id?: PilotingMechId;
+  mounted_pilot_id?: MountedPilotId;
+  eject_used?: EjectUsed;
   [k: string]: unknown;
 }
 /**
@@ -35460,6 +35541,7 @@ export interface WeaponState {
   tags?: Tags6;
   destroyed?: Destroyed1;
   limited_charges_remaining?: LimitedChargesRemaining;
+  needs_reload?: NeedsReload;
   [k: string]: unknown;
 }
 /**
@@ -35728,6 +35810,7 @@ export interface CombatTurn {
   movement_mode?: MovementMode;
   movement_path?: MovementPath;
   actions?: Actions1;
+  has_moved_or_acted?: HasMovedOrActed;
   [k: string]: unknown;
 }
 /**
@@ -35900,6 +35983,13 @@ export interface ActionExecutionInput {
   movement_path?: MovementPath1;
   is_overcharge?: IsOvercharge;
   granted_by_overcharge?: GrantedByOvercharge1;
+  stabilize_primary?: StabilizePrimary1;
+  stabilize_secondary?: StabilizeSecondary1;
+  apply_knockback?: ApplyKnockback;
+  /**
+   * Direction for eject (pilot flies 6 spaces in this direction)
+   */
+  eject_direction?: HexCoord | null;
   [k: string]: unknown;
 }
 /**
@@ -35986,6 +36076,25 @@ export interface TurnEndResult {
   new_round_number?: NewRoundNumber;
   end_of_turn_effects?: EndOfTurnEffects;
   cooldowns_decremented?: CooldownsDecremented1;
+  /**
+   * Burn tick resolution if actor had burn
+   */
+  burn_tick_result?: BurnTickResult | null;
+  [k: string]: unknown;
+}
+/**
+ * Result of burn damage tick at end of turn.
+ */
+export interface BurnTickResult {
+  target_id: TargetId10;
+  burn_amount: BurnAmount;
+  engineering_roll: EngineeringRoll;
+  engineering_bonus: EngineeringBonus;
+  total: Total;
+  dc?: Dc;
+  success: Success3;
+  damage_taken?: DamageTaken;
+  burn_cleared: BurnCleared;
   [k: string]: unknown;
 }
 /**
@@ -36003,7 +36112,7 @@ export interface ReactionInput {
  * Result of declaring a reaction.
  */
 export interface ReactionResult {
-  success: Success3;
+  success: Success4;
   error?: Error1;
   reaction_used?: ReactionUsed;
   effects_applied?: EffectsApplied1;

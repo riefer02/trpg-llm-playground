@@ -35,6 +35,13 @@
       "minimum": 0,
       "title": "Repairs Remaining",
       "type": "integer"
+    },
+    "burn_marked": {
+      "default": 0,
+      "description": "Accumulated burn damage",
+      "minimum": 0,
+      "title": "Burn Marked",
+      "type": "integer"
     }
   },
   "required": [

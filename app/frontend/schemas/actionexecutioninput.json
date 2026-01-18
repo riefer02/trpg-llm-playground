@@ -208,6 +208,59 @@
       "description": "Whether this action was granted by overcharge",
       "title": "Granted By Overcharge",
       "type": "boolean"
+    },
+    "stabilize_primary": {
+      "anyOf": [
+        {
+          "enum": [
+            "cool_heat",
+            "spend_repair_full_hp"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Primary stabilize option: cool heat OR spend repair for full HP",
+      "title": "Stabilize Primary"
+    },
+    "stabilize_secondary": {
+      "anyOf": [
+        {
+          "enum": [
+            "reload_loading",
+            "clear_burn",
+            "clear_condition"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Secondary stabilize option: reload/clear burn/clear condition",
+      "title": "Stabilize Secondary"
+    },
+    "apply_knockback": {
+      "default": true,
+      "description": "Whether to apply knockback on successful ram",
+      "title": "Apply Knockback",
+      "type": "boolean"
+    },
+    "eject_direction": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HexCoord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Direction for eject (pilot flies 6 spaces in this direction)"
     }
   },
   "required": [

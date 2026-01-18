@@ -307,6 +307,12 @@
           ],
           "default": null,
           "title": "Limited Charges Remaining"
+        },
+        "needs_reload": {
+          "default": false,
+          "description": "True after firing a loading weapon, cleared by Stabilize",
+          "title": "Needs Reload",
+          "type": "boolean"
         }
       },
       "required": [

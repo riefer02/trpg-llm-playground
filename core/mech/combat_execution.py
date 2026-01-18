@@ -54,6 +54,10 @@ from core.mech.combat_helpers import (
     _get_cover_modifier,
     _validate_attack_range_and_los,
     _is_melee_weapon,
+    _has_weapon_tag,
+    _get_weapon_state,
+    _validate_weapon_usable,
+    _update_weapon_after_attack,
     _resolve_stabilize,
     _resolve_hide,
     _resolve_ram,
@@ -566,6 +570,21 @@ def execute_action(
     has_overkill = any(tag.tag == "overkill" for tag in weapon_tags)
     smart_attack = any(tag.tag == "smart" for tag in weapon_tags)
 
+    # Validate weapon usability (loading, limited, ordnance restrictions)
+    if is_attack and action_input.weapon_id:
+        weapon_state = _get_weapon_state(actor, action_input.weapon_id)
+        valid, error_msg = _validate_weapon_usable(
+            weapon_state=weapon_state,
+            weapon_id=action_input.weapon_id,
+            actor=actor,
+            has_moved_or_acted=current_turn.has_moved_or_acted,
+        )
+        if not valid:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error=f"Cannot attack with {action_input.weapon_id}: {error_msg}",
+            )
+
     if is_attack and weapon_profile is not None:
         area_pattern = _extract_area_pattern(weapon_profile)
         if area_pattern is not None:
@@ -672,12 +691,27 @@ def execute_action(
 
     # Record action in turn
     updated_actions = list(current_turn.actions) + [action_use]
+    # Determine if this action blocks ordnance (sets has_moved_or_acted)
+    # Per PR2: Ordnance must fire before any action/movement except protocols
+    is_protocol = action_input.action_type == "protocol"
+    is_movement = action_input.action_id in ("move", "boost")
+    is_action_that_blocks_ordnance = (
+        not is_protocol and (
+            is_movement or
+            action_input.action_type in ("full", "quick")
+        )
+    )
+    new_has_moved_or_acted = (
+        current_turn.has_moved_or_acted or is_action_that_blocks_ordnance
+    )
+
     updated_turn = CombatTurn(
         actor_id=current_turn.actor_id,
         move_used=current_turn.move_used or (action_input.action_id == "move"),
         movement_mode=current_turn.movement_mode,
         movement_path=current_turn.movement_path,
         actions=updated_actions,
+        has_moved_or_acted=new_has_moved_or_acted,
     )
 
     # Initialize effect tracking
@@ -1001,6 +1035,28 @@ def execute_action(
                 "reason": "Consumed after successful hit",
             })
 
+        # Update weapon state after attack (set needs_reload, decrement limited)
+        if action_input.weapon_id:
+            # Re-fetch actor from scenario (may have been updated)
+            actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
+            updated_actor = _update_weapon_after_attack(actor, action_input.weapon_id)
+
+            # Apply updated actor to scenario
+            actor_idx = next(
+                (i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1
+            )
+            if actor_idx >= 0:
+                updated_combatants = list(scenario.combatants)
+                updated_combatants[actor_idx] = updated_actor
+                scenario = MechCombatScenario(
+                    combatants=updated_combatants,
+                    grapples=list(scenario.grapples),
+                    rounds=list(scenario.rounds),
+                    terrain=scenario.terrain,
+                    environment=scenario.environment,
+                    deployables=dict(scenario.deployables),
+                )
+
     # Handle tech actions (scan, bolster, lock on, invade)
     if action_input.action_id in ("scan", "bolster", "lock_on", "invade") and action_input.target_ids:
         target_id = action_input.target_ids[0]
@@ -1296,6 +1352,19 @@ def execute_reaction(
             success=False,
             error=f"Reactor {reaction_input.reactor_id} not found",
         )
+
+    # Block ordnance weapons from overwatch (PR2 5035-5037)
+    if reaction_input.reaction_type == "overwatch" and reaction_input.weapon_id:
+        has_ordnance = _has_weapon_tag(reaction_input.weapon_id, "ordnance")
+        # Also check weapon state tags
+        weapon_state = _get_weapon_state(reactor, reaction_input.weapon_id)
+        if weapon_state is not None and "ordnance" in weapon_state.tags:
+            has_ordnance = True
+        if has_ordnance:
+            return scenario, economy, ReactionResult(
+                success=False,
+                error="Ordnance weapons cannot be used for overwatch",
+            )
 
     # Check if reaction is available this round
     max_per_round = 1  # Standard reactions are 1/round

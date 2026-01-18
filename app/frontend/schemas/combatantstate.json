@@ -5392,6 +5392,13 @@
           "minimum": 0,
           "title": "Repairs Remaining",
           "type": "integer"
+        },
+        "burn_marked": {
+          "default": 0,
+          "description": "Accumulated burn damage",
+          "minimum": 0,
+          "title": "Burn Marked",
+          "type": "integer"
         }
       },
       "required": [
@@ -5457,6 +5464,14 @@
           "default": 0,
           "minimum": 0,
           "title": "Grit",
+          "type": "integer"
+        },
+        "engineering_skill": {
+          "default": 0,
+          "description": "Engineering skill for saves",
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Engineering Skill",
           "type": "integer"
         }
       },
@@ -37754,6 +37769,12 @@
           ],
           "default": null,
           "title": "Limited Charges Remaining"
+        },
+        "needs_reload": {
+          "default": false,
+          "description": "True after firing a loading weapon, cleared by Stabilize",
+          "title": "Needs Reload",
+          "type": "boolean"
         }
       },
       "required": [
@@ -39534,6 +39555,38 @@
       "description": "Effects expiring at turn boundaries",
       "title": "Turn End Effects",
       "type": "object"
+    },
+    "piloting_mech_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ID of mech this pilot is piloting (pilot only)",
+      "title": "Piloting Mech Id"
+    },
+    "mounted_pilot_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ID of pilot mounted in this mech (mech only)",
+      "title": "Mounted Pilot Id"
+    },
+    "eject_used": {
+      "default": false,
+      "description": "Whether eject has been used this combat (mech only)",
+      "title": "Eject Used",
+      "type": "boolean"
     }
   },
   "required": [
