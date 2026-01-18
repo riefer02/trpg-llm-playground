@@ -1,6 +1,6 @@
 # TTRPG LLM Playground
 
-A **monorepo** for Lancer TTRPG tooling: type-driven game schemas, synthetic data generation, and LLM fine-tuning.
+A monorepo for Lancer TTRPG tooling: a type-safe mechanical core, a full-stack app, and an LLM pipeline. The focus is on rules and mechanics only (no setting text), with types as the source of truth.
 
 ## Architecture
 
@@ -8,24 +8,25 @@ This project is organized into three domains:
 
 ```text
 trpg-llm-playground/
-├── core/                   # Type-driven Lancer schemas (Pydantic v2)
-│   ├── pilot/              # Pilot domain (skills, talents, licenses, etc.)
-│   │   └── tests/           # Pilot schema tests
+├── core/                   # Type-driven Lancer mechanics (Pydantic v2)
+│   ├── pilot/              # Pilot domain (skills, talents, licenses)
 │   ├── mech/               # Mech domain (frames, weapons, combat)
-│   │   └── tests/           # Mech schema tests
-│   ├── shared/             # Shared types (dice, enums, damage types)
-│   │   └── tests/           # Shared schema tests
+│   ├── shared/             # Shared types (dice, enums, effects)
+│   ├── npc/                # NPC templates and behavior
+│   ├── gm_toolkit/         # SITREPs, encounters, world helpers
 │   └── export.py           # JSON Schema export utility
 │
-├── llm/                    # LLM fine-tuning pipeline
-│   ├── src/                # Data processing, RAG, training modules
+├── app/                    # Full-stack web app (FastAPI + TanStack Start)
+│   ├── backend/            # API layer (thin wrapper over core)
+│   └── frontend/           # React app with generated types
+│
+├── llm/                    # Synthetic data + fine-tuning pipeline
+│   ├── src/                # Data generation, RAG, training modules
 │   ├── colab/              # Google Colab notebooks
 │   ├── scripts/            # CLI tools
 │   ├── config/             # YAML configuration
 │   ├── dataset/            # Generated datasets
 │   └── tests/              # LLM pipeline tests
-│
-├── app/                    # Future application layer (placeholder)
 │
 ├── books/                  # Source PDFs (not committed)
 └── models/                 # GGUF models for local inference
@@ -67,6 +68,16 @@ from core.export import export_all_schemas
 export_all_schemas("schemas/")  # Creates individual schema files
 ```
 
+### Running the App
+
+```bash
+make install-app
+cp .env.example .env
+make db-up
+make db-migrate
+make dev
+```
+
 ### Running the LLM Pipeline
 
 ```bash
@@ -91,7 +102,7 @@ python scripts/local_chat.py --chunks dataset/lancer_v1_chunks.jsonl --ui
 
 ## Core Type System
 
-The `/core` directory contains Pydantic v2 models that define the Lancer game system:
+The `/core` directory is the source of truth for all mechanics. The app and pipeline consume these types directly.
 
 ### Pilot Domain (`core/pilot/`)
 
@@ -157,9 +168,22 @@ python -m core.export --model Pilot
 
 ---
 
+## App Layer
+
+The `/app` directory is a full-stack web application:
+
+- FastAPI backend that validates input by calling `model_validate()` on core types
+- JSON blob storage pattern for core models
+- TanStack Start frontend with types generated from core JSON Schema
+
+If a type is missing in the frontend, add it to `core/export.py` and run `make generate-types`.
+
+---
+
 ## LLM Fine-Tuning Pipeline
 
-The `/llm` directory contains the complete pipeline for generating synthetic training data and fine-tuning models.
+The `/llm` directory contains the pipeline for synthetic data generation and fine-tuning.
+The next phase is focused on a compact, quantized model that uses the core's type primitives to generate structured content for the app. This is under construction and still exploratory.
 
 ### Configuration
 
@@ -231,21 +255,18 @@ Modal, Replicate, or dedicated GPU hosting (RunPod, Vast.ai).
 
 ## Roadmap
 
-### Completed
-- [x] Type-driven Pilot schemas with Pydantic v2
-- [x] Typed ID system (36 NewType definitions with coercion)
-- [x] Mech domain schemas (frames, systems, weapons)
-- [x] Combat domain schemas (actions, conditions, initiative)
-- [x] JSON Schema export for cross-language use
-- [x] Synthetic data generation pipeline
-- [x] Multi-turn conversation generation
-- [x] Quality verification and deduplication
-- [x] Local Ollama + RAG chat
+### Current Focus
+- [ ] Real-time multiplayer combat updates (WebSockets)
+- [ ] Movement path drawing and multi-target selection
+- [ ] System activation UI
+- [ ] Type-primitive, quantized generation pipeline (exploratory)
 
-### Planned
-- [ ] Database layer (SQLModel)
-- [ ] Web application (FastAPI + frontend)
-- [ ] Game engine using type dispatch
+### Completed
+- [x] Type-driven core mechanics (pilot, mech, NPC, GM toolkit)
+- [x] Typed ID system and JSON Schema export
+- [x] Full-stack app with core-validated API and generated frontend types
+- [x] Synthetic data pipeline with verification and deduplication
+- [x] Local RAG chat and evaluation harness
 
 ---
 
@@ -254,7 +275,9 @@ Modal, Replicate, or dedicated GPU hosting (RunPod, Vast.ai).
 | Layer | Technology |
 |-------|------------|
 | Type System | Pydantic v2, Python 3.11+ |
+| Backend | FastAPI, SQLModel, PostgreSQL |
+| Frontend | TanStack Start, React Query |
 | Training | Unsloth, LoRA, Hugging Face |
 | Inference | Ollama, GGUF quantization |
 | Data | PyMuPDF, OpenAI API |
-| Future App | FastAPI, SQLModel |
+| Types | JSON Schema export, json-schema-to-typescript |
