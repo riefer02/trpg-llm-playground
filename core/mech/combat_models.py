@@ -114,6 +114,10 @@ class ActionExecutionResult(FrozenModel):
         default_factory=list,
         description="Overheat check results triggered by heat"
     )
+    position_updates: dict[str, dict] = Field(
+        default_factory=dict,
+        description="Position changes keyed by combatant_id: {q, r}"
+    )
 
 
 class TurnStartResult(FrozenModel):

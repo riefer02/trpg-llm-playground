@@ -766,6 +766,15 @@
       },
       "title": "Overheat Checks",
       "type": "array"
+    },
+    "position_updates": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "description": "Position changes keyed by combatant_id: {q, r}",
+      "title": "Position Updates",
+      "type": "object"
     }
   },
   "required": [

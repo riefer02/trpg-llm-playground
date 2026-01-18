@@ -36018,6 +36018,7 @@ export interface ActionExecutionResult {
   statuses_applied?: StatusesApplied;
   structure_checks?: StructureChecks;
   overheat_checks?: OverheatChecks;
+  position_updates?: PositionUpdates;
   [k: string]: unknown;
 }
 /**
@@ -36042,6 +36043,14 @@ export interface StatusesApplied {
     | "burn"
     | "unshackled"
   )[];
+}
+/**
+ * Position changes keyed by combatant_id: {q, r}
+ */
+export interface PositionUpdates {
+  [k: string]: {
+    [k: string]: unknown;
+  };
 }
 /**
  * Result of starting a combatant's turn.

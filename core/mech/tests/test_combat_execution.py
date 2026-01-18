@@ -1425,6 +1425,314 @@ class TestWeaponTagEffects:
         assert any(effect["type"] == "burn" for effect in result.effects_applied)
 
 
+class TestKnockbackWeaponTag:
+    """Tests for knockback weapon tag integration."""
+
+    def test_weapon_with_knockback_pushes_target(self):
+        """Attack with knockback weapon pushes target on hit."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=20,
+            hp_max=20,
+        )
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # ipsn_war_pike has knockback 1
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ipsn_war_pike",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Check for knockback effect in result
+        knockback_effects = [e for e in result.effects_applied if e.get("type") == "knockback"]
+        assert len(knockback_effects) == 1
+        assert knockback_effects[0]["spaces_requested"] == 1
+        assert knockback_effects[0]["spaces_moved"] == 1
+
+        # Verify target was pushed away
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        # Target was at (1, 0), pushed 1 space away from attacker at (0, 0)
+        # Direction is (1, 0), so new position should be (2, 0)
+        assert defender_after.position.coord.q == 2
+        assert defender_after.position.coord.r == 0
+
+        # Check position_updates in result
+        assert "defender" in result.position_updates
+        assert result.position_updates["defender"]["q"] == 2
+        assert result.position_updates["defender"]["r"] == 0
+
+    def test_knockback_blocked_by_other_combatant(self):
+        """Knockback stops before hitting another combatant."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=20,
+            hp_max=20,
+        )
+        # Blocker mech at (2, 0) - in the knockback path
+        blocker = make_combatant(
+            id="blocker",
+            name="Blocker",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=2, r=0)),
+        )
+        scenario = make_scenario(combatants=[attacker, defender, blocker])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # ipsn_concussion_missiles has knockback 2
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ipsn_concussion_missiles",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Check knockback was blocked
+        knockback_effects = [e for e in result.effects_applied if e.get("type") == "knockback"]
+        assert len(knockback_effects) == 1
+        assert knockback_effects[0]["spaces_requested"] == 2
+        assert knockback_effects[0]["spaces_moved"] == 0  # Blocked immediately
+        assert knockback_effects[0]["blocked"] is True
+
+        # Target should stay at original position
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        assert defender_after.position.coord.q == 1
+        assert defender_after.position.coord.r == 0
+
+    def test_no_knockback_on_miss(self):
+        """Knockback only applies on hit."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=20,
+            hp_max=20,
+        )
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ipsn_war_pike",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 1  # Force miss
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # No knockback effect should be present
+        knockback_effects = [e for e in result.effects_applied if e.get("type") == "knockback"]
+        assert len(knockback_effects) == 0
+
+        # Target should stay at original position
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        assert defender_after.position.coord.q == 1
+        assert defender_after.position.coord.r == 0
+
+        # No position_updates
+        assert "defender" not in result.position_updates
+
+    def test_knockback_zero_has_no_effect(self):
+        """Weapon without knockback doesn't push."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=20,
+            hp_max=20,
+        )
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # assault_rifle has no knockback tag
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="assault_rifle",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # No knockback effect should be present
+        knockback_effects = [e for e in result.effects_applied if e.get("type") == "knockback"]
+        assert len(knockback_effects) == 0
+
+        # Target should stay at original position (aside from any other effects)
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        assert defender_after.position.coord.q == 1
+        assert defender_after.position.coord.r == 0
+
+    def test_knockback_position_in_result(self):
+        """ActionExecutionResult contains position_updates."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=20,
+            hp_max=20,
+        )
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ipsn_war_pike",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            _, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Result should have position_updates field
+        assert hasattr(result, "position_updates")
+        assert isinstance(result.position_updates, dict)
+        assert "defender" in result.position_updates
+
+    def test_higher_knockback_pushes_further(self):
+        """Knockback 3 weapon pushes target 3 spaces."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=50,
+            hp_max=50,
+        )
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # ha_daisy_cutter has knockback 3
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ha_daisy_cutter",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Check knockback effect
+        knockback_effects = [e for e in result.effects_applied if e.get("type") == "knockback"]
+        assert len(knockback_effects) == 1
+        assert knockback_effects[0]["spaces_requested"] == 3
+        assert knockback_effects[0]["spaces_moved"] == 3
+
+        # Verify target was pushed 3 spaces
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        assert defender_after.position.coord.q == 4
+        assert defender_after.position.coord.r == 0
+
+
 class TestAreaAttackResolution:
     """Tests for AoE targeting from weapon ranges."""
 

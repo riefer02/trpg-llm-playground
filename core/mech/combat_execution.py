@@ -61,6 +61,7 @@ from core.mech.combat_helpers import (
     _resolve_stabilize,
     _resolve_hide,
     _resolve_ram,
+    _apply_knockback_on_hit,
     _resolve_grapple,
     _resolve_search,
     _resolve_burn_tick,
@@ -567,6 +568,7 @@ def execute_action(
     heat_self = _extract_tag_value(weapon_tags, "heat_self") or 0
     heat_target = _extract_tag_value(weapon_tags, "heat_target") or 0
     burn_value = _extract_tag_value(weapon_tags, "burn")
+    knockback_value = _extract_tag_value(weapon_tags, "knockback") or 0
     has_overkill = any(tag.tag == "overkill" for tag in weapon_tags)
     smart_attack = any(tag.tag == "smart" for tag in weapon_tags)
 
@@ -722,6 +724,7 @@ def execute_action(
     statuses_applied: dict[str, list[StatusType]] = {}
     structure_checks: list[dict] = []
     overheat_checks: list[dict] = []
+    position_updates: dict[str, dict] = {}
 
     # Check if this is an attack action with targets
     if is_attack and attack_target_ids:
@@ -978,6 +981,25 @@ def execute_action(
                             "lowest_roll": overheat_result.lowest_roll,
                             "meltdown_state": overheat_result.meltdown_state is not None,
                         })
+
+                # Apply knockback if weapon has knockback tag
+                if knockback_value > 0:
+                    # Re-fetch target from scenario (may have been updated by damage)
+                    updated_target = next(
+                        (c for c in scenario.combatants if c.id == target_id), None
+                    )
+                    # Re-fetch actor from scenario
+                    current_actor = next(
+                        (c for c in scenario.combatants if c.id == action_input.actor_id), actor
+                    )
+                    # Only apply knockback if target is still alive (structure > 0)
+                    if updated_target and updated_target.resources.structure_current > 0:
+                        scenario, knockback_effect = _apply_knockback_on_hit(
+                            scenario, current_actor, updated_target, knockback_value
+                        )
+                        if knockback_effect:
+                            effects_applied.append(knockback_effect)
+                            position_updates[str(target_id)] = knockback_effect["final_position"]
             elif reliable_value is not None:
                 scenario, change, structure_result = apply_damage(
                     scenario, target_id, reliable_value, armor_piercing
@@ -1318,6 +1340,7 @@ def execute_action(
         statuses_applied=statuses_applied,
         structure_checks=structure_checks,
         overheat_checks=overheat_checks,
+        position_updates=position_updates,
     )
 
     return scenario, updated_turn, updated_economy, result

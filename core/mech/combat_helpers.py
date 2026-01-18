@@ -37,6 +37,7 @@ from core.mech.combat_state import (
     GrappleLink,
     WeaponState,
 )
+from core.shared.involuntary_movement import resolve_knockback
 from core.shared.los import LOSCheckRequest, check_line_of_sight
 
 if TYPE_CHECKING:
@@ -1109,6 +1110,81 @@ def _resolve_ram(
     return scenario, effects
 
 
+def _apply_knockback_on_hit(
+    scenario: MechCombatScenario,
+    attacker: CombatantState,
+    target: CombatantState,
+    knockback_spaces: int,
+) -> tuple[MechCombatScenario, dict | None]:
+    """Apply knockback to target after a successful attack hit.
+
+    Per PR2 5027-5028:
+    "On hit, you may knock back a target X spaces in a straight line
+    directly away from the point of origin"
+
+    Args:
+        scenario: Current combat scenario
+        attacker: The attacking combatant (knockback origin)
+        target: The target combatant to knock back
+        knockback_spaces: Number of spaces to knock back
+
+    Returns:
+        Tuple of (updated scenario, knockback effect dict or None)
+    """
+    if knockback_spaces <= 0:
+        return scenario, None
+
+    if attacker.position is None or target.position is None:
+        return scenario, None
+
+    # Build occupancy set for blocking check (all combatants except target)
+    occupied_hexes: dict[HexCoord, bool] = {}
+    for c in scenario.combatants:
+        if c.id != target.id and c.position is not None:
+            occupied_hexes[c.position.coord] = True
+
+    # Resolve knockback using involuntary movement helper
+    result = resolve_knockback(
+        source=attacker.position.coord,
+        target=target.position.coord,
+        spaces=knockback_spaces,
+        terrain=scenario.terrain,
+        occupied_hexes=occupied_hexes,
+    )
+
+    # Calculate final position from knockback result
+    final_position = result.end_position if result.end_position else target.position.coord
+
+    # Update target position in scenario if it changed
+    if final_position != target.position.coord:
+        new_position = target.position.model_copy(update={"coord": final_position})
+        updated_target = target.model_copy(update={"position": new_position})
+
+        updated_combatants = [
+            updated_target if c.id == target.id else c
+            for c in scenario.combatants
+        ]
+        scenario = MechCombatScenario(
+            combatants=updated_combatants,
+            grapples=list(scenario.grapples),
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+        )
+
+    effect: dict = {
+        "type": "knockback",
+        "target_id": str(target.id),
+        "spaces_requested": knockback_spaces,
+        "spaces_moved": result.spaces_knocked,
+        "final_position": {"q": final_position.q, "r": final_position.r},
+        "blocked": result.obstructed,
+    }
+
+    return scenario, effect
+
+
 def _resolve_grapple(
     scenario: MechCombatScenario,
     actor: CombatantState,
@@ -1885,6 +1961,7 @@ __all__ = [
     "_resolve_stabilize",
     "_resolve_hide",
     "_resolve_ram",
+    "_apply_knockback_on_hit",
     "_resolve_grapple",
     "_resolve_search",
     "_resolve_burn_tick",
