@@ -1137,7 +1137,7 @@ class TestWeaponDamageLookup:
 
         # Force hit with a natural 20 (crit)
         with patch("core.shared.rolls._roll_d20") as mock_d20, \
-             patch("core.mech.combat_execution.random.randint") as mock_dice:
+             patch("core.mech.combat_helpers.random.randint") as mock_dice:
             mock_d20.return_value = 20  # Crit
             mock_dice.return_value = 4  # Roll 4 on the d6
 
@@ -1366,7 +1366,7 @@ class TestWeaponTagEffects:
         )
 
         with patch("core.shared.rolls._roll_d20") as mock_roll, \
-            patch("core.mech.combat_execution.random.randint") as mock_rand:
+            patch("core.mech.combat_helpers.random.randint") as mock_rand:
             mock_roll.return_value = 20  # Force hit
             mock_rand.side_effect = [1, 2]  # Trigger overkill once, then reroll
 
@@ -2253,7 +2253,7 @@ class TestSearchAction:
         )
 
         # Force searcher to win contested check
-        with patch("core.shared.dice.roll_dice", side_effect=[15, 5]):
+        with patch("core.mech.combat_helpers.roll_dice", side_effect=[15, 5]):
             updated_scenario, _, _, result = execute_action(
                 scenario, turn, economy, action_input
             )
@@ -2280,7 +2280,7 @@ class TestSearchAction:
         )
 
         # Force target to win contested check
-        with patch("core.shared.dice.roll_dice", side_effect=[5, 15]):
+        with patch("core.mech.combat_helpers.roll_dice", side_effect=[5, 15]):
             updated_scenario, _, _, result = execute_action(
                 scenario, turn, economy, action_input
             )
@@ -2572,7 +2572,7 @@ class TestStatusEffectModifiers:
 
         # Force a hit on attack roll, but invisibility causes miss
         with patch("core.shared.rolls._roll_d20", return_value=20):
-            with patch("core.mech.combat_execution.random.random", return_value=0.3):  # < 0.5 means miss
+            with patch("core.mech.combat_helpers.random.random", return_value=0.3):  # < 0.5 means miss
                 _, _, _, result = execute_action(
                     scenario, turn, economy, action_input
                 )
@@ -2613,7 +2613,7 @@ class TestStatusEffectModifiers:
 
         # Force a hit on attack roll, and invisibility roll > 0.5 means no miss
         with patch("core.shared.rolls._roll_d20", return_value=20):
-            with patch("core.mech.combat_execution.random.random", return_value=0.7):  # >= 0.5 means no miss
+            with patch("core.mech.combat_helpers.random.random", return_value=0.7):  # >= 0.5 means no miss
                 _, _, _, result = execute_action(
                     scenario, turn, economy, action_input
                 )
@@ -3529,7 +3529,7 @@ class TestDamageModifiers:
 
         # Force hit but not crit (roll 15), and fixed damage (roll 3 on d6)
         with patch("core.shared.rolls._roll_d20", return_value=15), \
-             patch("core.mech.combat_execution.random.randint", return_value=3):
+             patch("core.mech.combat_helpers.random.randint", return_value=3):
             updated_scenario, _, _, result = execute_action(
                 scenario, turn, economy, action_input
             )
@@ -3579,7 +3579,7 @@ class TestDamageModifiers:
 
         # Force critical hit (roll 20), and fixed damage (roll 3 on d6)
         with patch("core.shared.rolls._roll_d20", return_value=20), \
-             patch("core.mech.combat_execution.random.randint", return_value=3):
+             patch("core.mech.combat_helpers.random.randint", return_value=3):
             updated_scenario, _, _, result = execute_action(
                 scenario, turn, economy, action_input
             )
@@ -3651,7 +3651,7 @@ class TestDamageModifiers:
 
         # Force hit (roll 15), and fixed damage (roll 4 on d6)
         with patch("core.shared.rolls._roll_d20", return_value=15), \
-             patch("core.mech.combat_execution.random.randint", return_value=4):
+             patch("core.mech.combat_helpers.random.randint", return_value=4):
             updated_scenario, _, _, result = execute_action(
                 scenario, turn, economy, action_input
             )
