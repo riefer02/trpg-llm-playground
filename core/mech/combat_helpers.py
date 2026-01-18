@@ -36,9 +36,10 @@ from core.mech.combat_state import (
     CombatantState,
     GrappleLink,
 )
+from core.shared.los import LOSCheckRequest, check_line_of_sight
 
 if TYPE_CHECKING:
-    from core.mech.combat_models import ResourceChange, StabilizePrimary, StabilizeSecondary
+    from core.mech.combat_models import ResourceChange, StabilizePrimary, StabilizeSecondary, BurnTickResult
 
 
 # =============================================================================
@@ -76,6 +77,165 @@ def _extract_area_pattern(profile: WeaponProfile) -> AttackPatternDefinition | N
         if tag.tag in {"line", "cone", "blast", "burst"} and tag.value is not None:
             return AttackPatternDefinition(pattern=tag.tag, size=tag.value)
     return None
+
+
+def _get_weapon_range(
+    weapon_id: str | None,
+    is_melee: bool = False,
+) -> int:
+    """Get effective range for a weapon.
+
+    Returns the weapon's range (for ranged) or threat (for melee).
+    Defaults: ranged=10, threat=1 if weapon not found.
+
+    Args:
+        weapon_id: Weapon ID to look up, or None for default
+        is_melee: Whether to look for threat (melee) or range (ranged)
+
+    Returns:
+        The effective range/threat value
+    """
+    default_range = 1 if is_melee else 10
+
+    if weapon_id is None:
+        return default_range
+
+    weapon_def = get_weapon_definition(weapon_id)
+    if weapon_def is None:
+        return default_range
+
+    profile = resolve_weapon_profile(weapon_def)
+
+    # Look for the appropriate range type in ranges
+    for range_entry in profile.ranges:
+        if is_melee and range_entry.range_type == "threat":
+            return range_entry.value
+        elif not is_melee and range_entry.range_type == "range":
+            return range_entry.value
+
+    return default_range
+
+
+def _has_weapon_tag(weapon_id: str | None, tag_name: str) -> bool:
+    """Check if a weapon has a specific tag.
+
+    Args:
+        weapon_id: Weapon ID to look up
+        tag_name: Tag name to search for
+
+    Returns:
+        True if weapon has the tag, False otherwise
+    """
+    if weapon_id is None:
+        return False
+
+    weapon_def = get_weapon_definition(weapon_id)
+    if weapon_def is None:
+        return False
+
+    profile = resolve_weapon_profile(weapon_def)
+    return any(tag.tag == tag_name for tag in profile.tags)
+
+
+def _is_melee_weapon(weapon_id: str | None) -> bool:
+    """Check if a weapon is melee (has threat range).
+
+    Args:
+        weapon_id: Weapon ID to look up
+
+    Returns:
+        True if weapon is melee, False otherwise
+    """
+    if weapon_id is None:
+        return False
+
+    weapon_def = get_weapon_definition(weapon_id)
+    if weapon_def is None:
+        return False
+
+    profile = resolve_weapon_profile(weapon_def)
+
+    for range_entry in profile.ranges:
+        if range_entry.range_type == "threat":
+            return True
+
+    return False
+
+
+def _validate_attack_range_and_los(
+    scenario: MechCombatScenario,
+    attacker: CombatantState,
+    target: CombatantState,
+    weapon_id: str | None,
+    is_tech_attack: bool = False,
+) -> tuple[bool, str | None]:
+    """Validate range and LOS for an attack.
+
+    Returns (valid, error_message). If valid=True, error_message is None.
+
+    Per PR2 pp 99-100:
+    - Ranged weapons: target must be within weapon range
+    - Melee weapons: target must be within threat range
+    - Tech attacks: target must be within sensor range
+    - LOS must not be blocked (except: seeking ignores LOS, arcing ignores LOS but not cover)
+
+    Args:
+        scenario: Current combat scenario
+        attacker: The attacking combatant
+        target: The target combatant
+        weapon_id: Weapon ID being used (None for tech attacks)
+        is_tech_attack: Whether this is a tech attack (uses sensor range)
+
+    Returns:
+        Tuple of (valid, error_message)
+    """
+    # Check positions exist
+    if attacker.position is None:
+        return (False, "Attacker has no position")
+    if target.position is None:
+        return (False, "Target has no position")
+
+    # Calculate hex distance
+    distance = attacker.position.coord.distance_to(target.position.coord)
+
+    # Determine required range
+    if is_tech_attack:
+        # Tech attacks use sensor range
+        required_range = attacker.stats.sensor_range if attacker.stats else 10
+        range_type = "sensor"
+    else:
+        # Check if melee or ranged
+        is_melee = _is_melee_weapon(weapon_id)
+        required_range = _get_weapon_range(weapon_id, is_melee=is_melee)
+        range_type = "threat" if is_melee else "range"
+
+    # Validate range
+    if distance > required_range:
+        return (False, f"Target out of range ({distance} > {required_range} {range_type})")
+
+    # Check for seeking/arcing tags that bypass LOS
+    has_seeking = _has_weapon_tag(weapon_id, "seeking")
+    has_arcing = _has_weapon_tag(weapon_id, "arcing")
+
+    # Check LOS
+    los_request = LOSCheckRequest(
+        attacker_pos=attacker.position,
+        target_pos=target.position,
+        terrain=scenario.terrain,
+    )
+    los_result = check_line_of_sight(los_request)
+
+    if los_result.los_type == "blocked":
+        # Seeking weapons ignore LOS entirely
+        if has_seeking:
+            pass  # Valid despite blocked LOS
+        # Arcing weapons ignore LOS (but cover still applies, handled elsewhere)
+        elif has_arcing:
+            pass  # Valid despite blocked LOS
+        else:
+            return (False, "No line of sight to target")
+
+    return (True, None)
 
 
 def _roll_damage_with_overkill(
@@ -590,13 +750,18 @@ def _resolve_stabilize(
         })
 
     elif secondary_option == "clear_burn":
-        # End all Burn on self
+        # End all Burn on self and reset burn_marked
         new_statuses = [s for s in updated_actor.statuses if s != "burn"]
-        updated_actor = updated_actor.model_copy(update={"statuses": new_statuses})
+        new_resources = updated_actor.resources.model_copy(update={"burn_marked": 0})
+        updated_actor = updated_actor.model_copy(update={
+            "statuses": new_statuses,
+            "resources": new_resources,
+        })
         effects.append({
             "type": "stabilize_secondary",
             "option": "clear_burn",
             "burn_cleared": "burn" in actor.statuses,
+            "burn_marked_cleared": actor.resources.burn_marked,
         })
 
     elif secondary_option == "clear_condition":
@@ -949,6 +1114,100 @@ def _resolve_search(
     })
 
     return scenario, effects
+
+
+# =============================================================================
+# Burn Tick Resolution
+# =============================================================================
+
+
+def _resolve_burn_tick(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+    force_roll: int | None = None,
+) -> tuple[MechCombatScenario, "BurnTickResult | None"]:
+    """Resolve burn damage tick at end of turn.
+
+    Per PR2 5017-5021: Engineering check (1d20 + ENG vs DC 10).
+    Success clears all burn. Failure deals burn damage (ignores armor).
+
+    Args:
+        scenario: Current combat scenario
+        actor: The combatant whose turn is ending
+        force_roll: Optional forced roll value for testing
+
+    Returns:
+        Tuple of (updated scenario, BurnTickResult or None if no burn)
+    """
+    from core.mech.combat_models import BurnTickResult
+
+    # Check if actor has burn status AND burn_marked > 0
+    if "burn" not in actor.statuses or actor.resources.burn_marked <= 0:
+        return scenario, None
+
+    burn_amount = actor.resources.burn_marked
+    engineering_bonus = actor.stats.engineering_skill if actor.stats else 0
+    dc = 10
+
+    # Roll engineering check
+    if force_roll is not None:
+        engineering_roll = force_roll
+    else:
+        engineering_roll = roll_dice("1d20")
+
+    total = engineering_roll + engineering_bonus
+    success = total >= dc
+
+    # Find actor index
+    actor_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
+    if actor_idx < 0:
+        return scenario, None
+
+    damage_taken = 0
+    burn_cleared = False
+    updated_actor = actor
+
+    if success:
+        # Success: Clear all burn
+        new_statuses = [s for s in actor.statuses if s != "burn"]
+        new_resources = actor.resources.model_copy(update={"burn_marked": 0})
+        updated_actor = actor.model_copy(update={
+            "statuses": new_statuses,
+            "resources": new_resources,
+        })
+        burn_cleared = True
+    else:
+        # Failure: Take burn damage (ignores armor - full AP bypass)
+        # We need to apply damage directly to HP, bypassing armor
+        damage_taken = burn_amount
+        new_hp = max(0, actor.resources.hp_current - damage_taken)
+        new_resources = actor.resources.model_copy(update={"hp_current": new_hp})
+        updated_actor = actor.model_copy(update={"resources": new_resources})
+
+    # Update scenario
+    updated_combatants = list(scenario.combatants)
+    updated_combatants[actor_idx] = updated_actor
+
+    scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+    return scenario, BurnTickResult(
+        target_id=actor.id,
+        burn_amount=burn_amount,
+        engineering_roll=engineering_roll,
+        engineering_bonus=engineering_bonus,
+        total=total,
+        dc=dc,
+        success=success,
+        damage_taken=damage_taken,
+        burn_cleared=burn_cleared,
+    )
 
 
 # =============================================================================
@@ -1446,6 +1705,11 @@ __all__ = [
     "_extract_area_pattern",
     "_roll_damage_with_overkill",
     "_roll_weapon_damage",
+    # Range and LOS Validation
+    "_get_weapon_range",
+    "_has_weapon_tag",
+    "_is_melee_weapon",
+    "_validate_attack_range_and_los",
     # Tech Actions
     "_build_full_tech_option",
     "_apply_tech_result",
@@ -1465,6 +1729,7 @@ __all__ = [
     "_resolve_ram",
     "_resolve_grapple",
     "_resolve_search",
+    "_resolve_burn_tick",
     # Movement Resolution
     "_resolve_movement",
     # Mount/Dismount/Eject

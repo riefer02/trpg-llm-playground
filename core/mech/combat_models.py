@@ -129,6 +129,20 @@ class TurnStartResult(FrozenModel):
     )
 
 
+class BurnTickResult(FrozenModel):
+    """Result of burn damage tick at end of turn."""
+
+    target_id: str = Field(..., description="Combatant who took the burn tick")
+    burn_amount: int = Field(..., description="Total burn marked before resolution")
+    engineering_roll: int = Field(..., description="1d20 roll")
+    engineering_bonus: int = Field(..., description="Engineering skill bonus")
+    total: int = Field(..., description="Roll + bonus")
+    dc: int = Field(default=10, description="Difficulty class (always 10)")
+    success: bool = Field(..., description="Whether check succeeded")
+    damage_taken: int = Field(default=0, description="Damage taken (0 if success)")
+    burn_cleared: bool = Field(..., description="Whether burn was cleared")
+
+
 class TurnEndResult(FrozenModel):
     """Result of ending a combatant's turn."""
 
@@ -140,6 +154,9 @@ class TurnEndResult(FrozenModel):
     end_of_turn_effects: list[dict] = Field(default_factory=list, description="Effects applied at turn end")
     cooldowns_decremented: list[str] = Field(
         default_factory=list, description="Effect IDs whose cooldowns were decremented"
+    )
+    burn_tick_result: BurnTickResult | None = Field(
+        default=None, description="Burn tick resolution if actor had burn"
     )
 
 
@@ -196,6 +213,7 @@ __all__ = [
     "ResourceChange",
     "ActionExecutionResult",
     "TurnStartResult",
+    "BurnTickResult",
     "TurnEndResult",
     "ReactionResult",
     "AvailableAction",

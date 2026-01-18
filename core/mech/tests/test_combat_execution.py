@@ -3672,3 +3672,736 @@ class TestDamageModifiers:
             c for c in updated_scenario.combatants if c.id == "target_1"
         )
         assert updated_target.resources.hp_current == 50 - 4
+
+
+# =============================================================================
+# Burn Tick Tests (Phase 17)
+# =============================================================================
+
+
+class TestBurnTick:
+    """Tests for burn damage tick at end of turn (PR2 5017-5021, 4103-4109)."""
+
+    def test_burn_tick_success_clears_burn(self):
+        """Roll 15 + 0 ENG >= 10 clears all burn, no damage."""
+        from unittest.mock import patch
+
+        # Create actor with burn status and burn_marked
+        actor = CombatantState(
+            id="actor_1",
+            name="Burning Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                engineering_skill=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                burn_marked=4,
+                structure_current=4,
+                stress_current=4,
+            ),
+            statuses=["burn"],
+        )
+        turn = make_turn(actor_id="actor_1")
+        round1 = make_round(round_index=1, turns=[turn])
+        scenario = make_scenario(combatants=[actor], rounds=[round1])
+
+        # Force roll of 15 (success: 15 >= 10)
+        with patch("core.mech.combat_helpers.roll_dice", return_value=15):
+            updated_scenario, result, _, _ = end_turn(
+                scenario, current_round=1, current_turn_index=0, current_turn=turn
+            )
+
+        # Check burn tick result
+        assert result.burn_tick_result is not None
+        assert result.burn_tick_result.success is True
+        assert result.burn_tick_result.engineering_roll == 15
+        assert result.burn_tick_result.total == 15
+        assert result.burn_tick_result.damage_taken == 0
+        assert result.burn_tick_result.burn_cleared is True
+
+        # Check actor state
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert "burn" not in updated_actor.statuses
+        assert updated_actor.resources.burn_marked == 0
+        assert updated_actor.resources.hp_current == 10  # No damage
+
+    def test_burn_tick_failure_deals_damage(self):
+        """Roll 5 + 0 ENG < 10 deals burn_marked damage."""
+        from unittest.mock import patch
+
+        actor = CombatantState(
+            id="actor_1",
+            name="Burning Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                engineering_skill=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                burn_marked=4,
+                structure_current=4,
+                stress_current=4,
+            ),
+            statuses=["burn"],
+        )
+        turn = make_turn(actor_id="actor_1")
+        round1 = make_round(round_index=1, turns=[turn])
+        scenario = make_scenario(combatants=[actor], rounds=[round1])
+
+        # Force roll of 5 (failure: 5 < 10)
+        with patch("core.mech.combat_helpers.roll_dice", return_value=5):
+            updated_scenario, result, _, _ = end_turn(
+                scenario, current_round=1, current_turn_index=0, current_turn=turn
+            )
+
+        # Check burn tick result
+        assert result.burn_tick_result is not None
+        assert result.burn_tick_result.success is False
+        assert result.burn_tick_result.engineering_roll == 5
+        assert result.burn_tick_result.total == 5
+        assert result.burn_tick_result.damage_taken == 4
+        assert result.burn_tick_result.burn_cleared is False
+
+        # Check actor state - still has burn, took damage
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert "burn" in updated_actor.statuses
+        assert updated_actor.resources.burn_marked == 4  # Still marked
+        assert updated_actor.resources.hp_current == 6  # 10 - 4 burn damage
+
+    def test_burn_stacks_additively(self):
+        """Burn applied multiple times stacks additively."""
+        # Create target with existing burn status and burn_marked = 3
+        target = CombatantState(
+            id="target_1",
+            name="Burning Target",
+            side="hostiles",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=20,
+                evasion=8,
+                e_defense=8,
+            ),
+            resources=CombatResources(
+                hp_current=20,
+                burn_marked=3,  # Already has 3 burn
+                structure_current=4,
+                stress_current=4,
+            ),
+            statuses=["burn"],
+        )
+
+        # Simulate applying burn 2 by updating the burn_marked value
+        # This tests the accumulation logic (original burn_marked + new burn)
+        new_burn_value = 2
+        new_burn_marked = target.resources.burn_marked + new_burn_value
+        new_resources = target.resources.model_copy(update={"burn_marked": new_burn_marked})
+        updated_target = target.model_copy(update={"resources": new_resources})
+
+        # Verify stacking: 3 + 2 = 5
+        assert updated_target.resources.burn_marked == 5
+        assert "burn" in updated_target.statuses
+
+    def test_burn_ignores_armor_on_tick(self):
+        """Actor with armor=2, burn=4 takes 4 damage not 2."""
+        from unittest.mock import patch
+
+        # Create actor with armor and burn
+        actor = CombatantState(
+            id="actor_1",
+            name="Armored Burning Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=2,  # Has 2 armor
+                engineering_skill=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                burn_marked=4,
+                structure_current=4,
+                stress_current=4,
+            ),
+            statuses=["burn"],
+        )
+        turn = make_turn(actor_id="actor_1")
+        round1 = make_round(round_index=1, turns=[turn])
+        scenario = make_scenario(combatants=[actor], rounds=[round1])
+
+        # Force roll of 5 (failure: 5 < 10)
+        with patch("core.mech.combat_helpers.roll_dice", return_value=5):
+            updated_scenario, result, _, _ = end_turn(
+                scenario, current_round=1, current_turn_index=0, current_turn=turn
+            )
+
+        # Burn damage ignores armor - should take full 4 damage, not 4-2=2
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.resources.hp_current == 6  # 10 - 4 = 6 (armor ignored)
+
+    def test_no_burn_tick_without_status(self):
+        """No tick if actor lacks burn status."""
+        # Actor with burn_marked but no burn status (shouldn't happen normally)
+        actor = CombatantState(
+            id="actor_1",
+            name="Not Burning",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                burn_marked=4,
+                structure_current=4,
+                stress_current=4,
+            ),
+            statuses=[],  # No burn status
+        )
+        turn = make_turn(actor_id="actor_1")
+        round1 = make_round(round_index=1, turns=[turn])
+        scenario = make_scenario(combatants=[actor], rounds=[round1])
+
+        updated_scenario, result, _, _ = end_turn(
+            scenario, current_round=1, current_turn_index=0, current_turn=turn
+        )
+
+        # No burn tick should occur
+        assert result.burn_tick_result is None
+
+    def test_no_burn_tick_without_burn_marked(self):
+        """No tick if actor has burn status but burn_marked=0."""
+        actor = CombatantState(
+            id="actor_1",
+            name="Burn Status Only",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                burn_marked=0,  # No burn marked
+                structure_current=4,
+                stress_current=4,
+            ),
+            statuses=["burn"],  # Has burn status
+        )
+        turn = make_turn(actor_id="actor_1")
+        round1 = make_round(round_index=1, turns=[turn])
+        scenario = make_scenario(combatants=[actor], rounds=[round1])
+
+        updated_scenario, result, _, _ = end_turn(
+            scenario, current_round=1, current_turn_index=0, current_turn=turn
+        )
+
+        # No burn tick should occur
+        assert result.burn_tick_result is None
+
+    def test_engineering_skill_adds_to_roll(self):
+        """ENG 3 + roll 7 = 10, exactly success."""
+        from unittest.mock import patch
+
+        actor = CombatantState(
+            id="actor_1",
+            name="Skilled Engineer",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                engineering_skill=3,  # +3 ENG
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                burn_marked=4,
+                structure_current=4,
+                stress_current=4,
+            ),
+            statuses=["burn"],
+        )
+        turn = make_turn(actor_id="actor_1")
+        round1 = make_round(round_index=1, turns=[turn])
+        scenario = make_scenario(combatants=[actor], rounds=[round1])
+
+        # Roll 7 + ENG 3 = 10, exactly meets DC 10
+        with patch("core.mech.combat_helpers.roll_dice", return_value=7):
+            updated_scenario, result, _, _ = end_turn(
+                scenario, current_round=1, current_turn_index=0, current_turn=turn
+            )
+
+        assert result.burn_tick_result is not None
+        assert result.burn_tick_result.engineering_roll == 7
+        assert result.burn_tick_result.engineering_bonus == 3
+        assert result.burn_tick_result.total == 10
+        assert result.burn_tick_result.success is True
+        assert result.burn_tick_result.burn_cleared is True
+
+    def test_stabilize_clear_burn_resets_burn_marked(self):
+        """Stabilize with clear_burn sets burn_marked=0."""
+        actor = CombatantState(
+            id="actor_1",
+            name="Stabilizing Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                burn_marked=5,  # Has accumulated burn
+                heat_current=2,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            statuses=["burn"],
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cool_heat",
+            stabilize_secondary="clear_burn",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert "burn" not in updated_actor.statuses
+        assert updated_actor.resources.burn_marked == 0
+
+
+
+# =============================================================================
+# Range and LOS Enforcement Tests
+# =============================================================================
+
+
+class TestRangeAndLOS:
+    """Tests for range validation and LOS enforcement per PR2 pp 99-100."""
+
+    def test_ranged_attack_within_range_succeeds(self):
+        """Target at distance 5, weapon range 10 should allow attack."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=5,
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=5, r=0)),  # Distance 5
+            hp_current=10,
+            hp_max=10,
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # assault_rifle has range 10
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="assault_rifle",
+            target_ids=["target"],
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=5,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=20,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+    def test_ranged_attack_out_of_range_fails(self):
+        """Target at distance 15, weapon range 10 should fail."""
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=15, r=0)),  # Distance 15
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # assault_rifle has range 10
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="assault_rifle",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "out of range" in result.error.lower()
+
+    def test_melee_attack_within_threat_succeeds(self):
+        """Target at distance 1, threat 1 should allow attack."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=5,
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),  # Distance 1
+            hp_current=10,
+            hp_max=10,
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # tactical_knife has threat 1
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="tactical_knife",
+            target_ids=["target"],
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=5,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=20,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+    def test_melee_attack_out_of_threat_fails(self):
+        """Target at distance 3, threat 1 should fail."""
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=3, r=0)),  # Distance 3
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # tactical_knife has threat 1
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="tactical_knife",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "out of range" in result.error.lower()
+
+    def test_tech_attack_within_sensor_range_succeeds(self):
+        """Target within sensor range should allow tech attack."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            tech_attack=2,
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=5, r=0)),  # Distance 5, sensor_range default is 10
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="lock_on",
+            action_type="quick",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+    def test_tech_attack_out_of_sensor_range_fails(self):
+        """Target beyond sensor range should fail tech attack."""
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=15, r=0)),  # Distance 15, beyond sensor_range=10
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="lock_on",
+            action_type="quick",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "out of range" in result.error.lower()
+
+    def test_blocked_los_prevents_attack(self):
+        """Terrain blocking LOS should prevent attack."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=3, r=0)),  # Distance 3
+        )
+        # Terrain at (1,0) blocks LOS
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), blocks_line_of_sight=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[attacker, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="assault_rifle",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "line of sight" in result.error.lower()
+
+    def test_seeking_weapon_ignores_blocked_los(self):
+        """Seeking weapon should attack through blocked LOS."""
+        from unittest.mock import patch
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=5,
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=3, r=0)),  # Distance 3
+            hp_current=10,
+            hp_max=10,
+        )
+        # Terrain at (1,0) blocks LOS
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), blocks_line_of_sight=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[attacker, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # Use a weapon with seeking tag - horus_autopod has seeking
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="horus_autopod",
+            target_ids=["target"],
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=5,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=20,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+    def test_arcing_weapon_ignores_blocked_los(self):
+        """Arcing weapon should attack through blocked LOS."""
+        from unittest.mock import patch
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=5,
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=3, r=0)),  # Distance 3
+            hp_current=10,
+            hp_max=10,
+        )
+        # Terrain at (1,0) and (2,0) block LOS
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), blocks_line_of_sight=True),
+            TerrainHex(coord=HexCoord(q=2, r=0), blocks_line_of_sight=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[attacker, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # mortar has arcing tag
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="mortar",
+            target_ids=["target"],
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=5,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=20,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+

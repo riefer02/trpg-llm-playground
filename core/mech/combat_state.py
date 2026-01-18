@@ -93,6 +93,7 @@ class CombatStats(FrozenModel):
     sensor_range: int = Field(default=0, ge=0)
     tech_attack: int = Field(default=0)
     grit: int = Field(default=0, ge=0)
+    engineering_skill: int = Field(default=0, ge=0, le=6, description="Engineering skill for saves")
 
 
 class CombatResources(FrozenModel):
@@ -104,6 +105,7 @@ class CombatResources(FrozenModel):
     structure_current: int = Field(default=0, ge=0)
     stress_current: int = Field(default=0, ge=0)
     repairs_remaining: int = Field(default=0, ge=0)
+    burn_marked: int = Field(default=0, ge=0, description="Accumulated burn damage")
 
 
 class WeaponState(FrozenModel):

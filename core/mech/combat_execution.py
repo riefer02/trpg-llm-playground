@@ -29,6 +29,7 @@ from core.mech.combat_models import (
     ActionExecutionResult,
     TurnStartResult,
     TurnEndResult,
+    BurnTickResult,
     ReactionInput,
     ReactionResult,
     AvailableAction,
@@ -51,11 +52,14 @@ from core.mech.combat_helpers import (
     _get_target_status_modifiers,
     _check_invisibility_miss,
     _get_cover_modifier,
+    _validate_attack_range_and_los,
+    _is_melee_weapon,
     _resolve_stabilize,
     _resolve_hide,
     _resolve_ram,
     _resolve_grapple,
     _resolve_search,
+    _resolve_burn_tick,
     _resolve_movement,
     _resolve_mount,
     _resolve_dismount,
@@ -287,15 +291,41 @@ def end_turn(
 
     end_of_turn_effects: list[dict] = []
     cooldowns_decremented: list[str] = []
-    updated_actor = actor
+    burn_tick_result: BurnTickResult | None = None
+    updated_actor: CombatantState | None = actor
 
     if actor is not None:
+        updated_actor = actor
+
+        # Resolve burn tick at end of turn (PR2 5017-5021)
+        if "burn" in actor.statuses and actor.resources.burn_marked > 0:
+            scenario, burn_tick_result = _resolve_burn_tick(scenario, actor)
+
+            # Re-fetch updated actor from scenario
+            for i, c in enumerate(scenario.combatants):
+                if c.id == actor_id:
+                    updated_actor = c
+                    actor_index = i
+                    break
+
+            if burn_tick_result:
+                end_of_turn_effects.append({
+                    "type": "burn_tick",
+                    "target_id": actor_id,
+                    "roll": burn_tick_result.engineering_roll,
+                    "bonus": burn_tick_result.engineering_bonus,
+                    "total": burn_tick_result.total,
+                    "success": burn_tick_result.success,
+                    "damage_taken": burn_tick_result.damage_taken,
+                    "burn_cleared": burn_tick_result.burn_cleared,
+                })
+
         # Decrement cooldowns on turn end
-        if actor.cooldown_states:
-            mutable_cooldowns = dict(actor.cooldown_states)
+        if updated_actor.cooldown_states:
+            mutable_cooldowns = dict(updated_actor.cooldown_states)
             results = decrement_cooldowns_on_turn_end(actor_cooldown_states=mutable_cooldowns)
             cooldowns_decremented = [r.effect_id for r in results if r.was_decremented]
-            updated_actor = actor.model_copy(update={"cooldown_states": mutable_cooldowns})
+            updated_actor = updated_actor.model_copy(update={"cooldown_states": mutable_cooldowns})
 
     # Update combatants if actor was modified
     updated_combatants = list(scenario.combatants)
@@ -360,6 +390,7 @@ def end_turn(
         new_round_number=next_round if round_advanced else None,
         end_of_turn_effects=end_of_turn_effects,
         cooldowns_decremented=cooldowns_decremented,
+        burn_tick_result=burn_tick_result,
     )
 
     return updated_scenario, result, next_round, next_turn_index
@@ -662,6 +693,27 @@ def execute_action(
     if is_attack and attack_target_ids:
         from core.shared.rolls import resolve_attack
 
+        # Validate range and LOS for each target before resolving attacks
+        # Skip for area attacks (already validated by area origin)
+        if area_pattern is None:
+            for target_id in attack_target_ids:
+                target = next((c for c in scenario.combatants if c.id == target_id), None)
+                if target is None:
+                    continue
+
+                valid, error = _validate_attack_range_and_los(
+                    scenario=scenario,
+                    attacker=actor,
+                    target=target,
+                    weapon_id=action_input.weapon_id,
+                    is_tech_attack=False,
+                )
+                if not valid:
+                    return scenario, current_turn, economy, ActionExecutionResult(
+                        success=False,
+                        error=f"Attack on {target_id} failed: {error}",
+                    )
+
         # Get attack bonus from actor's grit
         attack_bonus = actor.stats.grit if actor.stats else 0
         self_overkill_heat = 0
@@ -840,10 +892,39 @@ def execute_action(
                         scenario, target_id, ["burn"]
                     )
                     _record_statuses_applied(statuses_applied, target_id, added_statuses)
+
+                    # Accumulate burn_marked (stacking per PR2)
+                    burn_target_idx = next(
+                        (i for i, c in enumerate(scenario.combatants) if c.id == target_id), -1
+                    )
+                    if burn_target_idx >= 0:
+                        burn_target = scenario.combatants[burn_target_idx]
+                        new_burn = burn_target.resources.burn_marked + burn_value
+                        new_burn_resources = burn_target.resources.model_copy(
+                            update={"burn_marked": new_burn}
+                        )
+                        updated_burn_target = burn_target.model_copy(
+                            update={"resources": new_burn_resources}
+                        )
+                        updated_burn_combatants = list(scenario.combatants)
+                        updated_burn_combatants[burn_target_idx] = updated_burn_target
+                        scenario = MechCombatScenario(
+                            combatants=updated_burn_combatants,
+                            grapples=list(scenario.grapples),
+                            rounds=list(scenario.rounds),
+                            terrain=scenario.terrain,
+                            environment=scenario.environment,
+                            deployables=dict(scenario.deployables),
+                        )
+
                     effects_applied.append({
                         "type": "burn",
                         "target_id": target_id,
                         "amount": burn_value,
+                        "total_burn_marked": (
+                            scenario.combatants[burn_target_idx].resources.burn_marked
+                            if burn_target_idx >= 0 else burn_value
+                        ),
                     })
 
                 if heat_target > 0:
@@ -926,6 +1007,20 @@ def execute_action(
         target = next((c for c in scenario.combatants if c.id == target_id), None)
 
         if target is not None:
+            # Validate range and LOS for tech attack
+            valid, error = _validate_attack_range_and_los(
+                scenario=scenario,
+                attacker=actor,
+                target=target,
+                weapon_id=None,
+                is_tech_attack=True,
+            )
+            if not valid:
+                return scenario, current_turn, economy, ActionExecutionResult(
+                    success=False,
+                    error=f"Tech attack on {target_id} failed: {error}",
+                )
+
             tech_result: ScanResult | BolsterResult | LockOnResult | InvadeResult | None = None
             if action_input.action_id == "scan":
                 tech_result = resolve_scan(
