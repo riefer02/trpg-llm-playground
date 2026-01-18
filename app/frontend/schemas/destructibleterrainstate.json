@@ -1,0 +1,146 @@
+{
+  "$defs": {
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    },
+    "HexPosition": {
+      "description": "Hex position with optional elevation.",
+      "properties": {
+        "coord": {
+          "$ref": "#/$defs/HexCoord"
+        },
+        "elevation": {
+          "default": 0,
+          "description": "Vertical elevation in spaces",
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "coord"
+      ],
+      "title": "HexPosition",
+      "type": "object"
+    }
+  },
+  "description": "Runtime state for a destructible terrain feature.\n\nPer PR2:\n- Objects have armor 0-4 depending on material\n- Objects have 10 HP per size\n- Objects have evasion 5",
+  "properties": {
+    "primitive_id": {
+      "title": "Primitive Id",
+      "type": "string"
+    },
+    "position": {
+      "$ref": "#/$defs/HexPosition"
+    },
+    "size": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Size",
+      "type": "integer"
+    },
+    "hp": {
+      "minimum": 0,
+      "title": "Hp",
+      "type": "integer"
+    },
+    "max_hp": {
+      "minimum": 1,
+      "title": "Max Hp",
+      "type": "integer"
+    },
+    "armor": {
+      "default": 0,
+      "maximum": 4,
+      "minimum": 0,
+      "title": "Armor",
+      "type": "integer"
+    },
+    "evasion": {
+      "default": 5,
+      "minimum": 0,
+      "title": "Evasion",
+      "type": "integer"
+    },
+    "material": {
+      "default": "hardy",
+      "enum": [
+        "organic",
+        "tough",
+        "hardy",
+        "fortified",
+        "armored"
+      ],
+      "title": "Material",
+      "type": "string"
+    },
+    "is_destroyed": {
+      "default": false,
+      "title": "Is Destroyed",
+      "type": "boolean"
+    },
+    "provides_soft_cover": {
+      "default": false,
+      "title": "Provides Soft Cover",
+      "type": "boolean"
+    },
+    "provides_hard_cover": {
+      "default": true,
+      "title": "Provides Hard Cover",
+      "type": "boolean"
+    },
+    "hard_cover_size": {
+      "anyOf": [
+        {
+          "enum": [
+            "size_half",
+            "size_1",
+            "size_2",
+            "size_3",
+            "size_4",
+            "size_5"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hard Cover Size"
+    }
+  },
+  "required": [
+    "primitive_id",
+    "position",
+    "hp",
+    "max_hp"
+  ],
+  "title": "DestructibleTerrainState",
+  "type": "object"
+}

@@ -1,0 +1,45 @@
+{
+  "description": "Material properties for destructible terrain.\n\nPer PR2 ~4123:\n- Objects have armor 0-4 depending on material type\n- Objects have 10 HP per size\n- Objects have evasion 5",
+  "properties": {
+    "material_type": {
+      "enum": [
+        "organic",
+        "tough",
+        "hardy",
+        "fortified",
+        "armored"
+      ],
+      "title": "Material Type",
+      "type": "string"
+    },
+    "armor": {
+      "default": 0,
+      "maximum": 4,
+      "minimum": 0,
+      "title": "Armor",
+      "type": "integer"
+    },
+    "hp_per_size": {
+      "default": 10,
+      "minimum": 1,
+      "title": "Hp Per Size",
+      "type": "integer"
+    },
+    "evasion": {
+      "default": 5,
+      "minimum": 0,
+      "title": "Evasion",
+      "type": "integer"
+    },
+    "is_flammable": {
+      "default": false,
+      "title": "Is Flammable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "material_type"
+  ],
+  "title": "MaterialProperties",
+  "type": "object"
+}

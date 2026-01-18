@@ -281,6 +281,24 @@ from core.shared.campaign import (
     SessionLifecycleCheckpoint,
     MissionOutcomeReport,
 )
+from core.shared.terrain_primitives import (
+    MaterialProperties,
+    TerrainPrimitive,
+    FloorTile,
+    Obstacle,
+    SoftCoverZone,
+    Hazard,
+    Objective,
+    DestructibleTerrainState,
+    GeneratedTerrain,
+)
+from core.shared.terrain_generation import (
+    TileSetConfig,
+    TerrainGeneratorParams,
+)
+from core.shared.hide_search import (
+    SoftCoverZoneState,
+)
 
 
 # All exportable models
@@ -531,6 +549,19 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     # Action economy
     "ActionEconomyState": ActionEconomyState,
     "ActionEconomyResult": ActionEconomyResult,
+    # Terrain primitives and generation
+    "MaterialProperties": MaterialProperties,
+    "TerrainPrimitive": TerrainPrimitive,
+    "FloorTile": FloorTile,
+    "Obstacle": Obstacle,
+    "SoftCoverZone": SoftCoverZone,
+    "Hazard": Hazard,
+    "Objective": Objective,
+    "DestructibleTerrainState": DestructibleTerrainState,
+    "GeneratedTerrain": GeneratedTerrain,
+    "TileSetConfig": TileSetConfig,
+    "TerrainGeneratorParams": TerrainGeneratorParams,
+    "SoftCoverZoneState": SoftCoverZoneState,
 }
 
 

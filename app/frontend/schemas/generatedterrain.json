@@ -1,0 +1,1126 @@
+{
+  "$defs": {
+    "DestructibleTerrainState": {
+      "description": "Runtime state for a destructible terrain feature.\n\nPer PR2:\n- Objects have armor 0-4 depending on material\n- Objects have 10 HP per size\n- Objects have evasion 5",
+      "properties": {
+        "primitive_id": {
+          "title": "Primitive Id",
+          "type": "string"
+        },
+        "position": {
+          "$ref": "#/$defs/HexPosition"
+        },
+        "size": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Size",
+          "type": "integer"
+        },
+        "hp": {
+          "minimum": 0,
+          "title": "Hp",
+          "type": "integer"
+        },
+        "max_hp": {
+          "minimum": 1,
+          "title": "Max Hp",
+          "type": "integer"
+        },
+        "armor": {
+          "default": 0,
+          "maximum": 4,
+          "minimum": 0,
+          "title": "Armor",
+          "type": "integer"
+        },
+        "evasion": {
+          "default": 5,
+          "minimum": 0,
+          "title": "Evasion",
+          "type": "integer"
+        },
+        "material": {
+          "default": "hardy",
+          "enum": [
+            "organic",
+            "tough",
+            "hardy",
+            "fortified",
+            "armored"
+          ],
+          "title": "Material",
+          "type": "string"
+        },
+        "is_destroyed": {
+          "default": false,
+          "title": "Is Destroyed",
+          "type": "boolean"
+        },
+        "provides_soft_cover": {
+          "default": false,
+          "title": "Provides Soft Cover",
+          "type": "boolean"
+        },
+        "provides_hard_cover": {
+          "default": true,
+          "title": "Provides Hard Cover",
+          "type": "boolean"
+        },
+        "hard_cover_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "size_half",
+                "size_1",
+                "size_2",
+                "size_3",
+                "size_4",
+                "size_5"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Cover Size"
+        }
+      },
+      "required": [
+        "primitive_id",
+        "position",
+        "hp",
+        "max_hp"
+      ],
+      "title": "DestructibleTerrainState",
+      "type": "object"
+    },
+    "FloorTile": {
+      "description": "Floor tile primitive for normal/difficult/dangerous/climbing terrain.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "floor",
+          "default": "floor",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "coords": {
+          "items": {
+            "$ref": "#/$defs/HexCoord"
+          },
+          "title": "Coords",
+          "type": "array"
+        },
+        "floor_type": {
+          "default": "normal",
+          "enum": [
+            "normal",
+            "difficult",
+            "dangerous",
+            "climbing"
+          ],
+          "title": "Floor Type",
+          "type": "string"
+        },
+        "elevation": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        },
+        "blocks_line_of_sight": {
+          "default": false,
+          "title": "Blocks Line Of Sight",
+          "type": "boolean"
+        },
+        "provides_soft_cover": {
+          "default": false,
+          "title": "Provides Soft Cover",
+          "type": "boolean"
+        },
+        "provides_hard_cover": {
+          "default": false,
+          "title": "Provides Hard Cover",
+          "type": "boolean"
+        },
+        "hard_cover_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "size_half",
+                "size_1",
+                "size_2",
+                "size_3",
+                "size_4",
+                "size_5"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Cover Size"
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialProperties"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "zone_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "deployment",
+                "extraction",
+                "objective",
+                "ingress"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Type"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "FloorTile",
+      "type": "object"
+    },
+    "Hazard": {
+      "description": "Hazard primitive for lava, radiation, acid, electricity.\n\nPer PR2: Default 5 damage, engineering check DC 10.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "hazard",
+          "default": "hazard",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "coords": {
+          "items": {
+            "$ref": "#/$defs/HexCoord"
+          },
+          "title": "Coords",
+          "type": "array"
+        },
+        "hazard_subtype": {
+          "default": "lava",
+          "enum": [
+            "lava",
+            "acid",
+            "radiation",
+            "electricity"
+          ],
+          "title": "Hazard Subtype",
+          "type": "string"
+        },
+        "elevation": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        },
+        "blocks_line_of_sight": {
+          "default": false,
+          "title": "Blocks Line Of Sight",
+          "type": "boolean"
+        },
+        "provides_soft_cover": {
+          "default": false,
+          "title": "Provides Soft Cover",
+          "type": "boolean"
+        },
+        "provides_hard_cover": {
+          "default": false,
+          "title": "Provides Hard Cover",
+          "type": "boolean"
+        },
+        "hard_cover_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "size_half",
+                "size_1",
+                "size_2",
+                "size_3",
+                "size_4",
+                "size_5"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Cover Size"
+        },
+        "difficult": {
+          "default": false,
+          "title": "Difficult",
+          "type": "boolean"
+        },
+        "dangerous": {
+          "default": true,
+          "title": "Dangerous",
+          "type": "boolean"
+        },
+        "damage": {
+          "default": 5,
+          "minimum": 0,
+          "title": "Damage",
+          "type": "integer"
+        },
+        "damage_type": {
+          "default": "kinetic",
+          "enum": [
+            "kinetic",
+            "explosive",
+            "energy",
+            "burn"
+          ],
+          "title": "Damage Type",
+          "type": "string"
+        },
+        "check_dc": {
+          "default": 10,
+          "minimum": 0,
+          "title": "Check Dc",
+          "type": "integer"
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialProperties"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "zone_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "deployment",
+                "extraction",
+                "objective",
+                "ingress"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Type"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Hazard",
+      "type": "object"
+    },
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    },
+    "HexPosition": {
+      "description": "Hex position with optional elevation.",
+      "properties": {
+        "coord": {
+          "$ref": "#/$defs/HexCoord"
+        },
+        "elevation": {
+          "default": 0,
+          "description": "Vertical elevation in spaces",
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "coord"
+      ],
+      "title": "HexPosition",
+      "type": "object"
+    },
+    "MaterialProperties": {
+      "description": "Material properties for destructible terrain.\n\nPer PR2 ~4123:\n- Objects have armor 0-4 depending on material type\n- Objects have 10 HP per size\n- Objects have evasion 5",
+      "properties": {
+        "material_type": {
+          "enum": [
+            "organic",
+            "tough",
+            "hardy",
+            "fortified",
+            "armored"
+          ],
+          "title": "Material Type",
+          "type": "string"
+        },
+        "armor": {
+          "default": 0,
+          "maximum": 4,
+          "minimum": 0,
+          "title": "Armor",
+          "type": "integer"
+        },
+        "hp_per_size": {
+          "default": 10,
+          "minimum": 1,
+          "title": "Hp Per Size",
+          "type": "integer"
+        },
+        "evasion": {
+          "default": 5,
+          "minimum": 0,
+          "title": "Evasion",
+          "type": "integer"
+        },
+        "is_flammable": {
+          "default": false,
+          "title": "Is Flammable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "material_type"
+      ],
+      "title": "MaterialProperties",
+      "type": "object"
+    },
+    "Objective": {
+      "description": "Objective primitive for control points, extraction markers, etc.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "objective",
+          "default": "objective",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "coords": {
+          "items": {
+            "$ref": "#/$defs/HexCoord"
+          },
+          "title": "Coords",
+          "type": "array"
+        },
+        "objective_type": {
+          "default": "control_point",
+          "enum": [
+            "control_point",
+            "escort_target",
+            "extraction",
+            "ingress"
+          ],
+          "title": "Objective Type",
+          "type": "string"
+        },
+        "elevation": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        },
+        "blocks_line_of_sight": {
+          "default": false,
+          "title": "Blocks Line Of Sight",
+          "type": "boolean"
+        },
+        "provides_soft_cover": {
+          "default": false,
+          "title": "Provides Soft Cover",
+          "type": "boolean"
+        },
+        "provides_hard_cover": {
+          "default": false,
+          "title": "Provides Hard Cover",
+          "type": "boolean"
+        },
+        "hard_cover_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "size_half",
+                "size_1",
+                "size_2",
+                "size_3",
+                "size_4",
+                "size_5"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Cover Size"
+        },
+        "difficult": {
+          "default": false,
+          "title": "Difficult",
+          "type": "boolean"
+        },
+        "dangerous": {
+          "default": false,
+          "title": "Dangerous",
+          "type": "boolean"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialProperties"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "zone_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "deployment",
+                "extraction",
+                "objective",
+                "ingress"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Type"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Objective",
+      "type": "object"
+    },
+    "Obstacle": {
+      "description": "Obstacle primitive for walls, rocks, debris (destructible).\n\nPer PR2:\n- Objects have 10 HP per size\n- Objects have armor based on material (0-4)\n- Objects have evasion 5",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "obstacle",
+          "default": "obstacle",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "coords": {
+          "items": {
+            "$ref": "#/$defs/HexCoord"
+          },
+          "title": "Coords",
+          "type": "array"
+        },
+        "elevation": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        },
+        "blocks_line_of_sight": {
+          "default": true,
+          "title": "Blocks Line Of Sight",
+          "type": "boolean"
+        },
+        "provides_soft_cover": {
+          "default": false,
+          "title": "Provides Soft Cover",
+          "type": "boolean"
+        },
+        "provides_hard_cover": {
+          "default": true,
+          "title": "Provides Hard Cover",
+          "type": "boolean"
+        },
+        "hard_cover_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "size_half",
+                "size_1",
+                "size_2",
+                "size_3",
+                "size_4",
+                "size_5"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "size_1",
+          "title": "Hard Cover Size"
+        },
+        "difficult": {
+          "default": false,
+          "title": "Difficult",
+          "type": "boolean"
+        },
+        "dangerous": {
+          "default": false,
+          "title": "Dangerous",
+          "type": "boolean"
+        },
+        "size": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Size",
+          "type": "integer"
+        },
+        "hp": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hp"
+        },
+        "is_destructible": {
+          "default": true,
+          "title": "Is Destructible",
+          "type": "boolean"
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialProperties"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "zone_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "deployment",
+                "extraction",
+                "objective",
+                "ingress"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Type"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Obstacle",
+      "type": "object"
+    },
+    "SoftCoverZone": {
+      "description": "Soft cover zone primitive for smoke, foliage areas (for Hide rules).\n\nThese zones provide soft cover for hiding and may have limited duration.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "zone",
+          "default": "zone",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "coords": {
+          "items": {
+            "$ref": "#/$defs/HexCoord"
+          },
+          "title": "Coords",
+          "type": "array"
+        },
+        "zone_subtype": {
+          "default": "smoke",
+          "enum": [
+            "smoke",
+            "foliage",
+            "mist",
+            "darkness"
+          ],
+          "title": "Zone Subtype",
+          "type": "string"
+        },
+        "elevation": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        },
+        "blocks_line_of_sight": {
+          "default": false,
+          "title": "Blocks Line Of Sight",
+          "type": "boolean"
+        },
+        "provides_soft_cover": {
+          "default": true,
+          "title": "Provides Soft Cover",
+          "type": "boolean"
+        },
+        "provides_hard_cover": {
+          "default": false,
+          "title": "Provides Hard Cover",
+          "type": "boolean"
+        },
+        "hard_cover_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "size_half",
+                "size_1",
+                "size_2",
+                "size_3",
+                "size_4",
+                "size_5"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Cover Size"
+        },
+        "difficult": {
+          "default": false,
+          "title": "Difficult",
+          "type": "boolean"
+        },
+        "dangerous": {
+          "default": false,
+          "title": "Dangerous",
+          "type": "boolean"
+        },
+        "duration_rounds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Rounds"
+        },
+        "created_round": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created Round"
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialProperties"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "zone_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "deployment",
+                "extraction",
+                "objective",
+                "ingress"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Type"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "SoftCoverZone",
+      "type": "object"
+    },
+    "TerrainHex": {
+      "description": "Terrain entry for a single hex.",
+      "properties": {
+        "coord": {
+          "$ref": "#/$defs/HexCoord"
+        },
+        "elevation": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        },
+        "blocks_line_of_sight": {
+          "default": false,
+          "title": "Blocks Line Of Sight",
+          "type": "boolean"
+        },
+        "provides_soft_cover": {
+          "default": false,
+          "title": "Provides Soft Cover",
+          "type": "boolean"
+        },
+        "provides_hard_cover": {
+          "default": false,
+          "title": "Provides Hard Cover",
+          "type": "boolean"
+        },
+        "hard_cover_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "size_half",
+                "size_1",
+                "size_2",
+                "size_3",
+                "size_4",
+                "size_5"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Cover Size"
+        },
+        "difficult": {
+          "default": false,
+          "title": "Difficult",
+          "type": "boolean"
+        },
+        "dangerous": {
+          "default": false,
+          "title": "Dangerous",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "coord"
+      ],
+      "title": "TerrainHex",
+      "type": "object"
+    },
+    "TerrainMap": {
+      "description": "Sparse terrain map for combat scenarios.",
+      "properties": {
+        "tiles": {
+          "items": {
+            "$ref": "#/$defs/TerrainHex"
+          },
+          "title": "Tiles",
+          "type": "array"
+        }
+      },
+      "title": "TerrainMap",
+      "type": "object"
+    },
+    "TerrainPrimitive": {
+      "description": "Base terrain primitive representing a single or multi-hex terrain feature.\n\nPrimitives can be composed into a TerrainMap using compose_terrain_map().\nLater primitives in the composition list override earlier ones for overlapping coords.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "floor",
+            "obstacle",
+            "zone",
+            "hazard",
+            "objective"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "coords": {
+          "items": {
+            "$ref": "#/$defs/HexCoord"
+          },
+          "title": "Coords",
+          "type": "array"
+        },
+        "elevation": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Elevation",
+          "type": "integer"
+        },
+        "blocks_line_of_sight": {
+          "default": false,
+          "title": "Blocks Line Of Sight",
+          "type": "boolean"
+        },
+        "provides_soft_cover": {
+          "default": false,
+          "title": "Provides Soft Cover",
+          "type": "boolean"
+        },
+        "provides_hard_cover": {
+          "default": false,
+          "title": "Provides Hard Cover",
+          "type": "boolean"
+        },
+        "hard_cover_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "size_half",
+                "size_1",
+                "size_2",
+                "size_3",
+                "size_4",
+                "size_5"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Cover Size"
+        },
+        "difficult": {
+          "default": false,
+          "title": "Difficult",
+          "type": "boolean"
+        },
+        "dangerous": {
+          "default": false,
+          "title": "Dangerous",
+          "type": "boolean"
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialProperties"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "zone_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "deployment",
+                "extraction",
+                "objective",
+                "ingress"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Type"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name"
+      ],
+      "title": "TerrainPrimitive",
+      "type": "object"
+    }
+  },
+  "description": "Result of composing terrain primitives into a TerrainMap.\n\nContains:\n- terrain_map: The compiled TerrainMap for use with existing rules\n- primitives: Original primitives for reference\n- zones: Zone ID to coordinate mapping\n- soft_cover_zones: Soft cover zones for Hide tracking\n- destructibles: Runtime state for destructible terrain",
+  "properties": {
+    "terrain_map": {
+      "$ref": "#/$defs/TerrainMap"
+    },
+    "primitives": {
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/TerrainPrimitive"
+          },
+          {
+            "$ref": "#/$defs/FloorTile"
+          },
+          {
+            "$ref": "#/$defs/Obstacle"
+          },
+          {
+            "$ref": "#/$defs/SoftCoverZone"
+          },
+          {
+            "$ref": "#/$defs/Hazard"
+          },
+          {
+            "$ref": "#/$defs/Objective"
+          }
+        ]
+      },
+      "title": "Primitives",
+      "type": "array"
+    },
+    "zones": {
+      "additionalProperties": {
+        "items": {
+          "$ref": "#/$defs/HexCoord"
+        },
+        "type": "array"
+      },
+      "title": "Zones",
+      "type": "object"
+    },
+    "soft_cover_zones": {
+      "items": {
+        "$ref": "#/$defs/SoftCoverZone"
+      },
+      "title": "Soft Cover Zones",
+      "type": "array"
+    },
+    "destructibles": {
+      "items": {
+        "$ref": "#/$defs/DestructibleTerrainState"
+      },
+      "title": "Destructibles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "terrain_map"
+  ],
+  "title": "GeneratedTerrain",
+  "type": "object"
+}

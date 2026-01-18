@@ -1,0 +1,297 @@
+{
+  "$defs": {
+    "SitrepTemplate": {
+      "description": "Base template for SITREP scenario types per PR2 12537-12762.\n\nTemplates define mechanical parameters for different mission types.\nThey are reusable starting points for creating missions.\n\nAttributes:\n    sitrep_type: SITREP type identifier (escort, control, extract, etc.)\n    name: Display name (ESCORT, CONTROL, etc.)\n    description: Brief description of the mission type\n    duration_rounds: Default mission duration in rounds (usually 6)\n    deployment_type: Who deploys first or how deployment is determined\n    deployment_zones: Where player characters deploy\n    extraction_zone: Where objectives are extracted (escort/extract)\n    objective_zones: Zones that are objectives (control, holdout, etc.)\n    ingress_zones: Where enemy reinforcements can enter\n    reserve_pattern: How many reserves the enemy has\n    reserve_per_round: How many reserves enter per round\n    victory_conditions: List of conditions for mission victory\n    special_rules: Additional rules specific to this mission type",
+      "properties": {
+        "sitrep_type": {
+          "description": "SITREP type identifier",
+          "enum": [
+            "escort",
+            "control",
+            "extract",
+            "hold_out",
+            "gauntlet",
+            "recon"
+          ],
+          "title": "Sitrep Type",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "description": "Mission type description",
+          "title": "Description",
+          "type": "string"
+        },
+        "duration_rounds": {
+          "default": 6,
+          "minimum": 1,
+          "title": "Duration Rounds",
+          "type": "integer"
+        },
+        "deployment_type": {
+          "default": "players_first",
+          "enum": [
+            "players_first",
+            "enemies_first",
+            "roll_off"
+          ],
+          "title": "Deployment Type",
+          "type": "string"
+        },
+        "deployment_zones": {
+          "items": {
+            "$ref": "#/$defs/SitrepZone"
+          },
+          "title": "Deployment Zones",
+          "type": "array"
+        },
+        "extraction_zone": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SitrepZone"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "objective_zones": {
+          "items": {
+            "$ref": "#/$defs/SitrepZone"
+          },
+          "title": "Objective Zones",
+          "type": "array"
+        },
+        "ingress_zones": {
+          "items": {
+            "$ref": "#/$defs/SitrepZone"
+          },
+          "title": "Ingress Zones",
+          "type": "array"
+        },
+        "reserve_pattern": {
+          "default": "normal",
+          "enum": [
+            "none",
+            "half",
+            "normal",
+            "double",
+            "increasing"
+          ],
+          "title": "Reserve Pattern",
+          "type": "string"
+        },
+        "reserve_per_round": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reserve Per Round"
+        },
+        "victory_conditions": {
+          "items": {
+            "$ref": "#/$defs/VictoryCondition"
+          },
+          "title": "Victory Conditions",
+          "type": "array"
+        },
+        "special_rules": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Special Rules",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sitrep_type",
+        "name",
+        "description"
+      ],
+      "title": "SitrepTemplate",
+      "type": "object"
+    },
+    "SitrepZone": {
+      "description": "Generic zone for SITREP configurations per PR2 12550-12565.\n\nAttributes:\n    zone_type: Type of zone (deployment, extraction, objective, ingress)\n    width: Width for rectangular zones (e.g., 4 for 4x4 control zones)\n    height: Height for rectangular zones\n    location: Descriptive location (e.g., \"north_edge\", \"quadrant_nw\")\n    terrain_notes: Notes about terrain or special properties",
+      "properties": {
+        "zone_type": {
+          "enum": [
+            "deployment",
+            "extraction",
+            "objective",
+            "ingress"
+          ],
+          "title": "Zone Type",
+          "type": "string"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Width"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Height"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        },
+        "terrain_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terrain Notes"
+        }
+      },
+      "required": [
+        "zone_type"
+      ],
+      "title": "SitrepZone",
+      "type": "object"
+    },
+    "VictoryCondition": {
+      "description": "Structured victory condition for validation per PR2 rules.\n\nAttributes:\n    condition_type: Type of victory condition\n    threshold: Optional numeric threshold (e.g., zones to control)\n    description: Human-readable description of the condition",
+      "properties": {
+        "condition_type": {
+          "enum": [
+            "extract_objective",
+            "control_zones",
+            "score_above_threshold",
+            "outnumber_enemies",
+            "control_real_objective",
+            "survive_rounds"
+          ],
+          "title": "Condition Type",
+          "type": "string"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        },
+        "description": {
+          "description": "Human-readable description",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "condition_type",
+        "description"
+      ],
+      "title": "VictoryCondition",
+      "type": "object"
+    }
+  },
+  "description": "Parameters for terrain generation.",
+  "properties": {
+    "map_width": {
+      "default": 20,
+      "maximum": 40,
+      "minimum": 5,
+      "title": "Map Width",
+      "type": "integer"
+    },
+    "map_height": {
+      "default": 16,
+      "maximum": 40,
+      "minimum": 4,
+      "title": "Map Height",
+      "type": "integer"
+    },
+    "sitrep_template": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SitrepTemplate"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "tile_set": {
+      "default": "urban",
+      "enum": [
+        "urban",
+        "industrial",
+        "wilderness",
+        "zero_g"
+      ],
+      "title": "Tile Set",
+      "type": "string"
+    },
+    "seed": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Seed"
+    },
+    "density": {
+      "default": 0.3,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Density",
+      "type": "number"
+    }
+  },
+  "title": "TerrainGeneratorParams",
+  "type": "object"
+}

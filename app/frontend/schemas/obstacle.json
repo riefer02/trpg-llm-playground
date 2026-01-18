@@ -1,0 +1,210 @@
+{
+  "$defs": {
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    },
+    "MaterialProperties": {
+      "description": "Material properties for destructible terrain.\n\nPer PR2 ~4123:\n- Objects have armor 0-4 depending on material type\n- Objects have 10 HP per size\n- Objects have evasion 5",
+      "properties": {
+        "material_type": {
+          "enum": [
+            "organic",
+            "tough",
+            "hardy",
+            "fortified",
+            "armored"
+          ],
+          "title": "Material Type",
+          "type": "string"
+        },
+        "armor": {
+          "default": 0,
+          "maximum": 4,
+          "minimum": 0,
+          "title": "Armor",
+          "type": "integer"
+        },
+        "hp_per_size": {
+          "default": 10,
+          "minimum": 1,
+          "title": "Hp Per Size",
+          "type": "integer"
+        },
+        "evasion": {
+          "default": 5,
+          "minimum": 0,
+          "title": "Evasion",
+          "type": "integer"
+        },
+        "is_flammable": {
+          "default": false,
+          "title": "Is Flammable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "material_type"
+      ],
+      "title": "MaterialProperties",
+      "type": "object"
+    }
+  },
+  "description": "Obstacle primitive for walls, rocks, debris (destructible).\n\nPer PR2:\n- Objects have 10 HP per size\n- Objects have armor based on material (0-4)\n- Objects have evasion 5",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "const": "obstacle",
+      "default": "obstacle",
+      "title": "Kind",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "coords": {
+      "items": {
+        "$ref": "#/$defs/HexCoord"
+      },
+      "title": "Coords",
+      "type": "array"
+    },
+    "elevation": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Elevation",
+      "type": "integer"
+    },
+    "blocks_line_of_sight": {
+      "default": true,
+      "title": "Blocks Line Of Sight",
+      "type": "boolean"
+    },
+    "provides_soft_cover": {
+      "default": false,
+      "title": "Provides Soft Cover",
+      "type": "boolean"
+    },
+    "provides_hard_cover": {
+      "default": true,
+      "title": "Provides Hard Cover",
+      "type": "boolean"
+    },
+    "hard_cover_size": {
+      "anyOf": [
+        {
+          "enum": [
+            "size_half",
+            "size_1",
+            "size_2",
+            "size_3",
+            "size_4",
+            "size_5"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "size_1",
+      "title": "Hard Cover Size"
+    },
+    "difficult": {
+      "default": false,
+      "title": "Difficult",
+      "type": "boolean"
+    },
+    "dangerous": {
+      "default": false,
+      "title": "Dangerous",
+      "type": "boolean"
+    },
+    "size": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Size",
+      "type": "integer"
+    },
+    "hp": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hp"
+    },
+    "is_destructible": {
+      "default": true,
+      "title": "Is Destructible",
+      "type": "boolean"
+    },
+    "material": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MaterialProperties"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "zone_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "deployment",
+            "extraction",
+            "objective",
+            "ingress"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Zone Type"
+    }
+  },
+  "required": [
+    "id",
+    "name"
+  ],
+  "title": "Obstacle",
+  "type": "object"
+}

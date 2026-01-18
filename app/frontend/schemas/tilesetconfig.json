@@ -1,0 +1,107 @@
+{
+  "description": "Configuration for a terrain tile set.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "features": {
+      "items": {
+        "enum": [
+          "building",
+          "wall",
+          "rubble",
+          "barricade",
+          "vehicle",
+          "machinery",
+          "catwalk",
+          "pipe",
+          "container",
+          "vat",
+          "tree",
+          "rock",
+          "stream",
+          "brush",
+          "fallen_log",
+          "debris",
+          "asteroid",
+          "hull",
+          "cargo"
+        ],
+        "type": "string"
+      },
+      "title": "Features",
+      "type": "array"
+    },
+    "materials": {
+      "items": {
+        "enum": [
+          "organic",
+          "tough",
+          "hardy",
+          "fortified",
+          "armored"
+        ],
+        "type": "string"
+      },
+      "title": "Materials",
+      "type": "array"
+    },
+    "hazards": {
+      "items": {
+        "enum": [
+          "electricity",
+          "acid",
+          "steam",
+          "lava",
+          "radiation"
+        ],
+        "type": "string"
+      },
+      "title": "Hazards",
+      "type": "array"
+    },
+    "cover_density": {
+      "default": 0.3,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Cover Density",
+      "type": "number"
+    },
+    "elevation_range": {
+      "default": [
+        0,
+        0
+      ],
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "Elevation Range",
+      "type": "array"
+    },
+    "soft_cover_zones": {
+      "default": false,
+      "title": "Soft Cover Zones",
+      "type": "boolean"
+    },
+    "special_rules": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Special Rules",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "TileSetConfig",
+  "type": "object"
+}

@@ -237,7 +237,19 @@ export type LancerTTRPGSchema =
   | AvailableAction
   | AvailableActionsResult
   | ActionEconomyState2
-  | ActionEconomyResult;
+  | ActionEconomyResult
+  | MaterialProperties
+  | TerrainPrimitive
+  | FloorTile
+  | Obstacle
+  | SoftCoverZone
+  | Hazard
+  | Objective
+  | DestructibleTerrainState
+  | GeneratedTerrain
+  | TileSetConfig
+  | TerrainGeneratorParams
+  | SoftCoverZoneState;
 export type Id = string;
 /**
  * The pilot's callsign
@@ -30309,6 +30321,188 @@ export type Errors = string[];
  * Non-blocking warnings
  */
 export type Warnings = string[];
+export type MaterialType = "organic" | "tough" | "hardy" | "fortified" | "armored";
+export type Armor6 = number;
+export type HpPerSize1 = number;
+export type Evasion8 = number;
+export type IsFlammable = boolean;
+export type Id26 = string;
+export type Kind2 = "floor" | "obstacle" | "zone" | "hazard" | "objective";
+export type Name46 = string;
+export type Coords = HexCoord[];
+export type Elevation2 = number;
+export type BlocksLineOfSight2 = boolean;
+export type ProvidesSoftCover2 = boolean;
+export type ProvidesHardCover1 = boolean;
+export type HardCoverSize1 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
+export type Difficult1 = boolean;
+export type Dangerous1 = boolean;
+export type ZoneType = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type Id27 = string;
+export type Kind3 = "floor";
+export type Name47 = string;
+export type Coords1 = HexCoord[];
+export type FloorType = "normal" | "difficult" | "dangerous" | "climbing";
+export type Elevation3 = number;
+export type BlocksLineOfSight3 = boolean;
+export type ProvidesSoftCover3 = boolean;
+export type ProvidesHardCover2 = boolean;
+export type HardCoverSize2 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
+export type ZoneType1 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type Id28 = string;
+export type Kind4 = "obstacle";
+export type Name48 = string;
+export type Coords2 = HexCoord[];
+export type Elevation4 = number;
+export type BlocksLineOfSight4 = boolean;
+export type ProvidesSoftCover4 = boolean;
+export type ProvidesHardCover3 = boolean;
+export type HardCoverSize3 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
+export type Difficult2 = boolean;
+export type Dangerous2 = boolean;
+export type Size18 = number;
+export type Hp7 = number | null;
+export type IsDestructible = boolean;
+export type ZoneType2 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type Id29 = string;
+export type Kind5 = "zone";
+export type Name49 = string;
+export type Coords3 = HexCoord[];
+export type ZoneSubtype = "smoke" | "foliage" | "mist" | "darkness";
+export type Elevation5 = number;
+export type BlocksLineOfSight5 = boolean;
+export type ProvidesSoftCover5 = boolean;
+export type ProvidesHardCover4 = boolean;
+export type HardCoverSize4 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
+export type Difficult3 = boolean;
+export type Dangerous3 = boolean;
+export type DurationRounds = number | null;
+export type CreatedRound = number | null;
+export type ZoneType3 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type Id30 = string;
+export type Kind6 = "hazard";
+export type Name50 = string;
+export type Coords4 = HexCoord[];
+export type HazardSubtype = "lava" | "acid" | "radiation" | "electricity";
+export type Elevation6 = number;
+export type BlocksLineOfSight6 = boolean;
+export type ProvidesSoftCover6 = boolean;
+export type ProvidesHardCover5 = boolean;
+export type HardCoverSize5 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
+export type Difficult4 = boolean;
+export type Dangerous4 = boolean;
+export type Damage4 = number;
+export type DamageType15 = "kinetic" | "explosive" | "energy" | "burn";
+export type CheckDc = number;
+export type ZoneType4 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type Id31 = string;
+export type Kind7 = "objective";
+export type Name51 = string;
+export type Coords5 = HexCoord[];
+export type ObjectiveType = "control_point" | "escort_target" | "extraction" | "ingress";
+export type Elevation7 = number;
+export type BlocksLineOfSight7 = boolean;
+export type ProvidesSoftCover7 = boolean;
+export type ProvidesHardCover6 = boolean;
+export type HardCoverSize6 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
+export type Difficult5 = boolean;
+export type Dangerous5 = boolean;
+export type ZoneId = string | null;
+export type ZoneType5 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type PrimitiveId = string;
+export type Size19 = number;
+export type Hp8 = number;
+export type MaxHp1 = number;
+export type Armor7 = number;
+export type Evasion9 = number;
+export type Material = "organic" | "tough" | "hardy" | "fortified" | "armored";
+export type IsDestroyed1 = boolean;
+export type ProvidesSoftCover8 = boolean;
+export type ProvidesHardCover7 = boolean;
+export type HardCoverSize7 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
+export type Primitives = (TerrainPrimitive | FloorTile | Obstacle | SoftCoverZone | Hazard | Objective)[];
+export type SoftCoverZones = SoftCoverZone[];
+export type Destructibles = DestructibleTerrainState[];
+export type Name52 = string;
+export type Features = (
+  | "building"
+  | "wall"
+  | "rubble"
+  | "barricade"
+  | "vehicle"
+  | "machinery"
+  | "catwalk"
+  | "pipe"
+  | "container"
+  | "vat"
+  | "tree"
+  | "rock"
+  | "stream"
+  | "brush"
+  | "fallen_log"
+  | "debris"
+  | "asteroid"
+  | "hull"
+  | "cargo"
+)[];
+export type Materials = ("organic" | "tough" | "hardy" | "fortified" | "armored")[];
+export type Hazards = ("electricity" | "acid" | "steam" | "lava" | "radiation")[];
+export type CoverDensity = number;
+/**
+ * @minItems 2
+ * @maxItems 2
+ */
+export type ElevationRange = [unknown, unknown];
+export type SoftCoverZones1 = boolean;
+export type SpecialRules = string[];
+export type MapWidth = number;
+export type MapHeight = number;
+/**
+ * SITREP type identifier
+ */
+export type SitrepType = "escort" | "control" | "extract" | "hold_out" | "gauntlet" | "recon";
+/**
+ * Display name
+ */
+export type Name53 = string;
+/**
+ * Mission type description
+ */
+export type Description8 = string;
+export type DurationRounds1 = number;
+export type DeploymentType = "players_first" | "enemies_first" | "roll_off";
+export type ZoneType6 = "deployment" | "extraction" | "objective" | "ingress";
+export type Width1 = number | null;
+export type Height1 = number | null;
+export type Location = string | null;
+export type TerrainNotes = string | null;
+export type DeploymentZones = SitrepZone[];
+export type ObjectiveZones = SitrepZone[];
+export type IngressZones = SitrepZone[];
+export type ReservePattern = "none" | "half" | "normal" | "double" | "increasing";
+export type ReservePerRound = number | null;
+export type ConditionType1 =
+  | "extract_objective"
+  | "control_zones"
+  | "score_above_threshold"
+  | "outnumber_enemies"
+  | "control_real_objective"
+  | "survive_rounds";
+export type Threshold1 = number | null;
+/**
+ * Human-readable description
+ */
+export type Description9 = string;
+export type VictoryConditions = VictoryCondition[];
+export type SpecialRules1 = string[];
+export type TileSet = "urban" | "industrial" | "wilderness" | "zero_g";
+export type Seed = number | null;
+export type Density = number;
+export type ZoneId1 = string;
+export type Coords6 = HexCoord[];
+export type ZoneSubtype1 = string;
+export type CreatedRound1 = number | null;
+export type DurationRounds2 = number | null;
 
 /**
  * A Lancer pilot character.
@@ -36238,5 +36432,311 @@ export interface ActionEconomyResult {
   can_take_reaction: CanTakeReaction;
   errors?: Errors;
   warnings?: Warnings;
+  [k: string]: unknown;
+}
+/**
+ * Material properties for destructible terrain.
+ *
+ * Per PR2 ~4123:
+ * - Objects have armor 0-4 depending on material type
+ * - Objects have 10 HP per size
+ * - Objects have evasion 5
+ */
+export interface MaterialProperties {
+  material_type: MaterialType;
+  armor?: Armor6;
+  hp_per_size?: HpPerSize1;
+  evasion?: Evasion8;
+  is_flammable?: IsFlammable;
+  [k: string]: unknown;
+}
+/**
+ * Base terrain primitive representing a single or multi-hex terrain feature.
+ *
+ * Primitives can be composed into a TerrainMap using compose_terrain_map().
+ * Later primitives in the composition list override earlier ones for overlapping coords.
+ */
+export interface TerrainPrimitive {
+  id: Id26;
+  kind: Kind2;
+  name: Name46;
+  coords?: Coords;
+  elevation?: Elevation2;
+  blocks_line_of_sight?: BlocksLineOfSight2;
+  provides_soft_cover?: ProvidesSoftCover2;
+  provides_hard_cover?: ProvidesHardCover1;
+  hard_cover_size?: HardCoverSize1;
+  difficult?: Difficult1;
+  dangerous?: Dangerous1;
+  material?: MaterialProperties | null;
+  zone_type?: ZoneType;
+  [k: string]: unknown;
+}
+/**
+ * Floor tile primitive for normal/difficult/dangerous/climbing terrain.
+ */
+export interface FloorTile {
+  id: Id27;
+  kind?: Kind3;
+  name: Name47;
+  coords?: Coords1;
+  floor_type?: FloorType;
+  elevation?: Elevation3;
+  blocks_line_of_sight?: BlocksLineOfSight3;
+  provides_soft_cover?: ProvidesSoftCover3;
+  provides_hard_cover?: ProvidesHardCover2;
+  hard_cover_size?: HardCoverSize2;
+  material?: MaterialProperties | null;
+  zone_type?: ZoneType1;
+  [k: string]: unknown;
+}
+/**
+ * Obstacle primitive for walls, rocks, debris (destructible).
+ *
+ * Per PR2:
+ * - Objects have 10 HP per size
+ * - Objects have armor based on material (0-4)
+ * - Objects have evasion 5
+ */
+export interface Obstacle {
+  id: Id28;
+  kind?: Kind4;
+  name: Name48;
+  coords?: Coords2;
+  elevation?: Elevation4;
+  blocks_line_of_sight?: BlocksLineOfSight4;
+  provides_soft_cover?: ProvidesSoftCover4;
+  provides_hard_cover?: ProvidesHardCover3;
+  hard_cover_size?: HardCoverSize3;
+  difficult?: Difficult2;
+  dangerous?: Dangerous2;
+  size?: Size18;
+  hp?: Hp7;
+  is_destructible?: IsDestructible;
+  material?: MaterialProperties | null;
+  zone_type?: ZoneType2;
+  [k: string]: unknown;
+}
+/**
+ * Soft cover zone primitive for smoke, foliage areas (for Hide rules).
+ *
+ * These zones provide soft cover for hiding and may have limited duration.
+ */
+export interface SoftCoverZone {
+  id: Id29;
+  kind?: Kind5;
+  name: Name49;
+  coords?: Coords3;
+  zone_subtype?: ZoneSubtype;
+  elevation?: Elevation5;
+  blocks_line_of_sight?: BlocksLineOfSight5;
+  provides_soft_cover?: ProvidesSoftCover5;
+  provides_hard_cover?: ProvidesHardCover4;
+  hard_cover_size?: HardCoverSize4;
+  difficult?: Difficult3;
+  dangerous?: Dangerous3;
+  duration_rounds?: DurationRounds;
+  created_round?: CreatedRound;
+  material?: MaterialProperties | null;
+  zone_type?: ZoneType3;
+  [k: string]: unknown;
+}
+/**
+ * Hazard primitive for lava, radiation, acid, electricity.
+ *
+ * Per PR2: Default 5 damage, engineering check DC 10.
+ */
+export interface Hazard {
+  id: Id30;
+  kind?: Kind6;
+  name: Name50;
+  coords?: Coords4;
+  hazard_subtype?: HazardSubtype;
+  elevation?: Elevation6;
+  blocks_line_of_sight?: BlocksLineOfSight6;
+  provides_soft_cover?: ProvidesSoftCover6;
+  provides_hard_cover?: ProvidesHardCover5;
+  hard_cover_size?: HardCoverSize5;
+  difficult?: Difficult4;
+  dangerous?: Dangerous4;
+  damage?: Damage4;
+  damage_type?: DamageType15;
+  check_dc?: CheckDc;
+  material?: MaterialProperties | null;
+  zone_type?: ZoneType4;
+  [k: string]: unknown;
+}
+/**
+ * Objective primitive for control points, extraction markers, etc.
+ */
+export interface Objective {
+  id: Id31;
+  kind?: Kind7;
+  name: Name51;
+  coords?: Coords5;
+  objective_type?: ObjectiveType;
+  elevation?: Elevation7;
+  blocks_line_of_sight?: BlocksLineOfSight7;
+  provides_soft_cover?: ProvidesSoftCover7;
+  provides_hard_cover?: ProvidesHardCover6;
+  hard_cover_size?: HardCoverSize6;
+  difficult?: Difficult5;
+  dangerous?: Dangerous5;
+  zone_id?: ZoneId;
+  material?: MaterialProperties | null;
+  zone_type?: ZoneType5;
+  [k: string]: unknown;
+}
+/**
+ * Runtime state for a destructible terrain feature.
+ *
+ * Per PR2:
+ * - Objects have armor 0-4 depending on material
+ * - Objects have 10 HP per size
+ * - Objects have evasion 5
+ */
+export interface DestructibleTerrainState {
+  primitive_id: PrimitiveId;
+  position: HexPosition;
+  size?: Size19;
+  hp: Hp8;
+  max_hp: MaxHp1;
+  armor?: Armor7;
+  evasion?: Evasion9;
+  material?: Material;
+  is_destroyed?: IsDestroyed1;
+  provides_soft_cover?: ProvidesSoftCover8;
+  provides_hard_cover?: ProvidesHardCover7;
+  hard_cover_size?: HardCoverSize7;
+  [k: string]: unknown;
+}
+/**
+ * Result of composing terrain primitives into a TerrainMap.
+ *
+ * Contains:
+ * - terrain_map: The compiled TerrainMap for use with existing rules
+ * - primitives: Original primitives for reference
+ * - zones: Zone ID to coordinate mapping
+ * - soft_cover_zones: Soft cover zones for Hide tracking
+ * - destructibles: Runtime state for destructible terrain
+ */
+export interface GeneratedTerrain {
+  terrain_map: TerrainMap;
+  primitives?: Primitives;
+  zones?: Zones1;
+  soft_cover_zones?: SoftCoverZones;
+  destructibles?: Destructibles;
+  [k: string]: unknown;
+}
+export interface Zones1 {
+  [k: string]: HexCoord[];
+}
+/**
+ * Configuration for a terrain tile set.
+ */
+export interface TileSetConfig {
+  name: Name52;
+  features?: Features;
+  materials?: Materials;
+  hazards?: Hazards;
+  cover_density?: CoverDensity;
+  elevation_range?: ElevationRange;
+  soft_cover_zones?: SoftCoverZones1;
+  special_rules?: SpecialRules;
+  [k: string]: unknown;
+}
+/**
+ * Parameters for terrain generation.
+ */
+export interface TerrainGeneratorParams {
+  map_width?: MapWidth;
+  map_height?: MapHeight;
+  sitrep_template?: SitrepTemplate | null;
+  tile_set?: TileSet;
+  seed?: Seed;
+  density?: Density;
+  [k: string]: unknown;
+}
+/**
+ * Base template for SITREP scenario types per PR2 12537-12762.
+ *
+ * Templates define mechanical parameters for different mission types.
+ * They are reusable starting points for creating missions.
+ *
+ * Attributes:
+ *     sitrep_type: SITREP type identifier (escort, control, extract, etc.)
+ *     name: Display name (ESCORT, CONTROL, etc.)
+ *     description: Brief description of the mission type
+ *     duration_rounds: Default mission duration in rounds (usually 6)
+ *     deployment_type: Who deploys first or how deployment is determined
+ *     deployment_zones: Where player characters deploy
+ *     extraction_zone: Where objectives are extracted (escort/extract)
+ *     objective_zones: Zones that are objectives (control, holdout, etc.)
+ *     ingress_zones: Where enemy reinforcements can enter
+ *     reserve_pattern: How many reserves the enemy has
+ *     reserve_per_round: How many reserves enter per round
+ *     victory_conditions: List of conditions for mission victory
+ *     special_rules: Additional rules specific to this mission type
+ */
+export interface SitrepTemplate {
+  sitrep_type: SitrepType;
+  name: Name53;
+  description: Description8;
+  duration_rounds?: DurationRounds1;
+  deployment_type?: DeploymentType;
+  deployment_zones?: DeploymentZones;
+  extraction_zone?: SitrepZone | null;
+  objective_zones?: ObjectiveZones;
+  ingress_zones?: IngressZones;
+  reserve_pattern?: ReservePattern;
+  reserve_per_round?: ReservePerRound;
+  victory_conditions?: VictoryConditions;
+  special_rules?: SpecialRules1;
+  [k: string]: unknown;
+}
+/**
+ * Generic zone for SITREP configurations per PR2 12550-12565.
+ *
+ * Attributes:
+ *     zone_type: Type of zone (deployment, extraction, objective, ingress)
+ *     width: Width for rectangular zones (e.g., 4 for 4x4 control zones)
+ *     height: Height for rectangular zones
+ *     location: Descriptive location (e.g., "north_edge", "quadrant_nw")
+ *     terrain_notes: Notes about terrain or special properties
+ */
+export interface SitrepZone {
+  zone_type: ZoneType6;
+  width?: Width1;
+  height?: Height1;
+  location?: Location;
+  terrain_notes?: TerrainNotes;
+  [k: string]: unknown;
+}
+/**
+ * Structured victory condition for validation per PR2 rules.
+ *
+ * Attributes:
+ *     condition_type: Type of victory condition
+ *     threshold: Optional numeric threshold (e.g., zones to control)
+ *     description: Human-readable description of the condition
+ */
+export interface VictoryCondition {
+  condition_type: ConditionType1;
+  threshold?: Threshold1;
+  description: Description9;
+  [k: string]: unknown;
+}
+/**
+ * Runtime state for a soft cover zone with duration tracking.
+ *
+ * Used for smoke clouds, foliage areas, and other zones that provide
+ * soft cover for hiding but may expire after a set number of rounds.
+ */
+export interface SoftCoverZoneState {
+  zone_id: ZoneId1;
+  coords: Coords6;
+  zone_subtype: ZoneSubtype1;
+  created_round?: CreatedRound1;
+  duration_rounds?: DurationRounds2;
   [k: string]: unknown;
 }

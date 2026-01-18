@@ -39,6 +39,91 @@ from core.shared.terrain import get_terrain_at
 from core.mech.statuses import get_status_definition
 
 
+# =============================================================================
+# Soft Cover Zone Tracking (for terrain primitives integration)
+# =============================================================================
+
+
+class SoftCoverZoneState(FrozenModel):
+    """Runtime state for a soft cover zone with duration tracking.
+
+    Used for smoke clouds, foliage areas, and other zones that provide
+    soft cover for hiding but may expire after a set number of rounds.
+    """
+
+    zone_id: str
+    coords: frozenset[HexCoord]
+    zone_subtype: str  # "smoke", "foliage", "mist", "darkness"
+    created_round: int | None = None
+    duration_rounds: int | None = None  # None = permanent
+
+
+def is_in_active_soft_cover_zone(
+    zones: list[SoftCoverZoneState],
+    coord: HexCoord,
+    current_round: int | None = None,
+) -> bool:
+    """Check if coord is in an active (non-expired) soft cover zone.
+
+    Args:
+        zones: List of soft cover zone states
+        coord: The coordinate to check
+        current_round: Current round number for expiration check
+
+    Returns:
+        True if coord is in an active zone
+    """
+    for zone in zones:
+        if coord not in zone.coords:
+            continue
+
+        # Check if zone has expired
+        if zone.duration_rounds is not None and current_round is not None:
+            if zone.created_round is not None:
+                elapsed = current_round - zone.created_round
+                if elapsed >= zone.duration_rounds:
+                    continue  # Zone expired
+
+        return True
+
+    return False
+
+
+def check_soft_cover_for_hide(
+    terrain: TerrainMap | None,
+    soft_cover_zones: list[SoftCoverZoneState],
+    target_coord: HexCoord,
+    current_round: int | None = None,
+    min_adjacent_hexes: int = 3,
+) -> bool:
+    """Combined check for soft cover area: terrain OR active zone.
+
+    This integrates terrain-based soft cover with zone-based soft cover
+    from terrain primitives.
+
+    Args:
+        terrain: The terrain map (for terrain-based soft cover)
+        soft_cover_zones: List of active soft cover zones
+        target_coord: The coordinate to check
+        current_round: Current round number for zone expiration
+        min_adjacent_hexes: Minimum adjacent hexes for terrain-based area
+
+    Returns:
+        True if target is in a soft cover area/zone
+    """
+    # Check zone-based soft cover first
+    if is_in_active_soft_cover_zone(zones=soft_cover_zones, coord=target_coord, current_round=current_round):
+        return True
+
+    # Fall back to terrain-based soft cover
+    return is_soft_cover_area(terrain=terrain, target_coord=target_coord, min_adjacent_hexes=min_adjacent_hexes)
+
+
+# =============================================================================
+# Original Hide/Search Types and Functions
+# =============================================================================
+
+
 class HideAttempt(FrozenModel):
     """Input for hide action resolution."""
 
