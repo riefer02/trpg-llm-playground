@@ -9,6 +9,7 @@ This project is organized into three domains:
 ```text
 trpg-llm-playground/
 ├── core/                   # Type-driven Lancer mechanics (Pydantic v2)
+│   ├── character/          # Unified character model (pilot + mech)
 │   ├── pilot/              # Pilot domain (skills, talents, licenses)
 │   ├── mech/               # Mech domain (frames, weapons, combat)
 │   ├── shared/             # Shared types (dice, enums, effects)
@@ -37,12 +38,12 @@ trpg-llm-playground/
 ### Using the Type System
 
 ```python
-from core import Pilot, SkillSet, create_ll0_pilot, PilotTrigger, Talent
+from core import SkillSet, create_ll0_character, PilotTrigger, Talent
 from core.pilot import STANDARD_BACKGROUNDS
-from core.shared.ids import PilotId, TalentId
+from core.shared.ids import CharacterId, TalentId
 
-# Create a new pilot
-pilot = create_ll0_pilot(
+# Create a new LL0 character (pilot + mech)
+character = create_ll0_character(
     callsign="PHOENIX",
     name="Alex Chen",
     background=STANDARD_BACKGROUNDS[0],
@@ -60,8 +61,12 @@ pilot = create_ll0_pilot(
     ],
 )
 
-print(f"{pilot.callsign} - LL{pilot.level}, HP: {pilot.hp}, Grit: {pilot.grit}")
-# PHOENIX - LL0, HP: 6, Grit: 0
+stats = character.active_mech_stats
+print(
+    f"{character.pilot.callsign} - LL{character.pilot.level}, "
+    f"Mech HP: {stats.hp}, Grit: {character.pilot.grit}"
+)
+# PHOENIX - LL0, Mech HP: 10, Grit: 0
 
 # Export to JSON Schema
 from core.export import export_all_schemas
@@ -103,6 +108,14 @@ python scripts/local_chat.py --chunks dataset/lancer_v1_chunks.jsonl --ui
 ## Core Type System
 
 The `/core` directory is the source of truth for all mechanics. The app and pipeline consume these types directly.
+
+### Character Domain (`core/character/`)
+
+| Module | Contents |
+|--------|----------|
+| `character.py` | Unified Character model (pilot + mech configurations) |
+| `factory.py` | Character creation helpers (LL0, empty, etc.) |
+| `validation.py` | Holistic character validation (pilot + mech rules) |
 
 ### Pilot Domain (`core/pilot/`)
 
@@ -161,8 +174,8 @@ python -m core.export --model Pilot
 
 ### Coverage & Validation Status
 
-- Coverage is focused on **mechanical rules** only (no flavor text), with shared effect primitives in `core/shared/effects.py`.
-- Pilot domain (skills, triggers, gear, talents, licenses, core bonuses) is typed and validated; mech domain (frames, weapons, systems, combat) is actively expanding.
+- Coverage is focused on **mechanical rules** only (no flavor text), with shared effect primitives in `core/shared/effects/`.
+- Character is the primary entry point (pilot + mech); pilot, mech, NPC, and GM toolkit domains are typed and validated with ongoing expansion tracked in `notes/mechanics_coverage_map.md`.
 - Remaining gaps are tracked in `notes/mechanics_coverage_map.md`; new mechanics should extend typed effects rather than add untyped strings.
 - Core validation runs through schema tests (`make test-core`) and example builds; JSON Schema export is supported for integration.
 
