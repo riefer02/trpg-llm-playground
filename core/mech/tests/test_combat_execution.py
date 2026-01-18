@@ -3218,3 +3218,457 @@ class TestMountDismountEject:
         eject_effect = next(e for e in result.effects_applied if e.get("type") == "eject")
         assert eject_effect["success"] is False
         assert "already used" in eject_effect["reason"]
+
+
+# =============================================================================
+# Cover Modifier Tests
+# =============================================================================
+
+
+class TestCoverModifiers:
+    """Tests for cover modifiers in attack resolution."""
+
+    def test_soft_cover_adds_difficulty_ranged(self):
+        """Soft cover terrain should add +1 difficulty to ranged attacks."""
+        from unittest.mock import patch
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=5,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+        )
+        # Create terrain with soft cover at target's position
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=2, r=0), provides_soft_cover=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="assault_rifle",
+        )
+
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        # Check cover modifier effect was logged
+        cover_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "cover_modifier"),
+            None
+        )
+        assert cover_effect is not None
+        assert cover_effect["cover_type"] == "soft"
+        assert cover_effect["difficulty_added"] == 1
+
+        # Check status_modifiers includes cover_diff
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        assert attack_effect["status_modifiers"]["cover_diff"] == 1
+
+    def test_hard_cover_adds_difficulty_ranged(self):
+        """Hard cover terrain should add +2 difficulty to ranged attacks."""
+        from unittest.mock import patch
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=5,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Target adjacent to hard cover
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+        )
+        # Create terrain with hard cover adjacent to target
+        terrain = TerrainMap(tiles=[
+            TerrainHex(
+                coord=HexCoord(q=3, r=0),
+                provides_hard_cover=True,
+                hard_cover_size="size_1",
+            ),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="assault_rifle",
+        )
+
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        # Check cover modifier effect was logged
+        cover_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "cover_modifier"),
+            None
+        )
+        assert cover_effect is not None
+        assert cover_effect["cover_type"] == "hard"
+        assert cover_effect["difficulty_added"] == 2
+
+    def test_cover_ignored_for_melee(self):
+        """Melee attacks should ignore cover modifiers."""
+        from unittest.mock import patch
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=5,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        # Create terrain with soft cover at target's position
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), provides_soft_cover=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        # Use melee weapon (heavy_melee_weapon is threat-only)
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="heavy_melee_weapon",
+        )
+
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        # No cover modifier should be logged for melee
+        cover_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "cover_modifier"),
+            None
+        )
+        assert cover_effect is None
+
+        # Check status_modifiers has cover_diff = 0
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        assert attack_effect["status_modifiers"]["cover_diff"] == 0
+
+    def test_no_cover_modifier_without_terrain(self):
+        """Should gracefully handle scenarios without terrain."""
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=5,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+        )
+        # No terrain
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="assault_rifle",
+        )
+
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        # No cover modifier should be logged
+        cover_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "cover_modifier"),
+            None
+        )
+        assert cover_effect is None
+
+        # Check status_modifiers has cover_diff = 0
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        assert attack_effect["status_modifiers"]["cover_diff"] == 0
+
+    def test_flanking_negates_hard_cover(self):
+        """Flanking position should negate hard cover bonus.
+
+        Per PR2: Flanking requires the attacker to be adjacent to the target
+        AND on the same row as target relative to hard cover. This means the
+        attacker is on the opposite side of the target from the cover.
+        """
+        from unittest.mock import patch
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        # Setup:
+        # - Hard cover at (1, 0)
+        # - Target at (2, 0) - adjacent to hard cover
+        # - Attacker at (3, 0) - adjacent to target, on opposite side from cover
+        # This is a flanking position: cover(1,0) -> target(2,0) -> attacker(3,0)
+        actor = make_combatant(
+            id="actor_1",
+            grit=5,
+            position=HexPosition(coord=HexCoord(q=3, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+        )
+        terrain = TerrainMap(tiles=[
+            TerrainHex(
+                coord=HexCoord(q=1, r=0),
+                provides_hard_cover=True,
+                hard_cover_size="size_1",
+            ),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="assault_rifle",
+        )
+
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        # If flanking is detected, hard cover should be negated
+        # The cover_diff should be 0 (flanked) or at most 1 (soft cover fallback)
+        assert attack_effect["status_modifiers"]["cover_diff"] < 2
+
+
+# =============================================================================
+# Damage Modifier Tests
+# =============================================================================
+
+
+class TestDamageModifiers:
+    """Tests for damage modifiers (exposed, shredded) in attack resolution."""
+
+    def test_exposed_doubles_damage(self):
+        """Exposed status should double damage dealt."""
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=5,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target_1",
+            hp_max=50,
+            hp_current=50,
+            statuses=["exposed"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="assault_rifle",  # 1d6 damage
+        )
+
+        # Force hit but not crit (roll 15), and fixed damage (roll 3 on d6)
+        with patch("core.shared.rolls._roll_d20", return_value=15), \
+             patch("core.mech.combat_execution.random.randint", return_value=3):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        # Check exposed multiplier effect was logged
+        exposed_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "exposed_multiplier"),
+            None
+        )
+        assert exposed_effect is not None
+        assert exposed_effect["multiplier"] == 2
+
+        # Verify damage was doubled (3 * 2 = 6)
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert updated_target.resources.hp_current == 50 - 6
+
+    def test_exposed_stacks_with_critical(self):
+        """Critical hit + exposed should result in 4x damage."""
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=5,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target_1",
+            hp_max=50,
+            hp_current=50,
+            statuses=["exposed"],
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="assault_rifle",  # 1d6 damage
+        )
+
+        # Force critical hit (roll 20), and fixed damage (roll 3 on d6)
+        with patch("core.shared.rolls._roll_d20", return_value=20), \
+             patch("core.mech.combat_execution.random.randint", return_value=3):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        assert attack_effect["critical"] is True
+
+        exposed_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "exposed_multiplier"),
+            None
+        )
+        assert exposed_effect is not None
+
+        # Verify damage was quadrupled: 3 * 2 (crit) * 2 (exposed) = 12
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert updated_target.resources.hp_current == 50 - 12
+
+    def test_shredded_ignores_armor(self):
+        """Shredded status should bypass all armor."""
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=5,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Create target with armor
+        target = CombatantState(
+            id="target_1",
+            name="Armored Target",
+            side="hostiles",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=50,
+                evasion=8,
+                e_defense=8,
+                armor=3,  # 3 armor
+                speed=4,
+                sensor_range=10,
+                tech_attack=0,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=50,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            statuses=["shredded"],
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="assault_rifle",  # 1d6 damage, no AP
+        )
+
+        # Force hit (roll 15), and fixed damage (roll 4 on d6)
+        with patch("core.shared.rolls._roll_d20", return_value=15), \
+             patch("core.mech.combat_execution.random.randint", return_value=4):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        # Check shredded armor bypass effect was logged
+        shredded_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "shredded_armor_bypass"),
+            None
+        )
+        assert shredded_effect is not None
+        assert shredded_effect["armor_bypassed"] == 3
+
+        # Verify full damage was dealt (armor bypassed)
+        # Without shredded: 4 - 3 armor = 1 damage
+        # With shredded: 4 damage (armor ignored)
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert updated_target.resources.hp_current == 50 - 4

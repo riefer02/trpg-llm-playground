@@ -1003,9 +1003,21 @@ def execute_action(
                 target, is_ranged_attack
             )
 
+            # Get cover modifier for ranged attacks
+            cover_difficulty = 0
+            cover_info = None
+            if is_ranged_attack:
+                cover_difficulty, cover_info = _get_cover_modifier(
+                    scenario, actor, target
+                )
+                if cover_info is not None:
+                    effects_applied.append(cover_info)
+
             # Combine all accuracy/difficulty modifiers
             final_accuracy_bonus = accuracy_bonus + attacker_acc_mod + target_acc_mod
-            final_difficulty_bonus = difficulty_bonus + attacker_diff_mod + target_diff_mod
+            final_difficulty_bonus = (
+                difficulty_bonus + attacker_diff_mod + target_diff_mod + cover_difficulty
+            )
 
             attack_result = resolve_attack(
                 attack_bonus=attack_bonus,
@@ -1042,6 +1054,7 @@ def execute_action(
                     "attacker_diff": attacker_diff_mod,
                     "target_acc": target_acc_mod,
                     "target_diff": target_diff_mod,
+                    "cover_diff": cover_difficulty,
                 },
             })
 
@@ -1070,11 +1083,31 @@ def execute_action(
                     self_overkill_heat += overkill_heat
 
                 final_damage = base_damage * 2 if attack_result.is_critical else base_damage
+
+                # Apply exposed damage multiplier (stacks with critical: crit + exposed = 4x)
+                if "exposed" in target.statuses:
+                    final_damage = final_damage * 2
+                    effects_applied.append({
+                        "type": "exposed_multiplier",
+                        "target_id": target_id,
+                        "multiplier": 2,
+                    })
+
                 if reliable_value is not None and final_damage < reliable_value:
                     final_damage = reliable_value
 
+                # Shredded ignores armor
+                effective_ap = armor_piercing
+                if "shredded" in target.statuses:
+                    effective_ap = target.stats.armor if target.stats else 0
+                    effects_applied.append({
+                        "type": "shredded_armor_bypass",
+                        "target_id": target_id,
+                        "armor_bypassed": effective_ap,
+                    })
+
                 scenario, change, structure_result = apply_damage(
-                    scenario, target_id, final_damage, armor_piercing
+                    scenario, target_id, final_damage, effective_ap
                 )
                 resource_changes.append(change)
                 damage_dealt += abs(change.hp_change or 0)
@@ -2813,6 +2846,53 @@ def _check_invisibility_miss(target: CombatantState) -> bool:
         return False
 
     return random.random() < 0.5
+
+
+def _get_cover_modifier(
+    scenario: MechCombatScenario,
+    attacker: CombatantState,
+    target: CombatantState,
+) -> tuple[int, dict | None]:
+    """Get cover difficulty modifier for ranged attack.
+
+    Per PR2:
+    - Soft Cover: +1 Difficulty
+    - Hard Cover: +2 Difficulty (requires adjacency)
+    - Flanking negates hard cover
+
+    Args:
+        scenario: Current combat scenario
+        attacker: The attacking combatant
+        target: The target combatant
+
+    Returns:
+        Tuple of (difficulty_modifier, effect_dict_or_none)
+    """
+    if scenario.terrain is None:
+        return 0, None
+    if attacker.position is None or target.position is None:
+        return 0, None
+
+    from core.shared.terrain import get_cover_difficulty
+    from core.shared.enums import SizeClass
+
+    target_size: SizeClass = target.stats.size if target.stats else "size_1"
+    result = get_cover_difficulty(
+        terrain=scenario.terrain,
+        attacker_coord=attacker.position.coord,
+        target_coord=target.position.coord,
+        target_size=target_size,
+    )
+
+    if result.difficulty_modifier == 0:
+        return 0, None
+
+    return result.difficulty_modifier, {
+        "type": "cover_modifier",
+        "cover_type": result.cover_type,
+        "difficulty_added": result.difficulty_modifier,
+        "reason": result.reason,
+    }
 
 
 # =============================================================================
