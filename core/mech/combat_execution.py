@@ -54,6 +54,7 @@ from core.mech.combat_helpers import (
     _get_cover_modifier,
     _validate_attack_range_and_los,
     _is_melee_weapon,
+    _get_thrown_range,
     _has_weapon_tag,
     _get_weapon_state,
     _validate_weapon_usable,
@@ -77,6 +78,7 @@ from core.mech.combat_state import (
     CombatResources,
     CombatTurn,
     CombatRound,
+    ActionLogEffect,
     ActionUse,
     OverchargeState,
 )
@@ -571,6 +573,8 @@ def execute_action(
     knockback_value = _extract_tag_value(weapon_tags, "knockback") or 0
     has_overkill = any(tag.tag == "overkill" for tag in weapon_tags)
     smart_attack = any(tag.tag == "smart" for tag in weapon_tags)
+    thrown_range = _get_thrown_range(action_input.weapon_id) if action_input.use_thrown else None
+    thrown_coord: HexCoord | None = None
 
     # Validate weapon usability (loading, limited, ordnance restrictions)
     if is_attack and action_input.weapon_id:
@@ -726,6 +730,35 @@ def execute_action(
     overheat_checks: list[dict] = []
     position_updates: dict[str, dict] = {}
 
+    if is_attack and action_input.use_thrown and not attack_target_ids:
+        if action_input.weapon_id is None:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Thrown attack requires a weapon",
+            )
+        if not _is_melee_weapon(action_input.weapon_id):
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Only melee weapons can be thrown",
+            )
+        if thrown_range is None:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Weapon has no thrown range",
+            )
+        if actor.position is None or action_input.target_position is None:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Thrown attack requires a target position",
+            )
+        distance = actor.position.coord.distance_to(action_input.target_position.coord)
+        if distance > thrown_range:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error=f"Target out of range ({distance} > {thrown_range} thrown)",
+            )
+        thrown_coord = action_input.target_position.coord
+
     # Check if this is an attack action with targets
     if is_attack and attack_target_ids:
         from core.shared.rolls import resolve_attack
@@ -744,6 +777,7 @@ def execute_action(
                     target=target,
                     weapon_id=action_input.weapon_id,
                     is_tech_attack=False,
+                    use_thrown=action_input.use_thrown,
                 )
                 if not valid:
                     return scenario, current_turn, economy, ActionExecutionResult(
@@ -757,12 +791,13 @@ def execute_action(
 
         # Determine if attack is ranged (check weapon ranges)
         is_ranged_attack = True  # Default to ranged
+        threat_range = None
         if weapon_profile is not None:
             for range_entry in weapon_profile.ranges:
                 if range_entry.range_type == "threat":
                     is_ranged_attack = False
+                    threat_range = range_entry.value
                     break
-
         # Get attacker status modifiers
         attacker_acc_mod, attacker_diff_mod = _get_attacker_status_modifiers(actor)
 
@@ -774,6 +809,17 @@ def execute_action(
             target = next((c for c in scenario.combatants if c.id == target_id), None)
             if target is None:
                 continue
+
+            is_thrown_attack = False
+            if (
+                action_input.use_thrown
+                and thrown_range is not None
+                and actor.position is not None
+                and target.position is not None
+            ):
+                is_thrown_attack = True
+                if thrown_coord is None:
+                    thrown_coord = target.position.coord
 
             target_defense = target.stats.e_defense if smart_attack else target.stats.evasion
             if target.stats is None:
@@ -787,7 +833,7 @@ def execute_action(
             # Get cover modifier for ranged attacks
             cover_difficulty = 0
             cover_info = None
-            if is_ranged_attack:
+            if is_ranged_attack or is_thrown_attack:
                 cover_difficulty, cover_info = _get_cover_modifier(
                     scenario, actor, target
                 )
@@ -1057,11 +1103,22 @@ def execute_action(
                 "reason": "Consumed after successful hit",
             })
 
+        if thrown_coord is not None and action_input.weapon_id:
+            effects_applied.append({
+                "type": "weapon_thrown",
+                "weapon_id": action_input.weapon_id,
+                "coord": {"q": thrown_coord.q, "r": thrown_coord.r},
+            })
+
         # Update weapon state after attack (set needs_reload, decrement limited)
         if action_input.weapon_id:
             # Re-fetch actor from scenario (may have been updated)
             actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
-            updated_actor = _update_weapon_after_attack(actor, action_input.weapon_id)
+            updated_actor = _update_weapon_after_attack(
+                actor,
+                action_input.weapon_id,
+                thrown_coord=thrown_coord,
+            )
 
             # Apply updated actor to scenario
             actor_idx = next(
@@ -1080,6 +1137,39 @@ def execute_action(
                 )
 
     # Handle tech actions (scan, bolster, lock on, invade)
+    if (
+        is_attack
+        and action_input.use_thrown
+        and not attack_target_ids
+        and thrown_coord is not None
+        and action_input.weapon_id
+    ):
+        effects_applied.append({
+            "type": "weapon_thrown",
+            "weapon_id": action_input.weapon_id,
+            "coord": {"q": thrown_coord.q, "r": thrown_coord.r},
+        })
+        actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
+        updated_actor = _update_weapon_after_attack(
+            actor,
+            action_input.weapon_id,
+            thrown_coord=thrown_coord,
+        )
+        actor_idx = next(
+            (i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1
+        )
+        if actor_idx >= 0:
+            updated_combatants = list(scenario.combatants)
+            updated_combatants[actor_idx] = updated_actor
+            scenario = MechCombatScenario(
+                combatants=updated_combatants,
+                grapples=list(scenario.grapples),
+                rounds=list(scenario.rounds),
+                terrain=scenario.terrain,
+                environment=scenario.environment,
+                deployables=dict(scenario.deployables),
+            )
+
     if action_input.action_id in ("scan", "bolster", "lock_on", "invade") and action_input.target_ids:
         target_id = action_input.target_ids[0]
         target = next((c for c in scenario.combatants if c.id == target_id), None)
@@ -1330,6 +1420,14 @@ def execute_action(
         scenario, eject_effects = _resolve_eject(scenario, actor, action_input.eject_direction)
         effects_applied.extend(eject_effects)
 
+    log_effects = _build_action_log_effects(effects_applied, statuses_applied)
+    if log_effects:
+        action_use = action_use.model_copy(update={"log_effects": log_effects})
+        updated_actions = list(updated_turn.actions)
+        if updated_actions:
+            updated_actions[-1] = action_use
+            updated_turn = updated_turn.model_copy(update={"actions": updated_actions})
+
     result = ActionExecutionResult(
         success=True,
         action_use=action_use,
@@ -1344,6 +1442,40 @@ def execute_action(
     )
 
     return scenario, updated_turn, updated_economy, result
+
+
+def _build_action_log_effects(
+    effects_applied: list[dict],
+    statuses_applied: dict[str, list[StatusType]],
+) -> list[ActionLogEffect]:
+    log_effects: list[ActionLogEffect] = []
+
+    for effect in effects_applied:
+        effect_type = effect.get("type")
+        if effect_type == "weapon_thrown":
+            log_effects.append(
+                ActionLogEffect(
+                    type="weapon_thrown",
+                    weapon_id=effect.get("weapon_id"),
+                )
+            )
+        elif effect_type == "retrieve_thrown_weapon":
+            log_effects.append(
+                ActionLogEffect(
+                    type="retrieve_thrown_weapon",
+                    weapon_id=effect.get("weapon_id"),
+                )
+            )
+
+    seen_statuses: set[StatusType] = set()
+    for statuses in statuses_applied.values():
+        for status in statuses:
+            if status in seen_statuses:
+                continue
+            seen_statuses.add(status)
+            log_effects.append(ActionLogEffect(type="status_applied", status=status))
+
+    return log_effects
 
 
 def execute_reaction(

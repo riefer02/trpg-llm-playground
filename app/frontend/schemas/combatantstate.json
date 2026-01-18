@@ -37775,6 +37775,18 @@
           "description": "True after firing a loading weapon, cleared by Stabilize",
           "title": "Needs Reload",
           "type": "boolean"
+        },
+        "thrown_coord": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HexCoord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Coordinate where the weapon was thrown/dropped (None if carried)"
         }
       },
       "required": [

@@ -8,7 +8,7 @@ common query patterns.
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import Column, JSON, UniqueConstraint
+from sqlalchemy import Column, JSON, Text, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -106,6 +106,7 @@ class CampaignInviteDB(TimestampMixin, table=True):
     token: str = Field(index=True)
     status: str = Field(default="pending")  # pending, accepted, revoked, expired
     invited_email: str | None = None
+    invite_note: str | None = Field(default=None, sa_column=Column(Text))
     expires_at: datetime | None = None
     redeemed_by_user_id: str | None = Field(default=None, index=True)
 

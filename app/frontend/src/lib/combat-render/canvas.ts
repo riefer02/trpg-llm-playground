@@ -1,4 +1,6 @@
-import type { HexCoord } from "../types/lancer";
+import type { ActionLogEffect, HexCoord } from "../types/lancer";
+
+import { EFFECT_ICON_BY_TYPE } from "../combat-effects";
 
 import type { HexLayout, PixelPoint } from "./hex";
 import { axialToPixel, hexCorners, pixelToAxial } from "./hex";
@@ -27,6 +29,13 @@ export type RenderToken = {
   radius?: number;
 };
 
+export type RenderMarker = {
+  id: string;
+  coord: HexCoord;
+  kind: ActionLogEffect["type"];
+  count?: number;
+};
+
 export type TokenStyle = {
   fillStyle?: string;
   strokeStyle?: string;
@@ -47,9 +56,19 @@ export type AreaOverlay = {
   style?: HoverStyle;
 };
 
+export type MarkerStyle = {
+  fillStyle?: string;
+  strokeStyle?: string;
+  lineWidth?: number;
+  radius?: number;
+  labelColor?: string;
+  font?: string;
+};
+
 export type CombatRenderState = {
   grid: HexGrid;
   tokens: RenderToken[];
+  markers?: RenderMarker[];
   overlays?: AreaOverlay[];
   hover?: HexCoord | null;
 };
@@ -57,6 +76,7 @@ export type CombatRenderState = {
 export type RenderStyles = {
   grid?: GridStyle;
   tokens?: TokenStyle;
+  markers?: MarkerStyle;
   overlays?: HoverStyle;
   hover?: HoverStyle;
 };
@@ -105,6 +125,9 @@ export function renderCombatCanvas(
   if (state.overlays?.length) {
     drawAreaOverlays(ctx, layout, state.overlays, styles.overlays);
   }
+  if (state.markers?.length) {
+    drawMarkers(ctx, layout, state.markers, styles.markers);
+  }
   drawTokens(ctx, layout, state.tokens, styles.tokens);
   if (state.hover) {
     drawHoverOverlay(ctx, layout, state.hover, styles.hover);
@@ -150,6 +173,38 @@ export function drawTokens(
       ctx.textBaseline = "middle";
       ctx.fillText(token.label, center.x, center.y);
     }
+  }
+}
+
+export function drawMarkers(
+  ctx: CanvasRenderingContext2D,
+  layout: HexLayout,
+  markers: RenderMarker[],
+  style: MarkerStyle = {},
+): void {
+  for (const marker of markers) {
+    const center = axialToPixel(marker.coord, layout);
+    const config = EFFECT_ICON_BY_TYPE[marker.kind];
+    const radius = style.radius ?? layout.size * 0.22;
+    const label =
+      marker.count && marker.count > 1
+        ? `${config.glyph}${marker.count}`
+        : config.glyph;
+
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = style.fillStyle ?? config.color;
+    ctx.fill();
+
+    ctx.strokeStyle = style.strokeStyle ?? "#0f172a";
+    ctx.lineWidth = style.lineWidth ?? 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = style.labelColor ?? "#0f172a";
+    ctx.font = style.font ?? "10px 'Space Grotesk', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, center.x, center.y);
   }
 }
 

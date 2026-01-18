@@ -6,7 +6,12 @@ import type {
   AvailableActionItem,
   AvailableActionsResponse,
 } from "../../lib/api/combat";
-import type { FullTechOptionSelection, HexCoord, MechInventory } from "../../lib/types/lancer";
+import type {
+  FullTechOptionSelection,
+  HexCoord,
+  MechInventory,
+  MechWeaponDefinition,
+} from "../../lib/types/lancer";
 import { calculatePathDistance, hexEquals, isAdjacent } from "../../lib/combat-render/hex";
 import { Button } from "../ui";
 import { SystemPicker } from "./SystemPicker";
@@ -16,6 +21,7 @@ type FullTechOption = FullTechOptionSelection["option"];
 type FullTechStep = 1 | 2;
 
 const FULL_TECH_OPTIONS: FullTechOption[] = ["scan", "bolster", "lock_on", "invade"];
+const ATTACK_ACTION_IDS = new Set(["skirmish", "barrage", "fight"]);
 
 export type ActionPanelState =
   | "idle"
@@ -53,6 +59,7 @@ export interface ActionPanelProps {
   isExecuting?: boolean;
   selectedTargetIds?: string[];
   actorInventory?: MechInventory | null;
+  weaponDefinitions?: Map<string, MechWeaponDefinition> | null;
   actorSpeed?: number;
   actorPosition?: HexCoord | null;
   /** Incoming hex click from canvas when in path mode */
@@ -69,6 +76,7 @@ export function ActionPanel({
   isExecuting = false,
   selectedTargetIds = [],
   actorInventory,
+  weaponDefinitions,
   actorSpeed = 4,
   actorPosition,
   hexClickCoord,
@@ -77,6 +85,7 @@ export function ActionPanel({
   const [selectedAction, setSelectedAction] = useState<AvailableActionItem | null>(null);
   const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
+  const [useThrown, setUseThrown] = useState(false);
   const [movementPath, setMovementPath] = useState<HexCoord[]>([]);
   const [lastProcessedClick, setLastProcessedClick] = useState<HexCoord | null>(null);
   const [fullTechStep, setFullTechStep] = useState<FullTechStep>(1);
@@ -137,12 +146,32 @@ export function ActionPanel({
       formatTechOption(option),
   }));
 
+  const selectedWeaponDefinition =
+    selectedWeaponId && weaponDefinitions ? weaponDefinitions.get(selectedWeaponId) : undefined;
+  const canUseThrown = Boolean(
+    selectedAction &&
+      ATTACK_ACTION_IDS.has(selectedAction.action_id) &&
+      selectedWeaponDefinition &&
+      isMeleeWeapon(selectedWeaponDefinition) &&
+      getThrownRange(selectedWeaponDefinition) !== null
+  );
+  const thrownRange = selectedWeaponDefinition
+    ? getThrownRange(selectedWeaponDefinition)
+    : null;
+
+  useEffect(() => {
+    if (!canUseThrown && useThrown) {
+      setUseThrown(false);
+    }
+  }, [canUseThrown, useThrown]);
+
   const handleActionClick = (action: AvailableActionItem) => {
     if (!action.is_available) return;
 
     setSelectedAction(action);
     setSelectedWeaponId(null);
     setSelectedSystemId(null);
+    setUseThrown(false);
     setMovementPath([]);
     setFullTechStep(1);
     setFullTechSelections({});
@@ -191,6 +220,7 @@ export function ActionPanel({
 
   const handleWeaponSelect = (weaponId: string) => {
     setSelectedWeaponId(weaponId);
+    setUseThrown(false);
 
     if (selectedAction?.requires_target) {
       // After weapon selection, move to target selection
@@ -294,6 +324,7 @@ export function ActionPanel({
       target_ids: selectedTargetIds,
       weapon_id: selectedWeaponId ?? undefined,
       system_id: selectedSystemId ?? undefined,
+      use_thrown: useThrown || undefined,
     });
   };
 
@@ -301,6 +332,7 @@ export function ActionPanel({
     setSelectedAction(null);
     setSelectedWeaponId(null);
     setSelectedSystemId(null);
+    setUseThrown(false);
     setMovementPath([]);
     setFullTechStep(1);
     setFullTechSelections({});
@@ -314,6 +346,7 @@ export function ActionPanel({
     setSelectedAction(null);
     setSelectedWeaponId(null);
     setSelectedSystemId(null);
+    setUseThrown(false);
     setMovementPath([]);
     setFullTechStep(1);
     setFullTechSelections({});
@@ -580,6 +613,19 @@ export function ActionPanel({
           </div>
         )}
 
+        {selectedWeaponId && canUseThrown && (
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              className="accent-primary"
+              checked={useThrown}
+              onChange={(event) => setUseThrown(event.target.checked)}
+              disabled={isExecuting}
+            />
+            Throw weapon{thrownRange ? ` (Range ${thrownRange})` : ""} - disarms until retrieved
+          </label>
+        )}
+
         {panelState === "selecting_target" && selectedAction && (
           <div className="text-xs text-muted-foreground">
             {selectedAction.max_targets > 1
@@ -805,4 +851,26 @@ function formatSystemId(systemId: string): string {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function isMeleeWeapon(weapon: MechWeaponDefinition): boolean {
+  return Boolean(weapon.ranges?.some((range) => range.range_type === "threat"));
+}
+
+function getThrownRange(weapon: MechWeaponDefinition): number | null {
+  const thrownValues: number[] = [];
+  for (const range of weapon.ranges ?? []) {
+    if (range.range_type === "thrown") {
+      thrownValues.push(range.value);
+    }
+  }
+  for (const tag of weapon.tags ?? []) {
+    if (tag.tag === "thrown" && tag.value !== undefined && tag.value !== null) {
+      thrownValues.push(tag.value);
+    }
+  }
+  if (!thrownValues.length) {
+    return null;
+  }
+  return Math.max(...thrownValues);
 }

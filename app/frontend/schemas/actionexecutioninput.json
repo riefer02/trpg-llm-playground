@@ -250,6 +250,12 @@
       "title": "Apply Knockback",
       "type": "boolean"
     },
+    "use_thrown": {
+      "default": false,
+      "description": "Whether to treat a melee weapon attack as thrown (uses thrown range, applies cover, disarms weapon)",
+      "title": "Use Thrown",
+      "type": "boolean"
+    },
     "eject_direction": {
       "anyOf": [
         {

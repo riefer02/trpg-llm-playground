@@ -21,6 +21,34 @@
       "title": "DiceRollResult",
       "type": "object"
     },
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    },
     "MechInventory": {
       "description": "Inventory state for mounts and systems.",
       "properties": {
@@ -313,6 +341,18 @@
           "description": "True after firing a loading weapon, cleared by Stabilize",
           "title": "Needs Reload",
           "type": "boolean"
+        },
+        "thrown_coord": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HexCoord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Coordinate where the weapon was thrown/dropped (None if carried)"
         }
       },
       "required": [

@@ -159,10 +159,11 @@ async def test_campaign_invite_preview_and_management(client: AsyncClient) -> No
 
     invite_resp = await client.post(
         f"/api/campaigns/{campaign_id}/invites",
-        json={"role": "player"},
+        json={"role": "player", "invite_note": "Bring LL0-ready builds."},
         headers=owner_headers,
     )
     invite = invite_resp.json()
+    assert invite["invite_note"] == "Bring LL0-ready builds."
 
     preview_resp = await client.get(
         f"/api/campaigns/invites/{invite['token']}/preview",
@@ -172,6 +173,7 @@ async def test_campaign_invite_preview_and_management(client: AsyncClient) -> No
     preview_data = preview_resp.json()
     assert preview_data["campaign_name"] == "Preview Squad"
     assert preview_data["status"] == "pending"
+    assert preview_data["invite_note"] == "Bring LL0-ready builds."
     assert "readiness_issues" in preview_data
     assert preview_data["min_pilots"] >= 1
 

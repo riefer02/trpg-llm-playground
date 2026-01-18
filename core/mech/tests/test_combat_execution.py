@@ -492,7 +492,10 @@ class TestExecuteAction:
             defender_after = next(
                 c for c in updated_scenario.combatants if c.id == "defender"
             )
-            assert defender_after.resources.hp_current < 10  # Started with 10 HP
+            assert (
+                defender_after.resources.hp_current < 10
+                or defender_after.resources.structure_current < 4
+            )
 
     def test_execute_attack_with_forced_hit(self):
         """Attack with natural 20 should always hit and deal double damage."""
@@ -3701,6 +3704,60 @@ class TestCoverModifiers:
         attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
         assert attack_effect["status_modifiers"]["cover_diff"] == 0
 
+    def test_cover_applies_for_thrown_melee(self):
+        """Thrown melee attacks should apply cover modifiers."""
+        from unittest.mock import patch
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=5,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+        )
+        # Create terrain with soft cover at target's position
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=2, r=0), provides_soft_cover=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        # tactical_knife has thrown 3, so distance 2 should be thrown
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="tactical_knife",
+            use_thrown=True,
+        )
+
+        with patch("core.shared.rolls._roll_d20", return_value=15):
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success
+        cover_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "cover_modifier"),
+            None
+        )
+        assert cover_effect is not None
+        assert cover_effect["cover_type"] == "soft"
+        assert cover_effect["difficulty_added"] == 1
+
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        assert attack_effect["status_modifiers"]["cover_diff"] == 1
+
     def test_no_cover_modifier_without_terrain(self):
         """Should gracefully handle scenarios without terrain."""
         from unittest.mock import patch
@@ -4429,12 +4486,12 @@ class TestRangeAndLOS:
         turn = make_turn(actor_id="attacker")
         economy = ActionEconomyState()
 
-        # tactical_knife has threat 1
+        # tactical_melee has threat 1
         action_input = ActionExecutionInput(
             actor_id="attacker",
             action_id="skirmish",
             action_type="quick",
-            weapon_id="tactical_knife",
+            weapon_id="tactical_melee",
             target_ids=["target"],
         )
 
@@ -4473,12 +4530,12 @@ class TestRangeAndLOS:
         turn = make_turn(actor_id="attacker")
         economy = ActionEconomyState()
 
-        # tactical_knife has threat 1
+        # tactical_melee has threat 1
         action_input = ActionExecutionInput(
             actor_id="attacker",
             action_id="skirmish",
             action_type="quick",
-            weapon_id="tactical_knife",
+            weapon_id="tactical_melee",
             target_ids=["target"],
         )
 
@@ -4486,6 +4543,139 @@ class TestRangeAndLOS:
 
         assert result.success is False
         assert "out of range" in result.error.lower()
+
+    def test_thrown_attack_within_range_succeeds(self):
+        """Thrown melee weapon should work within thrown range."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=5,
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=3, r=0)),  # Distance 3
+            hp_current=10,
+            hp_max=10,
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # tactical_knife has thrown 3
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="tactical_knife",
+            target_ids=["target"],
+            use_thrown=True,
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=5,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=20,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+    def test_thrown_attack_out_of_range_fails(self):
+        """Thrown melee weapon should fail beyond thrown range."""
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=4, r=0)),  # Distance 4
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # tactical_knife has thrown 3
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="tactical_knife",
+            target_ids=["target"],
+            use_thrown=True,
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "out of range" in result.error.lower()
+
+    def test_thrown_attack_uses_tag_range(self):
+        """Thrown range should be honored when defined as a tag value."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=5,
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=5, r=0)),  # Distance 5
+            hp_current=10,
+            hp_max=10,
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # ha_type3_burst_knife has thrown 5 as a tag
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="ha_type3_burst_knife",
+            target_ids=["target"],
+            use_thrown=True,
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=5,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=20,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
 
     def test_tech_attack_within_sensor_range_succeeds(self):
         """Target within sensor range should allow tech attack."""
@@ -5137,3 +5327,242 @@ class TestWeaponTagEnforcement:
         """A fresh CombatTurn has has_moved_or_acted=False."""
         turn = CombatTurn(actor_id="actor")
         assert turn.has_moved_or_acted is False
+
+
+# =============================================================================
+# Thrown Weapon Handling Tests
+# =============================================================================
+
+
+class TestThrownWeaponHandling:
+    """Tests for thrown melee weapon disarm and retrieval behavior."""
+
+    def make_combatant_with_weapon(
+        self,
+        id: str,
+        weapon_id: str,
+        thrown_coord: HexCoord | None = None,
+    ) -> CombatantState:
+        weapon_state = WeaponState(
+            weapon_id=weapon_id,
+            tags=[],
+            destroyed=False,
+            limited_charges_remaining=None,
+            needs_reload=False,
+            thrown_coord=thrown_coord,
+        )
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=False,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+
+        return CombatantState(
+            id=id,
+            name="Thrown Tester",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            statuses=[],
+            inventory=inventory,
+        )
+
+    def test_thrown_weapon_marks_disarmed_on_attack(self):
+        """Thrown attack should set weapon thrown_coord."""
+        from unittest.mock import patch
+
+        attacker = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="tactical_knife",
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = CombatTurn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="tactical_knife",
+            target_ids=["target"],
+            use_thrown=True,
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=15,
+                target_defense=8,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success is True
+        updated_attacker = next(c for c in updated_scenario.combatants if c.id == "attacker")
+        weapon_state = updated_attacker.inventory.mounts[0].weapons[0]
+        assert weapon_state.thrown_coord == HexCoord(q=2, r=0)
+        assert result.action_use is not None
+        assert any(
+            effect.type == "weapon_thrown"
+            for effect in result.action_use.log_effects
+        )
+
+    def test_thrown_weapon_marks_disarmed_without_targets(self):
+        """Thrown attack should disarm even when no combatant targets are provided."""
+        attacker = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="tactical_knife",
+        )
+        scenario = make_scenario(combatants=[attacker])
+        turn = CombatTurn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="tactical_knife",
+            target_position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            use_thrown=True,
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success is True
+        updated_attacker = next(c for c in updated_scenario.combatants if c.id == "attacker")
+        weapon_state = updated_attacker.inventory.mounts[0].weapons[0]
+        assert weapon_state.thrown_coord == HexCoord(q=2, r=0)
+        assert result.action_use is not None
+        assert any(
+            effect.type == "weapon_thrown"
+            for effect in result.action_use.log_effects
+        )
+
+    def test_thrown_weapon_blocked_until_retrieved(self):
+        """Thrown weapons should be unusable until retrieved."""
+        attacker = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="tactical_knife",
+            thrown_coord=HexCoord(q=2, r=0),
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = CombatTurn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="tactical_knife",
+            target_ids=["target"],
+            use_thrown=True,
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "retrieve" in result.error.lower()
+
+    def test_thrown_weapon_retrieved_on_adjacent_move(self):
+        """Moving adjacent to thrown weapon should retrieve it."""
+        attacker = self.make_combatant_with_weapon(
+            id="attacker",
+            weapon_id="tactical_knife",
+            thrown_coord=HexCoord(q=2, r=0),
+        )
+        scenario = make_scenario(combatants=[attacker])
+        turn = CombatTurn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="move",
+            action_type="free",
+            movement_path=[HexPosition(coord=HexCoord(q=1, r=0), elevation=0)],
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success is True
+        updated_attacker = next(c for c in updated_scenario.combatants if c.id == "attacker")
+        weapon_state = updated_attacker.inventory.mounts[0].weapons[0]
+        assert weapon_state.thrown_coord is None
+
+        retrieve_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "retrieve_thrown_weapon"),
+            None,
+        )
+        assert retrieve_effect is not None
+        assert result.action_use is not None
+        assert any(
+            effect.type == "retrieve_thrown_weapon"
+            for effect in result.action_use.log_effects
+        )
+
+
+class TestActionLogEffects:
+    """Tests for action log effect summaries."""
+
+    def test_action_log_effects_include_statuses(self):
+        """Status applications should be captured in action log effects."""
+        actor = make_combatant(id="actor")
+        target = make_combatant(id="target")
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor",
+            action_id="lock_on",
+            action_type="quick",
+            target_ids=["target"],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert result.action_use is not None
+        assert any(
+            effect.type == "status_applied" and effect.status == "lock_on"
+            for effect in result.action_use.log_effects
+        )

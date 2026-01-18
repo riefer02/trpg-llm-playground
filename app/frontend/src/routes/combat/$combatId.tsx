@@ -10,6 +10,7 @@ import {
   useAvailableActions,
   useSubmitReaction,
   useReactionOpportunity,
+  useWeapons,
   type ActionRequest,
   type ActionEconomyState,
   type AvailableActionItem,
@@ -71,6 +72,7 @@ function CombatSessionPage() {
   const { data: availableActions } = useAvailableActions(combatId, {
     enabled: turnActive,
   });
+  const weaponsQuery = useWeapons();
 
   // Canvas interaction state
   const [hovered, setHovered] = useState<HexCoord | null>(null);
@@ -299,6 +301,10 @@ function CombatSessionPage() {
     () => new Map((scenario?.combatants ?? []).map((c) => [c.id, c.name])),
     [scenario?.combatants],
   );
+  const weaponDefinitions = useMemo(
+    () => new Map((weaponsQuery.data ?? []).map((weapon) => [weapon.id, weapon])),
+    [weaponsQuery.data],
+  );
 
   const renderOutput: CombatRenderAdapterOutput | null = useMemo(() => {
     if (!scenario) {
@@ -494,6 +500,7 @@ function CombatSessionPage() {
               isExecuting={executeAction.isPending}
               selectedTargetIds={selectedTargetIds}
               actorInventory={currentActor?.inventory}
+              weaponDefinitions={weaponDefinitions}
               actorSpeed={currentActor?.stats?.speed ?? 4}
               actorPosition={currentActor?.position?.coord ?? null}
               hexClickCoord={pathHexClick}

@@ -59,6 +59,11 @@ class ActionExecutionInput(FrozenModel):
     )
     # Ram knockback preference
     apply_knockback: bool = Field(default=True, description="Whether to apply knockback on successful ram")
+    # Thrown melee preference
+    use_thrown: bool = Field(
+        default=False,
+        description="Whether to treat a melee weapon attack as thrown (uses thrown range, applies cover, disarms weapon)",
+    )
     # Eject direction (for eject action)
     eject_direction: HexCoord | None = Field(
         default=None, description="Direction for eject (pilot flies 6 spaces in this direction)"

@@ -118,6 +118,36 @@ def _get_weapon_range(
     return default_range
 
 
+def _get_thrown_range(weapon_id: str | None) -> int | None:
+    """Get thrown range for a weapon (if any).
+
+    Thrown ranges may be represented as:
+    - Range entries with range_type="thrown"
+    - Weapon tags with tag="thrown" and a numeric value
+    """
+    if weapon_id is None:
+        return None
+
+    weapon_def = get_weapon_definition(weapon_id)
+    if weapon_def is None:
+        return None
+
+    profile = resolve_weapon_profile(weapon_def)
+
+    thrown_values = [
+        range_entry.value
+        for range_entry in profile.ranges
+        if range_entry.range_type == "thrown"
+    ]
+    thrown_values.extend(
+        tag.value
+        for tag in profile.tags
+        if tag.tag == "thrown" and tag.value is not None
+    )
+
+    return max(thrown_values) if thrown_values else None
+
+
 def _has_weapon_tag(weapon_id: str | None, tag_name: str) -> bool:
     """Check if a weapon has a specific tag.
 
@@ -198,6 +228,7 @@ def _validate_weapon_usable(
     - Loading (5029-5030): Must reload before using again
     - Limited (5080-5081): Finite charges per full repair
     - Ordnance (5035-5037): Must fire before moving/acting, not while engaged
+    - Thrown (5047-5049): Thrown weapons are disarmed until retrieved
 
     Args:
         weapon_state: The weapon's current state from inventory
@@ -214,6 +245,10 @@ def _validate_weapon_usable(
     # Check destroyed
     if weapon_state is not None and weapon_state.destroyed:
         return (False, "Weapon is destroyed")
+
+    # Check thrown/disarmed state
+    if weapon_state is not None and weapon_state.thrown_coord is not None:
+        return (False, "Weapon was thrown and must be retrieved before use")
 
     # Check loading - needs reload
     if weapon_state is not None and weapon_state.needs_reload:
@@ -243,12 +278,14 @@ def _validate_weapon_usable(
 def _update_weapon_after_attack(
     actor: CombatantState,
     weapon_id: str,
+    thrown_coord: HexCoord | None = None,
 ) -> CombatantState:
-    """Update weapon state after attack (set needs_reload, decrement limited).
+    """Update weapon state after attack (reload, limited, thrown disarm).
 
     Per PR2 rules:
     - Loading weapons need reload after firing
     - Limited weapons consume one charge per attack
+    - Thrown attacks disarm the weapon until retrieved
 
     Args:
         actor: The attacking combatant
@@ -274,6 +311,8 @@ def _update_weapon_after_attack(
                     updates["limited_charges_remaining"] = max(
                         0, weapon.limited_charges_remaining - 1
                     )
+                if thrown_coord is not None:
+                    updates["thrown_coord"] = thrown_coord
                 if updates:
                     weapon = weapon.model_copy(update=updates)
             new_weapons.append(weapon)
@@ -320,6 +359,7 @@ def _validate_attack_range_and_los(
     target: CombatantState,
     weapon_id: str | None,
     is_tech_attack: bool = False,
+    use_thrown: bool = False,
 ) -> tuple[bool, str | None]:
     """Validate range and LOS for an attack.
 
@@ -328,6 +368,7 @@ def _validate_attack_range_and_los(
     Per PR2 pp 99-100:
     - Ranged weapons: target must be within weapon range
     - Melee weapons: target must be within threat range
+    - Thrown melee weapons: if use_thrown=True, target must be within thrown range
     - Tech attacks: target must be within sensor range
     - LOS must not be blocked (except: seeking ignores LOS, arcing ignores LOS but not cover)
 
@@ -358,8 +399,23 @@ def _validate_attack_range_and_los(
     else:
         # Check if melee or ranged
         is_melee = _is_melee_weapon(weapon_id)
-        required_range = _get_weapon_range(weapon_id, is_melee=is_melee)
-        range_type = "threat" if is_melee else "range"
+        if use_thrown and not is_melee:
+            return (False, "Only melee weapons can be thrown")
+
+        if is_melee:
+            threat_range = _get_weapon_range(weapon_id, is_melee=True)
+            if use_thrown:
+                thrown_range = _get_thrown_range(weapon_id)
+                if thrown_range is None:
+                    return (False, "Weapon has no thrown range")
+                required_range = thrown_range
+                range_type = "thrown"
+            else:
+                required_range = threat_range
+                range_type = "threat"
+        else:
+            required_range = _get_weapon_range(weapon_id, is_melee=False)
+            range_type = "range"
 
     # Validate range
     if distance > required_range:
@@ -1544,6 +1600,32 @@ def _resolve_movement(
 
     if actor_idx >= 0:
         updated_actor = actor.model_copy(update={"position": final_position})
+
+        # Auto-retrieve thrown weapons when moving adjacent to their location.
+        if actor.inventory is not None:
+            updated_mounts = []
+            for mount in actor.inventory.mounts:
+                new_weapons = []
+                for weapon in mount.weapons:
+                    if weapon.thrown_coord is not None:
+                        for step in path:
+                            if step.coord.distance_to(weapon.thrown_coord) <= 1:
+                                effects.append({
+                                    "type": "retrieve_thrown_weapon",
+                                    "weapon_id": weapon.weapon_id,
+                                    "coord": {
+                                        "q": weapon.thrown_coord.q,
+                                        "r": weapon.thrown_coord.r,
+                                    },
+                                })
+                                weapon = weapon.model_copy(update={"thrown_coord": None})
+                                break
+                    new_weapons.append(weapon)
+                updated_mounts.append(mount.model_copy(update={"weapons": new_weapons}))
+
+            updated_inventory = actor.inventory.model_copy(update={"mounts": updated_mounts})
+            updated_actor = updated_actor.model_copy(update={"inventory": updated_inventory})
+
         updated_combatants = list(scenario.combatants)
         updated_combatants[actor_idx] = updated_actor
 
@@ -1936,6 +2018,7 @@ __all__ = [
     "_roll_weapon_damage",
     # Range and LOS Validation
     "_get_weapon_range",
+    "_get_thrown_range",
     "_has_weapon_tag",
     "_is_melee_weapon",
     "_validate_attack_range_and_los",

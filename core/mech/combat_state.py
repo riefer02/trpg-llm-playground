@@ -119,6 +119,10 @@ class WeaponState(FrozenModel):
         default=False,
         description="True after firing a loading weapon, cleared by Stabilize",
     )
+    thrown_coord: HexCoord | None = Field(
+        default=None,
+        description="Coordinate where the weapon was thrown/dropped (None if carried)",
+    )
 
 
 class WeaponMountState(FrozenModel):
@@ -285,6 +289,22 @@ class AppliedPerTargetEffect(FrozenModel):
     source: PerTargetEffectSource = "direct"
 
 
+ActionLogEffectType = Literal[
+    "weapon_thrown",
+    "retrieve_thrown_weapon",
+    "status_applied",
+]
+
+
+class ActionLogEffect(FrozenModel):
+    """Small effect summary for combat log display."""
+
+    type: ActionLogEffectType
+    status: StatusType | None = None
+    target_id: CombatantIdField | None = None
+    weapon_id: WeaponIdField | None = None
+
+
 class ActionUse(FrozenModel):
     """An action taken during a combat turn."""
 
@@ -320,6 +340,7 @@ class ActionUse(FrozenModel):
     applied_per_target_effects: list[AppliedPerTargetEffect] = Field(
         default_factory=list
     )
+    log_effects: list[ActionLogEffect] = Field(default_factory=list)
 
 
 class CombatTurn(FrozenModel):

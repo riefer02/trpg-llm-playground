@@ -28,6 +28,7 @@ export interface ActionRequest {
   full_tech_second?: FullTechOptionSelection;
   movement_path?: { coord: { q: number; r: number } }[];
   is_overcharge?: boolean;
+  use_thrown?: boolean;
 }
 
 export interface ActionResponse {

@@ -87,6 +87,12 @@ function InviteLandingPage() {
                   ))}
                 </div>
               )}
+              {previewQuery.data.invite_note && (
+                <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground space-y-1">
+                  <div className="font-medium text-foreground">Invite note</div>
+                  <div>{previewQuery.data.invite_note}</div>
+                </div>
+              )}
               <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground space-y-1">
                 <div className="font-medium text-foreground">Next steps</div>
                 <div>1. Accept the invite.</div>

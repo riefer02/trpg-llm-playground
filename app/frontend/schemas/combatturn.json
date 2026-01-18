@@ -46,6 +46,79 @@
       "title": "AccuracyDifficulty",
       "type": "object"
     },
+    "ActionLogEffect": {
+      "description": "Small effect summary for combat log display.",
+      "properties": {
+        "type": {
+          "enum": [
+            "weapon_thrown",
+            "retrieve_thrown_weapon",
+            "status_applied"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "braced",
+                "immobilized",
+                "impaired",
+                "jammed",
+                "lock_on",
+                "shredded",
+                "slowed",
+                "stunned",
+                "prone",
+                "hidden",
+                "invisible",
+                "shutdown",
+                "exposed",
+                "engaged",
+                "burn",
+                "unshackled"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Id"
+        },
+        "weapon_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weapon Id"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ActionLogEffect",
+      "type": "object"
+    },
     "ActionUse": {
       "description": "An action taken during a combat turn.",
       "properties": {
@@ -352,6 +425,13 @@
             "$ref": "#/$defs/AppliedPerTargetEffect"
           },
           "title": "Applied Per Target Effects",
+          "type": "array"
+        },
+        "log_effects": {
+          "items": {
+            "$ref": "#/$defs/ActionLogEffect"
+          },
+          "title": "Log Effects",
           "type": "array"
         }
       },

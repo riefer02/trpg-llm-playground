@@ -290,6 +290,9 @@ class CampaignCreateRequest(BaseModel):
 class CampaignInviteCreateRequest(BaseModel):
     role: str = Field(default="player", description="player or co_gm")
     invited_email: str | None = Field(default=None, description="Optional email memo")
+    invite_note: str | None = Field(
+        default=None, description="Optional note shown to invitee"
+    )
     expires_in_hours: int | None = Field(
         default=168, ge=1, le=24 * 30, description="Validity window in hours"
     )
@@ -387,6 +390,7 @@ class CampaignInviteResponse(BaseModel):
     role: str
     status: str
     invited_email: str | None
+    invite_note: str | None
     expires_at: datetime | None
     invited_by_user_id: str
     redeemed_by_user_id: str | None
@@ -402,6 +406,7 @@ class CampaignInvitePreviewResponse(BaseModel):
     role: str
     status: str
     expires_at: datetime | None
+    invite_note: str | None
     seat_warning: str | None
     ready_players: int
     preferred_pilots: int
@@ -681,6 +686,7 @@ async def create_invite(
         token=token,
         status="pending",
         invited_email=body.invited_email,
+        invite_note=body.invite_note,
         expires_at=expires_at,
     )
     session.add(invite)
@@ -776,6 +782,7 @@ async def preview_invite(
         role=invite.role,
         status=invite.status,
         expires_at=invite.expires_at,
+        invite_note=invite.invite_note,
         seat_warning=seat_warning,
         ready_players=readiness["ready_players"],
         preferred_pilots=readiness["preferred_pilots"],

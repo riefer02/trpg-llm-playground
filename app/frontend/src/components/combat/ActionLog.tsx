@@ -1,4 +1,49 @@
-import type { ActionUse, CombatRound } from "../../lib/types/lancer";
+import type { LucideIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  Anchor,
+  ArrowDown,
+  Ban,
+  CircleDot,
+  Crosshair,
+  EyeOff,
+  Ghost,
+  Power,
+  Scissors,
+  Send,
+  Shield,
+  Snail,
+  Sun,
+  Swords,
+  Undo2,
+  Zap,
+} from "lucide-react";
+
+import {
+  resolveActionLogEffectIcon,
+  type IconName,
+} from "../../lib/combat-effects";
+import type { ActionLogEffect, ActionUse, CombatRound } from "../../lib/types/lancer";
+
+const EFFECT_ICON_COMPONENTS: Record<IconName, LucideIcon> = {
+  send: Send,
+  undo2: Undo2,
+  crosshair: Crosshair,
+  alertTriangle: AlertTriangle,
+  scissors: Scissors,
+  ban: Ban,
+  sun: Sun,
+  anchor: Anchor,
+  snail: Snail,
+  zap: Zap,
+  eyeOff: EyeOff,
+  ghost: Ghost,
+  arrowDown: ArrowDown,
+  shield: Shield,
+  swords: Swords,
+  power: Power,
+  circleDot: CircleDot,
+};
 
 export interface SelectedAction {
   roundIdx: number;
@@ -122,6 +167,7 @@ function ActionItem({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const effects = dedupeActionEffects(action.log_effects ?? []);
   return (
     <button
       type="button"
@@ -132,7 +178,49 @@ function ActionItem({
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
       }`}
     >
-      {action.action_id} ({action.action_type})
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate">
+          {action.action_id} ({action.action_type})
+        </span>
+        {effects.length > 0 && (
+          <span className="flex items-center gap-1">
+            {effects.map((effect, index) => (
+              <EffectIcon key={`${effect.type}-${effect.status ?? index}`} effect={effect} />
+            ))}
+          </span>
+        )}
+      </div>
     </button>
+  );
+}
+
+function dedupeActionEffects(effects: ActionLogEffect[]): ActionLogEffect[] {
+  const seen = new Set<string>();
+  const result: ActionLogEffect[] = [];
+  for (const effect of effects) {
+    const key =
+      effect.type === "status_applied"
+        ? `${effect.type}:${effect.status ?? "unknown"}`
+        : effect.type;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(effect);
+  }
+  return result;
+}
+
+function EffectIcon({ effect }: { effect: ActionLogEffect }) {
+  const config = resolveActionLogEffectIcon(effect);
+  const Icon = EFFECT_ICON_COMPONENTS[config.icon] ?? CircleDot;
+  return (
+    <span
+      className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/70 bg-background/80"
+      title={config.label}
+      style={{ color: config.color }}
+    >
+      <Icon className="h-3 w-3" />
+    </span>
   );
 }

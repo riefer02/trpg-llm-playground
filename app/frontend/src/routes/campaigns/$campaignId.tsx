@@ -80,6 +80,7 @@ function CampaignDetailPage() {
   const [characterId, setCharacterId] = useState("");
   const [inviteRole, setInviteRole] = useState<"player" | "co_gm">("player");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteNote, setInviteNote] = useState("");
   const [identityForm, setIdentityForm] = useState({
     squad_name: "",
     patron: "",
@@ -182,9 +183,11 @@ function CampaignDetailPage() {
       data: {
         role: inviteRole,
         invited_email: inviteEmail || undefined,
+        invite_note: inviteNote || undefined,
       },
     });
     setInviteEmail("");
+    setInviteNote("");
   };
 
   const handleAttach = (event: React.FormEvent) => {
@@ -1266,6 +1269,15 @@ function CampaignDetailPage() {
                   placeholder="friend@example.com"
                 />
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Invite note (shown to players)</label>
+                <textarea
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm min-h-[72px]"
+                  value={inviteNote}
+                  onChange={(event) => setInviteNote(event.target.value)}
+                  placeholder="Share warnings, expectations, or loadout notes."
+                />
+              </div>
               <Button type="submit" disabled={createInvite.isPending}>
                 {createInvite.isPending ? "Creating invite..." : "Generate invite"}
               </Button>
@@ -1299,6 +1311,11 @@ function CampaignDetailPage() {
                   {invite.invited_email && (
                     <p className="text-xs text-muted-foreground">
                       Memo: {invite.invited_email}
+                    </p>
+                  )}
+                  {invite.invite_note && (
+                    <p className="text-xs text-muted-foreground">
+                      Note: {invite.invite_note}
                     </p>
                   )}
                   {invite.redeemed_by_user_id && (

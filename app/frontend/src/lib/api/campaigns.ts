@@ -20,6 +20,7 @@ export interface CampaignInvite {
   role: string;
   status: string;
   invited_email: string | null;
+  invite_note: string | null;
   expires_at: string | null;
   invited_by_user_id: string;
   redeemed_by_user_id: string | null;
@@ -60,6 +61,7 @@ export interface CampaignInvitePreviewResponse {
     role: string;
     status: string;
     expires_at: string | null;
+    invite_note: string | null;
     seat_warning: string | null;
     ready_players: number;
     preferred_pilots: number;
@@ -139,6 +141,7 @@ export interface CampaignCreateRequest {
 export interface CampaignInviteCreateRequest {
   role?: "player" | "co_gm";
   invited_email?: string;
+  invite_note?: string;
   expires_in_hours?: number;
 }
 

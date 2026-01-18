@@ -562,6 +562,10 @@ class ActionRequest(BaseModel):
     )
     movement_path: list[dict[str, Any]] = Field(default_factory=list, description="Movement path")
     is_overcharge: bool = Field(default=False, description="Whether this uses overcharge")
+    use_thrown: bool = Field(
+        default=False,
+        description="Whether to treat a melee weapon attack as thrown",
+    )
 
 
 class ActionResponse(BaseModel):
@@ -858,6 +862,7 @@ async def execute_combat_action(
         full_tech_second=body.full_tech_second,
         movement_path=movement_path,
         is_overcharge=body.is_overcharge,
+        use_thrown=body.use_thrown,
     )
 
     # Execute action using core helper

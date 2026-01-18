@@ -29922,6 +29922,30 @@ export type MaxCount2 = number | null;
 export type ResetOn6 = ("scene_end" | "rest" | "full_repair" | "never") | null;
 export type Source4 = "save_check" | "triggered_effect" | "direct";
 export type AppliedPerTargetEffects = AppliedPerTargetEffect[];
+export type Type = "weapon_thrown" | "retrieve_thrown_weapon" | "status_applied";
+export type Status15 =
+  | (
+      | "braced"
+      | "immobilized"
+      | "impaired"
+      | "jammed"
+      | "lock_on"
+      | "shredded"
+      | "slowed"
+      | "stunned"
+      | "prone"
+      | "hidden"
+      | "invisible"
+      | "shutdown"
+      | "exposed"
+      | "engaged"
+      | "burn"
+      | "unshackled"
+    )
+  | null;
+export type TargetId9 = string | null;
+export type WeaponId4 = string | null;
+export type LogEffects = ActionLogEffect[];
 export type ActorId = string;
 export type MoveUsed = boolean;
 export type MovementMode = "ground" | "flight" | "hover" | "teleport";
@@ -29998,13 +30022,13 @@ export type TargetIds2 = string[];
 /**
  * Weapon being used
  */
-export type WeaponId4 = string | null;
+export type WeaponId5 = string | null;
 /**
  * System being activated
  */
 export type SystemId2 = string | null;
 export type Option = "scan" | "bolster" | "lock_on" | "invade";
-export type TargetId9 = string;
+export type TargetId10 = string;
 export type ScanOptions1 = ("stats" | "hidden_info" | "public_info")[] | null;
 /**
  * Movement path for move actions
@@ -30030,6 +30054,10 @@ export type StabilizeSecondary1 = ("reload_loading" | "clear_burn" | "clear_cond
  * Whether to apply knockback on successful ram
  */
 export type ApplyKnockback = boolean;
+/**
+ * Whether to treat a melee weapon attack as thrown (uses thrown range, applies cover, disarms weapon)
+ */
+export type UseThrown = boolean;
 /**
  * Whether action executed successfully
  */
@@ -30125,7 +30153,7 @@ export type CooldownsDecremented1 = string[];
 /**
  * Combatant who took the burn tick
  */
-export type TargetId10 = string;
+export type TargetId11 = string;
 /**
  * Total burn marked before resolution
  */
@@ -30177,7 +30205,7 @@ export type TargetIds3 = string[];
 /**
  * Weapon for overwatch attack
  */
-export type WeaponId5 = string | null;
+export type WeaponId6 = string | null;
 /**
  * Whether reaction was valid
  */
@@ -35542,6 +35570,10 @@ export interface WeaponState {
   destroyed?: Destroyed1;
   limited_charges_remaining?: LimitedChargesRemaining;
   needs_reload?: NeedsReload;
+  /**
+   * Coordinate where the weapon was thrown/dropped (None if carried)
+   */
+  thrown_coord?: HexCoord | null;
   [k: string]: unknown;
 }
 /**
@@ -35787,6 +35819,7 @@ export interface ActionUse {
   contested_check?: ContestedCheck | null;
   consumes_lock_on?: ConsumesLockOn;
   applied_per_target_effects?: AppliedPerTargetEffects;
+  log_effects?: LogEffects;
   [k: string]: unknown;
 }
 /**
@@ -35799,6 +35832,16 @@ export interface AppliedPerTargetEffect {
   max_count?: MaxCount2;
   reset_on?: ResetOn6;
   source?: Source4;
+  [k: string]: unknown;
+}
+/**
+ * Small effect summary for combat log display.
+ */
+export interface ActionLogEffect {
+  type: Type;
+  status?: Status15;
+  target_id?: TargetId9;
+  weapon_id?: WeaponId4;
   [k: string]: unknown;
 }
 /**
@@ -35970,7 +36013,7 @@ export interface ActionExecutionInput {
    * Target position for area/movement
    */
   target_position?: HexPosition | null;
-  weapon_id?: WeaponId4;
+  weapon_id?: WeaponId5;
   system_id?: SystemId2;
   /**
    * First Full Tech option selection
@@ -35986,6 +36029,7 @@ export interface ActionExecutionInput {
   stabilize_primary?: StabilizePrimary1;
   stabilize_secondary?: StabilizeSecondary1;
   apply_knockback?: ApplyKnockback;
+  use_thrown?: UseThrown;
   /**
    * Direction for eject (pilot flies 6 spaces in this direction)
    */
@@ -35997,7 +36041,7 @@ export interface ActionExecutionInput {
  */
 export interface FullTechOptionSelection {
   option: Option;
-  target_id: TargetId9;
+  target_id: TargetId10;
   scan_options?: ScanOptions1;
   [k: string]: unknown;
 }
@@ -36095,7 +36139,7 @@ export interface TurnEndResult {
  * Result of burn damage tick at end of turn.
  */
 export interface BurnTickResult {
-  target_id: TargetId10;
+  target_id: TargetId11;
   burn_amount: BurnAmount;
   engineering_roll: EngineeringRoll;
   engineering_bonus: EngineeringBonus;
@@ -36114,7 +36158,7 @@ export interface ReactionInput {
   reaction_type: ReactionType;
   trigger_action_id?: TriggerActionId;
   target_ids?: TargetIds3;
-  weapon_id?: WeaponId5;
+  weapon_id?: WeaponId6;
   [k: string]: unknown;
 }
 /**

@@ -15,6 +15,7 @@ import type {
   CombatRenderState,
   HexGrid,
   HoverStyle,
+  RenderMarker,
   RenderToken,
 } from "./canvas";
 import { buildHexGrid } from "./canvas";
@@ -116,6 +117,7 @@ export function adaptCombatScenario(
     combatants,
     input.tokenColors,
   );
+  const markers = buildMarkers(combatants);
 
   const overlayBuild = buildOverlays({
     action: input.action ?? resolveActionFromTurn(input.turn),
@@ -141,6 +143,7 @@ export function adaptCombatScenario(
     origin: input.gridOrigin ?? { q: 0, r: 0 },
     radius: input.gridRadius,
     tokens,
+    markers,
     overlays: overlayBuild.overlays,
     scenario: input.scenario,
   });
@@ -149,6 +152,7 @@ export function adaptCombatScenario(
     state: {
       grid,
       tokens,
+      markers,
       overlays: overlayBuild.overlays,
       hover: input.hover ?? null,
     },
@@ -245,6 +249,35 @@ function buildOverlays(input: OverlayBuildInput): OverlayBuildResult {
   overlays.push(overlayResult.overlay);
   overlayMetadata.push(overlayResult.meta);
   return { overlays, overlayMetadata };
+}
+
+function buildMarkers(combatants: CombatantState[]): RenderMarker[] {
+  const byCoord = new Map<
+    string,
+    { coord: HexCoord; count: number }
+  >();
+
+  for (const combatant of combatants) {
+    for (const mount of combatant.inventory?.mounts ?? []) {
+      for (const weapon of mount.weapons ?? []) {
+        if (!weapon.thrown_coord) {
+          continue;
+        }
+        const coord = weapon.thrown_coord;
+        const key = `${coord.q},${coord.r}`;
+        const entry = byCoord.get(key) ?? { coord, count: 0 };
+        entry.count += 1;
+        byCoord.set(key, entry);
+      }
+    }
+  }
+
+  return Array.from(byCoord.entries()).map(([key, entry]) => ({
+    id: `weapon_thrown:${key}`,
+    coord: entry.coord,
+    kind: "weapon_thrown",
+    count: entry.count,
+  }));
 }
 
 function buildOverlayFromAction({
@@ -426,12 +459,14 @@ function resolveGrid({
   origin,
   radius,
   tokens,
+  markers,
   overlays,
   scenario,
 }: {
   origin: HexCoord;
   radius?: number;
   tokens: RenderToken[];
+  markers: RenderMarker[];
   overlays: AreaOverlay[];
   scenario: MechCombatScenario;
 }): HexGrid {
@@ -447,6 +482,9 @@ function resolveGrid({
     for (const coord of overlay.coords) {
       maxDistance = Math.max(maxDistance, hexDistance(origin, coord));
     }
+  }
+  for (const marker of markers) {
+    maxDistance = Math.max(maxDistance, hexDistance(origin, marker.coord));
   }
   for (const tile of scenario.terrain?.tiles ?? []) {
     maxDistance = Math.max(maxDistance, hexDistance(origin, tile.coord));
