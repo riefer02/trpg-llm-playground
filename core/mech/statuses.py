@@ -24,6 +24,30 @@ StatusClearTrigger = Literal[
     "stand_up",
 ]
 
+StatusDurationType = Literal["indefinite", "end_of_turn", "end_of_next_turn"]
+
+
+class StatusInstance(FrozenModel):
+    """Tracks an applied status with duration metadata.
+
+    This model enables automatic status expiration based on turn boundaries
+    and trigger-based clearing per PR2 rules.
+
+    Duration types:
+    - indefinite: Status persists until explicitly cleared (e.g., prone, shutdown)
+    - end_of_turn: Status expires at end of current turn
+    - end_of_next_turn: Status expires at end of next turn (e.g., braced, stunned)
+    """
+
+    status: StatusType
+    applied_on_round: int = Field(..., ge=1, description="Round when status was applied")
+    applied_by: str | None = Field(
+        default=None, description="ID of combatant who applied this status, if any"
+    )
+    duration_type: StatusDurationType = Field(
+        default="indefinite", description="How the status expires"
+    )
+
 
 class ActionRestriction(FrozenModel):
     """Action limitations caused by a status or condition."""
@@ -223,6 +247,7 @@ COMBAT_STATUS_DEFINITIONS: list[StatusDefinition] = [
             auto_fail_hull_saves=True,
             auto_fail_agility_saves=True,
         ),
+        clear_triggers=["end_of_next_turn"],
     ),
 ]
 
@@ -233,3 +258,43 @@ STATUS_DEFINITIONS_BY_ID = {definition.status: definition for definition in COMB
 def get_status_definition(status: StatusType) -> StatusDefinition | None:
     """Look up a status or condition definition by ID."""
     return STATUS_DEFINITIONS_BY_ID.get(status)
+
+
+def get_status_default_duration(status: StatusType) -> StatusDurationType:
+    """Get the default duration type for a status based on its clear triggers.
+
+    Duration mapping:
+    - Statuses with 'end_of_next_turn' clear trigger → end_of_next_turn
+    - Statuses with 'end_of_turn' clear trigger → end_of_turn
+    - All others → indefinite (trigger-based or permanent)
+
+    Args:
+        status: The status type to look up
+
+    Returns:
+        The duration type for automatic expiration handling
+    """
+    definition = get_status_definition(status)
+    if definition is None:
+        return "indefinite"
+
+    if "end_of_next_turn" in definition.clear_triggers:
+        return "end_of_next_turn"
+    if "end_of_turn" in definition.clear_triggers:
+        return "end_of_turn"
+    return "indefinite"
+
+
+def get_status_clear_triggers(status: StatusType) -> list[StatusClearTrigger]:
+    """Get the clear triggers for a status.
+
+    Args:
+        status: The status type to look up
+
+    Returns:
+        List of triggers that clear this status
+    """
+    definition = get_status_definition(status)
+    if definition is None:
+        return []
+    return definition.clear_triggers

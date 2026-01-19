@@ -236,6 +236,9 @@ export type LancerTTRPGSchema =
   | ReactionResult
   | AvailableAction
   | AvailableActionsResult
+  | OverwatchOpportunityInfo
+  | OverwatchOpportunity
+  | OverwatchTriggerResult
   | ActionEconomyState2
   | ActionEconomyResult
   | MaterialProperties
@@ -30109,6 +30112,30 @@ export type OverheatChecks = {
   [k: string]: unknown;
 }[];
 /**
+ * ID of enemy who can react
+ */
+export type ReactorId = string;
+/**
+ * Weapon with threat covering position
+ */
+export type WeaponId6 = string;
+/**
+ * Threat range of the weapon
+ */
+export type WeaponThreat = number;
+/**
+ * True if reactor has available reaction budget
+ */
+export type CanReact = boolean;
+/**
+ * Reason if reaction is prevented
+ */
+export type PreventionReason = string | null;
+/**
+ * Overwatch opportunities triggered at movement start
+ */
+export type OverwatchOpportunities = OverwatchOpportunityInfo[];
+/**
  * ID of the actor whose turn started
  */
 export type ActorId2 = string;
@@ -30201,7 +30228,7 @@ export type BurnCleared = boolean;
 /**
  * ID of the reacting combatant
  */
-export type ReactorId = string;
+export type ReactorId1 = string;
 /**
  * Type of reaction
  */
@@ -30217,7 +30244,7 @@ export type TargetIds3 = string[];
 /**
  * Weapon for overwatch attack
  */
-export type WeaponId6 = string | null;
+export type WeaponId7 = string | null;
 /**
  * Whether reaction was valid
  */
@@ -30293,6 +30320,42 @@ export type Protocols1 = AvailableAction[];
  * Whether overcharge is available
  */
 export type CanOvercharge = boolean;
+/**
+ * ID of enemy who can react
+ */
+export type ReactorId2 = string;
+/**
+ * Weapon with threat covering position
+ */
+export type WeaponId8 = string;
+/**
+ * Threat range of the weapon
+ */
+export type WeaponThreat1 = number;
+/**
+ * ID of moving combatant (target)
+ */
+export type TargetId12 = string;
+/**
+ * True if reactor has available reaction budget
+ */
+export type CanReact1 = boolean;
+/**
+ * Reason if reaction is prevented
+ */
+export type PreventionReason1 = string | null;
+/**
+ * List of overwatch opportunities detected
+ */
+export type Opportunities = OverwatchOpportunity[];
+/**
+ * True if mover's status prevents all overwatch reactions
+ */
+export type ReactionsPrevented = boolean;
+/**
+ * Global reason if all reactions are prevented
+ */
+export type PreventionReason2 = string | null;
 /**
  * Whether action can be taken
  */
@@ -36257,6 +36320,7 @@ export interface ActionExecutionResult {
   structure_checks?: StructureChecks;
   overheat_checks?: OverheatChecks;
   position_updates?: PositionUpdates;
+  overwatch_opportunities?: OverwatchOpportunities;
   [k: string]: unknown;
 }
 /**
@@ -36289,6 +36353,22 @@ export interface PositionUpdates {
   [k: string]: {
     [k: string]: unknown;
   };
+}
+/**
+ * Overwatch opportunity info in action result.
+ *
+ * Describes a detected overwatch opportunity when a combatant starts
+ * movement inside an enemy's weapon threat range. Per PR2 4395-4401,
+ * enemies can take overwatch reactions against targets starting movement
+ * in their threat range.
+ */
+export interface OverwatchOpportunityInfo {
+  reactor_id: ReactorId;
+  weapon_id: WeaponId6;
+  weapon_threat: WeaponThreat;
+  can_react: CanReact;
+  prevention_reason?: PreventionReason;
+  [k: string]: unknown;
 }
 /**
  * Result of starting a combatant's turn.
@@ -36348,11 +36428,11 @@ export interface BurnTickResult {
  * Input for declaring a reaction.
  */
 export interface ReactionInput {
-  reactor_id: ReactorId;
+  reactor_id: ReactorId1;
   reaction_type: ReactionType;
   trigger_action_id?: TriggerActionId;
   target_ids?: TargetIds3;
-  weapon_id?: WeaponId6;
+  weapon_id?: WeaponId7;
   [k: string]: unknown;
 }
 /**
@@ -36404,6 +36484,48 @@ export interface ActionEconomyState1 {
   quick_actions_used?: QuickActionsUsed;
   overcharge_used?: OverchargeUsed;
   reactions_used_this_turn?: ReactionsUsedThisTurn;
+  [k: string]: unknown;
+}
+/**
+ * A detected overwatch opportunity for a single enemy.
+ *
+ * This represents one enemy's ability to potentially react with overwatch
+ * when a combatant starts movement in their weapon's threat range.
+ */
+export interface OverwatchOpportunity {
+  reactor_id: ReactorId2;
+  weapon_id: WeaponId8;
+  weapon_threat: WeaponThreat1;
+  target_id: TargetId12;
+  target_position: HexCoord1;
+  can_react: CanReact1;
+  prevention_reason?: PreventionReason1;
+  [k: string]: unknown;
+}
+/**
+ * Axial hex coordinate (q, r).
+ *
+ * Supports tuple-like comparison and indexing for migration compatibility:
+ * - h == (x, y) returns True if coordinates match
+ * - h[0] == h.q, h[1] == h.r
+ * - hash(h) == hash((x, y))
+ */
+export interface HexCoord1 {
+  q: Q;
+  r: R;
+  s: S;
+  [k: string]: unknown;
+}
+/**
+ * Result of checking overwatch triggers at movement start.
+ *
+ * Per PR2 rules, this check happens BEFORE movement occurs - the trigger
+ * condition is starting movement inside threat range, not entering it.
+ */
+export interface OverwatchTriggerResult {
+  opportunities?: Opportunities;
+  reactions_prevented?: ReactionsPrevented;
+  prevention_reason?: PreventionReason2;
   [k: string]: unknown;
 }
 /**

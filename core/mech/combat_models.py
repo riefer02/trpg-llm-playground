@@ -96,6 +96,24 @@ class ResourceChange(FrozenModel):
     repairs_change: int = 0
 
 
+class OverwatchOpportunityInfo(FrozenModel):
+    """Overwatch opportunity info in action result.
+
+    Describes a detected overwatch opportunity when a combatant starts
+    movement inside an enemy's weapon threat range. Per PR2 4395-4401,
+    enemies can take overwatch reactions against targets starting movement
+    in their threat range.
+    """
+
+    reactor_id: str = Field(..., description="ID of enemy who can react")
+    weapon_id: str = Field(..., description="Weapon with threat covering position")
+    weapon_threat: int = Field(..., ge=1, description="Threat range of the weapon")
+    can_react: bool = Field(..., description="True if reactor has available reaction budget")
+    prevention_reason: str | None = Field(
+        default=None, description="Reason if reaction is prevented"
+    )
+
+
 class ActionExecutionResult(FrozenModel):
     """Result of executing a combat action."""
 
@@ -122,6 +140,10 @@ class ActionExecutionResult(FrozenModel):
     position_updates: dict[str, dict] = Field(
         default_factory=dict,
         description="Position changes keyed by combatant_id: {q, r}"
+    )
+    overwatch_opportunities: list[OverwatchOpportunityInfo] = Field(
+        default_factory=list,
+        description="Overwatch opportunities triggered at movement start"
     )
 
 
@@ -220,6 +242,7 @@ __all__ = [
     "ReactionInput",
     # Output models
     "ResourceChange",
+    "OverwatchOpportunityInfo",
     "ActionExecutionResult",
     "TurnStartResult",
     "BurnTickResult",

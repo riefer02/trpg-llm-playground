@@ -26,6 +26,7 @@ from core.mech.combat_models import (
     StabilizeSecondary,
     ActionExecutionInput,
     ResourceChange,
+    OverwatchOpportunityInfo,
     ActionExecutionResult,
     TurnStartResult,
     TurnEndResult,
@@ -35,6 +36,9 @@ from core.mech.combat_models import (
     AvailableAction,
     AvailableActionsResult,
 )
+
+# Import overwatch trigger detection
+from core.shared.overwatch import check_overwatch_triggers_at_movement_start
 
 # Import helpers from combat_helpers
 from core.mech.combat_helpers import (
@@ -59,6 +63,8 @@ from core.mech.combat_helpers import (
     _get_weapon_state,
     _validate_weapon_usable,
     _update_weapon_after_attack,
+    _get_system_state,
+    _validate_system_usable,
     _resolve_stabilize,
     _resolve_hide,
     _resolve_ram,
@@ -70,6 +76,8 @@ from core.mech.combat_helpers import (
     _resolve_mount,
     _resolve_dismount,
     _resolve_eject,
+    _clear_statuses_by_trigger,
+    _expire_turn_duration_statuses,
 )
 
 from core.mech.combat_state import (
@@ -339,6 +347,25 @@ def end_turn(
     if updated_actor is not None and actor_index >= 0:
         updated_combatants[actor_index] = updated_actor
 
+    # Create intermediate scenario for status expiration
+    intermediate_scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+    # Expire duration-based statuses (braced, stunned, etc.)
+    intermediate_scenario, expired_effects = _expire_turn_duration_statuses(
+        intermediate_scenario, actor_id, current_round
+    )
+    end_of_turn_effects.extend(expired_effects)
+
+    # Re-fetch combatants after expiration
+    updated_combatants = list(intermediate_scenario.combatants)
+
     # Get current round data
     round_idx = current_round - 1
     current_round_data = scenario.rounds[round_idx] if round_idx < len(scenario.rounds) else None
@@ -591,6 +618,16 @@ def execute_action(
                 error=f"Cannot attack with {action_input.weapon_id}: {error_msg}",
             )
 
+    # Validate system usability (for activate actions)
+    if action_input.system_id:
+        system_state = _get_system_state(actor, action_input.system_id)
+        valid, error_msg = _validate_system_usable(system_state, action_input.system_id)
+        if not valid:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error=f"Cannot activate system: {error_msg}",
+            )
+
     if is_attack and weapon_profile is not None:
         area_pattern = _extract_area_pattern(weapon_profile)
         if area_pattern is not None:
@@ -729,6 +766,7 @@ def execute_action(
     structure_checks: list[dict] = []
     overheat_checks: list[dict] = []
     position_updates: dict[str, dict] = {}
+    overwatch_opportunities: list[OverwatchOpportunityInfo] = []
 
     if is_attack and action_input.use_thrown and not attack_target_ids:
         if action_input.weapon_id is None:
@@ -1394,12 +1432,46 @@ def execute_action(
     if action_input.action_id in ("move", "boost") and action_input.movement_path:
         # Re-fetch actor from scenario as it may have been updated
         actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
+
+        # Check if Disengage was used this turn (affects engagement and reactions)
+        disengage_active = any(
+            a.action_id == "disengage"
+            for a in current_turn.actions
+        )
+
+        # Check for overwatch triggers at movement start (PR2 4395-4401)
+        # Overwatch triggers when an enemy STARTS movement in weapon threat range
+        if actor.position is not None:
+            is_hidden = "hidden" in actor.statuses
+            is_invisible = "invisible" in actor.statuses
+
+            overwatch_result = check_overwatch_triggers_at_movement_start(
+                scenario=scenario,
+                mover=actor,
+                is_disengaging=disengage_active,
+                is_hidden=is_hidden,
+                is_invisible=is_invisible,
+            )
+
+            # Convert to OverwatchOpportunityInfo for result
+            for opp in overwatch_result.opportunities:
+                overwatch_opportunities.append(
+                    OverwatchOpportunityInfo(
+                        reactor_id=str(opp.reactor_id),
+                        weapon_id=str(opp.weapon_id),
+                        weapon_threat=opp.weapon_threat,
+                        can_react=opp.can_react,
+                        prevention_reason=opp.prevention_reason,
+                    )
+                )
+
         scenario, move_effects = _resolve_movement(
             scenario,
             actor,
             action_input.movement_path,
             is_boost=(action_input.action_id == "boost"),
             apply_damage_func=apply_damage,
+            ignore_engagement=disengage_active,
         )
         effects_applied.extend(move_effects)
 
@@ -1420,6 +1492,38 @@ def execute_action(
         scenario, eject_effects = _resolve_eject(scenario, actor, action_input.eject_direction)
         effects_applied.extend(eject_effects)
 
+    # Clear statuses based on action triggers (PR2 status clear rules)
+    statuses_cleared: list[StatusType] = []
+
+    # Attack actions clear hidden status
+    if action_input.action_id in ("skirmish", "barrage", "improvised_attack", "fight"):
+        scenario, cleared = _clear_statuses_by_trigger(scenario, action_input.actor_id, "attack")
+        statuses_cleared.extend(cleared)
+
+    # Boost action clears hidden status
+    if action_input.action_id == "boost":
+        scenario, cleared = _clear_statuses_by_trigger(scenario, action_input.actor_id, "boost")
+        statuses_cleared.extend(cleared)
+
+    # boot_up action clears shutdown status
+    if action_input.action_id == "boot_up":
+        scenario, cleared = _clear_statuses_by_trigger(scenario, action_input.actor_id, "boot_up")
+        statuses_cleared.extend(cleared)
+
+    # stand_up action clears prone status
+    if action_input.action_id == "stand_up":
+        scenario, cleared = _clear_statuses_by_trigger(scenario, action_input.actor_id, "stand_up")
+        statuses_cleared.extend(cleared)
+
+    # Record cleared statuses in effects
+    if statuses_cleared:
+        effects_applied.append({
+            "type": "statuses_cleared",
+            "actor_id": action_input.actor_id,
+            "statuses": [str(s) for s in statuses_cleared],
+            "trigger": action_input.action_id,
+        })
+
     log_effects = _build_action_log_effects(effects_applied, statuses_applied)
     if log_effects:
         action_use = action_use.model_copy(update={"log_effects": log_effects})
@@ -1439,6 +1543,7 @@ def execute_action(
         structure_checks=structure_checks,
         overheat_checks=overheat_checks,
         position_updates=position_updates,
+        overwatch_opportunities=overwatch_opportunities,
     )
 
     return scenario, updated_turn, updated_economy, result
@@ -1576,6 +1681,20 @@ def execute_reaction(
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
     )
+
+    # Reactions clear hidden status (PR2 status clear rules)
+    updated_scenario, cleared_statuses = _clear_statuses_by_trigger(
+        updated_scenario, reaction_input.reactor_id, "reaction"
+    )
+
+    # Record cleared statuses in effects
+    if cleared_statuses:
+        effects_applied.append({
+            "type": "statuses_cleared",
+            "actor_id": reaction_input.reactor_id,
+            "statuses": [str(s) for s in cleared_statuses],
+            "trigger": "reaction",
+        })
 
     return updated_scenario, updated_economy, ReactionResult(
         success=True,

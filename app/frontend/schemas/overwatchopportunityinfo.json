@@ -1,0 +1,47 @@
+{
+  "description": "Overwatch opportunity info in action result.\n\nDescribes a detected overwatch opportunity when a combatant starts\nmovement inside an enemy's weapon threat range. Per PR2 4395-4401,\nenemies can take overwatch reactions against targets starting movement\nin their threat range.",
+  "properties": {
+    "reactor_id": {
+      "description": "ID of enemy who can react",
+      "title": "Reactor Id",
+      "type": "string"
+    },
+    "weapon_id": {
+      "description": "Weapon with threat covering position",
+      "title": "Weapon Id",
+      "type": "string"
+    },
+    "weapon_threat": {
+      "description": "Threat range of the weapon",
+      "minimum": 1,
+      "title": "Weapon Threat",
+      "type": "integer"
+    },
+    "can_react": {
+      "description": "True if reactor has available reaction budget",
+      "title": "Can React",
+      "type": "boolean"
+    },
+    "prevention_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Reason if reaction is prevented",
+      "title": "Prevention Reason"
+    }
+  },
+  "required": [
+    "reactor_id",
+    "weapon_id",
+    "weapon_threat",
+    "can_react"
+  ],
+  "title": "OverwatchOpportunityInfo",
+  "type": "object"
+}

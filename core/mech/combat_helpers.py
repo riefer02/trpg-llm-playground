@@ -12,6 +12,12 @@ from typing import TYPE_CHECKING
 from core.shared.enums import StatusType
 from core.shared.dice import roll_dice
 from core.shared.state_helpers import add_statuses
+from core.mech.statuses import (
+    StatusInstance,
+    StatusClearTrigger,
+    get_status_default_duration,
+    get_status_clear_triggers,
+)
 from core.shared.full_tech import (
     FullTechFirstOption,
     FullTechSecondOption,
@@ -36,9 +42,11 @@ from core.mech.combat_state import (
     CombatantState,
     GrappleLink,
     WeaponState,
+    MechSystemState,
 )
 from core.shared.involuntary_movement import resolve_knockback
 from core.shared.los import LOSCheckRequest, check_line_of_sight
+from core.shared.movement import check_engagement_stop, _is_hostile
 
 if TYPE_CHECKING:
     from core.mech.combat_models import ResourceChange, StabilizePrimary, StabilizeSecondary, BurnTickResult
@@ -239,8 +247,16 @@ def _validate_weapon_usable(
     Returns:
         Tuple of (valid, error_message). If valid=True, error_message is None.
     """
+    # If weapon_id provided but not found in inventory, fail
+    # Only check if actor actually has inventory set up (allows compendium-only tests)
+    if weapon_id is not None and weapon_state is None:
+        if actor.inventory is not None:
+            return (False, "Weapon not found in inventory")
+        # If no inventory, allow compendium lookup (backward compatible for testing)
+
+    # If no weapon specified at all, pass (action doesn't require weapon)
     if weapon_state is None and weapon_id is None:
-        return (True, None)  # No weapon to validate
+        return (True, None)
 
     # Check destroyed
     if weapon_state is not None and weapon_state.destroyed:
@@ -351,6 +367,60 @@ def _reload_all_loading_weapons(
 
     new_inventory = actor.inventory.model_copy(update={"mounts": new_mounts})
     return actor.model_copy(update={"inventory": new_inventory}), reloaded_weapons
+
+
+def _get_system_state(
+    actor: CombatantState,
+    system_id: str,
+) -> MechSystemState | None:
+    """Find system state in actor's inventory by system ID.
+
+    Args:
+        actor: The combatant to search
+        system_id: System ID to find
+
+    Returns:
+        MechSystemState if found, None otherwise
+    """
+    if not actor.inventory:
+        return None
+    for system in actor.inventory.systems:
+        if system.system_id == system_id:
+            return system
+    return None
+
+
+def _validate_system_usable(
+    system_state: MechSystemState | None,
+    system_id: str | None,
+) -> tuple[bool, str | None]:
+    """Validate system can be activated.
+
+    Args:
+        system_state: The system's current state from inventory
+        system_id: System ID for reference
+
+    Returns:
+        Tuple of (valid, error_message). If valid=True, error_message is None.
+    """
+    # If system_id provided but not found in inventory, fail
+    if system_id is not None and system_state is None:
+        return (False, "System not found in inventory")
+
+    # If no system specified at all, pass (action doesn't require system)
+    if system_state is None and system_id is None:
+        return (True, None)
+
+    # Check destroyed
+    if system_state is not None and system_state.destroyed:
+        return (False, "System is destroyed")
+
+    # Check limited charges
+    if system_state is not None and system_state.limited_charges_remaining is not None:
+        if system_state.limited_charges_remaining <= 0:
+            return (False, "System has no charges remaining")
+
+    return (True, None)
 
 
 def _validate_attack_range_and_los(
@@ -750,6 +820,246 @@ def _get_basic_available_actions(actor: CombatantState) -> list[str]:
         actions = [a for a in actions if a in ["improvised_attack", "grapple", "mount_dismount", "brace"]]
 
     return actions
+
+
+# =============================================================================
+# Status Duration & Clearing Helpers
+# =============================================================================
+
+
+def _apply_status_with_duration(
+    scenario: MechCombatScenario,
+    target_id: str,
+    status: StatusType,
+    current_round: int,
+    applied_by: str | None = None,
+) -> tuple[MechCombatScenario, bool]:
+    """Apply a status to a target with duration tracking.
+
+    Creates a StatusInstance for the status with appropriate duration metadata.
+    Also updates the legacy statuses list for backwards compatibility.
+
+    Args:
+        scenario: Current combat scenario
+        target_id: ID of target combatant
+        status: Status type to apply
+        current_round: Current round number for tracking duration
+        applied_by: ID of combatant who applied this status (optional)
+
+    Returns:
+        Tuple of (updated scenario, whether status was newly applied)
+    """
+    target_idx = next(
+        (i for i, c in enumerate(scenario.combatants) if c.id == target_id), -1
+    )
+    if target_idx < 0:
+        return scenario, False
+
+    target = scenario.combatants[target_idx]
+
+    # Check if status already exists
+    if status in target.statuses:
+        return scenario, False
+
+    # Determine duration type from status definition
+    duration_type = get_status_default_duration(status)
+
+    # Create status instance
+    new_instance = StatusInstance(
+        status=status,
+        applied_on_round=current_round,
+        applied_by=applied_by,
+        duration_type=duration_type,
+    )
+
+    # Update both status_instances and statuses lists
+    new_instances = list(target.status_instances) + [new_instance]
+    new_statuses = list(target.statuses) + [status]
+
+    updated_target = target.model_copy(
+        update={"status_instances": new_instances, "statuses": new_statuses}
+    )
+
+    updated_combatants = list(scenario.combatants)
+    updated_combatants[target_idx] = updated_target
+
+    updated_scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+    return updated_scenario, True
+
+
+def _clear_statuses_by_trigger(
+    scenario: MechCombatScenario,
+    actor_id: str,
+    trigger: StatusClearTrigger,
+) -> tuple[MechCombatScenario, list[StatusType]]:
+    """Clear all statuses on actor matching the given trigger.
+
+    Per PR2 rules, certain actions trigger automatic status clearing:
+    - attack: Clears hidden
+    - boost: Clears hidden
+    - reaction: Clears hidden
+    - boot_up: Clears shutdown
+    - stand_up: Clears prone
+
+    Args:
+        scenario: Current combat scenario
+        actor_id: ID of the combatant whose statuses to check
+        trigger: The trigger event that occurred
+
+    Returns:
+        Tuple of (updated scenario, list of statuses that were cleared)
+    """
+    actor_idx = next(
+        (i for i, c in enumerate(scenario.combatants) if c.id == actor_id), -1
+    )
+    if actor_idx < 0:
+        return scenario, []
+
+    actor = scenario.combatants[actor_idx]
+    cleared_statuses: list[StatusType] = []
+
+    # Find statuses to clear based on trigger
+    for status in actor.statuses:
+        triggers = get_status_clear_triggers(status)
+        if trigger in triggers:
+            cleared_statuses.append(status)
+
+    if not cleared_statuses:
+        return scenario, []
+
+    # Remove cleared statuses from both lists
+    new_statuses = [s for s in actor.statuses if s not in cleared_statuses]
+    new_instances = [
+        inst for inst in actor.status_instances if inst.status not in cleared_statuses
+    ]
+
+    updated_actor = actor.model_copy(
+        update={"statuses": new_statuses, "status_instances": new_instances}
+    )
+
+    updated_combatants = list(scenario.combatants)
+    updated_combatants[actor_idx] = updated_actor
+
+    updated_scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+    return updated_scenario, cleared_statuses
+
+
+def _expire_turn_duration_statuses(
+    scenario: MechCombatScenario,
+    actor_id: str,
+    current_round: int,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Expire duration-based statuses at end of turn.
+
+    Handles:
+    - end_of_turn: Expires immediately at end of current turn
+    - end_of_next_turn: Expires at end of the round AFTER they were applied
+
+    Args:
+        scenario: Current combat scenario
+        actor_id: ID of the combatant whose turn is ending
+        current_round: Current round number
+
+    Returns:
+        Tuple of (updated scenario, list of expiration effect dicts)
+    """
+    actor_idx = next(
+        (i for i, c in enumerate(scenario.combatants) if c.id == actor_id), -1
+    )
+    if actor_idx < 0:
+        return scenario, []
+
+    actor = scenario.combatants[actor_idx]
+    expired_effects: list[dict] = []
+    expired_statuses: list[StatusType] = []
+
+    for instance in actor.status_instances:
+        should_expire = False
+
+        if instance.duration_type == "end_of_turn":
+            # Always expires at end of turn
+            should_expire = True
+        elif instance.duration_type == "end_of_next_turn":
+            # Expires at end of the round AFTER it was applied
+            # e.g., applied in round 1 → expires at end of round 2
+            if current_round > instance.applied_on_round:
+                should_expire = True
+
+        if should_expire:
+            expired_statuses.append(instance.status)
+            expired_effects.append({
+                "type": "status_expired",
+                "status": instance.status,
+                "duration_type": instance.duration_type,
+                "applied_on_round": instance.applied_on_round,
+                "expired_on_round": current_round,
+            })
+
+    if not expired_statuses:
+        return scenario, []
+
+    # Remove expired statuses from both lists
+    new_statuses = [s for s in actor.statuses if s not in expired_statuses]
+    new_instances = [
+        inst for inst in actor.status_instances if inst.status not in expired_statuses
+    ]
+
+    updated_actor = actor.model_copy(
+        update={"statuses": new_statuses, "status_instances": new_instances}
+    )
+
+    updated_combatants = list(scenario.combatants)
+    updated_combatants[actor_idx] = updated_actor
+
+    updated_scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+    return updated_scenario, expired_effects
+
+
+def _sync_statuses_from_instances(combatant: CombatantState) -> CombatantState:
+    """Rebuild the statuses list from status_instances.
+
+    Ensures backwards compatibility by keeping the statuses list
+    in sync with the status_instances list.
+
+    Args:
+        combatant: Combatant whose statuses to sync
+
+    Returns:
+        Updated combatant with synced statuses list
+    """
+    instance_statuses = [inst.status for inst in combatant.status_instances]
+
+    # Keep any statuses that are in the legacy list but not tracked
+    # This handles statuses applied before the instance tracking system
+    legacy_only = [s for s in combatant.statuses if s not in instance_statuses]
+
+    synced_statuses = instance_statuses + legacy_only
+
+    return combatant.model_copy(update={"statuses": synced_statuses})
 
 
 # =============================================================================
@@ -1500,12 +1810,102 @@ def _resolve_burn_tick(
 # =============================================================================
 
 
+def _apply_engagement_status(
+    scenario: MechCombatScenario,
+    mover: CombatantState,
+    final_position: HexPosition,
+    ignore_engagement: bool = False,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Apply engaged status to mover and all adjacent hostiles after movement.
+
+    Per PR2 3817-3819:
+    "If you move adjacent to a hostile character, you become engaged."
+
+    Both parties become engaged (mutual engagement, matching grapple behavior).
+
+    Args:
+        scenario: Current combat scenario
+        mover: The combatant that just moved
+        final_position: The final position of the mover
+        ignore_engagement: Whether to skip status application (e.g., Disengage)
+
+    Returns:
+        Tuple of (updated scenario, list of effects)
+    """
+    effects: list[dict] = []
+
+    # Skip if ignoring engagement (Disengage action)
+    if ignore_engagement:
+        return scenario, effects
+
+    # Find all adjacent hostile combatants
+    updated_combatants = list(scenario.combatants)
+    mover_idx = next((i for i, c in enumerate(updated_combatants) if c.id == mover.id), -1)
+
+    adjacent_hostile_ids: list[tuple[int, CombatantState]] = []
+    for i, combatant in enumerate(updated_combatants):
+        if combatant.id == mover.id:
+            continue
+        if combatant.position is None:
+            continue
+        if not _is_hostile(mover.id, combatant.id, scenario):
+            continue
+        if final_position.coord.distance_to(combatant.position.coord) == 1:
+            adjacent_hostile_ids.append((i, combatant))
+
+    if not adjacent_hostile_ids:
+        return scenario, effects
+
+    # Apply engaged to mover if not already engaged
+    if mover_idx >= 0:
+        mover_statuses = list(updated_combatants[mover_idx].statuses)
+        if "engaged" not in mover_statuses:
+            mover_statuses.append("engaged")
+            updated_combatants[mover_idx] = updated_combatants[mover_idx].model_copy(
+                update={"statuses": mover_statuses}
+            )
+            effects.append({
+                "type": "status_applied",
+                "target_id": str(mover.id),
+                "status": "engaged",
+                "reason": "moved_adjacent_to_hostile",
+            })
+
+    # Apply engaged to each adjacent hostile if not already engaged
+    for idx, hostile in adjacent_hostile_ids:
+        hostile_statuses = list(hostile.statuses)
+        if "engaged" not in hostile_statuses:
+            hostile_statuses.append("engaged")
+            updated_combatants[idx] = hostile.model_copy(
+                update={"statuses": hostile_statuses}
+            )
+            effects.append({
+                "type": "status_applied",
+                "target_id": str(hostile.id),
+                "status": "engaged",
+                "reason": "hostile_moved_adjacent",
+            })
+
+    # Build updated scenario
+    updated_scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+    return updated_scenario, effects
+
+
 def _resolve_movement(
     scenario: MechCombatScenario,
     actor: CombatantState,
     path: list[HexPosition],
     is_boost: bool = False,
     apply_damage_func=None,
+    ignore_engagement: bool = False,
 ) -> tuple[MechCombatScenario, list[dict]]:
     """Resolve movement action - validate path, apply terrain effects, update position.
 
@@ -1514,6 +1914,15 @@ def _resolve_movement(
     - Boost: Quick action, move up to 2x Speed in spaces
     - Difficult terrain costs 2 spaces per 1 space moved
     - Dangerous terrain triggers engineering check (DC 10), 5 damage on failure
+    - Engagement: If moving adjacent to same-size-or-larger hostile, must stop
+
+    Args:
+        scenario: Current combat scenario
+        actor: The moving combatant
+        path: List of hex positions for the movement path
+        is_boost: Whether this is a Boost action (2x speed)
+        apply_damage_func: Function to apply damage (for dangerous terrain)
+        ignore_engagement: Whether to ignore engagement rules (e.g., Disengage action)
 
     Returns:
         Tuple of (updated scenario, effects list)
@@ -1533,6 +1942,34 @@ def _resolve_movement(
             "reason": "Empty movement path",
         })
         return scenario, effects
+
+    # Check engagement stop (unless ignoring via Disengage)
+    # Per PR2 3817-3819: Must stop when moving adjacent to same-size-or-larger hostile
+    if not ignore_engagement and actor.position is not None:
+        # Include starting position in path for engagement check
+        # check_engagement_stop expects path[0] to be the starting position
+        path_coords = [actor.position.coord] + [p.coord for p in path]
+        entity_size = actor.stats.size if actor.stats else "size_1"
+        should_stop, stop_coord = check_engagement_stop(
+            entity_id=actor.id,
+            entity_size=entity_size,
+            path=path_coords,
+            scenario=scenario,
+            ignore_engagement=False,
+        )
+
+        if should_stop and stop_coord:
+            # Truncate path to stop position
+            stop_idx = next(
+                (i for i, p in enumerate(path) if p.coord == stop_coord),
+                len(path) - 1
+            )
+            path = path[:stop_idx + 1]
+            effects.append({
+                "type": "engagement_stop",
+                "stop_coord": {"q": stop_coord.q, "r": stop_coord.r},
+                "reason": "same_size_or_larger_hostile",
+            })
 
     # Calculate total movement cost with terrain
     total_cost = 0
@@ -1637,6 +2074,20 @@ def _resolve_movement(
             environment=scenario.environment,
             deployables=dict(scenario.deployables),
         )
+
+    # Apply engaged status to mover and adjacent hostiles after position update
+    # Per PR2 3817: Moving adjacent to a hostile triggers engagement
+    # Re-fetch updated actor from scenario
+    updated_actor_for_engagement = next(
+        (c for c in scenario.combatants if c.id == actor.id), actor
+    )
+    scenario, engagement_effects = _apply_engagement_status(
+        scenario,
+        updated_actor_for_engagement,
+        final_position,
+        ignore_engagement=ignore_engagement,
+    )
+    effects.extend(engagement_effects)
 
     effects.append({
         "type": "movement",
@@ -2027,6 +2478,9 @@ __all__ = [
     "_validate_weapon_usable",
     "_update_weapon_after_attack",
     "_reload_all_loading_weapons",
+    # System Validation
+    "_get_system_state",
+    "_validate_system_usable",
     # Tech Actions
     "_build_full_tech_option",
     "_apply_tech_result",
@@ -2035,6 +2489,11 @@ __all__ = [
     "_apply_statuses_to_target",
     "_remove_status_from_target",
     "_get_basic_available_actions",
+    # Status Duration & Clearing
+    "_apply_status_with_duration",
+    "_clear_statuses_by_trigger",
+    "_expire_turn_duration_statuses",
+    "_sync_statuses_from_instances",
     # Attack Modifiers
     "_get_attacker_status_modifiers",
     "_get_target_status_modifiers",
@@ -2049,6 +2508,7 @@ __all__ = [
     "_resolve_search",
     "_resolve_burn_tick",
     # Movement Resolution
+    "_apply_engagement_status",
     "_resolve_movement",
     # Mount/Dismount/Eject
     "_resolve_mount",

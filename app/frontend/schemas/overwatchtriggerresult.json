@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    },
+    "OverwatchOpportunity": {
+      "description": "A detected overwatch opportunity for a single enemy.\n\nThis represents one enemy's ability to potentially react with overwatch\nwhen a combatant starts movement in their weapon's threat range.",
+      "properties": {
+        "reactor_id": {
+          "description": "ID of enemy who can react",
+          "title": "Reactor Id",
+          "type": "string"
+        },
+        "weapon_id": {
+          "description": "Weapon with threat covering position",
+          "title": "Weapon Id",
+          "type": "string"
+        },
+        "weapon_threat": {
+          "description": "Threat range of the weapon",
+          "minimum": 1,
+          "title": "Weapon Threat",
+          "type": "integer"
+        },
+        "target_id": {
+          "description": "ID of moving combatant (target)",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_position": {
+          "$ref": "#/$defs/HexCoord",
+          "description": "Mover's starting position"
+        },
+        "can_react": {
+          "description": "True if reactor has available reaction budget",
+          "title": "Can React",
+          "type": "boolean"
+        },
+        "prevention_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reason if reaction is prevented",
+          "title": "Prevention Reason"
+        }
+      },
+      "required": [
+        "reactor_id",
+        "weapon_id",
+        "weapon_threat",
+        "target_id",
+        "target_position",
+        "can_react"
+      ],
+      "title": "OverwatchOpportunity",
+      "type": "object"
+    }
+  },
+  "description": "Result of checking overwatch triggers at movement start.\n\nPer PR2 rules, this check happens BEFORE movement occurs - the trigger\ncondition is starting movement inside threat range, not entering it.",
+  "properties": {
+    "opportunities": {
+      "description": "List of overwatch opportunities detected",
+      "items": {
+        "$ref": "#/$defs/OverwatchOpportunity"
+      },
+      "title": "Opportunities",
+      "type": "array"
+    },
+    "reactions_prevented": {
+      "default": false,
+      "description": "True if mover's status prevents all overwatch reactions",
+      "title": "Reactions Prevented",
+      "type": "boolean"
+    },
+    "prevention_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Global reason if all reactions are prevented",
+      "title": "Prevention Reason"
+    }
+  },
+  "title": "OverwatchTriggerResult",
+  "type": "object"
+}

@@ -589,6 +589,13 @@ COMBAT_ACTION_RULES: list[ActionRule] = [
             ]
         ),
     ),
+    ActionRule(
+        id="stand_up",
+        name="Stand Up",
+        action_type="quick",
+        scope="both",
+        category="utility",
+    ),
 ]
 
 

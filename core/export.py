@@ -192,7 +192,7 @@ from core.mech import (
 )
 from core.mech.grid import HexCoord, HexPosition
 from core.mech.terrain import TerrainHex, TerrainMap
-from core.mech.statuses import StatusDefinition
+from core.mech.statuses import StatusDefinition, StatusInstance
 from core.mech.combat_rules import (
     TurnOrderRules,
     TurnActionRules,
@@ -260,6 +260,13 @@ from core.mech.combat_execution import (
     AvailableAction,
     AvailableActionsResult,
     ResourceChange,
+)
+from core.mech.combat_models import (
+    OverwatchOpportunityInfo,
+)
+from core.shared.overwatch import (
+    OverwatchOpportunity,
+    OverwatchTriggerResult,
 )
 from core.mech.action_economy import (
     ActionEconomyState,
@@ -489,6 +496,7 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "TerrainHex": TerrainHex,
     "TerrainMap": TerrainMap,
     "StatusDefinition": StatusDefinition,
+    "StatusInstance": StatusInstance,
     "TurnOrderRules": TurnOrderRules,
     "TurnActionRules": TurnActionRules,
     "EngagementRules": EngagementRules,
@@ -546,6 +554,10 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "AvailableAction": AvailableAction,
     "AvailableActionsResult": AvailableActionsResult,
     "ResourceChange": ResourceChange,
+    "OverwatchOpportunityInfo": OverwatchOpportunityInfo,
+    # Overwatch trigger detection
+    "OverwatchOpportunity": OverwatchOpportunity,
+    "OverwatchTriggerResult": OverwatchTriggerResult,
     # Action economy
     "ActionEconomyState": ActionEconomyState,
     "ActionEconomyResult": ActionEconomyResult,

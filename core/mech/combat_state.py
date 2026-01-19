@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from core.shared.heat import MeltdownState
     from core.shared.protocols import ProtocolState
     from core.shared.turn_end import TurnEndEffectState
+    from core.mech.statuses import StatusInstance
 
 
 CombatSide = Literal["players", "hostiles", "neutral"]
@@ -189,6 +190,10 @@ class CombatantState(FrozenModel):
     position: HexPosition | None = None
     statuses: list[StatusType] = Field(default_factory=list)
     conditions: list[StatusType] = Field(default_factory=list)
+    status_instances: list["StatusInstance"] = Field(
+        default_factory=list,
+        description="Tracked status instances with duration metadata for automatic expiration",
+    )
     inventory: MechInventory | None = None
     ai_controlled: bool = False
     ai_type: Literal["compcon", "nhp"] | None = Field(
@@ -448,12 +453,14 @@ try:
     from core.shared.heat import MeltdownState
     from core.shared.protocols import ProtocolState
     from core.shared.turn_end import TurnEndEffectState
+    from core.mech.statuses import StatusInstance
 
     CombatantState.model_rebuild(
         _types_namespace={
             "MeltdownState": MeltdownState,
             "ProtocolState": ProtocolState,
             "TurnEndEffectState": TurnEndEffectState,
+            "StatusInstance": StatusInstance,
         }
     )
 except ImportError:

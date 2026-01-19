@@ -54,6 +54,7 @@ BASIC_MECH_ACTIONS: list[ActionDefinition] = [
     ActionDefinition(id="scan", name="Scan", action_type="quick", tags=["tech"]),
     ActionDefinition(id="lock_on", name="Lock On", action_type="quick", tags=["tech"]),
     ActionDefinition(id="invade", name="Invade", action_type="quick", tags=["tech"]),
+    ActionDefinition(id="stand_up", name="Stand Up", action_type="quick", scope="both", tags=["utility"]),
 ]
 
 

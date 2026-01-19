@@ -451,7 +451,6 @@ from core.shared.invisibility import (
     can_always_hide_while_invisible,
     get_invisibility_miss_chance_description,
 )
-
 __all__ = [
     # Enums
     "ActionType",
