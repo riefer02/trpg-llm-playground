@@ -1,0 +1,52 @@
+{
+  "description": "Active tracking of a victory condition during mission resolution.\n\nAttributes:\n    condition_type: Type of victory condition being tracked\n    target_value: The target value needed to achieve victory (e.g., 3 zones)\n    current_value: The current progress toward the target\n    is_met: Whether this condition has been satisfied\n    description: Human-readable description of the condition",
+  "properties": {
+    "condition_type": {
+      "enum": [
+        "extract_objective",
+        "control_zones",
+        "score_above_threshold",
+        "outnumber_enemies",
+        "control_real_objective",
+        "survive_rounds"
+      ],
+      "title": "Condition Type",
+      "type": "string"
+    },
+    "target_value": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Value"
+    },
+    "current_value": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Current Value",
+      "type": "integer"
+    },
+    "is_met": {
+      "default": false,
+      "title": "Is Met",
+      "type": "boolean"
+    },
+    "description": {
+      "description": "Human-readable description",
+      "title": "Description",
+      "type": "string"
+    }
+  },
+  "required": [
+    "condition_type",
+    "description"
+  ],
+  "title": "SitrepVictoryCondition",
+  "type": "object"
+}

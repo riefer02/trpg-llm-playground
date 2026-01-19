@@ -181,6 +181,7 @@ export type LancerTTRPGSchema =
   | TerrainHex
   | TerrainMap
   | StatusDefinition
+  | StatusInstance
   | TurnOrderRules
   | TurnActionRules
   | EngagementRules
@@ -230,6 +231,7 @@ export type LancerTTRPGSchema =
   | ResolutionSettings
   | ActionExecutionInput
   | ActionExecutionResult
+  | DamageBreakdown1
   | TurnStartResult
   | TurnEndResult
   | ReactionInput
@@ -252,7 +254,16 @@ export type LancerTTRPGSchema =
   | GeneratedTerrain
   | TileSetConfig
   | TerrainGeneratorParams
-  | SoftCoverZoneState;
+  | SoftCoverZoneState
+  | SitrepTemplate
+  | SitrepZone
+  | VictoryCondition
+  | SitrepResolution
+  | SitrepDeployment
+  | SitrepVictoryCondition
+  | ZoneControlStateTracker
+  | PlayerPartyPower
+  | EnemyForceRecommendation;
 export type Id = string;
 /**
  * The pilot's callsign
@@ -29100,6 +29111,35 @@ export type ClearTriggers = (
   | "invisibility_lost"
   | "stand_up"
 )[];
+export type Status15 =
+  | "braced"
+  | "immobilized"
+  | "impaired"
+  | "jammed"
+  | "lock_on"
+  | "shredded"
+  | "slowed"
+  | "stunned"
+  | "prone"
+  | "hidden"
+  | "invisible"
+  | "shutdown"
+  | "exposed"
+  | "engaged"
+  | "burn"
+  | "unshackled";
+/**
+ * Round when status was applied
+ */
+export type AppliedOnRound = number;
+/**
+ * ID of combatant who applied this status, if any
+ */
+export type AppliedBy = string | null;
+/**
+ * How the status expires
+ */
+export type DurationType = "indefinite" | "end_of_turn" | "end_of_next_turn";
 export type PlayersActFirst = boolean;
 export type NominationRequired = boolean;
 export type GmChoosesIfNoNomination = boolean;
@@ -29622,6 +29662,10 @@ export type Conditions = (
   | "burn"
   | "unshackled"
 )[];
+/**
+ * Tracked status instances with duration metadata for automatic expiration
+ */
+export type StatusInstances = StatusInstance[];
 export type MountIndex1 = number;
 export type SlotType2 = ("main" | "heavy" | "aux_aux" | "main_aux" | "flexible" | "integrated") | null;
 export type WeaponId3 = string;
@@ -29835,7 +29879,7 @@ export type EffectId4 = string;
 /**
  * When the effect expires
  */
-export type DurationType = "scene" | "start_of_next_turn" | "end_of_next_turn" | "turns";
+export type DurationType1 = "scene" | "start_of_next_turn" | "end_of_next_turn" | "turns";
 /**
  * Turns remaining (for turns duration_type)
  */
@@ -29855,11 +29899,27 @@ export type TargetId5 = string | null;
 /**
  * When the effect expires
  */
-export type DurationType1 = "end_of_turn" | "start_of_next_turn" | "end_of_next_turn" | "until_cleared" | "scene";
+export type DurationType2 = "end_of_turn" | "start_of_next_turn" | "end_of_next_turn" | "until_cleared" | "scene";
 /**
  * Actor who applied this effect
  */
-export type AppliedBy = string;
+export type AppliedBy1 = string;
+/**
+ * Aggregated mechanical effects from pilot talents
+ */
+export type TalentEffects = MechanicalEffect[];
+/**
+ * Passive mechanical effects from frame traits
+ */
+export type FrameTraitEffects = MechanicalEffect[];
+/**
+ * Whether core power can be activated (once per mission)
+ */
+export type CorePowerAvailable = boolean;
+/**
+ * Whether core power is currently active
+ */
+export type CorePowerActive = boolean;
 /**
  * ID of mech this pilot is piloting (pilot only)
  */
@@ -29938,7 +29998,7 @@ export type ResetOn6 = ("scene_end" | "rest" | "full_repair" | "never") | null;
 export type Source4 = "save_check" | "triggered_effect" | "direct";
 export type AppliedPerTargetEffects = AppliedPerTargetEffect[];
 export type Type = "weapon_thrown" | "retrieve_thrown_weapon" | "status_applied";
-export type Status15 =
+export type Status16 =
   | (
       | "braced"
       | "immobilized"
@@ -29998,6 +30058,48 @@ export type DetectionDc = number | null;
 export type DisarmDc = number | null;
 export type EDefense6 = number;
 export type Reactions1 = string[];
+export type TemplateType = "escort" | "control" | "extract" | "hold_out" | "gauntlet" | "recon";
+export type CurrentRound = number;
+export type MaxRounds = number;
+export type PlayerScore = number;
+export type EnemyScore = number;
+export type ZoneId = string;
+export type State = "player_controlled" | "enemy_controlled" | "contested" | "neutral";
+export type ControllingSide = string | null;
+export type LastCheckedTurn = number;
+export type ConditionType1 =
+  | "extract_objective"
+  | "control_zones"
+  | "score_above_threshold"
+  | "outnumber_enemies"
+  | "control_real_objective"
+  | "survive_rounds";
+export type TargetValue = number | null;
+export type CurrentValue = number;
+export type IsMet = boolean;
+/**
+ * Human-readable description
+ */
+export type Description8 = string;
+export type VictoryConditions = SitrepVictoryCondition[];
+export type ExtractionProgress = number;
+export type SurvivingPlayers = number;
+export type SurvivingEnemies = number;
+export type Outcome3 = ("players_win" | "enemies_win" | "draw" | "ongoing") | null;
+export type TurnLimitReached = boolean;
+export type ReservesRemaining = number;
+export type ZoneType = "deployment" | "extraction" | "objective" | "ingress";
+export type Width1 = number | null;
+export type Height1 = number | null;
+export type Location = string | null;
+export type TerrainNotes = string | null;
+export type PlayerZones = SitrepZone[];
+export type EnemyZones = SitrepZone[];
+export type IngressZones = SitrepZone[];
+export type ReservePool = string[];
+export type ReservesSpawnedPerRound = number | null;
+export type LastIngressZone = string | null;
+export type ReservePattern = "none" | "half" | "normal" | "double" | "increasing";
 export type Code4 = string;
 export type Message4 = string;
 export type Severity5 = "error" | "warning";
@@ -30039,6 +30141,10 @@ export type TargetIds2 = string[];
  */
 export type WeaponId5 = string | null;
 /**
+ * Weapon profile to use for weapons with multiple profiles (e.g., kinetic/energy/explosive)
+ */
+export type WeaponProfileId = string | null;
+/**
  * System being activated
  */
 export type SystemId2 = string | null;
@@ -30060,7 +30166,7 @@ export type GrantedByOvercharge1 = boolean;
 /**
  * Primary stabilize option: cool heat OR spend repair for full HP
  */
-export type StabilizePrimary1 = ("cool_heat" | "spend_repair_full_hp") | null;
+export type StabilizePrimary1 = ("cool_heat" | "spend_repair_full_hp" | "cancel_meltdown") | null;
 /**
  * Secondary stabilize option: reload/clear burn/clear condition
  */
@@ -30073,6 +30179,18 @@ export type ApplyKnockback = boolean;
  * Whether to treat a melee weapon attack as thrown (uses thrown range, applies cover, disarms weapon)
  */
 export type UseThrown = boolean;
+/**
+ * Kind of deployable to create
+ */
+export type DeployKind = ("drone" | "mine" | "deployable") | null;
+/**
+ * Name for the deployed entity
+ */
+export type DeployName = string | null;
+/**
+ * Type of mine being deployed
+ */
+export type MineType = ("explosive" | "shroud" | "breaching" | "cluster" | "emp") | null;
 /**
  * Whether action executed successfully
  */
@@ -30091,6 +30209,11 @@ export type EffectsApplied = {
  * Total damage dealt
  */
 export type DamageDealt = number;
+export type Kinetic = number;
+export type Explosive = number;
+export type Energy = number;
+export type Burn1 = number;
+export type Heat1 = number;
 /**
  * Heat generated by this action
  */
@@ -30160,6 +30283,38 @@ export type PreparedActionExpired = boolean;
  */
 export type CooldownsDecremented = string[];
 /**
+ * Whether combatant had active meltdown countdown
+ */
+export type MeltdownCountdownActive = boolean;
+/**
+ * Turns remaining after decrement (None if no countdown)
+ */
+export type MeltdownCountdownRemaining = number | null;
+/**
+ * Whether meltdown explosion triggered this turn
+ */
+export type MeltdownTriggered = boolean;
+/**
+ * Total damage from meltdown explosion (4d6)
+ */
+export type MeltdownExplosionDamage = number;
+/**
+ * IDs of combatants damaged by meltdown explosion
+ */
+export type MeltdownAffectedTargets = string[];
+/**
+ * IDs of mines that armed at start of this turn
+ */
+export type MinesArmed = string[];
+/**
+ * Heat from active latch drones applied to owner
+ */
+export type DroneHeatToOwner = number;
+/**
+ * IDs of drones that can act this turn
+ */
+export type DronesReadyToAct = string[];
+/**
  * ID of the actor whose turn ended
  */
 export type ActorId3 = string;
@@ -30226,6 +30381,10 @@ export type DamageTaken = number;
  */
 export type BurnCleared = boolean;
 /**
+ * IDs of drones that primed at end of this turn
+ */
+export type DronesPrimed = string[];
+/**
  * ID of the reacting combatant
  */
 export type ReactorId1 = string;
@@ -30245,6 +30404,10 @@ export type TargetIds3 = string[];
  * Weapon for overwatch attack
  */
 export type WeaponId7 = string | null;
+/**
+ * Weapon profile to use for weapons with multiple profiles
+ */
+export type WeaponProfileId1 = string | null;
 /**
  * Whether reaction was valid
  */
@@ -30267,6 +30430,28 @@ export type EffectsApplied1 = {
  * Damage dealt by overwatch
  */
 export type DamageDealt1 = number;
+/**
+ * Whether overwatch attack hit
+ */
+export type AttackHit = boolean | null;
+/**
+ * Whether attack was critical
+ */
+export type AttackCritical = boolean | null;
+/**
+ * The d20 roll for overwatch attack
+ */
+export type AttackRoll1 = number | null;
+/**
+ * Resource changes from overwatch attack
+ */
+export type ResourceChanges2 = ResourceChange[];
+/**
+ * Structure check results from overwatch damage
+ */
+export type StructureChecks1 = {
+  [k: string]: unknown;
+}[];
 /**
  * Action identifier
  */
@@ -30400,7 +30585,7 @@ export type ProvidesHardCover1 = boolean;
 export type HardCoverSize1 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
 export type Difficult1 = boolean;
 export type Dangerous1 = boolean;
-export type ZoneType = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type ZoneType1 = ("deployment" | "extraction" | "objective" | "ingress") | null;
 export type Id27 = string;
 export type Kind3 = "floor";
 export type Name47 = string;
@@ -30411,7 +30596,7 @@ export type BlocksLineOfSight3 = boolean;
 export type ProvidesSoftCover3 = boolean;
 export type ProvidesHardCover2 = boolean;
 export type HardCoverSize2 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
-export type ZoneType1 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type ZoneType2 = ("deployment" | "extraction" | "objective" | "ingress") | null;
 export type Id28 = string;
 export type Kind4 = "obstacle";
 export type Name48 = string;
@@ -30426,7 +30611,7 @@ export type Dangerous2 = boolean;
 export type Size18 = number;
 export type Hp7 = number | null;
 export type IsDestructible = boolean;
-export type ZoneType2 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type ZoneType3 = ("deployment" | "extraction" | "objective" | "ingress") | null;
 export type Id29 = string;
 export type Kind5 = "zone";
 export type Name49 = string;
@@ -30441,7 +30626,7 @@ export type Difficult3 = boolean;
 export type Dangerous3 = boolean;
 export type DurationRounds = number | null;
 export type CreatedRound = number | null;
-export type ZoneType3 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type ZoneType4 = ("deployment" | "extraction" | "objective" | "ingress") | null;
 export type Id30 = string;
 export type Kind6 = "hazard";
 export type Name50 = string;
@@ -30457,7 +30642,7 @@ export type Dangerous4 = boolean;
 export type Damage4 = number;
 export type DamageType15 = "kinetic" | "explosive" | "energy" | "burn";
 export type CheckDc = number;
-export type ZoneType4 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type ZoneType5 = ("deployment" | "extraction" | "objective" | "ingress") | null;
 export type Id31 = string;
 export type Kind7 = "objective";
 export type Name51 = string;
@@ -30470,8 +30655,8 @@ export type ProvidesHardCover6 = boolean;
 export type HardCoverSize6 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
 export type Difficult5 = boolean;
 export type Dangerous5 = boolean;
-export type ZoneId = string | null;
-export type ZoneType5 = ("deployment" | "extraction" | "objective" | "ingress") | null;
+export type ZoneId1 = string | null;
+export type ZoneType6 = ("deployment" | "extraction" | "objective" | "ingress") | null;
 export type PrimitiveId = string;
 export type Size19 = number;
 export type Hp8 = number;
@@ -30531,20 +30716,15 @@ export type Name53 = string;
 /**
  * Mission type description
  */
-export type Description8 = string;
+export type Description9 = string;
 export type DurationRounds1 = number;
 export type DeploymentType = "players_first" | "enemies_first" | "roll_off";
-export type ZoneType6 = "deployment" | "extraction" | "objective" | "ingress";
-export type Width1 = number | null;
-export type Height1 = number | null;
-export type Location = string | null;
-export type TerrainNotes = string | null;
 export type DeploymentZones = SitrepZone[];
 export type ObjectiveZones = SitrepZone[];
-export type IngressZones = SitrepZone[];
-export type ReservePattern = "none" | "half" | "normal" | "double" | "increasing";
+export type IngressZones1 = SitrepZone[];
+export type ReservePattern1 = "none" | "half" | "normal" | "double" | "increasing";
 export type ReservePerRound = number | null;
-export type ConditionType1 =
+export type ConditionType2 =
   | "extract_objective"
   | "control_zones"
   | "score_above_threshold"
@@ -30555,17 +30735,24 @@ export type Threshold1 = number | null;
 /**
  * Human-readable description
  */
-export type Description9 = string;
-export type VictoryConditions = VictoryCondition[];
+export type Description10 = string;
+export type VictoryConditions1 = VictoryCondition[];
 export type SpecialRules1 = string[];
 export type TileSet = "urban" | "industrial" | "wilderness" | "zero_g";
 export type Seed = number | null;
 export type Density = number;
-export type ZoneId1 = string;
+export type ZoneId2 = string;
 export type Coords6 = HexCoord[];
 export type ZoneSubtype1 = string;
 export type CreatedRound1 = number | null;
 export type DurationRounds2 = number | null;
+export type PlayerCount = number;
+export type AvgLicenseLevel = number;
+export type TargetVictoryPoints = number;
+export type InitialVictoryPoints = number;
+export type ReserveVictoryPoints = number;
+export type SuggestedTier = "tier_1" | "tier_2" | "tier_3";
+export type RecommendedTemplateIds = string[];
 
 /**
  * A Lancer pilot character.
@@ -34945,6 +35132,24 @@ export interface TargetingRestriction {
   [k: string]: unknown;
 }
 /**
+ * Tracks an applied status with duration metadata.
+ *
+ * This model enables automatic status expiration based on turn boundaries
+ * and trigger-based clearing per PR2 rules.
+ *
+ * Duration types:
+ * - indefinite: Status persists until explicitly cleared (e.g., prone, shutdown)
+ * - end_of_turn: Status expires at end of current turn
+ * - end_of_next_turn: Status expires at end of next turn (e.g., braced, stunned)
+ */
+export interface StatusInstance {
+  status: Status15;
+  applied_on_round: AppliedOnRound;
+  applied_by?: AppliedBy;
+  duration_type?: DurationType;
+  [k: string]: unknown;
+}
+/**
  * Turn order and round cadence rules.
  */
 export interface TurnOrderRules {
@@ -35768,6 +35973,7 @@ export interface CombatantState {
   position?: HexPosition | null;
   statuses?: Statuses1;
   conditions?: Conditions;
+  status_instances?: StatusInstances;
   inventory?: MechInventory | null;
   ai_controlled?: AiControlled;
   ai_type?: AiType;
@@ -35795,6 +36001,14 @@ export interface CombatantState {
   meltdown_state?: MeltdownState | null;
   active_protocols?: ActiveProtocols;
   turn_end_effects?: TurnEndEffects;
+  talent_effects?: TalentEffects;
+  frame_trait_effects?: FrameTraitEffects;
+  core_power_available?: CorePowerAvailable;
+  core_power_active?: CorePowerActive;
+  /**
+   * Active effects from core power when activated
+   */
+  core_power_effects?: MechanicalEffect | null;
   piloting_mech_id?: PilotingMechId;
   mounted_pilot_id?: MountedPilotId;
   eject_used?: EjectUsed;
@@ -35992,7 +36206,7 @@ export interface EffectData {
  */
 export interface ProtocolDuration {
   effect_id: EffectId4;
-  duration_type: DurationType;
+  duration_type: DurationType1;
   turns_remaining?: TurnsRemaining2;
   [k: string]: unknown;
 }
@@ -36023,8 +36237,8 @@ export interface TurnEndEffectState {
   effect_id: EffectId5;
   effect_type: EffectType1;
   target_id?: TargetId5;
-  duration_type: DurationType1;
-  applied_by: AppliedBy;
+  duration_type: DurationType2;
+  applied_by: AppliedBy1;
   effect_data?: EffectData1;
   [k: string]: unknown;
 }
@@ -36096,7 +36310,7 @@ export interface AppliedPerTargetEffect {
  */
 export interface ActionLogEffect {
   type: Type;
-  status?: Status15;
+  status?: Status16;
   target_id?: TargetId9;
   weapon_id?: WeaponId4;
   [k: string]: unknown;
@@ -36140,6 +36354,10 @@ export interface MechCombatScenario {
   terrain?: TerrainMap | null;
   environment?: Environment1;
   deployables?: Deployables;
+  /**
+   * Active SITREP mission state tracking (zones, scores, victory conditions)
+   */
+  sitrep_resolution?: SitrepResolution | null;
   [k: string]: unknown;
 }
 /**
@@ -36180,6 +36398,118 @@ export interface DeployableState {
   disarm_dc?: DisarmDc;
   e_defense?: EDefense6;
   reactions?: Reactions1;
+  [k: string]: unknown;
+}
+/**
+ * Active SITREP resolution state for tracking mission progress.
+ *
+ * Attributes:
+ *     template_type: The SITREP type (escort, control, extract, etc.)
+ *     current_round: Current round number (1-indexed)
+ *     max_rounds: The round limit from the template
+ *     player_score: Cumulative player score
+ *     enemy_score: Cumulative enemy score
+ *     zone_states: Map of zone_id to control state tracker
+ *     victory_conditions: List of active victory conditions being tracked
+ *     extraction_progress: Progress toward extraction (0.0 to 1.0)
+ *     surviving_players: Number of active player characters
+ *     surviving_enemies: Number of active enemy NPCs
+ *     outcome: Current outcome assessment (None = ongoing)
+ *     turn_limit_reached: Whether the time limit has been reached
+ *     reserves_remaining: Count of reserves left in the pool
+ */
+export interface SitrepResolution {
+  template_type: TemplateType;
+  current_round?: CurrentRound;
+  max_rounds?: MaxRounds;
+  player_score?: PlayerScore;
+  enemy_score?: EnemyScore;
+  zone_states?: ZoneStates;
+  victory_conditions?: VictoryConditions;
+  extraction_progress?: ExtractionProgress;
+  surviving_players?: SurvivingPlayers;
+  surviving_enemies?: SurvivingEnemies;
+  outcome?: Outcome3;
+  turn_limit_reached?: TurnLimitReached;
+  reserves_remaining?: ReservesRemaining;
+  deployment?: SitrepDeployment | null;
+  [k: string]: unknown;
+}
+export interface ZoneStates {
+  [k: string]: ZoneControlStateTracker;
+}
+/**
+ * Tracks the control state of a zone during active resolution.
+ *
+ * Attributes:
+ *     zone_id: Identifier matching a zone in SitrepTemplate.objective_zones
+ *     state: Current control state (player, enemy, contested, or neutral)
+ *     controlling_side: Which side controls the zone ("players" or "enemies")
+ *     last_checked_turn: The turn number when this state was last evaluated
+ */
+export interface ZoneControlStateTracker {
+  zone_id: ZoneId;
+  state?: State;
+  controlling_side?: ControllingSide;
+  last_checked_turn?: LastCheckedTurn;
+  [k: string]: unknown;
+}
+/**
+ * Active tracking of a victory condition during mission resolution.
+ *
+ * Attributes:
+ *     condition_type: Type of victory condition being tracked
+ *     target_value: The target value needed to achieve victory (e.g., 3 zones)
+ *     current_value: The current progress toward the target
+ *     is_met: Whether this condition has been satisfied
+ *     description: Human-readable description of the condition
+ */
+export interface SitrepVictoryCondition {
+  condition_type: ConditionType1;
+  target_value?: TargetValue;
+  current_value?: CurrentValue;
+  is_met?: IsMet;
+  description: Description8;
+  [k: string]: unknown;
+}
+/**
+ * Deployment zone configuration for active mission resolution.
+ *
+ * Attributes:
+ *     player_zones: Where player characters deploy
+ *     enemy_zones: Where enemy forces deploy
+ *     ingress_zones: Where reinforcements can enter
+ *     reserve_pool: NPC IDs held in reserve for delayed deployment
+ *     reserves_spawned_per_round: How many reserves enter per round
+ *     last_ingress_zone: The most recently used ingress zone (for rotation rule)
+ *     reserve_pattern: How reserves are managed (none, half, normal, double, increasing)
+ */
+export interface SitrepDeployment {
+  player_zones?: PlayerZones;
+  enemy_zones?: EnemyZones;
+  ingress_zones?: IngressZones;
+  reserve_pool?: ReservePool;
+  reserves_spawned_per_round?: ReservesSpawnedPerRound;
+  last_ingress_zone?: LastIngressZone;
+  reserve_pattern?: ReservePattern;
+  [k: string]: unknown;
+}
+/**
+ * Generic zone for SITREP configurations per PR2 12550-12565.
+ *
+ * Attributes:
+ *     zone_type: Type of zone (deployment, extraction, objective, ingress)
+ *     width: Width for rectangular zones (e.g., 4 for 4x4 control zones)
+ *     height: Height for rectangular zones
+ *     location: Descriptive location (e.g., "north_edge", "quadrant_nw")
+ *     terrain_notes: Notes about terrain or special properties
+ */
+export interface SitrepZone {
+  zone_type: ZoneType;
+  width?: Width1;
+  height?: Height1;
+  location?: Location;
+  terrain_notes?: TerrainNotes;
   [k: string]: unknown;
 }
 /**
@@ -36271,6 +36601,7 @@ export interface ActionExecutionInput {
    */
   target_position?: HexPosition | null;
   weapon_id?: WeaponId5;
+  weapon_profile_id?: WeaponProfileId;
   system_id?: SystemId2;
   /**
    * First Full Tech option selection
@@ -36291,6 +36622,9 @@ export interface ActionExecutionInput {
    * Direction for eject (pilot flies 6 spaces in this direction)
    */
   eject_direction?: HexCoord | null;
+  deploy_kind?: DeployKind;
+  deploy_name?: DeployName;
+  mine_type?: MineType;
   [k: string]: unknown;
 }
 /**
@@ -36314,6 +36648,7 @@ export interface ActionExecutionResult {
   action_use?: ActionUse | null;
   effects_applied?: EffectsApplied;
   damage_dealt?: DamageDealt;
+  damage_breakdown?: DamageBreakdown;
   heat_generated?: HeatGenerated1;
   resource_changes?: ResourceChanges1;
   statuses_applied?: StatusesApplied;
@@ -36321,6 +36656,17 @@ export interface ActionExecutionResult {
   overheat_checks?: OverheatChecks;
   position_updates?: PositionUpdates;
   overwatch_opportunities?: OverwatchOpportunities;
+  [k: string]: unknown;
+}
+/**
+ * Net damage by type
+ */
+export interface DamageBreakdown {
+  kinetic?: Kinetic;
+  explosive?: Explosive;
+  energy?: Energy;
+  burn?: Burn1;
+  heat?: Heat1;
   [k: string]: unknown;
 }
 /**
@@ -36371,6 +36717,17 @@ export interface OverwatchOpportunityInfo {
   [k: string]: unknown;
 }
 /**
+ * Net damage totals by type (heat tracked separately from damage).
+ */
+export interface DamageBreakdown1 {
+  kinetic?: Kinetic;
+  explosive?: Explosive;
+  energy?: Energy;
+  burn?: Burn1;
+  heat?: Heat1;
+  [k: string]: unknown;
+}
+/**
  * Result of starting a combatant's turn.
  */
 export interface TurnStartResult {
@@ -36380,6 +36737,14 @@ export interface TurnStartResult {
   available_actions?: AvailableActions;
   prepared_action_expired?: PreparedActionExpired;
   cooldowns_decremented?: CooldownsDecremented;
+  meltdown_countdown_active?: MeltdownCountdownActive;
+  meltdown_countdown_remaining?: MeltdownCountdownRemaining;
+  meltdown_triggered?: MeltdownTriggered;
+  meltdown_explosion_damage?: MeltdownExplosionDamage;
+  meltdown_affected_targets?: MeltdownAffectedTargets;
+  mines_armed?: MinesArmed;
+  drone_heat_to_owner?: DroneHeatToOwner;
+  drones_ready_to_act?: DronesReadyToAct;
   [k: string]: unknown;
 }
 /**
@@ -36407,6 +36772,7 @@ export interface TurnEndResult {
    * Burn tick resolution if actor had burn
    */
   burn_tick_result?: BurnTickResult | null;
+  drones_primed?: DronesPrimed;
   [k: string]: unknown;
 }
 /**
@@ -36433,6 +36799,7 @@ export interface ReactionInput {
   trigger_action_id?: TriggerActionId;
   target_ids?: TargetIds3;
   weapon_id?: WeaponId7;
+  weapon_profile_id?: WeaponProfileId1;
   [k: string]: unknown;
 }
 /**
@@ -36444,6 +36811,23 @@ export interface ReactionResult {
   reaction_used?: ReactionUsed;
   effects_applied?: EffectsApplied1;
   damage_dealt?: DamageDealt1;
+  damage_breakdown?: DamageBreakdown2;
+  attack_hit?: AttackHit;
+  attack_critical?: AttackCritical;
+  attack_roll?: AttackRoll1;
+  resource_changes?: ResourceChanges2;
+  structure_checks?: StructureChecks1;
+  [k: string]: unknown;
+}
+/**
+ * Net damage by type
+ */
+export interface DamageBreakdown2 {
+  kinetic?: Kinetic;
+  explosive?: Explosive;
+  energy?: Energy;
+  burn?: Burn1;
+  heat?: Heat1;
   [k: string]: unknown;
 }
 /**
@@ -36591,7 +36975,7 @@ export interface TerrainPrimitive {
   difficult?: Difficult1;
   dangerous?: Dangerous1;
   material?: MaterialProperties | null;
-  zone_type?: ZoneType;
+  zone_type?: ZoneType1;
   [k: string]: unknown;
 }
 /**
@@ -36609,7 +36993,7 @@ export interface FloorTile {
   provides_hard_cover?: ProvidesHardCover2;
   hard_cover_size?: HardCoverSize2;
   material?: MaterialProperties | null;
-  zone_type?: ZoneType1;
+  zone_type?: ZoneType2;
   [k: string]: unknown;
 }
 /**
@@ -36636,7 +37020,7 @@ export interface Obstacle {
   hp?: Hp7;
   is_destructible?: IsDestructible;
   material?: MaterialProperties | null;
-  zone_type?: ZoneType2;
+  zone_type?: ZoneType3;
   [k: string]: unknown;
 }
 /**
@@ -36660,7 +37044,7 @@ export interface SoftCoverZone {
   duration_rounds?: DurationRounds;
   created_round?: CreatedRound;
   material?: MaterialProperties | null;
-  zone_type?: ZoneType3;
+  zone_type?: ZoneType4;
   [k: string]: unknown;
 }
 /**
@@ -36685,7 +37069,7 @@ export interface Hazard {
   damage_type?: DamageType15;
   check_dc?: CheckDc;
   material?: MaterialProperties | null;
-  zone_type?: ZoneType4;
+  zone_type?: ZoneType5;
   [k: string]: unknown;
 }
 /**
@@ -36704,9 +37088,9 @@ export interface Objective {
   hard_cover_size?: HardCoverSize6;
   difficult?: Difficult5;
   dangerous?: Dangerous5;
-  zone_id?: ZoneId;
+  zone_id?: ZoneId1;
   material?: MaterialProperties | null;
-  zone_type?: ZoneType5;
+  zone_type?: ZoneType6;
   [k: string]: unknown;
 }
 /**
@@ -36803,35 +37187,17 @@ export interface TerrainGeneratorParams {
 export interface SitrepTemplate {
   sitrep_type: SitrepType;
   name: Name53;
-  description: Description8;
+  description: Description9;
   duration_rounds?: DurationRounds1;
   deployment_type?: DeploymentType;
   deployment_zones?: DeploymentZones;
   extraction_zone?: SitrepZone | null;
   objective_zones?: ObjectiveZones;
-  ingress_zones?: IngressZones;
-  reserve_pattern?: ReservePattern;
+  ingress_zones?: IngressZones1;
+  reserve_pattern?: ReservePattern1;
   reserve_per_round?: ReservePerRound;
-  victory_conditions?: VictoryConditions;
+  victory_conditions?: VictoryConditions1;
   special_rules?: SpecialRules1;
-  [k: string]: unknown;
-}
-/**
- * Generic zone for SITREP configurations per PR2 12550-12565.
- *
- * Attributes:
- *     zone_type: Type of zone (deployment, extraction, objective, ingress)
- *     width: Width for rectangular zones (e.g., 4 for 4x4 control zones)
- *     height: Height for rectangular zones
- *     location: Descriptive location (e.g., "north_edge", "quadrant_nw")
- *     terrain_notes: Notes about terrain or special properties
- */
-export interface SitrepZone {
-  zone_type: ZoneType6;
-  width?: Width1;
-  height?: Height1;
-  location?: Location;
-  terrain_notes?: TerrainNotes;
   [k: string]: unknown;
 }
 /**
@@ -36843,9 +37209,9 @@ export interface SitrepZone {
  *     description: Human-readable description of the condition
  */
 export interface VictoryCondition {
-  condition_type: ConditionType1;
+  condition_type: ConditionType2;
   threshold?: Threshold1;
-  description: Description9;
+  description: Description10;
   [k: string]: unknown;
 }
 /**
@@ -36855,10 +37221,46 @@ export interface VictoryCondition {
  * soft cover for hiding but may expire after a set number of rounds.
  */
 export interface SoftCoverZoneState {
-  zone_id: ZoneId1;
+  zone_id: ZoneId2;
   coords: Coords6;
   zone_subtype: ZoneSubtype1;
   created_round?: CreatedRound1;
   duration_rounds?: DurationRounds2;
+  [k: string]: unknown;
+}
+/**
+ * Player party power estimation for encounter scaling.
+ *
+ * Power is calculated as: player_count × (1 + avg_license_level × 0.1)
+ * This gives roughly 2x power for a level 12 party vs level 0.
+ *
+ * Attributes:
+ *     player_count: Number of players in the party (1-6)
+ *     avg_license_level: Average license level across all players (0-12)
+ */
+export interface PlayerPartyPower {
+  player_count: PlayerCount;
+  avg_license_level: AvgLicenseLevel;
+  [k: string]: unknown;
+}
+/**
+ * Recommended enemy force for an encounter.
+ *
+ * Provides victory point targets split between initial deployment
+ * and reserves based on the SITREP type.
+ *
+ * Attributes:
+ *     target_victory_points: Total victory points for the encounter
+ *     initial_victory_points: Victory points for initially deployed enemies
+ *     reserve_victory_points: Victory points for reserve enemies
+ *     suggested_tier: Recommended NPC tier for the encounter
+ *     recommended_template_ids: Optional list of recommended template IDs
+ */
+export interface EnemyForceRecommendation {
+  target_victory_points: TargetVictoryPoints;
+  initial_victory_points: InitialVictoryPoints;
+  reserve_victory_points: ReserveVictoryPoints;
+  suggested_tier?: SuggestedTier;
+  recommended_template_ids?: RecommendedTemplateIds;
   [k: string]: unknown;
 }

@@ -9,8 +9,9 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING
 
-from core.shared.enums import StatusType
+from core.shared.enums import StatusType, DamageType, AttackType
 from core.shared.dice import roll_dice
+from core.shared.damage import DamageBreakdown
 from core.shared.state_helpers import add_statuses
 from core.mech.statuses import (
     StatusInstance,
@@ -30,7 +31,7 @@ from core.shared.full_tech import (
 from core.mech.grid import HexCoord, HexPosition, hex_add, hex_scale
 from core.mech.compendium import get_weapon_definition
 from core.mech.combat_rules import AttackPatternDefinition
-from core.mech.weapon import WeaponProfile, WeaponTag, resolve_weapon_profile
+from core.mech.weapon import WeaponProfile, WeaponTag, WeaponDamageType, resolve_weapon_profile
 from core.mech.tech_actions import (
     ScanResult,
     BolsterResult,
@@ -471,6 +472,8 @@ def _validate_attack_range_and_los(
     weapon_id: str | None,
     is_tech_attack: bool = False,
     use_thrown: bool = False,
+    profile_id: str | None = None,
+    force_threat: bool = False,
 ) -> tuple[bool, str | None]:
     """Validate range and LOS for an attack.
 
@@ -508,25 +511,36 @@ def _validate_attack_range_and_los(
         required_range = attacker.stats.sensor_range if attacker.stats else 10
         range_type = "sensor"
     else:
-        # Check if melee or ranged
-        is_melee = _is_melee_weapon(weapon_id)
-        if use_thrown and not is_melee:
-            return (False, "Only melee weapons can be thrown")
-
-        if is_melee:
-            threat_range = _get_weapon_range(weapon_id, is_melee=True)
-            if use_thrown:
-                thrown_range = _get_thrown_range(weapon_id)
-                if thrown_range is None:
-                    return (False, "Weapon has no thrown range")
-                required_range = thrown_range
-                range_type = "thrown"
-            else:
-                required_range = threat_range
-                range_type = "threat"
+        # Overwatch can force threat range even for ranged weapons
+        if force_threat:
+            required_range = _get_weapon_range(
+                weapon_id, is_melee=True, profile_id=profile_id
+            )
+            range_type = "threat"
         else:
-            required_range = _get_weapon_range(weapon_id, is_melee=False)
-            range_type = "range"
+            # Check if melee or ranged
+            is_melee = _is_melee_weapon(weapon_id, profile_id)
+            if use_thrown and not is_melee:
+                return (False, "Only melee weapons can be thrown")
+
+            if is_melee:
+                threat_range = _get_weapon_range(
+                    weapon_id, is_melee=True, profile_id=profile_id
+                )
+                if use_thrown:
+                    thrown_range = _get_thrown_range(weapon_id, profile_id)
+                    if thrown_range is None:
+                        return (False, "Weapon has no thrown range")
+                    required_range = thrown_range
+                    range_type = "thrown"
+                else:
+                    required_range = threat_range
+                    range_type = "threat"
+            else:
+                required_range = _get_weapon_range(
+                    weapon_id, is_melee=False, profile_id=profile_id
+                )
+                range_type = "range"
 
     # Validate range
     if distance > required_range:
@@ -600,6 +614,145 @@ def _roll_weapon_damage(
         total_damage = 6
 
     return total_damage, overkill_heat
+
+
+def _roll_weapon_damage_components(
+    profile: WeaponProfile | None,
+    apply_overkill: bool,
+) -> tuple[list[tuple[WeaponDamageType, int]], int]:
+    """Roll weapon damage per component and return (components, overkill_heat)."""
+    if profile is None:
+        return [("kinetic", 6)], 0
+
+    components: list[tuple[WeaponDamageType, int]] = []
+    overkill_heat = 0
+    for damage_component in profile.damage:
+        component_total = 0
+        if damage_component.dice is not None:
+            rolls, component_overkill = _roll_damage_with_overkill(
+                damage_component.dice,
+                apply_overkill,
+            )
+            component_total += sum(rolls) + damage_component.dice.modifier
+            overkill_heat += component_overkill
+        component_total += damage_component.flat
+        components.append((damage_component.damage_type, component_total))
+
+    if not components:
+        default_type = profile.damage_type or "kinetic"
+        components.append((default_type, 6))
+
+    return components, overkill_heat
+
+
+def _get_primary_damage_type(profile: WeaponProfile | None) -> DamageType:
+    """Pick a default damage type for reliable damage and bonuses."""
+    if profile is None:
+        return "kinetic"
+
+    if profile.damage_type in ("kinetic", "explosive", "energy", "burn"):
+        return profile.damage_type
+
+    for component in profile.damage:
+        if component.damage_type != "heat":
+            return component.damage_type
+
+    return "kinetic"
+
+
+def _collect_active_effects(combatant: CombatantState) -> list[MechanicalEffect]:
+    """Collect all active mechanical effects from a combatant."""
+    effects: list[MechanicalEffect] = []
+    effects.extend(combatant.talent_effects)
+    effects.extend(combatant.frame_trait_effects)
+    for mode in combatant.active_mode_effects:
+        effects.append(mode.effects)
+    if combatant.core_power_active and combatant.core_power_effects:
+        effects.append(combatant.core_power_effects)
+    return effects
+
+
+def _build_damage_context(
+    attacker: CombatantState | None,
+    target: CombatantState,
+    is_melee: bool,
+    is_ranged: bool,
+    is_tech: bool,
+    extra_context: dict | None = None,
+) -> dict:
+    """Build an EffectCondition context for incoming damage resolution."""
+    ctx: dict = {
+        "is_melee": is_melee,
+        "is_ranged": is_ranged,
+        "is_tech": is_tech,
+        "attack_type": "tech" if is_tech else ("ranged" if is_ranged else "melee"),
+        "is_incoming": True,
+        "is_outgoing": False,
+        "is_engaged": "engaged" in target.statuses,
+        "structure_remaining": target.resources.structure_current,
+        "structure_1_or_less": target.resources.structure_current <= 1,
+    }
+
+    if attacker and attacker.position and target.position:
+        distance = attacker.position.coord.distance_to(target.position.coord)
+        ctx["attack_range"] = distance
+        ctx["is_adjacent"] = distance == 1
+
+    if attacker and attacker.stats and target.stats:
+        size_map = {
+            "size_half": 0.5,
+            "size_1": 1,
+            "size_2": 2,
+            "size_3": 3,
+            "size_4": 4,
+            "size_5": 5,
+        }
+        attacker_size = size_map.get(attacker.stats.size, 1)
+        target_size = size_map.get(target.stats.size, 1)
+        ctx["actor_size"] = attacker_size
+        ctx["target_size"] = target_size
+        ctx["target_larger"] = target_size > attacker_size
+        ctx["target_smaller"] = target_size < attacker_size
+
+    if extra_context:
+        ctx.update(extra_context)
+
+    return ctx
+
+
+def _collect_damage_resistances(
+    target: CombatantState,
+    context: dict,
+) -> list[DamageType]:
+    """Collect active damage resistances for a target."""
+    resistances: set[DamageType] = set()
+    for effect in _collect_active_effects(target):
+        for resistance in effect.resistances:
+            if resistance.target not in ("self", "all"):
+                continue
+            if not _evaluate_condition(resistance.condition, context):
+                continue
+            if resistance.damage_type == "all":
+                resistances.update(["kinetic", "explosive", "energy", "burn"])
+            else:
+                resistances.add(resistance.damage_type)
+    return list(resistances)
+
+
+def _collect_heat_resistance_multiplier(
+    target: CombatantState,
+    context: dict,
+) -> float:
+    """Collect the strongest heat resistance multiplier for a target."""
+    multiplier = 1.0
+    for effect in _collect_active_effects(target):
+        for heat_resistance in effect.heat_resistances:
+            if heat_resistance.target not in ("self", "all"):
+                continue
+            if not _evaluate_condition(heat_resistance.condition, context):
+                continue
+            multiplier = min(multiplier, heat_resistance.multiplier)
+    return multiplier
 
 
 # =============================================================================
@@ -1147,6 +1300,15 @@ def _evaluate_condition(condition: EffectCondition | None, context: dict) -> boo
             "bondmate_adjacent": lambda c: c.get("bondmate_adjacent", False),
             "target_larger": lambda c: c.get("target_larger", False),
             "target_smaller": lambda c: c.get("target_smaller", False),
+            "attacks_within_range_3": lambda c: (
+                c.get("attack_range") is not None and c.get("attack_range") <= 3
+            ),
+            "benefiting_from_trail_cover": lambda c: c.get(
+                "benefiting_from_trail_cover", False
+            ),
+            "from_triggering_attack": lambda c: c.get("from_triggering_attack", False),
+            "structure_1_or_less": lambda c: c.get("structure_remaining", 99) <= 1,
+            "can_see_bondmate": lambda c: c.get("can_see_bondmate", False),
         }
 
         if condition in condition_checks:
@@ -2215,77 +2377,57 @@ def _apply_engagement_status(
     final_position: HexPosition,
     ignore_engagement: bool = False,
 ) -> tuple[MechCombatScenario, list[dict]]:
-    """Apply engaged status to mover and all adjacent hostiles after movement.
+    """Refresh engagement statuses after movement.
 
-    Per PR2 3817-3819:
-    "If you move adjacent to a hostile character, you become engaged."
-
-    Both parties become engaged (mutual engagement, matching grapple behavior).
-
-    Args:
-        scenario: Current combat scenario
-        mover: The combatant that just moved
-        final_position: The final position of the mover
-        ignore_engagement: Whether to skip status application (e.g., Disengage)
-
-    Returns:
-        Tuple of (updated scenario, list of effects)
+    Per PR2 3817-3819, engagement is adjacency-driven; moving away should
+    clear engaged status. Disengage prevents engagement with the mover.
     """
     effects: list[dict] = []
-
-    # Skip if ignoring engagement (Disengage action)
-    if ignore_engagement:
-        return scenario, effects
-
-    # Find all adjacent hostile combatants
     updated_combatants = list(scenario.combatants)
-    mover_idx = next((i for i, c in enumerate(updated_combatants) if c.id == mover.id), -1)
+    ignore_id = mover.id if ignore_engagement else None
 
-    adjacent_hostile_ids: list[tuple[int, CombatantState]] = []
-    for i, combatant in enumerate(updated_combatants):
-        if combatant.id == mover.id:
-            continue
+    for idx, combatant in enumerate(scenario.combatants):
         if combatant.position is None:
-            continue
-        if not _is_hostile(mover.id, combatant.id, scenario):
-            continue
-        if final_position.coord.distance_to(combatant.position.coord) == 1:
-            adjacent_hostile_ids.append((i, combatant))
+            is_engaged = False
+        elif ignore_id is not None and combatant.id == ignore_id:
+            is_engaged = False
+        else:
+            is_engaged = False
+            for other in scenario.combatants:
+                if other.id == combatant.id:
+                    continue
+                if other.position is None:
+                    continue
+                if ignore_id is not None and other.id == ignore_id:
+                    continue
+                if not _is_hostile(combatant.id, other.id, scenario):
+                    continue
+                if combatant.position.coord.distance_to(other.position.coord) == 1:
+                    is_engaged = True
+                    break
 
-    if not adjacent_hostile_ids:
-        return scenario, effects
-
-    # Apply engaged to mover if not already engaged
-    if mover_idx >= 0:
-        mover_statuses = list(updated_combatants[mover_idx].statuses)
-        if "engaged" not in mover_statuses:
-            mover_statuses.append("engaged")
-            updated_combatants[mover_idx] = updated_combatants[mover_idx].model_copy(
-                update={"statuses": mover_statuses}
-            )
+        current_statuses = list(updated_combatants[idx].statuses)
+        if is_engaged and "engaged" not in current_statuses:
+            current_statuses.append("engaged")
             effects.append({
                 "type": "status_applied",
-                "target_id": str(mover.id),
+                "target_id": str(combatant.id),
                 "status": "engaged",
-                "reason": "moved_adjacent_to_hostile",
+                "reason": "adjacent_to_hostile",
             })
-
-    # Apply engaged to each adjacent hostile if not already engaged
-    for idx, hostile in adjacent_hostile_ids:
-        hostile_statuses = list(hostile.statuses)
-        if "engaged" not in hostile_statuses:
-            hostile_statuses.append("engaged")
-            updated_combatants[idx] = hostile.model_copy(
-                update={"statuses": hostile_statuses}
-            )
+        if not is_engaged and "engaged" in current_statuses:
+            current_statuses = [s for s in current_statuses if s != "engaged"]
             effects.append({
-                "type": "status_applied",
-                "target_id": str(hostile.id),
+                "type": "status_removed",
+                "target_id": str(combatant.id),
                 "status": "engaged",
-                "reason": "hostile_moved_adjacent",
+                "reason": "no_adjacent_hostiles",
             })
 
-    # Build updated scenario
+        updated_combatants[idx] = updated_combatants[idx].model_copy(
+            update={"statuses": current_statuses}
+        )
+
     updated_scenario = MechCombatScenario(
         combatants=updated_combatants,
         grapples=list(scenario.grapples),
@@ -3107,7 +3249,7 @@ def resolve_single_attack(
     attacker: CombatantState,
     target: CombatantState,
     weapon_id: str,
-    apply_damage_func=None,
+    apply_typed_damage_func=None,
     profile_id: str | None = None,
 ) -> tuple[MechCombatScenario, "AttackOutcome"]:
     """Resolve a single attack from attacker to target.
@@ -3128,7 +3270,7 @@ def resolve_single_attack(
         attacker: The attacking combatant
         target: The target combatant
         weapon_id: Weapon ID being used
-        apply_damage_func: Optional damage application function (for dependency injection)
+        apply_typed_damage_func: Optional typed damage application function
         profile_id: Optional weapon profile ID for weapons with multiple profiles
 
     Returns:
@@ -3138,9 +3280,9 @@ def resolve_single_attack(
     from core.mech.combat_models import AttackOutcome, ResourceChange
 
     # Lazy import to avoid circular dependency
-    if apply_damage_func is None:
-        from core.mech.combat_execution import apply_damage
-        apply_damage_func = apply_damage
+    if apply_typed_damage_func is None:
+        from core.mech.combat_execution import apply_typed_damage
+        apply_typed_damage_func = apply_typed_damage
 
     effects: list[dict] = []
 
@@ -3155,6 +3297,7 @@ def resolve_single_attack(
     reliable_value = _extract_tag_value(weapon_tags, "reliable")
     has_overkill = any(tag.tag == "overkill" for tag in weapon_tags)
     smart_attack = any(tag.tag == "smart" for tag in weapon_tags)
+    primary_damage_type = _get_primary_damage_type(weapon_profile)
 
     # Get attack bonus from attacker's grit
     attack_bonus = attacker.stats.grit if attacker.stats else 0
@@ -3242,48 +3385,70 @@ def resolve_single_attack(
 
     # Initialize outcome tracking
     damage_dealt = 0
+    damage_breakdown = DamageBreakdown()
     resource_change: ResourceChange | None = None
     structure_check: dict | None = None
 
     # Apply damage if hit
     if attack_result.hit:
-        # Roll damage (overkill heat not tracked for reactions)
-        base_damage, _overkill_heat = _roll_weapon_damage(
+        base_components, _overkill_heat = _roll_weapon_damage_components(
             weapon_profile, apply_overkill=has_overkill
         )
 
-        # Critical = 2x damage
-        final_damage = base_damage * 2 if attack_result.is_critical else base_damage
+        scaled_components: list[tuple[str, int]] = []
+        for damage_type, amount in base_components:
+            scaled = amount
+            if attack_result.is_critical:
+                scaled *= 2
+            scaled_components.append((damage_type, scaled))
 
-        # Apply exposed damage multiplier
         if "exposed" in target.statuses:
-            final_damage = final_damage * 2
             effects.append({
                 "type": "exposed_multiplier",
                 "target_id": target.id,
                 "multiplier": 2,
             })
 
-        # Reliable minimum
-        if reliable_value is not None and final_damage < reliable_value:
-            final_damage = reliable_value
+        if reliable_value is not None:
+            total_scaled_damage = sum(
+                amount for dmg_type, amount in scaled_components if dmg_type != "heat"
+            )
+            if total_scaled_damage < reliable_value:
+                scaled_components.append(
+                    (primary_damage_type, reliable_value - total_scaled_damage)
+                )
 
-        # Shredded ignores armor
-        effective_ap = armor_piercing
         if "shredded" in target.statuses:
-            effective_ap = target.stats.armor if target.stats else 0
             effects.append({
                 "type": "shredded_armor_bypass",
                 "target_id": target.id,
-                "armor_bypassed": effective_ap,
+                "armor_bypassed": target.stats.armor if target.stats else 0,
             })
 
-        # Apply damage
-        scenario, change, structure_result = apply_damage_func(
-            scenario, target.id, final_damage, effective_ap
+        damage_context = _build_damage_context(
+            attacker=attacker,
+            target=target,
+            is_melee=not is_ranged_attack,
+            is_ranged=is_ranged_attack,
+            is_tech=smart_attack,
+        )
+        target_resistances = _collect_damage_resistances(target, damage_context)
+        heat_multiplier = _collect_heat_resistance_multiplier(target, damage_context)
+
+        scenario, change, breakdown, structure_result, _overheat_result = apply_typed_damage_func(
+            scenario,
+            target.id,
+            scaled_components,
+            armor_piercing=armor_piercing,
+            attacker_id=attacker.id,
+            resistances=target_resistances,
+            heat_resistance_multiplier=heat_multiplier,
         )
         resource_change = change
-        damage_dealt = abs(change.hp_change or 0)
+        damage_dealt = (
+            breakdown.kinetic + breakdown.explosive + breakdown.energy + breakdown.burn
+        )
+        damage_breakdown = breakdown
 
         if structure_result:
             structure_check = {
@@ -3296,18 +3461,66 @@ def resolve_single_attack(
                 "lowest_roll": structure_result.lowest_roll,
             }
 
-        # Consume lock-on if it was used
         if has_lock_on:
             scenario = _remove_status_from_target(scenario, target.id, "lock_on")
             effects.append({
                 "type": "lock_on_consumed",
                 "target_id": target.id,
             })
+    elif reliable_value is not None:
+        if "shredded" in target.statuses:
+            effects.append({
+                "type": "shredded_armor_bypass",
+                "target_id": target.id,
+                "armor_bypassed": target.stats.armor if target.stats else 0,
+            })
+
+        damage_context = _build_damage_context(
+            attacker=attacker,
+            target=target,
+            is_melee=not is_ranged_attack,
+            is_ranged=is_ranged_attack,
+            is_tech=smart_attack,
+        )
+        target_resistances = _collect_damage_resistances(target, damage_context)
+        heat_multiplier = _collect_heat_resistance_multiplier(target, damage_context)
+
+        scenario, change, breakdown, structure_result, _overheat_result = apply_typed_damage_func(
+            scenario,
+            target.id,
+            [(primary_damage_type, reliable_value)],
+            armor_piercing=armor_piercing,
+            attacker_id=attacker.id,
+            resistances=target_resistances,
+            heat_resistance_multiplier=heat_multiplier,
+        )
+        resource_change = change
+        damage_dealt = (
+            breakdown.kinetic + breakdown.explosive + breakdown.energy + breakdown.burn
+        )
+        damage_breakdown = breakdown
+        effects.append({
+            "type": "reliable_damage",
+            "target_id": target.id,
+            "amount": reliable_value,
+        })
+
+        if structure_result:
+            structure_check = {
+                "type": "structure_check",
+                "target_id": target.id,
+                "outcome": structure_result.outcome,
+                "mech_destroyed": structure_result.mech_destroyed,
+                "statuses": [str(s) for s in structure_result.statuses_to_apply],
+                "dice_rolls": structure_result.dice_rolls,
+                "lowest_roll": structure_result.lowest_roll,
+            }
 
     return scenario, AttackOutcome(
         hit=attack_result.hit,
         critical=attack_result.is_critical,
         damage_dealt=damage_dealt,
+        damage_breakdown=damage_breakdown,
         roll=attack_result.roll,
         total=attack_result.total_accuracy,
         target_defense=target_defense,
@@ -3330,6 +3543,8 @@ __all__ = [
     "_extract_area_pattern",
     "_roll_damage_with_overkill",
     "_roll_weapon_damage",
+    "_roll_weapon_damage_components",
+    "_get_primary_damage_type",
     # Range and LOS Validation
     "_get_weapon_range",
     "_get_thrown_range",
@@ -3362,6 +3577,10 @@ __all__ = [
     "_get_target_status_modifiers",
     "_check_invisibility_miss",
     "_get_cover_modifier",
+    # Damage/Resistance Helpers
+    "_build_damage_context",
+    "_collect_damage_resistances",
+    "_collect_heat_resistance_multiplier",
     # Action Resolution
     "_resolve_stabilize",
     "_resolve_hide",

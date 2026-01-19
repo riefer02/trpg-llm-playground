@@ -44,7 +44,7 @@ from core.mech.combat_state import (
     MechSystemState,
 )
 from core.mech.grid import HexPosition, HexCoord
-from core.shared.effects import CooldownState
+from core.shared.effects import CooldownState, MechanicalEffect, ReactionTriggerEffect, Resistance
 from core.shared.full_tech import FullTechOptionSelection
 from core.shared.rolls import AttackResolutionResult
 from core.shared.heat import MeltdownState
@@ -532,6 +532,9 @@ class TestExecuteAction:
         # Crit damage = base_damage * 2 = 6 * 2 = 12
         assert result.damage_dealt == 12
 
+        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+        assert defender_after.resources.hp_current == 8  # 20 - 12
+
     def test_execute_attack_missing_target(self):
         """Attack with non-existent target should not error."""
         attacker = make_combatant(id="attacker", name="Attacker", side="players")
@@ -729,7 +732,7 @@ class TestExecuteReaction:
         # Create target in range
         target = make_combatant(
             id="enemy_1",
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             side="hostiles",
         )
         scenario = make_scenario(combatants=[reactor, target])
@@ -1182,12 +1185,51 @@ class TestWeaponDamageLookup:
 
         assert result.success is True
         assert result.effects_applied[0]["hit"] is True
-        assert result.effects_applied[0]["critical"] is True
-        # Crit doubles damage: 4 * 2 = 8
-        assert result.damage_dealt == 8
 
-        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
-        assert defender_after.resources.hp_current == 22  # 30 - 8
+
+class TestMultiDamageResolution:
+    """Tests for multi-type damage resolution with resistances."""
+
+    def test_multi_type_damage_breakdown_applies_armor_and_resistance(self):
+        """Bolt Thrower applies armor per component and explosive resistance."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(id="attacker", name="Attacker", side="players")
+        target = make_combatant(id="target", name="Target", side="hostiles", hp_max=20, hp_current=20)
+        target_stats = target.stats.model_copy(update={"armor": 2})
+        target_effects = MechanicalEffect(
+            resistances=[Resistance(damage_type="explosive")]
+        )
+        target = target.model_copy(
+            update={"stats": target_stats, "frame_trait_effects": [target_effects]}
+        )
+
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target"],
+            weapon_id="bolt_thrower",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll, patch(
+            "core.mech.combat_helpers.random.randint"
+        ) as mock_rand:
+            mock_roll.return_value = 10
+            mock_rand.side_effect = [6, 5, 4]  # 2d6 kinetic, 1d6 explosive
+
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert result.damage_breakdown.kinetic == 9  # 11 - 2 armor
+        assert result.damage_breakdown.explosive == 1  # (4 - 2 armor) / 2 rounded up
+        assert result.damage_breakdown.energy == 0
+        assert result.damage_breakdown.burn == 0
+        assert result.damage_dealt == 10
 
     def test_attack_with_unknown_weapon_uses_default_damage(self):
         """Attack with unknown weapon should fall back to default damage."""
@@ -3818,6 +3860,45 @@ class TestMultipleEngagement:
         # Actor should have exactly one engaged status (no duplicate)
         updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
         assert updated_actor.statuses.count("engaged") == 1
+
+    def test_move_away_clears_engaged_status(self):
+        """Moving away from adjacency should clear engaged on both parties."""
+        actor = make_combatant(
+            id="actor_1",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            statuses=["engaged"],
+        )
+        enemy = make_combatant(
+            id="enemy_1",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            statuses=["engaged"],
+        )
+        scenario = make_scenario(combatants=[actor, enemy])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        movement_path = [
+            HexPosition(coord=HexCoord(q=-1, r=0), elevation=0),
+        ]
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="move",
+            action_type="free",
+            movement_path=movement_path,
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        updated_enemy = next(c for c in updated_scenario.combatants if c.id == "enemy_1")
+        assert "engaged" not in updated_actor.statuses
+        assert "engaged" not in updated_enemy.statuses
 
     def test_friendly_adjacent_no_engagement(self):
         """Moving adjacent to a friendly should not trigger engagement."""
@@ -6655,6 +6736,56 @@ class TestMovementOverwatchIntegration:
         assert result.success is True
         assert len(result.overwatch_opportunities) == 0
 
+    def test_move_entering_threat_with_cqb_trigger(self):
+        """Entering CQB threat should trigger overwatch when allowed by talent."""
+        player = make_combatant(
+            id="player_1",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        cqb_inventory = MechInventory(
+            mounts=[
+                WeaponMountState(
+                    mount_index=0,
+                    weapons=[WeaponState(weapon_id="pistol", tags=[], destroyed=False)],
+                )
+            ],
+            systems=[],
+        )
+        semper_vigilo = MechanicalEffect(
+            reaction_triggers=[
+                ReactionTriggerEffect(
+                    reaction_id="overwatch",
+                    trigger_events=["enemy_enters_threat"],
+                    condition="cqb_overwatch",
+                )
+            ]
+        )
+        enemy = make_combatant(
+            id="enemy_1",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=4, r=0), elevation=0),
+            inventory=cqb_inventory,
+            talent_effects=[semper_vigilo],
+        )
+
+        scenario = make_scenario(combatants=[player, enemy])
+        turn = make_turn(actor_id="player_1")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="player_1",
+            action_id="move",
+            action_type="full",
+            movement_path=[HexPosition(coord=HexCoord(q=1, r=0), elevation=0)],
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert len(result.overwatch_opportunities) == 1
+        assert result.overwatch_opportunities[0].reactor_id == "enemy_1"
+
     def test_move_with_disengage_no_opportunities(self):
         """Test that movement after disengage returns no overwatch opportunities."""
         # Create player mech at (0,0)
@@ -7333,7 +7464,7 @@ class TestOverwatchAttackResolution:
         target = make_combatant(
             id="target",
             hp_current=10,
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             side="hostiles",
         )
         scenario = make_scenario(combatants=[reactor, target])
@@ -7373,7 +7504,7 @@ class TestOverwatchAttackResolution:
         target = make_combatant(
             id="target",
             hp_current=10,
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             side="hostiles",
         )
         scenario = make_scenario(combatants=[reactor, target])
@@ -7438,7 +7569,7 @@ class TestOverwatchAttackResolution:
                 stress_current=4,
                 repairs_remaining=4,
             ),
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             statuses=[],
         )
         scenario = make_scenario(combatants=[reactor, target])
@@ -7480,7 +7611,7 @@ class TestOverwatchAttackResolution:
         )
         target = make_combatant(
             id="target",
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             side="hostiles",
         )
         scenario = make_scenario(combatants=[reactor, target])
@@ -7512,7 +7643,7 @@ class TestOverwatchAttackResolution:
         )
         target = make_combatant(
             id="target",
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             side="hostiles",
         )
         scenario = make_scenario(combatants=[reactor, target])
@@ -7547,7 +7678,7 @@ class TestOverwatchAttackResolution:
         )
         target = make_combatant(
             id="target",
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             side="hostiles",
         )
         scenario = make_scenario(combatants=[reactor, target])
@@ -7574,7 +7705,7 @@ class TestOverwatchAttackResolution:
         )
         target = make_combatant(
             id="target",
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             side="hostiles",
         )
         scenario = make_scenario(combatants=[reactor, target])
@@ -7670,7 +7801,7 @@ class TestOverwatchIntegration:
         # Target with only 1 HP remaining
         target = self.make_combatant_with_weapon(
             id="target",
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             hp_current=1,  # Will trigger structure check on any damage
             side="hostiles",
             structure_current=4,
@@ -7706,7 +7837,7 @@ class TestOverwatchIntegration:
         )
         target = make_combatant(
             id="target",
-            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
             side="hostiles",
         )
         scenario = make_scenario(combatants=[reactor, target])

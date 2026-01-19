@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from core.shared.enums import ActionType, StatusType
-from core.shared.dice import roll_dice
+from core.shared.enums import ActionType, StatusType, DamageType
+from core.shared.dice import roll_dice, round_up
 
 if TYPE_CHECKING:
     from core.shared.structure import StructureResolutionResult
@@ -38,14 +38,19 @@ from core.mech.combat_models import (
 )
 
 # Import overwatch trigger detection
-from core.shared.overwatch import check_overwatch_triggers_at_movement_start
+from core.shared.overwatch import check_overwatch_triggers_for_movement
+from core.shared.damage import DamageInput, DamageResolutionContext, DamageBreakdown, resolve_damage_on_target
 
 # Import helpers from combat_helpers
 from core.mech.combat_helpers import (
     _resolve_weapon_profile,
     _extract_tag_value,
     _extract_area_pattern,
-    _roll_weapon_damage,
+    _roll_weapon_damage_components,
+    _get_primary_damage_type,
+    _build_damage_context,
+    _collect_damage_resistances,
+    _collect_heat_resistance_multiplier,
     _build_full_tech_option,
     _apply_tech_result,
     _record_statuses_applied,
@@ -792,6 +797,7 @@ def execute_action(
     knockback_value = _extract_tag_value(weapon_tags, "knockback") or 0
     has_overkill = any(tag.tag == "overkill" for tag in weapon_tags)
     smart_attack = any(tag.tag == "smart" for tag in weapon_tags)
+    primary_damage_type = _get_primary_damage_type(weapon_profile)
     thrown_range = _get_thrown_range(
         action_input.weapon_id,
         action_input.weapon_profile_id,
@@ -943,11 +949,15 @@ def execute_action(
         current_turn.has_moved_or_acted or is_action_that_blocks_ordnance
     )
 
+    updated_movement_path = current_turn.movement_path
+    if action_input.action_id in ("move", "boost") and action_input.movement_path:
+        updated_movement_path = action_input.movement_path
+
     updated_turn = CombatTurn(
         actor_id=current_turn.actor_id,
         move_used=current_turn.move_used or (action_input.action_id == "move"),
         movement_mode=current_turn.movement_mode,
-        movement_path=current_turn.movement_path,
+        movement_path=updated_movement_path,
         actions=updated_actions,
         has_moved_or_acted=new_has_moved_or_acted,
     )
@@ -956,6 +966,13 @@ def execute_action(
     resource_changes: list[ResourceChange] = []
     effects_applied: list[dict] = []
     damage_dealt = 0
+    damage_totals = {
+        "kinetic": 0,
+        "explosive": 0,
+        "energy": 0,
+        "burn": 0,
+        "heat": 0,
+    }
     heat_generated = 0
     statuses_applied: dict[str, list[StatusType]] = {}
     structure_checks: list[dict] = []
@@ -1011,6 +1028,7 @@ def execute_action(
                     weapon_id=action_input.weapon_id,
                     is_tech_attack=False,
                     use_thrown=action_input.use_thrown,
+                    profile_id=action_input.weapon_profile_id,
                 )
                 if not valid:
                     return scenario, current_turn, economy, ActionExecutionResult(
@@ -1134,54 +1152,100 @@ def execute_action(
                 targets_with_lock_on.append(target_id)
 
         single_damage_roll = area_pattern.single_damage_roll if area_pattern else False
-        shared_damage = 0
+        shared_damage_components: list[tuple[str, int]] = []
         if single_damage_roll and any(result.hit for _, _, result, _ in attack_results):
-            shared_damage, shared_overkill_heat = _roll_weapon_damage(
+            shared_damage_components, shared_overkill_heat = _roll_weapon_damage_components(
                 weapon_profile,
                 apply_overkill=has_overkill,
             )
             self_overkill_heat += shared_overkill_heat
 
         for target_id, target, attack_result, _ in attack_results:
+            current_target = next(
+                (c for c in scenario.combatants if c.id == target_id), target
+            )
+            damage_context = _build_damage_context(
+                attacker=actor,
+                target=current_target,
+                is_melee=not is_ranged_attack,
+                is_ranged=is_ranged_attack,
+                is_tech=smart_attack,
+            )
+            target_resistances = _collect_damage_resistances(
+                current_target, damage_context
+            )
+            heat_multiplier = _collect_heat_resistance_multiplier(
+                current_target, damage_context
+            )
+
             if attack_result.hit:
                 if single_damage_roll:
-                    base_damage = shared_damage
+                    base_components = list(shared_damage_components)
                 else:
-                    base_damage, overkill_heat = _roll_weapon_damage(
+                    base_components, overkill_heat = _roll_weapon_damage_components(
                         weapon_profile,
                         apply_overkill=has_overkill,
                     )
                     self_overkill_heat += overkill_heat
 
-                final_damage = base_damage * 2 if attack_result.is_critical else base_damage
+                scaled_components: list[tuple[str, int]] = []
+                for damage_type, amount in base_components:
+                    scaled = amount
+                    if attack_result.is_critical:
+                        scaled *= 2
+                    scaled_components.append((damage_type, scaled))
 
-                # Apply exposed damage multiplier (stacks with critical: crit + exposed = 4x)
-                if "exposed" in target.statuses:
-                    final_damage = final_damage * 2
+                if "exposed" in current_target.statuses:
                     effects_applied.append({
                         "type": "exposed_multiplier",
                         "target_id": target_id,
                         "multiplier": 2,
                     })
 
-                if reliable_value is not None and final_damage < reliable_value:
-                    final_damage = reliable_value
+                if reliable_value is not None:
+                    total_scaled_damage = sum(
+                        amount for dmg_type, amount in scaled_components if dmg_type != "heat"
+                    )
+                    if total_scaled_damage < reliable_value:
+                        scaled_components.append(
+                            (primary_damage_type, reliable_value - total_scaled_damage)
+                        )
 
-                # Shredded ignores armor
-                effective_ap = armor_piercing
-                if "shredded" in target.statuses:
-                    effective_ap = target.stats.armor if target.stats else 0
+                if burn_value is not None and burn_value > 0:
+                    scaled_components.append(("burn", burn_value))
+
+                if heat_target > 0:
+                    scaled_components.append(("heat", heat_target))
+
+                if "shredded" in current_target.statuses:
                     effects_applied.append({
                         "type": "shredded_armor_bypass",
                         "target_id": target_id,
-                        "armor_bypassed": effective_ap,
+                        "armor_bypassed": current_target.stats.armor if current_target.stats else 0,
                     })
 
-                scenario, change, structure_result = apply_damage(
-                    scenario, target_id, final_damage, effective_ap
+                scenario, change, breakdown, structure_result, overheat_result = apply_typed_damage(
+                    scenario,
+                    target_id,
+                    scaled_components,
+                    armor_piercing=armor_piercing,
+                    attacker_id=actor.id,
+                    resistances=target_resistances,
+                    heat_resistance_multiplier=heat_multiplier,
                 )
                 resource_changes.append(change)
-                damage_dealt += abs(change.hp_change or 0)
+                damage_dealt += (
+                    breakdown.kinetic
+                    + breakdown.explosive
+                    + breakdown.energy
+                    + breakdown.burn
+                )
+                heat_generated += breakdown.heat
+                damage_totals["kinetic"] += breakdown.kinetic
+                damage_totals["explosive"] += breakdown.explosive
+                damage_totals["energy"] += breakdown.energy
+                damage_totals["burn"] += breakdown.burn
+                damage_totals["heat"] += breakdown.heat
 
                 if structure_result:
                     structure_checks.append({
@@ -1194,39 +1258,32 @@ def execute_action(
                         "lowest_roll": structure_result.lowest_roll,
                     })
 
-                if burn_value is not None and burn_value > 0:
-                    scenario, burn_change, burn_structure = apply_damage(
-                        scenario,
-                        target_id,
-                        burn_value,
-                        armor_piercing=target.stats.armor if target.stats else 0,
-                    )
-                    resource_changes.append(burn_change)
-                    damage_dealt += abs(burn_change.hp_change or 0)
+                if overheat_result:
+                    overheat_checks.append({
+                        "type": "overheat_check",
+                        "target_id": target_id,
+                        "outcome": overheat_result.outcome,
+                        "statuses": [str(s) for s in overheat_result.statuses_to_apply],
+                        "dice_rolls": overheat_result.dice_rolls,
+                        "lowest_roll": overheat_result.lowest_roll,
+                        "meltdown_state": overheat_result.meltdown_state is not None,
+                    })
 
-                    if burn_structure:
-                        structure_checks.append({
-                            "type": "structure_check",
-                            "target_id": target_id,
-                            "outcome": burn_structure.outcome,
-                            "mech_destroyed": burn_structure.mech_destroyed,
-                            "statuses": [str(s) for s in burn_structure.statuses_to_apply],
-                            "dice_rolls": burn_structure.dice_rolls,
-                            "lowest_roll": burn_structure.lowest_roll,
-                        })
-
+                if breakdown.burn > 0:
                     scenario, added_statuses = _apply_statuses_to_target(
                         scenario, target_id, ["burn"]
                     )
-                    _record_statuses_applied(statuses_applied, target_id, added_statuses)
+                    _record_statuses_applied(
+                        statuses_applied, target_id, added_statuses
+                    )
 
-                    # Accumulate burn_marked (stacking per PR2)
                     burn_target_idx = next(
-                        (i for i, c in enumerate(scenario.combatants) if c.id == target_id), -1
+                        (i for i, c in enumerate(scenario.combatants) if c.id == target_id),
+                        -1,
                     )
                     if burn_target_idx >= 0:
                         burn_target = scenario.combatants[burn_target_idx]
-                        new_burn = burn_target.resources.burn_marked + burn_value
+                        new_burn = burn_target.resources.burn_marked + breakdown.burn
                         new_burn_resources = burn_target.resources.model_copy(
                             update={"burn_marked": new_burn}
                         )
@@ -1247,42 +1304,21 @@ def execute_action(
                     effects_applied.append({
                         "type": "burn",
                         "target_id": target_id,
-                        "amount": burn_value,
+                        "amount": breakdown.burn,
                         "total_burn_marked": (
                             scenario.combatants[burn_target_idx].resources.burn_marked
-                            if burn_target_idx >= 0 else burn_value
+                            if burn_target_idx >= 0 else breakdown.burn
                         ),
                     })
 
-                if heat_target > 0:
-                    scenario, change, overheat_result = apply_heat(
-                        scenario, target_id, heat_target
-                    )
-                    resource_changes.append(change)
-                    heat_generated += heat_target
-
-                    if overheat_result:
-                        overheat_checks.append({
-                            "type": "overheat_check",
-                            "target_id": target_id,
-                            "outcome": overheat_result.outcome,
-                            "statuses": [str(s) for s in overheat_result.statuses_to_apply],
-                            "dice_rolls": overheat_result.dice_rolls,
-                            "lowest_roll": overheat_result.lowest_roll,
-                            "meltdown_state": overheat_result.meltdown_state is not None,
-                        })
-
                 # Apply knockback if weapon has knockback tag
                 if knockback_value > 0:
-                    # Re-fetch target from scenario (may have been updated by damage)
                     updated_target = next(
                         (c for c in scenario.combatants if c.id == target_id), None
                     )
-                    # Re-fetch actor from scenario
                     current_actor = next(
                         (c for c in scenario.combatants if c.id == action_input.actor_id), actor
                     )
-                    # Only apply knockback if target is still alive (structure > 0)
                     if updated_target and updated_target.resources.structure_current > 0:
                         scenario, knockback_effect = _apply_knockback_on_hit(
                             scenario, current_actor, updated_target, knockback_value
@@ -1291,11 +1327,34 @@ def execute_action(
                             effects_applied.append(knockback_effect)
                             position_updates[str(target_id)] = knockback_effect["final_position"]
             elif reliable_value is not None:
-                scenario, change, structure_result = apply_damage(
-                    scenario, target_id, reliable_value, armor_piercing
+                if "shredded" in current_target.statuses:
+                    effects_applied.append({
+                        "type": "shredded_armor_bypass",
+                        "target_id": target_id,
+                        "armor_bypassed": current_target.stats.armor if current_target.stats else 0,
+                    })
+
+                scenario, change, breakdown, structure_result, overheat_result = apply_typed_damage(
+                    scenario,
+                    target_id,
+                    [(primary_damage_type, reliable_value)],
+                    armor_piercing=armor_piercing,
+                    attacker_id=actor.id,
+                    resistances=target_resistances,
+                    heat_resistance_multiplier=heat_multiplier,
                 )
                 resource_changes.append(change)
-                damage_dealt += abs(change.hp_change or 0)
+                damage_dealt += (
+                    breakdown.kinetic
+                    + breakdown.explosive
+                    + breakdown.energy
+                    + breakdown.burn
+                )
+                damage_totals["kinetic"] += breakdown.kinetic
+                damage_totals["explosive"] += breakdown.explosive
+                damage_totals["energy"] += breakdown.energy
+                damage_totals["burn"] += breakdown.burn
+                damage_totals["heat"] += breakdown.heat
                 effects_applied.append({
                     "type": "reliable_damage",
                     "target_id": target_id,
@@ -1313,17 +1372,45 @@ def execute_action(
                         "lowest_roll": structure_result.lowest_roll,
                     })
 
+                if overheat_result:
+                    overheat_checks.append({
+                        "type": "overheat_check",
+                        "target_id": target_id,
+                        "outcome": overheat_result.outcome,
+                        "statuses": [str(s) for s in overheat_result.statuses_to_apply],
+                        "dice_rolls": overheat_result.dice_rolls,
+                        "lowest_roll": overheat_result.lowest_roll,
+                        "meltdown_state": overheat_result.meltdown_state is not None,
+                    })
+
         if heat_self > 0 or self_overkill_heat > 0:
             total_self_heat = heat_self + self_overkill_heat
-            scenario, change, overheat_result = apply_heat(
-                scenario, actor.id, total_self_heat
+            self_context = _build_damage_context(
+                attacker=actor,
+                target=actor,
+                is_melee=not is_ranged_attack,
+                is_ranged=is_ranged_attack,
+                is_tech=smart_attack,
+            )
+            self_heat_multiplier = _collect_heat_resistance_multiplier(
+                actor, self_context
+            )
+            scenario, change, breakdown, _, overheat_result = apply_typed_damage(
+                scenario,
+                actor.id,
+                [("heat", total_self_heat)],
+                armor_piercing=0,
+                attacker_id=actor.id,
+                resistances=[],
+                heat_resistance_multiplier=self_heat_multiplier,
             )
             resource_changes.append(change)
-            heat_generated += total_self_heat
+            heat_generated += breakdown.heat
+            damage_totals["heat"] += breakdown.heat
             effects_applied.append({
                 "type": "heat_self",
                 "target_id": actor.id,
-                "amount": total_self_heat,
+                "amount": breakdown.heat,
                 "overkill": self_overkill_heat,
             })
 
@@ -1673,15 +1760,15 @@ def execute_action(
             for a in current_turn.actions
         )
 
-        # Check for overwatch triggers at movement start (PR2 4395-4401)
-        # Overwatch triggers when an enemy STARTS movement in weapon threat range
+        # Check for overwatch triggers (start/enter/leave threat where permitted)
         if actor.position is not None:
             is_hidden = "hidden" in actor.statuses
             is_invisible = "invisible" in actor.statuses
 
-            overwatch_result = check_overwatch_triggers_at_movement_start(
+            overwatch_result = check_overwatch_triggers_for_movement(
                 scenario=scenario,
                 mover=actor,
+                movement_path=action_input.movement_path,
                 is_disengaging=disengage_active,
                 is_hidden=is_hidden,
                 is_invisible=is_invisible,
@@ -1795,6 +1882,7 @@ def execute_action(
         action_use=action_use,
         effects_applied=effects_applied,
         damage_dealt=damage_dealt,
+        damage_breakdown=DamageBreakdown(**damage_totals),
         heat_generated=heat_generated,
         resource_changes=resource_changes,
         statuses_applied=statuses_applied,
@@ -1969,6 +2057,8 @@ def execute_reaction(
             target=target,
             weapon_id=weapon_id,
             is_tech_attack=False,
+            profile_id=reaction_input.weapon_profile_id,
+            force_threat=True,
         )
         if not valid:
             return scenario, economy, ReactionResult(
@@ -2058,6 +2148,7 @@ def execute_reaction(
             reaction_used=reaction_input.reaction_type,
             effects_applied=effects_applied,
             damage_dealt=damage_dealt,
+            damage_breakdown=outcome.damage_breakdown,
             attack_hit=outcome.hit,
             attack_critical=outcome.critical,
             attack_roll=outcome.roll,
@@ -2488,6 +2579,138 @@ def check_overheat_cascade(
 # =============================================================================
 # Resource Mutation Helpers
 # =============================================================================
+
+
+def apply_typed_damage(
+    scenario: MechCombatScenario,
+    target_id: str,
+    damage_components: list[tuple[str, int]],
+    armor_piercing: int = 0,
+    attacker_id: str | None = None,
+    resistances: list[DamageType] | None = None,
+    heat_resistance_multiplier: float | None = None,
+) -> tuple[
+    MechCombatScenario,
+    ResourceChange,
+    DamageBreakdown,
+    "StructureResolutionResult | None",
+    "OverheatResolutionResult | None",
+]:
+    """Apply typed damage (including heat) in a single resolution pass."""
+    target: CombatantState | None = None
+    target_idx: int = -1
+    for i, c in enumerate(scenario.combatants):
+        if c.id == target_id:
+            target = c
+            target_idx = i
+            break
+
+    if target is None:
+        return (
+            scenario,
+            ResourceChange(combatant_id=target_id),
+            DamageBreakdown(),
+            None,
+            None,
+        )
+
+    resistances = resistances or []
+    heat_multiplier = heat_resistance_multiplier or 1.0
+    if "shredded" in target.statuses:
+        heat_multiplier = 1.0
+
+    damage_totals = {
+        "kinetic": 0,
+        "explosive": 0,
+        "energy": 0,
+        "burn": 0,
+        "heat": 0,
+    }
+
+    total_hp_damage = 0
+    total_heat = 0
+    for damage_type, amount in damage_components:
+        if amount <= 0:
+            continue
+        if damage_type == "heat":
+            adjusted_heat = round_up(amount * heat_multiplier)
+            total_heat += adjusted_heat
+            damage_totals["heat"] += adjusted_heat
+            continue
+
+        result = resolve_damage_on_target(
+            DamageInput(
+                damage=amount,
+                damage_type=damage_type,
+                armor_piercing=armor_piercing,
+            ),
+            DamageResolutionContext(
+                attacker_id=attacker_id or "attacker",
+                target=target,
+                resistances=resistances,
+            ),
+        )
+        total_hp_damage += result.damage_to_hp
+        damage_totals[result.damage_type] += result.damage_to_hp
+
+    old_hp = target.resources.hp_current
+    new_hp = max(0, old_hp - total_hp_damage)
+    hp_change = new_hp - old_hp
+    excess_damage = max(0, total_hp_damage - old_hp)
+
+    new_resources = target.resources.model_copy(update={"hp_current": new_hp})
+    updated_target = target.model_copy(update={"resources": new_resources})
+
+    structure_result: "StructureResolutionResult | None" = None
+    if total_hp_damage > 0 and new_hp == 0:
+        updated_target, structure_result = check_structure_cascade(
+            updated_target, excess_damage
+        )
+
+    old_heat = updated_target.resources.heat_current
+    old_stress = updated_target.resources.stress_current
+    overheat_result: "OverheatResolutionResult | None" = None
+    heat_change = 0
+    stress_change = 0
+    if total_heat > 0:
+        new_heat = old_heat + total_heat
+        new_resources = updated_target.resources.model_copy(
+            update={"heat_current": new_heat}
+        )
+        updated_target = updated_target.model_copy(update={"resources": new_resources})
+
+        if new_heat >= updated_target.resources.heat_cap:
+            updated_target, overheat_result = check_overheat_cascade(updated_target)
+
+        heat_change = updated_target.resources.heat_current - old_heat
+        stress_change = updated_target.resources.stress_current - old_stress
+
+    updated_combatants = list(scenario.combatants)
+    updated_combatants[target_idx] = updated_target
+    updated_scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+    )
+
+    structure_change = -1 if structure_result else 0
+
+    return (
+        updated_scenario,
+        ResourceChange(
+            combatant_id=target_id,
+            hp_change=hp_change,
+            heat_change=heat_change,
+            structure_change=structure_change,
+            stress_change=stress_change,
+        ),
+        DamageBreakdown(**damage_totals),
+        structure_result,
+        overheat_result,
+    )
 
 
 def apply_damage(

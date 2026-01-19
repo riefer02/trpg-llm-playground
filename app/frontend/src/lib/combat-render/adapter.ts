@@ -9,6 +9,7 @@ import type {
   HexPosition,
   MechCombatScenario,
   Side,
+  TerrainHex,
 } from "../types/lancer";
 
 import type {
@@ -17,6 +18,7 @@ import type {
   HexGrid,
   HoverStyle,
   RenderMarker,
+  RenderTerrainTile,
   RenderToken,
 } from "./canvas";
 import { buildHexGrid } from "./canvas";
@@ -118,6 +120,7 @@ export function adaptCombatScenario(
     combatants,
     input.tokenColors,
   );
+  const terrainTiles = buildTerrainTiles(input.scenario.terrain ?? null);
   const markers = buildMarkers(combatants, input.scenario.deployables);
 
   const overlayBuild = buildOverlays({
@@ -153,6 +156,7 @@ export function adaptCombatScenario(
     state: {
       grid,
       tokens,
+      terrain: terrainTiles.length ? terrainTiles : undefined,
       markers,
       overlays: overlayBuild.overlays,
       hover: input.hover ?? null,
@@ -306,6 +310,24 @@ function buildMarkers(
   }
 
   return markers;
+}
+
+function buildTerrainTiles(
+  terrain: MechCombatScenario["terrain"] | null,
+): RenderTerrainTile[] {
+  if (!terrain?.tiles?.length) {
+    return [];
+  }
+
+  return terrain.tiles.map((tile: TerrainHex) => ({
+    coord: tile.coord,
+    elevation: tile.elevation ?? 0,
+    difficult: tile.difficult ?? false,
+    dangerous: tile.dangerous ?? false,
+    providesSoftCover: tile.provides_soft_cover ?? false,
+    providesHardCover: tile.provides_hard_cover ?? false,
+    blocksLineOfSight: tile.blocks_line_of_sight ?? false,
+  }));
 }
 
 function buildOverlayFromAction({

@@ -576,6 +576,43 @@
       "title": "ContestedCheck",
       "type": "object"
     },
+    "DamageBreakdown": {
+      "description": "Net damage totals by type (heat tracked separately from damage).",
+      "properties": {
+        "kinetic": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Kinetic",
+          "type": "integer"
+        },
+        "explosive": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Explosive",
+          "type": "integer"
+        },
+        "energy": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Energy",
+          "type": "integer"
+        },
+        "burn": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Burn",
+          "type": "integer"
+        },
+        "heat": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Heat",
+          "type": "integer"
+        }
+      },
+      "title": "DamageBreakdown",
+      "type": "object"
+    },
     "FlatBonus": {
       "description": "Flat bonus applied to a roll (one source at a time).",
       "properties": {
@@ -832,6 +869,10 @@
       "description": "Total damage dealt",
       "title": "Damage Dealt",
       "type": "integer"
+    },
+    "damage_breakdown": {
+      "$ref": "#/$defs/DamageBreakdown",
+      "description": "Net damage by type"
     },
     "heat_generated": {
       "default": 0,

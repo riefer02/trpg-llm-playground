@@ -1,0 +1,358 @@
+{
+  "$defs": {
+    "SitrepDeployment": {
+      "description": "Deployment zone configuration for active mission resolution.\n\nAttributes:\n    player_zones: Where player characters deploy\n    enemy_zones: Where enemy forces deploy\n    ingress_zones: Where reinforcements can enter\n    reserve_pool: NPC IDs held in reserve for delayed deployment\n    reserves_spawned_per_round: How many reserves enter per round\n    last_ingress_zone: The most recently used ingress zone (for rotation rule)\n    reserve_pattern: How reserves are managed (none, half, normal, double, increasing)",
+      "properties": {
+        "player_zones": {
+          "items": {
+            "$ref": "#/$defs/SitrepZone"
+          },
+          "title": "Player Zones",
+          "type": "array"
+        },
+        "enemy_zones": {
+          "items": {
+            "$ref": "#/$defs/SitrepZone"
+          },
+          "title": "Enemy Zones",
+          "type": "array"
+        },
+        "ingress_zones": {
+          "items": {
+            "$ref": "#/$defs/SitrepZone"
+          },
+          "title": "Ingress Zones",
+          "type": "array"
+        },
+        "reserve_pool": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reserve Pool",
+          "type": "array"
+        },
+        "reserves_spawned_per_round": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reserves Spawned Per Round"
+        },
+        "last_ingress_zone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Ingress Zone"
+        },
+        "reserve_pattern": {
+          "default": "normal",
+          "enum": [
+            "none",
+            "half",
+            "normal",
+            "double",
+            "increasing"
+          ],
+          "title": "Reserve Pattern",
+          "type": "string"
+        }
+      },
+      "title": "SitrepDeployment",
+      "type": "object"
+    },
+    "SitrepVictoryCondition": {
+      "description": "Active tracking of a victory condition during mission resolution.\n\nAttributes:\n    condition_type: Type of victory condition being tracked\n    target_value: The target value needed to achieve victory (e.g., 3 zones)\n    current_value: The current progress toward the target\n    is_met: Whether this condition has been satisfied\n    description: Human-readable description of the condition",
+      "properties": {
+        "condition_type": {
+          "enum": [
+            "extract_objective",
+            "control_zones",
+            "score_above_threshold",
+            "outnumber_enemies",
+            "control_real_objective",
+            "survive_rounds"
+          ],
+          "title": "Condition Type",
+          "type": "string"
+        },
+        "target_value": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Value"
+        },
+        "current_value": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Current Value",
+          "type": "integer"
+        },
+        "is_met": {
+          "default": false,
+          "title": "Is Met",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Human-readable description",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "condition_type",
+        "description"
+      ],
+      "title": "SitrepVictoryCondition",
+      "type": "object"
+    },
+    "SitrepZone": {
+      "description": "Generic zone for SITREP configurations per PR2 12550-12565.\n\nAttributes:\n    zone_type: Type of zone (deployment, extraction, objective, ingress)\n    width: Width for rectangular zones (e.g., 4 for 4x4 control zones)\n    height: Height for rectangular zones\n    location: Descriptive location (e.g., \"north_edge\", \"quadrant_nw\")\n    terrain_notes: Notes about terrain or special properties",
+      "properties": {
+        "zone_type": {
+          "enum": [
+            "deployment",
+            "extraction",
+            "objective",
+            "ingress"
+          ],
+          "title": "Zone Type",
+          "type": "string"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Width"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Height"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        },
+        "terrain_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terrain Notes"
+        }
+      },
+      "required": [
+        "zone_type"
+      ],
+      "title": "SitrepZone",
+      "type": "object"
+    },
+    "ZoneControlStateTracker": {
+      "description": "Tracks the control state of a zone during active resolution.\n\nAttributes:\n    zone_id: Identifier matching a zone in SitrepTemplate.objective_zones\n    state: Current control state (player, enemy, contested, or neutral)\n    controlling_side: Which side controls the zone (\"players\" or \"enemies\")\n    last_checked_turn: The turn number when this state was last evaluated",
+      "properties": {
+        "zone_id": {
+          "title": "Zone Id",
+          "type": "string"
+        },
+        "state": {
+          "default": "neutral",
+          "enum": [
+            "player_controlled",
+            "enemy_controlled",
+            "contested",
+            "neutral"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "controlling_side": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Controlling Side"
+        },
+        "last_checked_turn": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Last Checked Turn",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "zone_id"
+      ],
+      "title": "ZoneControlStateTracker",
+      "type": "object"
+    }
+  },
+  "description": "Active SITREP resolution state for tracking mission progress.\n\nAttributes:\n    template_type: The SITREP type (escort, control, extract, etc.)\n    current_round: Current round number (1-indexed)\n    max_rounds: The round limit from the template\n    player_score: Cumulative player score\n    enemy_score: Cumulative enemy score\n    zone_states: Map of zone_id to control state tracker\n    victory_conditions: List of active victory conditions being tracked\n    extraction_progress: Progress toward extraction (0.0 to 1.0)\n    surviving_players: Number of active player characters\n    surviving_enemies: Number of active enemy NPCs\n    outcome: Current outcome assessment (None = ongoing)\n    turn_limit_reached: Whether the time limit has been reached\n    reserves_remaining: Count of reserves left in the pool",
+  "properties": {
+    "template_type": {
+      "enum": [
+        "escort",
+        "control",
+        "extract",
+        "hold_out",
+        "gauntlet",
+        "recon"
+      ],
+      "title": "Template Type",
+      "type": "string"
+    },
+    "current_round": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Current Round",
+      "type": "integer"
+    },
+    "max_rounds": {
+      "default": 6,
+      "minimum": 1,
+      "title": "Max Rounds",
+      "type": "integer"
+    },
+    "player_score": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Player Score",
+      "type": "integer"
+    },
+    "enemy_score": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Enemy Score",
+      "type": "integer"
+    },
+    "zone_states": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ZoneControlStateTracker"
+      },
+      "title": "Zone States",
+      "type": "object"
+    },
+    "victory_conditions": {
+      "items": {
+        "$ref": "#/$defs/SitrepVictoryCondition"
+      },
+      "title": "Victory Conditions",
+      "type": "array"
+    },
+    "extraction_progress": {
+      "default": 0.0,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Extraction Progress",
+      "type": "number"
+    },
+    "surviving_players": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Surviving Players",
+      "type": "integer"
+    },
+    "surviving_enemies": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Surviving Enemies",
+      "type": "integer"
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "enum": [
+            "players_win",
+            "enemies_win",
+            "draw",
+            "ongoing"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Outcome"
+    },
+    "turn_limit_reached": {
+      "default": false,
+      "title": "Turn Limit Reached",
+      "type": "boolean"
+    },
+    "reserves_remaining": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Reserves Remaining",
+      "type": "integer"
+    },
+    "deployment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SitrepDeployment"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "template_type"
+  ],
+  "title": "SitrepResolution",
+  "type": "object"
+}

@@ -1,0 +1,44 @@
+{
+  "description": "Recommended enemy force for an encounter.\n\nProvides victory point targets split between initial deployment\nand reserves based on the SITREP type.\n\nAttributes:\n    target_victory_points: Total victory points for the encounter\n    initial_victory_points: Victory points for initially deployed enemies\n    reserve_victory_points: Victory points for reserve enemies\n    suggested_tier: Recommended NPC tier for the encounter\n    recommended_template_ids: Optional list of recommended template IDs",
+  "properties": {
+    "target_victory_points": {
+      "minimum": 0.0,
+      "title": "Target Victory Points",
+      "type": "number"
+    },
+    "initial_victory_points": {
+      "minimum": 0.0,
+      "title": "Initial Victory Points",
+      "type": "number"
+    },
+    "reserve_victory_points": {
+      "minimum": 0.0,
+      "title": "Reserve Victory Points",
+      "type": "number"
+    },
+    "suggested_tier": {
+      "default": "tier_1",
+      "enum": [
+        "tier_1",
+        "tier_2",
+        "tier_3"
+      ],
+      "title": "Suggested Tier",
+      "type": "string"
+    },
+    "recommended_template_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Recommended Template Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "target_victory_points",
+    "initial_victory_points",
+    "reserve_victory_points"
+  ],
+  "title": "EnemyForceRecommendation",
+  "type": "object"
+}

@@ -1,0 +1,41 @@
+{
+  "description": "Structured victory condition for validation per PR2 rules.\n\nAttributes:\n    condition_type: Type of victory condition\n    threshold: Optional numeric threshold (e.g., zones to control)\n    description: Human-readable description of the condition",
+  "properties": {
+    "condition_type": {
+      "enum": [
+        "extract_objective",
+        "control_zones",
+        "score_above_threshold",
+        "outnumber_enemies",
+        "control_real_objective",
+        "survive_rounds"
+      ],
+      "title": "Condition Type",
+      "type": "string"
+    },
+    "threshold": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Threshold"
+    },
+    "description": {
+      "description": "Human-readable description",
+      "title": "Description",
+      "type": "string"
+    }
+  },
+  "required": [
+    "condition_type",
+    "description"
+  ],
+  "title": "VictoryCondition",
+  "type": "object"
+}

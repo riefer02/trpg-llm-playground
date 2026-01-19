@@ -144,6 +144,14 @@
       ],
       "default": null,
       "description": "Burn tick resolution if actor had burn"
+    },
+    "drones_primed": {
+      "description": "IDs of drones that primed at end of this turn",
+      "items": {
+        "type": "string"
+      },
+      "title": "Drones Primed",
+      "type": "array"
     }
   },
   "required": [

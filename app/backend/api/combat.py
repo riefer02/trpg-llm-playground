@@ -42,6 +42,7 @@ from core.mech.combat_execution import (
     ActionExecutionInput,
     ReactionInput,
 )
+from core.shared.overwatch import check_overwatch_triggers_for_movement
 from core.shared.full_tech import FullTechOptionSelection
 from core.shared.enums import ActionType
 
@@ -1228,13 +1229,11 @@ async def check_reaction_opportunity(
         combat_session.current_turn_index,
     )
 
-    # Check if combatant has reaction available (not used this round)
+    # Check if combatant has reaction available (per-round usage tracked in combatant state)
     round_idx = combat_session.current_round - 1
-    reaction_counts = {}
-    if round_idx < len(scenario.rounds):
-        reaction_counts = scenario.rounds[round_idx].reaction_counts_by_actor or {}
-
-    has_reaction = reaction_counts.get(combatant_id, 0) == 0
+    brace_used = combatant.per_round_reactions.get("brace", 0)
+    overwatch_used = combatant.per_round_reactions.get("overwatch", 0)
+    has_reaction = brace_used < 1 or overwatch_used < 1
 
     # Build pending triggers based on current turn state
     pending_triggers: list[ReactionTrigger] = []
@@ -1266,18 +1265,34 @@ async def check_reaction_opportunity(
                             )
                         )
 
-                # Check for movement that passed near us - overwatch opportunity
+                # Check for movement-based overwatch triggers
                 if current_turn.movement_path:
-                    # Simplified check: if enemy moved and we have ranged weapons
-                    pending_triggers.append(
-                        ReactionTrigger(
-                            trigger_type="enemy_movement",
-                            triggering_actor_id=current_actor.id,
-                            triggering_actor_name=current_actor.name,
-                            triggering_action_id=None,
-                            available_reactions=["overwatch"],
-                        )
+                    disengage_active = any(
+                        a.action_id == "disengage" for a in current_turn.actions or []
                     )
+                    overwatch_result = check_overwatch_triggers_for_movement(
+                        scenario=scenario,
+                        mover=current_actor,
+                        movement_path=current_turn.movement_path,
+                        is_disengaging=disengage_active,
+                        is_hidden="hidden" in current_actor.statuses,
+                        is_invisible="invisible" in current_actor.statuses,
+                    )
+                    for opp in overwatch_result.opportunities:
+                        if opp.reactor_id != combatant_id:
+                            continue
+                        if not opp.can_react:
+                            continue
+                        pending_triggers.append(
+                            ReactionTrigger(
+                                trigger_type="enemy_movement",
+                                triggering_actor_id=current_actor.id,
+                                triggering_actor_name=current_actor.name,
+                                triggering_action_id=None,
+                                available_reactions=["overwatch"],
+                            )
+                        )
+                        break
 
     return ReactionOpportunityResponse(
         combatant_id=combatant_id,

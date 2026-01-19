@@ -1,4 +1,82 @@
 {
+  "$defs": {
+    "DamageBreakdown": {
+      "description": "Net damage totals by type (heat tracked separately from damage).",
+      "properties": {
+        "kinetic": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Kinetic",
+          "type": "integer"
+        },
+        "explosive": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Explosive",
+          "type": "integer"
+        },
+        "energy": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Energy",
+          "type": "integer"
+        },
+        "burn": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Burn",
+          "type": "integer"
+        },
+        "heat": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Heat",
+          "type": "integer"
+        }
+      },
+      "title": "DamageBreakdown",
+      "type": "object"
+    },
+    "ResourceChange": {
+      "description": "Change to a combatant's resources.",
+      "properties": {
+        "combatant_id": {
+          "title": "Combatant Id",
+          "type": "string"
+        },
+        "hp_change": {
+          "default": 0,
+          "title": "Hp Change",
+          "type": "integer"
+        },
+        "heat_change": {
+          "default": 0,
+          "title": "Heat Change",
+          "type": "integer"
+        },
+        "structure_change": {
+          "default": 0,
+          "title": "Structure Change",
+          "type": "integer"
+        },
+        "stress_change": {
+          "default": 0,
+          "title": "Stress Change",
+          "type": "integer"
+        },
+        "repairs_change": {
+          "default": 0,
+          "title": "Repairs Change",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "combatant_id"
+      ],
+      "title": "ResourceChange",
+      "type": "object"
+    }
+  },
   "description": "Result of declaring a reaction.",
   "properties": {
     "success": {
@@ -46,6 +124,66 @@
       "description": "Damage dealt by overwatch",
       "title": "Damage Dealt",
       "type": "integer"
+    },
+    "damage_breakdown": {
+      "$ref": "#/$defs/DamageBreakdown",
+      "description": "Net damage by type"
+    },
+    "attack_hit": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Whether overwatch attack hit",
+      "title": "Attack Hit"
+    },
+    "attack_critical": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Whether attack was critical",
+      "title": "Attack Critical"
+    },
+    "attack_roll": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The d20 roll for overwatch attack",
+      "title": "Attack Roll"
+    },
+    "resource_changes": {
+      "description": "Resource changes from overwatch attack",
+      "items": {
+        "$ref": "#/$defs/ResourceChange"
+      },
+      "title": "Resource Changes",
+      "type": "array"
+    },
+    "structure_checks": {
+      "description": "Structure check results from overwatch damage",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Structure Checks",
+      "type": "array"
     }
   },
   "required": [

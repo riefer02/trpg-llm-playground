@@ -188,8 +188,8 @@ class TestResolveDamageOnTarget:
 
         assert result.armor_reduction == 0
         assert result.burn_ignored_armor is True
-        assert result.damage_to_hp == 0
-        assert result.damage_to_heat == 5
+        assert result.damage_to_hp == 5
+        assert result.damage_to_heat == 0
 
     def test_exposed_doubles_damage(self):
         """Exposed condition doubles damage before reductions."""
@@ -319,19 +319,19 @@ class TestApplyDamageToCombatant:
 
         assert updated.resources.hp_current == 0
 
-    def test_burn_adds_heat(self):
-        """Burn damage adds to heat instead of HP."""
+    def test_burn_applies_hp(self):
+        """Burn damage applies to HP immediately."""
         combatant = make_test_combatant(hp=10, armor=0, heat_cap=10)
         dmg = DamageInput(damage=5, damage_type="burn")
         ctx = DamageResolutionContext(attacker_id="attacker", target=combatant)
 
         updated, result = apply_damage_to_combatant(dmg, ctx)
 
-        assert updated.resources.hp_current == 10
-        assert updated.resources.heat_current == 5
+        assert updated.resources.hp_current == 5
+        assert updated.resources.heat_current == 0
 
-    def test_heat_accumulates(self):
-        """Burn damage stacks with existing heat."""
+    def test_burn_does_not_change_heat(self):
+        """Burn damage does not add heat."""
         resources = CombatResources(
             hp_current=10,
             heat_current=3,
@@ -347,7 +347,8 @@ class TestApplyDamageToCombatant:
 
         updated, result = apply_damage_to_combatant(dmg, ctx)
 
-        assert updated.resources.heat_current == 8
+        assert updated.resources.heat_current == 3
+        assert updated.resources.hp_current == 5
 
 
 class TestComputeDamageBeforeReductions:
@@ -472,12 +473,12 @@ class TestComputeResistanceReduction:
         )
         assert reduction == 4
 
-    def test_burn_not_resistable(self):
-        """Burn damage cannot be resisted."""
+    def test_burn_resistance_applies(self):
+        """Burn damage can be resisted like other damage types."""
         reduction = compute_resistance_reduction(
             10, "burn", is_shredded=False, resistances=["burn"]
         )
-        assert reduction == 0
+        assert reduction == 5
 
     def test_wrong_resistance_type(self):
         """Resistance to wrong damage type doesn't apply."""

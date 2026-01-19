@@ -1,0 +1,23 @@
+{
+  "description": "Player party power estimation for encounter scaling.\n\nPower is calculated as: player_count \u00d7 (1 + avg_license_level \u00d7 0.1)\nThis gives roughly 2x power for a level 12 party vs level 0.\n\nAttributes:\n    player_count: Number of players in the party (1-6)\n    avg_license_level: Average license level across all players (0-12)",
+  "properties": {
+    "player_count": {
+      "maximum": 6,
+      "minimum": 1,
+      "title": "Player Count",
+      "type": "integer"
+    },
+    "avg_license_level": {
+      "maximum": 12,
+      "minimum": 0,
+      "title": "Avg License Level",
+      "type": "number"
+    }
+  },
+  "required": [
+    "player_count",
+    "avg_license_level"
+  ],
+  "title": "PlayerPartyPower",
+  "type": "object"
+}

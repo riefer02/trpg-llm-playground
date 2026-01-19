@@ -48,6 +48,19 @@
       "default": null,
       "description": "Weapon for overwatch attack",
       "title": "Weapon Id"
+    },
+    "weapon_profile_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Weapon profile to use for weapons with multiple profiles",
+      "title": "Weapon Profile Id"
     }
   },
   "required": [

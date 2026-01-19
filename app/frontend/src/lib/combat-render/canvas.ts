@@ -69,11 +69,52 @@ export type MarkerStyle = {
   font?: string;
 };
 
+export type RenderTerrainTile = {
+  coord: HexCoord;
+  elevation?: number;
+  difficult?: boolean;
+  dangerous?: boolean;
+  providesSoftCover?: boolean;
+  providesHardCover?: boolean;
+  blocksLineOfSight?: boolean;
+};
+
+export type TerrainStyle = {
+  difficultFill?: string;
+  dangerousFill?: string;
+  blockingFill?: string;
+  softCoverStroke?: string;
+  hardCoverStroke?: string;
+  blockingStroke?: string;
+  softCoverLineWidth?: number;
+  hardCoverLineWidth?: number;
+  elevationBadgeFill?: string;
+  elevationBadgeStroke?: string;
+  elevationTextColor?: string;
+  elevationFont?: string;
+};
+
+export const DEFAULT_TERRAIN_STYLE: Required<TerrainStyle> = {
+  difficultFill: "rgba(251, 191, 36, 0.22)",
+  dangerousFill: "rgba(248, 113, 113, 0.24)",
+  blockingFill: "rgba(30, 41, 59, 0.35)",
+  softCoverStroke: "rgba(56, 189, 248, 0.9)",
+  hardCoverStroke: "rgba(15, 23, 42, 0.85)",
+  blockingStroke: "rgba(15, 23, 42, 0.9)",
+  softCoverLineWidth: 1.5,
+  hardCoverLineWidth: 2.5,
+  elevationBadgeFill: "rgba(226, 232, 240, 0.9)",
+  elevationBadgeStroke: "rgba(71, 85, 105, 0.8)",
+  elevationTextColor: "#0f172a",
+  elevationFont: "bold 10px 'Space Grotesk', sans-serif",
+};
+
 export type CombatRenderState = {
   grid: HexGrid;
   tokens: RenderToken[];
   markers?: RenderMarker[];
   overlays?: AreaOverlay[];
+  terrain?: RenderTerrainTile[];
   hover?: HexCoord | null;
 };
 
@@ -83,7 +124,34 @@ export type RenderStyles = {
   markers?: MarkerStyle;
   overlays?: HoverStyle;
   hover?: HoverStyle;
+  terrain?: TerrainStyle;
 };
+
+export type RenderPass =
+  | "grid"
+  | "terrain"
+  | "overlays"
+  | "markers"
+  | "tokens"
+  | "hover";
+
+export function getRenderPassOrder(state: CombatRenderState): RenderPass[] {
+  const passes: RenderPass[] = ["grid"];
+  if (state.terrain?.length) {
+    passes.push("terrain");
+  }
+  if (state.overlays?.length) {
+    passes.push("overlays");
+  }
+  if (state.markers?.length) {
+    passes.push("markers");
+  }
+  passes.push("tokens");
+  if (state.hover) {
+    passes.push("hover");
+  }
+  return passes;
+}
 
 export type HoverCallback = (
   coord: HexCoord | null,
@@ -125,16 +193,30 @@ export function renderCombatCanvas(
   const clearWidth = size?.width ?? ctx.canvas.width;
   const clearHeight = size?.height ?? ctx.canvas.height;
   ctx.clearRect(0, 0, clearWidth, clearHeight);
-  drawHexGrid(ctx, layout, state.grid, styles.grid);
-  if (state.overlays?.length) {
-    drawAreaOverlays(ctx, layout, state.overlays, styles.overlays);
-  }
-  if (state.markers?.length) {
-    drawMarkers(ctx, layout, state.markers, styles.markers);
-  }
-  drawTokens(ctx, layout, state.tokens, styles.tokens);
-  if (state.hover) {
-    drawHoverOverlay(ctx, layout, state.hover, styles.hover);
+  const passes = getRenderPassOrder(state);
+  for (const pass of passes) {
+    switch (pass) {
+      case "grid":
+        drawHexGrid(ctx, layout, state.grid, styles.grid);
+        break;
+      case "terrain":
+        drawTerrainTiles(ctx, layout, state.terrain ?? [], styles.terrain);
+        break;
+      case "overlays":
+        drawAreaOverlays(ctx, layout, state.overlays ?? [], styles.overlays);
+        break;
+      case "markers":
+        drawMarkers(ctx, layout, state.markers ?? [], styles.markers);
+        break;
+      case "tokens":
+        drawTokens(ctx, layout, state.tokens, styles.tokens);
+        break;
+      case "hover":
+        if (state.hover) {
+          drawHoverOverlay(ctx, layout, state.hover, styles.hover);
+        }
+        break;
+    }
   }
 }
 
@@ -209,6 +291,92 @@ export function drawMarkers(
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, center.x, center.y);
+  }
+}
+
+export function drawTerrainTiles(
+  ctx: CanvasRenderingContext2D,
+  layout: HexLayout,
+  tiles: RenderTerrainTile[],
+  style: TerrainStyle = {},
+): void {
+  const mergedStyle = { ...DEFAULT_TERRAIN_STYLE, ...style };
+  for (const tile of tiles) {
+    const center = axialToPixel(tile.coord, layout);
+    const corners = hexCorners(center, layout);
+
+    const drawPolygon = (fillStyle?: string, strokeStyle?: string, lineWidth?: number) => {
+      ctx.beginPath();
+      ctx.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i += 1) {
+        ctx.lineTo(corners[i].x, corners[i].y);
+      }
+      ctx.closePath();
+
+      if (fillStyle) {
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
+      }
+
+      if (strokeStyle && (lineWidth ?? 0) > 0) {
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = lineWidth ?? 1;
+        ctx.stroke();
+      }
+    };
+
+    if (tile.dangerous) {
+      drawPolygon(mergedStyle.dangerousFill);
+    } else if (tile.difficult) {
+      drawPolygon(mergedStyle.difficultFill);
+    }
+
+    if (tile.blocksLineOfSight) {
+      drawPolygon(
+        mergedStyle.blockingFill,
+        mergedStyle.blockingStroke,
+        mergedStyle.hardCoverLineWidth,
+      );
+    }
+
+    const hasHardCover = tile.providesHardCover;
+    const hasSoftCover = tile.providesSoftCover && !hasHardCover;
+
+    if (hasHardCover) {
+      drawPolygon(
+        undefined,
+        mergedStyle.hardCoverStroke,
+        mergedStyle.hardCoverLineWidth,
+      );
+    } else if (hasSoftCover) {
+      drawPolygon(
+        undefined,
+        mergedStyle.softCoverStroke,
+        mergedStyle.softCoverLineWidth,
+      );
+    }
+
+    if (tile.elevation && tile.elevation > 0) {
+      const badgeRadius = layout.size * 0.18;
+      const badgeCenter = {
+        x: center.x + layout.size * 0.32,
+        y: center.y - layout.size * 0.32,
+      };
+
+      ctx.beginPath();
+      ctx.arc(badgeCenter.x, badgeCenter.y, badgeRadius, 0, Math.PI * 2);
+      ctx.fillStyle = mergedStyle.elevationBadgeFill;
+      ctx.fill();
+      ctx.strokeStyle = mergedStyle.elevationBadgeStroke;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = mergedStyle.elevationTextColor;
+      ctx.font = mergedStyle.elevationFont;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(tile.elevation), badgeCenter.x, badgeCenter.y);
+    }
   }
 }
 

@@ -1,0 +1,43 @@
+{
+  "description": "Tracks the control state of a zone during active resolution.\n\nAttributes:\n    zone_id: Identifier matching a zone in SitrepTemplate.objective_zones\n    state: Current control state (player, enemy, contested, or neutral)\n    controlling_side: Which side controls the zone (\"players\" or \"enemies\")\n    last_checked_turn: The turn number when this state was last evaluated",
+  "properties": {
+    "zone_id": {
+      "title": "Zone Id",
+      "type": "string"
+    },
+    "state": {
+      "default": "neutral",
+      "enum": [
+        "player_controlled",
+        "enemy_controlled",
+        "contested",
+        "neutral"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "controlling_side": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Controlling Side"
+    },
+    "last_checked_turn": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Last Checked Turn",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "zone_id"
+  ],
+  "title": "ZoneControlStateTracker",
+  "type": "object"
+}

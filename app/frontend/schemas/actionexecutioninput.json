@@ -152,6 +152,19 @@
       "description": "Weapon being used",
       "title": "Weapon Id"
     },
+    "weapon_profile_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Weapon profile to use for weapons with multiple profiles (e.g., kinetic/energy/explosive)",
+      "title": "Weapon Profile Id"
+    },
     "system_id": {
       "anyOf": [
         {
@@ -214,7 +227,8 @@
         {
           "enum": [
             "cool_heat",
-            "spend_repair_full_hp"
+            "spend_repair_full_hp",
+            "cancel_meltdown"
           ],
           "type": "string"
         },
@@ -267,6 +281,57 @@
       ],
       "default": null,
       "description": "Direction for eject (pilot flies 6 spaces in this direction)"
+    },
+    "deploy_kind": {
+      "anyOf": [
+        {
+          "enum": [
+            "drone",
+            "mine",
+            "deployable"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Kind of deployable to create",
+      "title": "Deploy Kind"
+    },
+    "deploy_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Name for the deployed entity",
+      "title": "Deploy Name"
+    },
+    "mine_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "explosive",
+            "shroud",
+            "breaching",
+            "cluster",
+            "emp"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Type of mine being deployed",
+      "title": "Mine Type"
     }
   },
   "required": [

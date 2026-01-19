@@ -68,6 +68,67 @@
       },
       "title": "Cooldowns Decremented",
       "type": "array"
+    },
+    "meltdown_countdown_active": {
+      "default": false,
+      "description": "Whether combatant had active meltdown countdown",
+      "title": "Meltdown Countdown Active",
+      "type": "boolean"
+    },
+    "meltdown_countdown_remaining": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Turns remaining after decrement (None if no countdown)",
+      "title": "Meltdown Countdown Remaining"
+    },
+    "meltdown_triggered": {
+      "default": false,
+      "description": "Whether meltdown explosion triggered this turn",
+      "title": "Meltdown Triggered",
+      "type": "boolean"
+    },
+    "meltdown_explosion_damage": {
+      "default": 0,
+      "description": "Total damage from meltdown explosion (4d6)",
+      "title": "Meltdown Explosion Damage",
+      "type": "integer"
+    },
+    "meltdown_affected_targets": {
+      "description": "IDs of combatants damaged by meltdown explosion",
+      "items": {
+        "type": "string"
+      },
+      "title": "Meltdown Affected Targets",
+      "type": "array"
+    },
+    "mines_armed": {
+      "description": "IDs of mines that armed at start of this turn",
+      "items": {
+        "type": "string"
+      },
+      "title": "Mines Armed",
+      "type": "array"
+    },
+    "drone_heat_to_owner": {
+      "default": 0,
+      "description": "Heat from active latch drones applied to owner",
+      "title": "Drone Heat To Owner",
+      "type": "integer"
+    },
+    "drones_ready_to_act": {
+      "description": "IDs of drones that can act this turn",
+      "items": {
+        "type": "string"
+      },
+      "title": "Drones Ready To Act",
+      "type": "array"
     }
   },
   "required": [

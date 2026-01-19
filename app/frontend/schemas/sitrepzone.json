@@ -1,0 +1,70 @@
+{
+  "description": "Generic zone for SITREP configurations per PR2 12550-12565.\n\nAttributes:\n    zone_type: Type of zone (deployment, extraction, objective, ingress)\n    width: Width for rectangular zones (e.g., 4 for 4x4 control zones)\n    height: Height for rectangular zones\n    location: Descriptive location (e.g., \"north_edge\", \"quadrant_nw\")\n    terrain_notes: Notes about terrain or special properties",
+  "properties": {
+    "zone_type": {
+      "enum": [
+        "deployment",
+        "extraction",
+        "objective",
+        "ingress"
+      ],
+      "title": "Zone Type",
+      "type": "string"
+    },
+    "width": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Width"
+    },
+    "height": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Height"
+    },
+    "location": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Location"
+    },
+    "terrain_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Terrain Notes"
+    }
+  },
+  "required": [
+    "zone_type"
+  ],
+  "title": "SitrepZone",
+  "type": "object"
+}

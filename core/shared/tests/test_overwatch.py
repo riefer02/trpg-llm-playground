@@ -14,8 +14,10 @@ from core.shared.overwatch import (
     OverwatchOpportunity,
     OverwatchTriggerResult,
     check_overwatch_triggers_at_movement_start,
+    check_overwatch_triggers_for_movement,
 )
 from core.shared.ids import CombatantId, WeaponId
+from core.shared.effects import MechanicalEffect, ReactionTriggerEffect
 from core.mech.combat_state import (
     MechCombatScenario,
     CombatantState,
@@ -46,6 +48,7 @@ def make_combatant(
     statuses: list[str] | None = None,
     inventory: MechInventory | None = None,
     per_round_reactions: dict[str, int] | None = None,
+    talent_effects: list[MechanicalEffect] | None = None,
 ) -> CombatantState:
     """Create a test combatant."""
     if position is _DEFAULT_POSITION:
@@ -76,6 +79,7 @@ def make_combatant(
         statuses=statuses or [],
         inventory=inventory,
         per_round_reactions=per_round_reactions or {},
+        talent_effects=talent_effects or [],
     )
 
 
@@ -329,15 +333,15 @@ class TestOverwatchTriggerDetection:
         assert "enemy_1" in reactor_ids
         assert "enemy_2" in reactor_ids
 
-    def test_enemy_without_melee_weapon_no_trigger(self):
-        """Enemy with only ranged weapons does not trigger overwatch."""
+    def test_enemy_with_ranged_weapon_triggers_overwatch(self):
+        """Ranged weapons still threaten at default 1 for overwatch."""
         # Player mech at (0,0)
         player = make_combatant(
             id="player_1",
             side="players",
             position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
         )
-        # Enemy mech adjacent with ranged weapon only (assault_rifle has both range and threat)
+        # Enemy mech adjacent with ranged weapon only
         enemy = make_combatant(
             id="enemy_1",
             side="hostiles",
@@ -348,8 +352,87 @@ class TestOverwatchTriggerDetection:
 
         result = check_overwatch_triggers_at_movement_start(scenario, player)
 
-        # Heavy machine gun has no threat range
+        assert len(result.opportunities) == 1
+        assert result.opportunities[0].weapon_threat == 1
+
+    def test_entering_threat_without_trigger_no_opportunity(self):
+        """Entering threat does not trigger overwatch without a trigger effect."""
+        player = make_combatant(
+            id="player_1",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        pistol_inventory = MechInventory(
+            mounts=[
+                WeaponMountState(
+                    mount_index=0,
+                    weapons=[WeaponState(weapon_id="pistol", tags=[], destroyed=False)],
+                )
+            ],
+            systems=[],
+        )
+        enemy = make_combatant(
+            id="enemy_1",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=4, r=0), elevation=0),
+            inventory=pistol_inventory,
+        )
+        scenario = make_scenario([player, enemy])
+
+        movement_path = [HexPosition(coord=HexCoord(q=1, r=0), elevation=0)]
+        result = check_overwatch_triggers_for_movement(
+            scenario=scenario,
+            mover=player,
+            movement_path=movement_path,
+        )
+
         assert len(result.opportunities) == 0
+
+    def test_entering_threat_with_cqb_trigger(self):
+        """Semper Vigilo-style triggers fire on entering CQB threat."""
+        player = make_combatant(
+            id="player_1",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        pistol_inventory = MechInventory(
+            mounts=[
+                WeaponMountState(
+                    mount_index=0,
+                    weapons=[WeaponState(weapon_id="pistol", tags=[], destroyed=False)],
+                )
+            ],
+            systems=[],
+        )
+        semper_vigilo = MechanicalEffect(
+            reaction_triggers=[
+                ReactionTriggerEffect(
+                    reaction_id="overwatch",
+                    trigger_events=["enemy_enters_threat"],
+                    condition="cqb_overwatch",
+                )
+            ]
+        )
+        enemy = make_combatant(
+            id="enemy_1",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=4, r=0), elevation=0),
+            inventory=pistol_inventory,
+            talent_effects=[semper_vigilo],
+        )
+        scenario = make_scenario([player, enemy])
+
+        movement_path = [HexPosition(coord=HexCoord(q=1, r=0), elevation=0)]
+        result = check_overwatch_triggers_for_movement(
+            scenario=scenario,
+            mover=player,
+            movement_path=movement_path,
+        )
+
+        assert len(result.opportunities) == 1
+        assert result.opportunities[0].reactor_id == "enemy_1"
+        assert result.opportunities[0].weapon_id == "pistol"
+        assert result.opportunities[0].weapon_threat == 3
 
     def test_enemy_already_used_overwatch_cannot_react(self):
         """Enemy who already used overwatch this round cannot react."""

@@ -1,0 +1,63 @@
+{
+  "description": "Tracks an applied status with duration metadata.\n\nThis model enables automatic status expiration based on turn boundaries\nand trigger-based clearing per PR2 rules.\n\nDuration types:\n- indefinite: Status persists until explicitly cleared (e.g., prone, shutdown)\n- end_of_turn: Status expires at end of current turn\n- end_of_next_turn: Status expires at end of next turn (e.g., braced, stunned)",
+  "properties": {
+    "status": {
+      "enum": [
+        "braced",
+        "immobilized",
+        "impaired",
+        "jammed",
+        "lock_on",
+        "shredded",
+        "slowed",
+        "stunned",
+        "prone",
+        "hidden",
+        "invisible",
+        "shutdown",
+        "exposed",
+        "engaged",
+        "burn",
+        "unshackled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "applied_on_round": {
+      "description": "Round when status was applied",
+      "minimum": 1,
+      "title": "Applied On Round",
+      "type": "integer"
+    },
+    "applied_by": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ID of combatant who applied this status, if any",
+      "title": "Applied By"
+    },
+    "duration_type": {
+      "default": "indefinite",
+      "description": "How the status expires",
+      "enum": [
+        "indefinite",
+        "end_of_turn",
+        "end_of_next_turn"
+      ],
+      "title": "Duration Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "applied_on_round"
+  ],
+  "title": "StatusInstance",
+  "type": "object"
+}

@@ -533,7 +533,7 @@ async def test_overwatch_reaction(client: AsyncClient) -> None:
     """Test overwatch reaction."""
     combatants = [
         make_combatant(id="mech_1", name="Alpha"),
-        make_combatant(id="enemy_1", name="Enemy", side="hostiles", q=2, r=0),
+        make_combatant(id="enemy_1", name="Enemy", side="hostiles", q=1, r=0),
     ]
     create_resp = await client.post(
         "/api/combat",
@@ -547,6 +547,7 @@ async def test_overwatch_reaction(client: AsyncClient) -> None:
         json={
             "reactor_id": "mech_1",
             "reaction_type": "overwatch",
+            "weapon_id": "assault_rifle",
             "target_ids": ["enemy_1"],
         },
     )

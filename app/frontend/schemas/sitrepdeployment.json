@@ -1,0 +1,144 @@
+{
+  "$defs": {
+    "SitrepZone": {
+      "description": "Generic zone for SITREP configurations per PR2 12550-12565.\n\nAttributes:\n    zone_type: Type of zone (deployment, extraction, objective, ingress)\n    width: Width for rectangular zones (e.g., 4 for 4x4 control zones)\n    height: Height for rectangular zones\n    location: Descriptive location (e.g., \"north_edge\", \"quadrant_nw\")\n    terrain_notes: Notes about terrain or special properties",
+      "properties": {
+        "zone_type": {
+          "enum": [
+            "deployment",
+            "extraction",
+            "objective",
+            "ingress"
+          ],
+          "title": "Zone Type",
+          "type": "string"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Width"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Height"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        },
+        "terrain_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terrain Notes"
+        }
+      },
+      "required": [
+        "zone_type"
+      ],
+      "title": "SitrepZone",
+      "type": "object"
+    }
+  },
+  "description": "Deployment zone configuration for active mission resolution.\n\nAttributes:\n    player_zones: Where player characters deploy\n    enemy_zones: Where enemy forces deploy\n    ingress_zones: Where reinforcements can enter\n    reserve_pool: NPC IDs held in reserve for delayed deployment\n    reserves_spawned_per_round: How many reserves enter per round\n    last_ingress_zone: The most recently used ingress zone (for rotation rule)\n    reserve_pattern: How reserves are managed (none, half, normal, double, increasing)",
+  "properties": {
+    "player_zones": {
+      "items": {
+        "$ref": "#/$defs/SitrepZone"
+      },
+      "title": "Player Zones",
+      "type": "array"
+    },
+    "enemy_zones": {
+      "items": {
+        "$ref": "#/$defs/SitrepZone"
+      },
+      "title": "Enemy Zones",
+      "type": "array"
+    },
+    "ingress_zones": {
+      "items": {
+        "$ref": "#/$defs/SitrepZone"
+      },
+      "title": "Ingress Zones",
+      "type": "array"
+    },
+    "reserve_pool": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reserve Pool",
+      "type": "array"
+    },
+    "reserves_spawned_per_round": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reserves Spawned Per Round"
+    },
+    "last_ingress_zone": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Ingress Zone"
+    },
+    "reserve_pattern": {
+      "default": "normal",
+      "enum": [
+        "none",
+        "half",
+        "normal",
+        "double",
+        "increasing"
+      ],
+      "title": "Reserve Pattern",
+      "type": "string"
+    }
+  },
+  "title": "SitrepDeployment",
+  "type": "object"
+}

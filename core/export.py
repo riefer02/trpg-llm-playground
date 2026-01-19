@@ -51,6 +51,7 @@ from core.pilot import (
     PilotCombatRules,
 )
 from core.shared.dice import DiceExpression
+from core.shared.damage import DamageBreakdown
 from core.shared.effects import (
     MechanicalEffect,
     StatModifier,
@@ -562,6 +563,7 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     # Combat execution
     "ActionExecutionInput": ActionExecutionInput,
     "ActionExecutionResult": ActionExecutionResult,
+    "DamageBreakdown": DamageBreakdown,
     "TurnStartResult": TurnStartResult,
     "TurnEndResult": TurnEndResult,
     "ReactionInput": ReactionInput,

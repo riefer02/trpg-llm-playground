@@ -167,4 +167,54 @@ describe("combat-render adapter", () => {
     const output = adaptCombatScenario(makeInput(action, actor));
     expect(output.state.overlays ?? []).toHaveLength(0);
   });
+
+  it("maps terrain tiles into render state", () => {
+    const actor = combatant("alpha", "Alpha", 0, 0);
+    const scenario: MechCombatScenario = {
+      combatants: [actor],
+      terrain: {
+        tiles: [
+          {
+            coord: coord(1, 0),
+            elevation: 2,
+            difficult: true,
+            provides_soft_cover: true,
+          },
+          {
+            coord: coord(-1, 0),
+            dangerous: true,
+            provides_hard_cover: true,
+            blocks_line_of_sight: true,
+          },
+        ],
+      },
+    };
+
+    const output = adaptCombatScenario({
+      scenario,
+      action: null,
+      actorId: actor.id,
+    });
+
+    expect(output.state.terrain).toEqual([
+      {
+        coord: coord(1, 0),
+        elevation: 2,
+        difficult: true,
+        dangerous: false,
+        providesSoftCover: true,
+        providesHardCover: false,
+        blocksLineOfSight: false,
+      },
+      {
+        coord: coord(-1, 0),
+        elevation: 0,
+        difficult: false,
+        dangerous: true,
+        providesSoftCover: false,
+        providesHardCover: true,
+        blocksLineOfSight: true,
+      },
+    ]);
+  });
 });

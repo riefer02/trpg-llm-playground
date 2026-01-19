@@ -22,6 +22,7 @@ import {
   type SelectedAction,
 } from "../../components/combat/ActionLog";
 import { EconomyDisplay } from "../../components/combat/EconomyDisplay";
+import { TerrainLegend } from "../../components/combat/TerrainLegend";
 import { TurnControls, type TurnState } from "../../components/combat/TurnControls";
 import { ActionPanel, type TargetMode } from "../../components/combat/ActionPanel";
 import { OverchargeConfirm } from "../../components/combat/OverchargeConfirm";
@@ -450,6 +451,7 @@ function CombatSessionPage() {
                 <div>Selected: {formatCoord(selected)}</div>
                 <div>Targeted: {formatCoord(targeted)}</div>
               </div>
+              <TerrainLegend className="mt-3" />
             </div>
           </CardContent>
         </Card>

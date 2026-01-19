@@ -84,10 +84,8 @@ class DamageResolutionResult(FrozenModel):
     armor_reduction: int = Field(..., description="Amount reduced by armor")
     resistance_reduction: int = Field(..., description="Amount reduced by resistance")
     net_damage: int = Field(..., description="Final damage after all reductions")
-    damage_to_hp: int = Field(
-        ..., description="Damage applied to HP (burn adds to heat)"
-    )
-    damage_to_heat: int = Field(default=0, description="Heat added from burn damage")
+    damage_to_hp: int = Field(..., description="Damage applied to HP")
+    damage_to_heat: int = Field(default=0, description="Heat added from damage resolution")
     damage_type: DamageType = Field(..., description="Original damage type")
     is_shredded: bool = Field(
         ..., description="Target was shredded (no armor/resistance)"
@@ -97,6 +95,16 @@ class DamageResolutionResult(FrozenModel):
     burn_ignored_armor: bool = Field(
         ..., description="Burn ignored armor per PR2 rules"
     )
+
+
+class DamageBreakdown(FrozenModel):
+    """Net damage totals by type (heat tracked separately from damage)."""
+
+    kinetic: int = Field(default=0, ge=0)
+    explosive: int = Field(default=0, ge=0)
+    energy: int = Field(default=0, ge=0)
+    burn: int = Field(default=0, ge=0)
+    heat: int = Field(default=0, ge=0)
 
 
 def resolve_damage_on_target(
@@ -170,10 +178,6 @@ def resolve_damage_on_target(
 
     damage_to_hp = damage_after_resistance
     damage_to_heat = 0
-
-    if damage_type == "burn":
-        damage_to_hp = 0
-        damage_to_heat = damage_after_resistance
 
     return DamageResolutionResult(
         raw_damage=raw_damage,
@@ -301,8 +305,6 @@ def compute_resistance_reduction(
 
     Per PR2: Resistance reduces damage by half, rounded up.
     Resistance does not stack (only one reduction applies).
-    Burn damage cannot be resisted.
-
     Args:
         damage: Damage amount after armor
         damage_type: Type of damage
@@ -319,9 +321,6 @@ def compute_resistance_reduction(
         resistances = []
 
     if damage_type not in resistances:
-        return 0
-
-    if damage_type == "burn":
         return 0
 
     return round_up(damage / 2)

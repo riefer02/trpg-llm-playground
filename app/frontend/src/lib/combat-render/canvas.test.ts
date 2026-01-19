@@ -6,6 +6,7 @@ import {
   attachClickHandlers,
   buildHexGrid,
   getHoveredHex,
+  getRenderPassOrder,
   gridContains,
 } from "./canvas";
 
@@ -106,5 +107,25 @@ describe("combat-render canvas helpers", () => {
     expect(targeted).toEqual({ q: 0, r: 0 });
 
     detach();
+  });
+
+  it("builds render passes in terrain-first order", () => {
+    const state = {
+      grid: buildHexGrid(0),
+      tokens: [{ id: "alpha", coord: { q: 0, r: 0 } }],
+      terrain: [{ coord: { q: 0, r: 0 }, difficult: true }],
+      overlays: [{ coords: [{ q: 0, r: 0 }] }],
+      markers: [{ id: "marker:1", coord: { q: 0, r: 0 }, kind: "mine" }],
+      hover: { q: 0, r: 0 },
+    };
+
+    expect(getRenderPassOrder(state)).toEqual([
+      "grid",
+      "terrain",
+      "overlays",
+      "markers",
+      "tokens",
+      "hover",
+    ]);
   });
 });

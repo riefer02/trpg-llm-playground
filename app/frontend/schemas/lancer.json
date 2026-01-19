@@ -45640,6 +45640,69 @@
       "title": "StatusDefinition",
       "type": "object"
     },
+    "StatusInstance": {
+      "description": "Tracks an applied status with duration metadata.\n\nThis model enables automatic status expiration based on turn boundaries\nand trigger-based clearing per PR2 rules.\n\nDuration types:\n- indefinite: Status persists until explicitly cleared (e.g., prone, shutdown)\n- end_of_turn: Status expires at end of current turn\n- end_of_next_turn: Status expires at end of next turn (e.g., braced, stunned)",
+      "properties": {
+        "status": {
+          "enum": [
+            "braced",
+            "immobilized",
+            "impaired",
+            "jammed",
+            "lock_on",
+            "shredded",
+            "slowed",
+            "stunned",
+            "prone",
+            "hidden",
+            "invisible",
+            "shutdown",
+            "exposed",
+            "engaged",
+            "burn",
+            "unshackled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "applied_on_round": {
+          "description": "Round when status was applied",
+          "minimum": 1,
+          "title": "Applied On Round",
+          "type": "integer"
+        },
+        "applied_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of combatant who applied this status, if any",
+          "title": "Applied By"
+        },
+        "duration_type": {
+          "default": "indefinite",
+          "description": "How the status expires",
+          "enum": [
+            "indefinite",
+            "end_of_turn",
+            "end_of_next_turn"
+          ],
+          "title": "Duration Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "applied_on_round"
+      ],
+      "title": "StatusInstance",
+      "type": "object"
+    },
     "TurnOrderRules": {
       "description": "Turn order and round cadence rules.",
       "properties": {
@@ -49436,6 +49499,14 @@
           "title": "Conditions",
           "type": "array"
         },
+        "status_instances": {
+          "description": "Tracked status instances with duration metadata for automatic expiration",
+          "items": {
+            "$ref": "#/$defs/StatusInstance"
+          },
+          "title": "Status Instances",
+          "type": "array"
+        },
         "inventory": {
           "anyOf": [
             {
@@ -49608,6 +49679,46 @@
           "description": "Effects expiring at turn boundaries",
           "title": "Turn End Effects",
           "type": "object"
+        },
+        "talent_effects": {
+          "description": "Aggregated mechanical effects from pilot talents",
+          "items": {
+            "$ref": "#/$defs/MechanicalEffect"
+          },
+          "title": "Talent Effects",
+          "type": "array"
+        },
+        "frame_trait_effects": {
+          "description": "Passive mechanical effects from frame traits",
+          "items": {
+            "$ref": "#/$defs/MechanicalEffect"
+          },
+          "title": "Frame Trait Effects",
+          "type": "array"
+        },
+        "core_power_available": {
+          "default": true,
+          "description": "Whether core power can be activated (once per mission)",
+          "title": "Core Power Available",
+          "type": "boolean"
+        },
+        "core_power_active": {
+          "default": false,
+          "description": "Whether core power is currently active",
+          "title": "Core Power Active",
+          "type": "boolean"
+        },
+        "core_power_effects": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MechanicalEffect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Active effects from core power when activated"
         },
         "piloting_mech_id": {
           "anyOf": [
@@ -50405,6 +50516,362 @@
       "title": "DeployableState",
       "type": "object"
     },
+    "SitrepDeployment": {
+      "description": "Deployment zone configuration for active mission resolution.\n\nAttributes:\n    player_zones: Where player characters deploy\n    enemy_zones: Where enemy forces deploy\n    ingress_zones: Where reinforcements can enter\n    reserve_pool: NPC IDs held in reserve for delayed deployment\n    reserves_spawned_per_round: How many reserves enter per round\n    last_ingress_zone: The most recently used ingress zone (for rotation rule)\n    reserve_pattern: How reserves are managed (none, half, normal, double, increasing)",
+      "properties": {
+        "player_zones": {
+          "items": {
+            "$ref": "#/$defs/SitrepZone"
+          },
+          "title": "Player Zones",
+          "type": "array"
+        },
+        "enemy_zones": {
+          "items": {
+            "$ref": "#/$defs/SitrepZone"
+          },
+          "title": "Enemy Zones",
+          "type": "array"
+        },
+        "ingress_zones": {
+          "items": {
+            "$ref": "#/$defs/SitrepZone"
+          },
+          "title": "Ingress Zones",
+          "type": "array"
+        },
+        "reserve_pool": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reserve Pool",
+          "type": "array"
+        },
+        "reserves_spawned_per_round": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reserves Spawned Per Round"
+        },
+        "last_ingress_zone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Ingress Zone"
+        },
+        "reserve_pattern": {
+          "default": "normal",
+          "enum": [
+            "none",
+            "half",
+            "normal",
+            "double",
+            "increasing"
+          ],
+          "title": "Reserve Pattern",
+          "type": "string"
+        }
+      },
+      "title": "SitrepDeployment",
+      "type": "object"
+    },
+    "SitrepResolution": {
+      "description": "Active SITREP resolution state for tracking mission progress.\n\nAttributes:\n    template_type: The SITREP type (escort, control, extract, etc.)\n    current_round: Current round number (1-indexed)\n    max_rounds: The round limit from the template\n    player_score: Cumulative player score\n    enemy_score: Cumulative enemy score\n    zone_states: Map of zone_id to control state tracker\n    victory_conditions: List of active victory conditions being tracked\n    extraction_progress: Progress toward extraction (0.0 to 1.0)\n    surviving_players: Number of active player characters\n    surviving_enemies: Number of active enemy NPCs\n    outcome: Current outcome assessment (None = ongoing)\n    turn_limit_reached: Whether the time limit has been reached\n    reserves_remaining: Count of reserves left in the pool",
+      "properties": {
+        "template_type": {
+          "enum": [
+            "escort",
+            "control",
+            "extract",
+            "hold_out",
+            "gauntlet",
+            "recon"
+          ],
+          "title": "Template Type",
+          "type": "string"
+        },
+        "current_round": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Current Round",
+          "type": "integer"
+        },
+        "max_rounds": {
+          "default": 6,
+          "minimum": 1,
+          "title": "Max Rounds",
+          "type": "integer"
+        },
+        "player_score": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Player Score",
+          "type": "integer"
+        },
+        "enemy_score": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Enemy Score",
+          "type": "integer"
+        },
+        "zone_states": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ZoneControlStateTracker"
+          },
+          "title": "Zone States",
+          "type": "object"
+        },
+        "victory_conditions": {
+          "items": {
+            "$ref": "#/$defs/SitrepVictoryCondition"
+          },
+          "title": "Victory Conditions",
+          "type": "array"
+        },
+        "extraction_progress": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Extraction Progress",
+          "type": "number"
+        },
+        "surviving_players": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Surviving Players",
+          "type": "integer"
+        },
+        "surviving_enemies": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Surviving Enemies",
+          "type": "integer"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "enum": [
+                "players_win",
+                "enemies_win",
+                "draw",
+                "ongoing"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
+        },
+        "turn_limit_reached": {
+          "default": false,
+          "title": "Turn Limit Reached",
+          "type": "boolean"
+        },
+        "reserves_remaining": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Reserves Remaining",
+          "type": "integer"
+        },
+        "deployment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SitrepDeployment"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "template_type"
+      ],
+      "title": "SitrepResolution",
+      "type": "object"
+    },
+    "SitrepVictoryCondition": {
+      "description": "Active tracking of a victory condition during mission resolution.\n\nAttributes:\n    condition_type: Type of victory condition being tracked\n    target_value: The target value needed to achieve victory (e.g., 3 zones)\n    current_value: The current progress toward the target\n    is_met: Whether this condition has been satisfied\n    description: Human-readable description of the condition",
+      "properties": {
+        "condition_type": {
+          "enum": [
+            "extract_objective",
+            "control_zones",
+            "score_above_threshold",
+            "outnumber_enemies",
+            "control_real_objective",
+            "survive_rounds"
+          ],
+          "title": "Condition Type",
+          "type": "string"
+        },
+        "target_value": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Value"
+        },
+        "current_value": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Current Value",
+          "type": "integer"
+        },
+        "is_met": {
+          "default": false,
+          "title": "Is Met",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Human-readable description",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "condition_type",
+        "description"
+      ],
+      "title": "SitrepVictoryCondition",
+      "type": "object"
+    },
+    "SitrepZone": {
+      "description": "Generic zone for SITREP configurations per PR2 12550-12565.\n\nAttributes:\n    zone_type: Type of zone (deployment, extraction, objective, ingress)\n    width: Width for rectangular zones (e.g., 4 for 4x4 control zones)\n    height: Height for rectangular zones\n    location: Descriptive location (e.g., \"north_edge\", \"quadrant_nw\")\n    terrain_notes: Notes about terrain or special properties",
+      "properties": {
+        "zone_type": {
+          "enum": [
+            "deployment",
+            "extraction",
+            "objective",
+            "ingress"
+          ],
+          "title": "Zone Type",
+          "type": "string"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Width"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Height"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        },
+        "terrain_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terrain Notes"
+        }
+      },
+      "required": [
+        "zone_type"
+      ],
+      "title": "SitrepZone",
+      "type": "object"
+    },
+    "ZoneControlStateTracker": {
+      "description": "Tracks the control state of a zone during active resolution.\n\nAttributes:\n    zone_id: Identifier matching a zone in SitrepTemplate.objective_zones\n    state: Current control state (player, enemy, contested, or neutral)\n    controlling_side: Which side controls the zone (\"players\" or \"enemies\")\n    last_checked_turn: The turn number when this state was last evaluated",
+      "properties": {
+        "zone_id": {
+          "title": "Zone Id",
+          "type": "string"
+        },
+        "state": {
+          "default": "neutral",
+          "enum": [
+            "player_controlled",
+            "enemy_controlled",
+            "contested",
+            "neutral"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "controlling_side": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Controlling Side"
+        },
+        "last_checked_turn": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Last Checked Turn",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "zone_id"
+      ],
+      "title": "ZoneControlStateTracker",
+      "type": "object"
+    },
     "MechCombatScenario": {
       "description": "Full combat scenario for evaluation.",
       "properties": {
@@ -50457,6 +50924,18 @@
           "description": "Trackable deployables {deployable_id: state}",
           "title": "Deployables",
           "type": "object"
+        },
+        "sitrep_resolution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SitrepResolution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Active SITREP mission state tracking (zones, scores, victory conditions)"
         }
       },
       "title": "MechCombatScenario",
@@ -50847,6 +51326,19 @@
           "description": "Weapon being used",
           "title": "Weapon Id"
         },
+        "weapon_profile_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Weapon profile to use for weapons with multiple profiles (e.g., kinetic/energy/explosive)",
+          "title": "Weapon Profile Id"
+        },
         "system_id": {
           "anyOf": [
             {
@@ -50909,7 +51401,8 @@
             {
               "enum": [
                 "cool_heat",
-                "spend_repair_full_hp"
+                "spend_repair_full_hp",
+                "cancel_meltdown"
               ],
               "type": "string"
             },
@@ -50962,6 +51455,57 @@
           ],
           "default": null,
           "description": "Direction for eject (pilot flies 6 spaces in this direction)"
+        },
+        "deploy_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "drone",
+                "mine",
+                "deployable"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Kind of deployable to create",
+          "title": "Deploy Kind"
+        },
+        "deploy_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name for the deployed entity",
+          "title": "Deploy Name"
+        },
+        "mine_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "explosive",
+                "shroud",
+                "breaching",
+                "cluster",
+                "emp"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type of mine being deployed",
+          "title": "Mine Type"
         }
       },
       "required": [
@@ -50970,6 +51514,43 @@
         "action_type"
       ],
       "title": "ActionExecutionInput",
+      "type": "object"
+    },
+    "DamageBreakdown": {
+      "description": "Net damage totals by type (heat tracked separately from damage).",
+      "properties": {
+        "kinetic": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Kinetic",
+          "type": "integer"
+        },
+        "explosive": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Explosive",
+          "type": "integer"
+        },
+        "energy": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Energy",
+          "type": "integer"
+        },
+        "burn": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Burn",
+          "type": "integer"
+        },
+        "heat": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Heat",
+          "type": "integer"
+        }
+      },
+      "title": "DamageBreakdown",
       "type": "object"
     },
     "OverwatchOpportunityInfo": {
@@ -51066,6 +51647,10 @@
           "description": "Total damage dealt",
           "title": "Damage Dealt",
           "type": "integer"
+        },
+        "damage_breakdown": {
+          "$ref": "#/$defs/DamageBreakdown",
+          "description": "Net damage by type"
         },
         "heat_generated": {
           "default": 0,
@@ -51219,6 +51804,67 @@
             "type": "string"
           },
           "title": "Cooldowns Decremented",
+          "type": "array"
+        },
+        "meltdown_countdown_active": {
+          "default": false,
+          "description": "Whether combatant had active meltdown countdown",
+          "title": "Meltdown Countdown Active",
+          "type": "boolean"
+        },
+        "meltdown_countdown_remaining": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Turns remaining after decrement (None if no countdown)",
+          "title": "Meltdown Countdown Remaining"
+        },
+        "meltdown_triggered": {
+          "default": false,
+          "description": "Whether meltdown explosion triggered this turn",
+          "title": "Meltdown Triggered",
+          "type": "boolean"
+        },
+        "meltdown_explosion_damage": {
+          "default": 0,
+          "description": "Total damage from meltdown explosion (4d6)",
+          "title": "Meltdown Explosion Damage",
+          "type": "integer"
+        },
+        "meltdown_affected_targets": {
+          "description": "IDs of combatants damaged by meltdown explosion",
+          "items": {
+            "type": "string"
+          },
+          "title": "Meltdown Affected Targets",
+          "type": "array"
+        },
+        "mines_armed": {
+          "description": "IDs of mines that armed at start of this turn",
+          "items": {
+            "type": "string"
+          },
+          "title": "Mines Armed",
+          "type": "array"
+        },
+        "drone_heat_to_owner": {
+          "default": 0,
+          "description": "Heat from active latch drones applied to owner",
+          "title": "Drone Heat To Owner",
+          "type": "integer"
+        },
+        "drones_ready_to_act": {
+          "description": "IDs of drones that can act this turn",
+          "items": {
+            "type": "string"
+          },
+          "title": "Drones Ready To Act",
           "type": "array"
         }
       },
@@ -51374,6 +52020,14 @@
           ],
           "default": null,
           "description": "Burn tick resolution if actor had burn"
+        },
+        "drones_primed": {
+          "description": "IDs of drones that primed at end of this turn",
+          "items": {
+            "type": "string"
+          },
+          "title": "Drones Primed",
+          "type": "array"
         }
       },
       "required": [
@@ -51432,6 +52086,19 @@
           "default": null,
           "description": "Weapon for overwatch attack",
           "title": "Weapon Id"
+        },
+        "weapon_profile_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Weapon profile to use for weapons with multiple profiles",
+          "title": "Weapon Profile Id"
         }
       },
       "required": [
@@ -51489,6 +52156,66 @@
           "description": "Damage dealt by overwatch",
           "title": "Damage Dealt",
           "type": "integer"
+        },
+        "damage_breakdown": {
+          "$ref": "#/$defs/DamageBreakdown",
+          "description": "Net damage by type"
+        },
+        "attack_hit": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether overwatch attack hit",
+          "title": "Attack Hit"
+        },
+        "attack_critical": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether attack was critical",
+          "title": "Attack Critical"
+        },
+        "attack_roll": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The d20 roll for overwatch attack",
+          "title": "Attack Roll"
+        },
+        "resource_changes": {
+          "description": "Resource changes from overwatch attack",
+          "items": {
+            "$ref": "#/$defs/ResourceChange"
+          },
+          "title": "Resource Changes",
+          "type": "array"
+        },
+        "structure_checks": {
+          "description": "Structure check results from overwatch damage",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Structure Checks",
+          "type": "array"
         }
       },
       "required": [
@@ -53016,76 +53743,6 @@
       "title": "SitrepTemplate",
       "type": "object"
     },
-    "SitrepZone": {
-      "description": "Generic zone for SITREP configurations per PR2 12550-12565.\n\nAttributes:\n    zone_type: Type of zone (deployment, extraction, objective, ingress)\n    width: Width for rectangular zones (e.g., 4 for 4x4 control zones)\n    height: Height for rectangular zones\n    location: Descriptive location (e.g., \"north_edge\", \"quadrant_nw\")\n    terrain_notes: Notes about terrain or special properties",
-      "properties": {
-        "zone_type": {
-          "enum": [
-            "deployment",
-            "extraction",
-            "objective",
-            "ingress"
-          ],
-          "title": "Zone Type",
-          "type": "string"
-        },
-        "width": {
-          "anyOf": [
-            {
-              "minimum": 1,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Width"
-        },
-        "height": {
-          "anyOf": [
-            {
-              "minimum": 1,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Height"
-        },
-        "location": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Location"
-        },
-        "terrain_notes": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Terrain Notes"
-        }
-      },
-      "required": [
-        "zone_type"
-      ],
-      "title": "SitrepZone",
-      "type": "object"
-    },
     "VictoryCondition": {
       "description": "Structured victory condition for validation per PR2 rules.\n\nAttributes:\n    condition_type: Type of victory condition\n    threshold: Optional numeric threshold (e.g., zones to control)\n    description: Human-readable description of the condition",
       "properties": {
@@ -53239,6 +53896,73 @@
         "zone_subtype"
       ],
       "title": "SoftCoverZoneState",
+      "type": "object"
+    },
+    "PlayerPartyPower": {
+      "description": "Player party power estimation for encounter scaling.\n\nPower is calculated as: player_count \u00d7 (1 + avg_license_level \u00d7 0.1)\nThis gives roughly 2x power for a level 12 party vs level 0.\n\nAttributes:\n    player_count: Number of players in the party (1-6)\n    avg_license_level: Average license level across all players (0-12)",
+      "properties": {
+        "player_count": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Player Count",
+          "type": "integer"
+        },
+        "avg_license_level": {
+          "maximum": 12,
+          "minimum": 0,
+          "title": "Avg License Level",
+          "type": "number"
+        }
+      },
+      "required": [
+        "player_count",
+        "avg_license_level"
+      ],
+      "title": "PlayerPartyPower",
+      "type": "object"
+    },
+    "EnemyForceRecommendation": {
+      "description": "Recommended enemy force for an encounter.\n\nProvides victory point targets split between initial deployment\nand reserves based on the SITREP type.\n\nAttributes:\n    target_victory_points: Total victory points for the encounter\n    initial_victory_points: Victory points for initially deployed enemies\n    reserve_victory_points: Victory points for reserve enemies\n    suggested_tier: Recommended NPC tier for the encounter\n    recommended_template_ids: Optional list of recommended template IDs",
+      "properties": {
+        "target_victory_points": {
+          "minimum": 0.0,
+          "title": "Target Victory Points",
+          "type": "number"
+        },
+        "initial_victory_points": {
+          "minimum": 0.0,
+          "title": "Initial Victory Points",
+          "type": "number"
+        },
+        "reserve_victory_points": {
+          "minimum": 0.0,
+          "title": "Reserve Victory Points",
+          "type": "number"
+        },
+        "suggested_tier": {
+          "default": "tier_1",
+          "enum": [
+            "tier_1",
+            "tier_2",
+            "tier_3"
+          ],
+          "title": "Suggested Tier",
+          "type": "string"
+        },
+        "recommended_template_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recommended Template Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target_victory_points",
+        "initial_victory_points",
+        "reserve_victory_points"
+      ],
+      "title": "EnemyForceRecommendation",
       "type": "object"
     }
   },
@@ -53775,6 +54499,9 @@
       "$ref": "#/$defs/StatusDefinition"
     },
     {
+      "$ref": "#/$defs/StatusInstance"
+    },
+    {
       "$ref": "#/$defs/TurnOrderRules"
     },
     {
@@ -53922,6 +54649,9 @@
       "$ref": "#/$defs/ActionExecutionResult"
     },
     {
+      "$ref": "#/$defs/DamageBreakdown"
+    },
+    {
       "$ref": "#/$defs/TurnStartResult"
     },
     {
@@ -53989,6 +54719,33 @@
     },
     {
       "$ref": "#/$defs/SoftCoverZoneState"
+    },
+    {
+      "$ref": "#/$defs/SitrepTemplate"
+    },
+    {
+      "$ref": "#/$defs/SitrepZone"
+    },
+    {
+      "$ref": "#/$defs/VictoryCondition"
+    },
+    {
+      "$ref": "#/$defs/SitrepResolution"
+    },
+    {
+      "$ref": "#/$defs/SitrepDeployment"
+    },
+    {
+      "$ref": "#/$defs/SitrepVictoryCondition"
+    },
+    {
+      "$ref": "#/$defs/ZoneControlStateTracker"
+    },
+    {
+      "$ref": "#/$defs/PlayerPartyPower"
+    },
+    {
+      "$ref": "#/$defs/EnemyForceRecommendation"
     }
   ]
 }
