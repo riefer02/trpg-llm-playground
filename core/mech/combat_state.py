@@ -9,6 +9,7 @@ from core.shared.models import FrozenModel
 
 from core.shared.enums import StatusType, SizeClass, ActionType, AttackType
 from core.shared.effects import (
+    MechanicalEffect,
     ModeEffect,
     ReactionTriggerEffect,
     ReactionTriggerEvent,
@@ -17,6 +18,7 @@ from core.shared.effects import (
     CooldownState,
     ProgressionResetTrigger,
 )
+from core.shared.sitrep_resolution import SitrepResolution
 from core.shared.rolls import ContestedCheck
 from core.shared.dice import DiceExpression
 from core.mech.grid import HexPosition, HexCoord
@@ -234,6 +236,25 @@ class CombatantState(FrozenModel):
     turn_end_effects: dict[str, "TurnEndEffectState"] = Field(
         default_factory=dict, description="Effects expiring at turn boundaries"
     )
+    # Pilot talent effects (Phase 32)
+    talent_effects: list[MechanicalEffect] = Field(
+        default_factory=list,
+        description="Aggregated mechanical effects from pilot talents",
+    )
+    # Frame trait and core power effects (Phase 33)
+    frame_trait_effects: list[MechanicalEffect] = Field(
+        default_factory=list,
+        description="Passive mechanical effects from frame traits",
+    )
+    core_power_available: bool = Field(
+        default=True, description="Whether core power can be activated (once per mission)"
+    )
+    core_power_active: bool = Field(
+        default=False, description="Whether core power is currently active"
+    )
+    core_power_effects: MechanicalEffect | None = Field(
+        default=None, description="Active effects from core power when activated"
+    )
     # Mount/Dismount/Eject state
     piloting_mech_id: str | None = Field(
         default=None, description="ID of mech this pilot is piloting (pilot only)"
@@ -383,6 +404,11 @@ class MechCombatScenario(FrozenModel):
     environment: CombatEnvironment = "standard"
     deployables: dict[str, DeployableState] = Field(
         default_factory=dict, description="Trackable deployables {deployable_id: state}"
+    )
+    # Phase 34: SITREP mission state tracking
+    sitrep_resolution: SitrepResolution | None = Field(
+        default=None,
+        description="Active SITREP mission state tracking (zones, scores, victory conditions)",
     )
 
 

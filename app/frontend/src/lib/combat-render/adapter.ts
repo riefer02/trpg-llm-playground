@@ -4,6 +4,7 @@ import type {
   CombatRound,
   CombatTurn,
   CombatantState,
+  DeployableState,
   HexCoord,
   HexPosition,
   MechCombatScenario,
@@ -117,7 +118,7 @@ export function adaptCombatScenario(
     combatants,
     input.tokenColors,
   );
-  const markers = buildMarkers(combatants);
+  const markers = buildMarkers(combatants, input.scenario.deployables);
 
   const overlayBuild = buildOverlays({
     action: input.action ?? resolveActionFromTurn(input.turn),
@@ -251,8 +252,14 @@ function buildOverlays(input: OverlayBuildInput): OverlayBuildResult {
   return { overlays, overlayMetadata };
 }
 
-function buildMarkers(combatants: CombatantState[]): RenderMarker[] {
-  const byCoord = new Map<
+function buildMarkers(
+  combatants: CombatantState[],
+  deployables: Record<string, DeployableState> | undefined,
+): RenderMarker[] {
+  const markers: RenderMarker[] = [];
+
+  // Thrown weapons from combatant inventories
+  const thrownByCoord = new Map<
     string,
     { coord: HexCoord; count: number }
   >();
@@ -265,19 +272,40 @@ function buildMarkers(combatants: CombatantState[]): RenderMarker[] {
         }
         const coord = weapon.thrown_coord;
         const key = `${coord.q},${coord.r}`;
-        const entry = byCoord.get(key) ?? { coord, count: 0 };
+        const entry = thrownByCoord.get(key) ?? { coord, count: 0 };
         entry.count += 1;
-        byCoord.set(key, entry);
+        thrownByCoord.set(key, entry);
       }
     }
   }
 
-  return Array.from(byCoord.entries()).map(([key, entry]) => ({
-    id: `weapon_thrown:${key}`,
-    coord: entry.coord,
-    kind: "weapon_thrown",
-    count: entry.count,
-  }));
+  for (const [key, entry] of thrownByCoord.entries()) {
+    markers.push({
+      id: `weapon_thrown:${key}`,
+      coord: entry.coord,
+      kind: "weapon_thrown",
+      count: entry.count,
+    });
+  }
+
+  // Deployables (mines, drones, etc.)
+  if (deployables) {
+    for (const [id, deployable] of Object.entries(deployables)) {
+      // Skip destroyed deployables
+      if (deployable.is_destroyed) {
+        continue;
+      }
+
+      markers.push({
+        id: `deployable:${id}`,
+        coord: deployable.position.coord,
+        kind: deployable.kind,
+        armed: deployable.is_armed,
+      });
+    }
+  }
+
+  return markers;
 }
 
 function buildOverlayFromAction({

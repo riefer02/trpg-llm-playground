@@ -205,9 +205,22 @@ export interface CampaignLobbyUpdateRequest {
     status?: "draft" | "ready" | "launched" | "cooldown" | null;
 }
 
+// SITREP types for Phase 34 mission pipeline
+export type SitrepType = "escort" | "control" | "extract" | "hold_out" | "gauntlet" | "recon";
+export type TileSetType = "urban" | "industrial" | "wilderness" | "zero_g";
+export type EncounterDifficulty = "trivial" | "easy" | "standard" | "hard" | "extreme";
+
 export interface CampaignMissionLaunchRequest {
     environment?: "standard" | "zero_g" | "underwater";
     notes?: string | null;
+    // Phase 34: SITREP and terrain generation fields
+    sitrep_type?: SitrepType;
+    tile_set?: TileSetType;
+    difficulty?: EncounterDifficulty;
+    map_width?: number;
+    map_height?: number;
+    terrain_seed?: number;
+    enemy_template_ids?: string[];
 }
 
 export interface SessionLifecycleUpdateRequest {

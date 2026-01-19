@@ -7,8 +7,15 @@ Note: This module contains only mechanical definitions (allowed under
 the Lancer Third Party License). No copyrighted flavor text.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from pydantic import Field
 from core.shared.models import FrozenModel
+
+if TYPE_CHECKING:
+    from core.pilot.pilot import Pilot
 from core.shared.dice import DiceExpression
 from core.shared.payloads import DamageSpec
 from core.shared.id_helpers import TalentIdField
@@ -3192,3 +3199,26 @@ def get_talent_definition(talent_id: str) -> TalentDefinition | None:
         if talent.id == talent_id:
             return talent
     return None
+
+
+def collect_pilot_talent_effects(pilot: "Pilot") -> list[MechanicalEffect]:
+    """Aggregate MechanicalEffects from all pilot talents.
+
+    Collects effects from all unlocked ranks of each talent the pilot has.
+    For example, a pilot with Tactician rank 2 gets effects from ranks 1 AND 2.
+
+    Args:
+        pilot: The pilot whose talents to collect effects from.
+
+    Returns:
+        A list of MechanicalEffect objects from all unlocked talent ranks.
+    """
+    effects: list[MechanicalEffect] = []
+    for talent in pilot.talents:
+        definition = get_talent_definition(talent.talent_id)
+        if definition is None:
+            continue
+        # Collect effects from all unlocked ranks (1 through current rank)
+        for rank in definition.ranks[: talent.rank]:
+            effects.append(rank.effects)
+    return effects

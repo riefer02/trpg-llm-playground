@@ -54,6 +54,7 @@ from core.mech.combat_helpers import (
     _get_basic_available_actions,
     _get_attacker_status_modifiers,
     _get_target_status_modifiers,
+    _get_talent_accuracy_modifiers,
     _check_invisibility_miss,
     _get_cover_modifier,
     _validate_attack_range_and_los,
@@ -1033,6 +1034,15 @@ def execute_action(
         # Get attacker status modifiers
         attacker_acc_mod, attacker_diff_mod = _get_attacker_status_modifiers(actor)
 
+        # Get talent/frame effect modifiers (Phase 32)
+        talent_acc_mod, talent_diff_mod = _get_talent_accuracy_modifiers(
+            actor,
+            is_melee=not is_ranged_attack,
+            is_ranged=is_ranged_attack,
+            is_tech=smart_attack,
+            context={"is_outgoing": True},
+        )
+
         # Track lock-on targets for consumption after resolution
         targets_with_lock_on: list[str] = []
 
@@ -1072,10 +1082,10 @@ def execute_action(
                 if cover_info is not None:
                     effects_applied.append(cover_info)
 
-            # Combine all accuracy/difficulty modifiers
-            final_accuracy_bonus = accuracy_bonus + attacker_acc_mod + target_acc_mod
+            # Combine all accuracy/difficulty modifiers (including talents, Phase 32)
+            final_accuracy_bonus = accuracy_bonus + attacker_acc_mod + target_acc_mod + talent_acc_mod
             final_difficulty_bonus = (
-                difficulty_bonus + attacker_diff_mod + target_diff_mod + cover_difficulty
+                difficulty_bonus + attacker_diff_mod + target_diff_mod + cover_difficulty + talent_diff_mod
             )
 
             attack_result = resolve_attack(
@@ -1114,6 +1124,8 @@ def execute_action(
                     "target_acc": target_acc_mod,
                     "target_diff": target_diff_mod,
                     "cover_diff": cover_difficulty,
+                    "talent_acc": talent_acc_mod,
+                    "talent_diff": talent_diff_mod,
                 },
             })
 
@@ -1498,6 +1510,34 @@ def execute_action(
         )
         effects_applied.extend(stab_effects)
         resource_changes.extend(stab_changes)
+
+    # Handle Activate Core Power action (Phase 33)
+    if action_input.action_id == "activate_core_power":
+        if not actor.core_power_available:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Core power already used this mission",
+            )
+        if actor.core_power_active:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Core power already active",
+            )
+        # Activate core power
+        actor_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
+        if actor_idx >= 0:
+            updated_combatants = list(scenario.combatants)
+            updated_combatants[actor_idx] = actor.model_copy(update={
+                "core_power_available": False,
+                "core_power_active": True,
+            })
+            scenario = scenario.model_copy(update={"combatants": updated_combatants})
+            actor = updated_combatants[actor_idx]
+        effects_applied.append({
+            "type": "activate_core_power",
+            "actor_id": actor.id,
+            "core_power_effects": actor.core_power_effects.model_dump() if actor.core_power_effects else None,
+        })
 
     # Handle Disengage action (PR2 4288-4291)
     if action_input.action_id == "disengage":
@@ -2301,6 +2341,15 @@ def get_available_actions(
 
     # Protocols (at start of turn only - simplified)
     protocols: list[AvailableAction] = []
+
+    # Add activate_core_power if available (Phase 33)
+    if actor.core_power_available and actor.core_power_effects is not None:
+        protocols.append(AvailableAction(
+            action_id="activate_core_power",
+            action_name="Activate Core Power",
+            action_type="protocol",
+            is_available=True,
+        ))
 
     return AvailableActionsResult(
         actor_id=actor_id,

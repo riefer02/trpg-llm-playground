@@ -306,6 +306,21 @@ from core.shared.terrain_generation import (
 from core.shared.hide_search import (
     SoftCoverZoneState,
 )
+from core.shared.scenario import (
+    SitrepTemplate,
+    SitrepZone,
+    VictoryCondition,
+)
+from core.shared.sitrep_resolution import (
+    SitrepResolution,
+    SitrepDeployment,
+    SitrepVictoryCondition,
+    ZoneControlStateTracker,
+)
+from core.gm_toolkit.encounter_builder import (
+    PlayerPartyPower,
+    EnemyForceRecommendation,
+)
 
 
 # All exportable models
@@ -574,6 +589,16 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "TileSetConfig": TileSetConfig,
     "TerrainGeneratorParams": TerrainGeneratorParams,
     "SoftCoverZoneState": SoftCoverZoneState,
+    # SITREP and Mission Pipeline
+    "SitrepTemplate": SitrepTemplate,
+    "SitrepZone": SitrepZone,
+    "VictoryCondition": VictoryCondition,
+    "SitrepResolution": SitrepResolution,
+    "SitrepDeployment": SitrepDeployment,
+    "SitrepVictoryCondition": SitrepVictoryCondition,
+    "ZoneControlStateTracker": ZoneControlStateTracker,
+    "PlayerPartyPower": PlayerPartyPower,
+    "EnemyForceRecommendation": EnemyForceRecommendation,
 }
 
 

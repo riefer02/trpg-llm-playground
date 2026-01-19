@@ -17,7 +17,10 @@ export type IconName =
   | "shield"
   | "swords"
   | "power"
-  | "circleDot";
+  | "circleDot"
+  | "bomb"
+  | "bot"
+  | "package";
 
 export type EffectIconConfig = {
   key: string;
@@ -171,4 +174,74 @@ export function resolveActionLogEffectIcon(
     return DEFAULT_STATUS_ICON;
   }
   return EFFECT_ICON_BY_TYPE[effect.type];
+}
+
+export type DeployableIconKey =
+  | "mine"
+  | "mine_armed"
+  | "drone"
+  | "deployable"
+  | "other";
+
+export const DEPLOYABLE_ICON_CONFIG: Record<DeployableIconKey, EffectIconConfig> =
+  {
+    mine: {
+      key: "mine",
+      label: "Mine",
+      glyph: "M",
+      color: "#ef4444",
+      icon: "bomb",
+    },
+    mine_armed: {
+      key: "mine_armed",
+      label: "Armed Mine",
+      glyph: "!",
+      color: "#dc2626",
+      icon: "alertTriangle",
+    },
+    drone: {
+      key: "drone",
+      label: "Drone",
+      glyph: "D",
+      color: "#3b82f6",
+      icon: "bot",
+    },
+    deployable: {
+      key: "deployable",
+      label: "Deployable",
+      glyph: "X",
+      color: "#8b5cf6",
+      icon: "package",
+    },
+    other: {
+      key: "other",
+      label: "Object",
+      glyph: "O",
+      color: "#64748b",
+      icon: "circleDot",
+    },
+  };
+
+const FALLBACK_ICON: EffectIconConfig = {
+  key: "unknown",
+  label: "Unknown",
+  glyph: "?",
+  color: "#64748b",
+  icon: "circleDot",
+};
+
+export function getMarkerIconConfig(
+  kind: string,
+  armed?: boolean,
+): EffectIconConfig {
+  if (kind === "mine" && armed) {
+    return DEPLOYABLE_ICON_CONFIG.mine_armed;
+  }
+  if (kind in DEPLOYABLE_ICON_CONFIG) {
+    return DEPLOYABLE_ICON_CONFIG[kind as DeployableIconKey];
+  }
+  if (kind in EFFECT_ICON_BY_TYPE) {
+    return EFFECT_ICON_BY_TYPE[kind as ActionLogEffect["type"]];
+  }
+  return FALLBACK_ICON;
 }

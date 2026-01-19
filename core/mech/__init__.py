@@ -22,6 +22,8 @@ from core.mech.frame import (
     FrameTrait,
     MechFrameBaseStats,
     MechFrameDefinition,
+    collect_frame_trait_effects,
+    get_core_power_effects,
 )
 from core.mech.rules import (
     MechPilotingRules,
@@ -297,6 +299,8 @@ __all__ = [
     "FrameTrait",
     "MechFrameBaseStats",
     "MechFrameDefinition",
+    "collect_frame_trait_effects",
+    "get_core_power_effects",
     "MechPilotingRules",
     "CorePowerRules",
     "SystemPointRules",

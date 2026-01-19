@@ -23,6 +23,7 @@ export interface ActionRequest {
   target_ids?: string[];
   target_position?: { coord: { q: number; r: number } };
   weapon_id?: string;
+  weapon_profile_id?: string;
   system_id?: string;
   full_tech_first?: FullTechOptionSelection;
   full_tech_second?: FullTechOptionSelection;

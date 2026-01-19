@@ -553,6 +553,9 @@ class ActionRequest(BaseModel):
     target_ids: list[str] = Field(default_factory=list, description="Target combatant IDs")
     target_position: dict[str, Any] | None = Field(default=None, description="Target position")
     weapon_id: str | None = Field(default=None, description="Weapon to use")
+    weapon_profile_id: str | None = Field(
+        default=None, description="Weapon profile for weapons with multiple profiles"
+    )
     system_id: str | None = Field(default=None, description="System to activate")
     full_tech_first: FullTechOptionSelection | None = Field(
         default=None, description="First Full Tech option"
@@ -857,6 +860,7 @@ async def execute_combat_action(
         target_ids=action_target_ids,
         target_position=target_position,
         weapon_id=body.weapon_id,
+        weapon_profile_id=body.weapon_profile_id,
         system_id=body.system_id,
         full_tech_first=body.full_tech_first,
         full_tech_second=body.full_tech_second,

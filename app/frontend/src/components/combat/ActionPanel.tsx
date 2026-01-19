@@ -16,6 +16,7 @@ import { calculatePathDistance, hexEquals, isAdjacent } from "../../lib/combat-r
 import { Button } from "../ui";
 import { SystemPicker } from "./SystemPicker";
 import { WeaponPicker } from "./WeaponPicker";
+import { WeaponProfilePicker } from "./WeaponProfilePicker";
 
 type FullTechOption = FullTechOptionSelection["option"];
 type FullTechStep = 1 | 2;
@@ -27,6 +28,7 @@ export type ActionPanelState =
   | "idle"
   | "selecting_target"
   | "selecting_weapon"
+  | "selecting_weapon_profile"
   | "selecting_system"
   | "selecting_path"
   | "selecting_full_tech_option"
@@ -84,6 +86,7 @@ export function ActionPanel({
   const [panelState, setPanelState] = useState<ActionPanelState>("idle");
   const [selectedAction, setSelectedAction] = useState<AvailableActionItem | null>(null);
   const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
+  const [selectedWeaponProfileId, setSelectedWeaponProfileId] = useState<string | null>(null);
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
   const [useThrown, setUseThrown] = useState(false);
   const [movementPath, setMovementPath] = useState<HexCoord[]>([]);
@@ -170,6 +173,7 @@ export function ActionPanel({
 
     setSelectedAction(action);
     setSelectedWeaponId(null);
+    setSelectedWeaponProfileId(null);
     setSelectedSystemId(null);
     setUseThrown(false);
     setMovementPath([]);
@@ -221,6 +225,17 @@ export function ActionPanel({
   const handleWeaponSelect = (weaponId: string) => {
     setSelectedWeaponId(weaponId);
     setUseThrown(false);
+    setSelectedWeaponProfileId(null);
+
+    // Check if weapon has multiple profiles
+    const weapon = weaponDefinitions?.get(weaponId);
+    const profiles = weapon?.dynamic?.profile_choice?.profiles;
+
+    if (profiles && profiles.length > 1) {
+      // Need profile selection first
+      setPanelState("selecting_weapon_profile");
+      return;
+    }
 
     if (selectedAction?.requires_target) {
       // After weapon selection, move to target selection
@@ -233,6 +248,22 @@ export function ActionPanel({
       });
     } else {
       // No target needed, go straight to confirming
+      setPanelState("confirming");
+    }
+  };
+
+  const handleWeaponProfileSelect = (profileId: string) => {
+    setSelectedWeaponProfileId(profileId);
+
+    if (selectedAction?.requires_target) {
+      setPanelState("selecting_target");
+      onTargetModeChange({
+        actionId: selectedAction.action_id,
+        actionType: selectedAction.action_type as ActionRequest["action_type"],
+        requiresTarget: selectedAction.requires_target,
+        requiresWeapon: selectedAction.requires_weapon,
+      });
+    } else {
       setPanelState("confirming");
     }
   };
@@ -323,6 +354,7 @@ export function ActionPanel({
       action_type: selectedAction.action_type as ActionRequest["action_type"],
       target_ids: selectedTargetIds,
       weapon_id: selectedWeaponId ?? undefined,
+      weapon_profile_id: selectedWeaponProfileId ?? undefined,
       system_id: selectedSystemId ?? undefined,
       use_thrown: useThrown || undefined,
     });
@@ -331,6 +363,7 @@ export function ActionPanel({
   const handleCancelAction = () => {
     setSelectedAction(null);
     setSelectedWeaponId(null);
+    setSelectedWeaponProfileId(null);
     setSelectedSystemId(null);
     setUseThrown(false);
     setMovementPath([]);
@@ -345,6 +378,7 @@ export function ActionPanel({
   const resetAfterExecution = () => {
     setSelectedAction(null);
     setSelectedWeaponId(null);
+    setSelectedWeaponProfileId(null);
     setSelectedSystemId(null);
     setUseThrown(false);
     setMovementPath([]);
@@ -417,6 +451,31 @@ export function ActionPanel({
         <SystemPicker
           inventory={actorInventory}
           onSelect={handleSystemSelect}
+          onCancel={handleCancelAction}
+          isOpen={true}
+        />
+      </div>
+    );
+  }
+
+  // Show weapon profile picker
+  if (panelState === "selecting_weapon_profile") {
+    const weapon = selectedWeaponId ? weaponDefinitions?.get(selectedWeaponId) : null;
+    return (
+      <div className="space-y-3">
+        {selectedAction && (
+          <div className="rounded-md border border-border bg-muted/30 p-3">
+            <div className="text-sm font-medium text-foreground mb-2">
+              {selectedAction.action_name}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {selectedAction.action_type} action - Select a profile
+            </div>
+          </div>
+        )}
+        <WeaponProfilePicker
+          weapon={weapon ?? null}
+          onSelect={handleWeaponProfileSelect}
           onCancel={handleCancelAction}
           isOpen={true}
         />

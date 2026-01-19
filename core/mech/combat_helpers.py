@@ -44,6 +44,18 @@ from core.mech.combat_state import (
     WeaponState,
     MechSystemState,
 )
+from core.shared.effects import (
+    MechanicalEffect,
+    AccuracyModifier,
+    CheckModifierEffect,
+    EffectCondition,
+    SpatialCondition,
+    AttackContextCondition,
+    CheckContextCondition,
+    SizeCondition,
+    ReactionCondition,
+    ConditionGroup,
+)
 from core.shared.involuntary_movement import resolve_knockback
 from core.shared.los import LOSCheckRequest, check_line_of_sight
 from core.shared.movement import check_engagement_stop, _is_hostile
@@ -1089,6 +1101,319 @@ def _sync_statuses_from_instances(combatant: CombatantState) -> CombatantState:
     synced_statuses = instance_statuses + legacy_only
 
     return combatant.model_copy(update={"statuses": synced_statuses})
+
+
+# =============================================================================
+# Talent Effect Helpers (Phase 32)
+# =============================================================================
+
+
+def _evaluate_condition(condition: EffectCondition | None, context: dict) -> bool:
+    """Evaluate a condition against the current combat context.
+
+    Handles all EffectCondition types:
+    - None: Always true
+    - str: Simple condition string lookup
+    - SpatialCondition: Check spatial relationships
+    - AttackContextCondition: Check attack context
+    - CheckContextCondition: Check skill/save context
+    - SizeCondition: Check size comparisons
+    - ReactionCondition: Check reaction triggers
+    - ConditionGroup: Combine conditions with AND/OR
+
+    Args:
+        condition: The condition to evaluate
+        context: Dictionary with context like {"is_melee": True, "is_first_attack": True}
+
+    Returns:
+        True if condition is met or None, False otherwise
+    """
+    if condition is None:
+        return True
+
+    # Handle string conditions
+    if isinstance(condition, str):
+        # Map known condition strings to context checks
+        condition_checks = {
+            "engaged": lambda c: c.get("is_engaged", False),
+            "while_flying": lambda c: c.get("is_flying", False),
+            "first_melee": lambda c: c.get("is_first_melee", False),
+            "first_ranged": lambda c: c.get("is_first_ranged", False),
+            "melee_attack": lambda c: c.get("is_melee", False),
+            "ranged_attack": lambda c: c.get("is_ranged", False),
+            "tech_attack": lambda c: c.get("is_tech", False),
+            "natural_20": lambda c: c.get("is_nat_20", False),
+            "in_danger_zone": lambda c: c.get("in_danger_zone", False),
+            "bondmate_adjacent": lambda c: c.get("bondmate_adjacent", False),
+            "target_larger": lambda c: c.get("target_larger", False),
+            "target_smaller": lambda c: c.get("target_smaller", False),
+        }
+
+        if condition in condition_checks:
+            return condition_checks[condition](context)
+
+        # Unknown string condition - conservatively return False
+        return False
+
+    # Handle SpatialCondition
+    if isinstance(condition, SpatialCondition):
+        # Check spatial relationship against context
+        rel = condition.relation
+        if rel == "adjacent":
+            return context.get("is_adjacent", False)
+        if rel == "within_range":
+            return context.get("within_range", False)
+        if rel == "engaged":
+            return context.get("is_engaged", False)
+        return False
+
+    # Handle AttackContextCondition
+    if isinstance(condition, AttackContextCondition):
+        # Check attack context (attack_types is a list)
+        if condition.attack_types:
+            ctx_attack_type = context.get("attack_type")
+            if ctx_attack_type not in condition.attack_types:
+                return False
+        # Check applies_to direction
+        applies_to = condition.applies_to
+        if applies_to == "outgoing" and not context.get("is_outgoing", True):
+            return False
+        if applies_to == "incoming" and not context.get("is_incoming", False):
+            return False
+        return True
+
+    # Handle CheckContextCondition
+    if isinstance(condition, CheckContextCondition):
+        # Check check kinds (check_kinds is a list)
+        if condition.check_kinds:
+            ctx_check_kind = context.get("check_kind")
+            if ctx_check_kind not in condition.check_kinds:
+                return False
+        # Check save types (saves is a list)
+        if condition.saves:
+            ctx_save_type = context.get("save_type")
+            if ctx_save_type not in condition.saves:
+                return False
+        return True
+
+    # Handle SizeCondition
+    if isinstance(condition, SizeCondition):
+        # Get the size to compare based on subject
+        if condition.subject == "self":
+            subject_size = context.get("actor_size", 1)
+        elif condition.subject == "target":
+            subject_size = context.get("target_size", 1)
+        else:  # source
+            subject_size = context.get("source_size", 1)
+
+        # Convert size class to numeric for comparison
+        size_map = {
+            "size_half": 0.5, "size_1": 1, "size_2": 2,
+            "size_3": 3, "size_4": 4, "size_5": 5
+        }
+        condition_size = size_map.get(condition.size, 1)
+
+        # Apply comparator
+        if condition.comparator == "lt":
+            return subject_size < condition_size
+        if condition.comparator == "lte":
+            return subject_size <= condition_size
+        if condition.comparator == "gt":
+            return subject_size > condition_size
+        if condition.comparator == "gte":
+            return subject_size >= condition_size
+        if condition.comparator == "eq":
+            return subject_size == condition_size
+        return False
+
+    # Handle ReactionCondition
+    if isinstance(condition, ReactionCondition):
+        # Check reaction_id
+        if condition.reaction_id:
+            return context.get("reaction_id") == condition.reaction_id
+        # Check is_attack
+        if condition.is_attack is not None:
+            return context.get("is_attack_reaction") == condition.is_attack
+        return True
+
+    # Handle ConditionGroup
+    if isinstance(condition, ConditionGroup):
+        # all_of: all conditions must be met
+        if condition.all_of:
+            if not all(_evaluate_condition(c, context) for c in condition.all_of):
+                return False
+        # any_of: at least one condition must be met
+        if condition.any_of:
+            if not any(_evaluate_condition(c, context) for c in condition.any_of):
+                return False
+        # none_of: no conditions must be met
+        if condition.none_of:
+            if any(_evaluate_condition(c, context) for c in condition.none_of):
+                return False
+        return True
+
+    # Unknown condition type - conservatively return False
+    return False
+
+
+def _get_talent_accuracy_modifiers(
+    actor: CombatantState,
+    is_melee: bool = False,
+    is_ranged: bool = False,
+    is_tech: bool = False,
+    context: dict | None = None,
+) -> tuple[int, int]:
+    """Get accuracy and difficulty modifiers from talent effects.
+
+    Evaluates accuracy_mods from all talent effects on the actor.
+
+    Args:
+        actor: The combatant whose talents to evaluate
+        is_melee: Whether this is a melee attack
+        is_ranged: Whether this is a ranged attack
+        is_tech: Whether this is a tech attack
+        context: Additional context for condition evaluation
+
+    Returns:
+        Tuple of (accuracy_mod, difficulty_mod)
+    """
+    accuracy_mod = 0
+    difficulty_mod = 0
+    ctx = context or {}
+
+    # Add attack type to context
+    ctx["is_melee"] = is_melee
+    ctx["is_ranged"] = is_ranged
+    ctx["is_tech"] = is_tech
+
+    for effect in actor.talent_effects:
+        for acc_mod in effect.accuracy_mods:
+            # Check if this modifier applies to the attack type
+            applies = acc_mod.applies_to == "all"
+            if not applies and is_melee and acc_mod.applies_to == "melee":
+                applies = True
+            if not applies and is_ranged and acc_mod.applies_to == "ranged":
+                applies = True
+            if not applies and is_tech and acc_mod.applies_to == "tech":
+                applies = True
+
+            if not applies:
+                continue
+
+            # Check condition
+            if not _evaluate_condition(acc_mod.condition, ctx):
+                continue
+
+            # Apply modifier (positive = accuracy, negative = difficulty)
+            if acc_mod.value > 0:
+                accuracy_mod += acc_mod.value
+            else:
+                difficulty_mod += abs(acc_mod.value)
+
+    # Also check frame trait effects
+    for effect in actor.frame_trait_effects:
+        for acc_mod in effect.accuracy_mods:
+            applies = acc_mod.applies_to == "all"
+            if not applies and is_melee and acc_mod.applies_to == "melee":
+                applies = True
+            if not applies and is_ranged and acc_mod.applies_to == "ranged":
+                applies = True
+            if not applies and is_tech and acc_mod.applies_to == "tech":
+                applies = True
+
+            if not applies:
+                continue
+
+            if not _evaluate_condition(acc_mod.condition, ctx):
+                continue
+
+            if acc_mod.value > 0:
+                accuracy_mod += acc_mod.value
+            else:
+                difficulty_mod += abs(acc_mod.value)
+
+    # Check active core power effects
+    if actor.core_power_active and actor.core_power_effects:
+        for acc_mod in actor.core_power_effects.accuracy_mods:
+            applies = acc_mod.applies_to == "all"
+            if not applies and is_melee and acc_mod.applies_to == "melee":
+                applies = True
+            if not applies and is_ranged and acc_mod.applies_to == "ranged":
+                applies = True
+            if not applies and is_tech and acc_mod.applies_to == "tech":
+                applies = True
+
+            if not applies:
+                continue
+
+            if not _evaluate_condition(acc_mod.condition, ctx):
+                continue
+
+            if acc_mod.value > 0:
+                accuracy_mod += acc_mod.value
+            else:
+                difficulty_mod += abs(acc_mod.value)
+
+    return accuracy_mod, difficulty_mod
+
+
+def _get_talent_check_modifiers(
+    actor: CombatantState,
+    check_type: str,
+    check_kind: str = "check",
+    context: dict | None = None,
+) -> tuple[int, int]:
+    """Get accuracy and difficulty modifiers from talent effects for checks/saves.
+
+    Evaluates check_mods from all talent effects on the actor.
+
+    Args:
+        actor: The combatant whose talents to evaluate
+        check_type: Type of check (e.g., "hull", "agility", "systems", "engineering")
+        check_kind: Kind of check ("check" or "save")
+        context: Additional context for condition evaluation
+
+    Returns:
+        Tuple of (accuracy_mod, difficulty_mod)
+    """
+    accuracy_mod = 0
+    difficulty_mod = 0
+    ctx = context or {}
+
+    for effect in actor.talent_effects:
+        for check_mod in effect.check_mods:
+            # Check if this modifier applies to this check type
+            if check_mod.check_types and check_type not in check_mod.check_types:
+                continue
+            # Check if this modifier applies to this check kind
+            if check_mod.check_kinds and check_kind not in check_mod.check_kinds:
+                continue
+            # Check condition
+            if not _evaluate_condition(check_mod.condition, ctx):
+                continue
+
+            # Apply modifier
+            if check_mod.value > 0:
+                accuracy_mod += check_mod.value
+            else:
+                difficulty_mod += abs(check_mod.value)
+
+    # Also check frame trait effects
+    for effect in actor.frame_trait_effects:
+        for check_mod in effect.check_mods:
+            if check_mod.check_types and check_type not in check_mod.check_types:
+                continue
+            if check_mod.check_kinds and check_kind not in check_mod.check_kinds:
+                continue
+            if not _evaluate_condition(check_mod.condition, ctx):
+                continue
+
+            if check_mod.value > 0:
+                accuracy_mod += check_mod.value
+            else:
+                difficulty_mod += abs(check_mod.value)
+
+    return accuracy_mod, difficulty_mod
 
 
 # =============================================================================
@@ -2850,6 +3175,15 @@ def resolve_single_attack(
     # Get attacker status modifiers
     attacker_acc_mod, attacker_diff_mod = _get_attacker_status_modifiers(attacker)
 
+    # Get talent/frame effect modifiers (Phase 32)
+    talent_acc_mod, talent_diff_mod = _get_talent_accuracy_modifiers(
+        attacker,
+        is_melee=not is_ranged_attack,
+        is_ranged=is_ranged_attack,
+        is_tech=smart_attack,
+        context={"is_outgoing": True},
+    )
+
     # Get target status modifiers
     target_acc_mod, target_diff_mod, has_lock_on = _get_target_status_modifiers(
         target, is_ranged_attack
@@ -2862,10 +3196,10 @@ def resolve_single_attack(
         if cover_info is not None:
             effects.append(cover_info)
 
-    # Combine all accuracy/difficulty modifiers
-    final_accuracy_bonus = accuracy_bonus + attacker_acc_mod + target_acc_mod
+    # Combine all accuracy/difficulty modifiers (including talents, Phase 32)
+    final_accuracy_bonus = accuracy_bonus + attacker_acc_mod + target_acc_mod + talent_acc_mod
     final_difficulty_bonus = (
-        difficulty_bonus + attacker_diff_mod + target_diff_mod + cover_difficulty
+        difficulty_bonus + attacker_diff_mod + target_diff_mod + cover_difficulty + talent_diff_mod
     )
 
     # Resolve attack roll
@@ -2901,6 +3235,8 @@ def resolve_single_attack(
             "target_acc": target_acc_mod,
             "target_diff": target_diff_mod,
             "cover_diff": cover_difficulty,
+            "talent_acc": talent_acc_mod,
+            "talent_diff": talent_diff_mod,
         },
     })
 

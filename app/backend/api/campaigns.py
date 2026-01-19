@@ -40,7 +40,12 @@ from core.mech.combat_state import (
     CombatResources,
     CombatStats,
     MechCombatScenario,
+    create_npc_combatant,
 )
+from core.mech.grid import HexPosition, HexCoord
+from core.mech.terrain import TerrainMap
+from core.pilot import collect_pilot_talent_effects
+from core.mech import collect_frame_trait_effects, get_core_power_effects
 from core.shared.campaign.campaign import (
     Campaign,
     CampaignIdentity,
@@ -55,6 +60,24 @@ from core.shared.campaign.campaign import (
     SessionLifecycleCheckpoint,
 )
 from core.shared.campaign.serialization import get_campaign_summary
+from core.shared.scenario import SitrepType, SITREP_TEMPLATES
+from core.shared.terrain_generation import (
+    TileSetType,
+    TerrainGeneratorParams,
+    generate_terrain_from_sitrep,
+    generate_zone_coords,
+)
+from core.shared.sitrep_resolution import (
+    SitrepResolution,
+    create_sitrep_resolution,
+)
+from core.gm_toolkit.encounter_builder import (
+    EncounterDifficulty,
+    estimate_party_power,
+    calculate_enemy_force,
+)
+from core.npc.state import NPCState, convert_to_combat_stats
+from core.npc.models import NPCTemplate
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -250,6 +273,20 @@ def _character_to_combatant(character_db: CharacterDB) -> CombatantState:
         raise ConflictError(
             "Character requires an active mech before launching a mission"
         )
+
+    # Collect pilot talent effects (Phase 32)
+    talent_effects = collect_pilot_talent_effects(character.pilot)
+
+    # Collect frame trait effects and core power (Phase 33)
+    frame_trait_effects = []
+    core_power_effects = None
+    active_mech = character.active_mech
+    if active_mech:
+        frame = active_mech.get_frame()
+        if frame:
+            frame_trait_effects = collect_frame_trait_effects(frame)
+            core_power_effects = get_core_power_effects(frame)
+
     return CombatantState(
         id=f"combat_{character_db.id}",
         name=character_db.callsign,
@@ -273,7 +310,174 @@ def _character_to_combatant(character_db: CharacterDB) -> CombatantState:
             stress_current=stats.structure,
             repairs_remaining=stats.repair_cap,
         ),
+        talent_effects=talent_effects,
+        frame_trait_effects=frame_trait_effects,
+        core_power_available=True,
+        core_power_active=False,
+        core_power_effects=core_power_effects,
     )
+
+
+# =============================================================================
+# Phase 34: Mission Pipeline Helpers
+# =============================================================================
+
+
+def _generate_mission_terrain(
+    sitrep_type: SitrepType,
+    tile_set: TileSetType | None,
+    map_width: int,
+    map_height: int,
+    seed: int | None,
+) -> tuple[TerrainMap | None, SitrepResolution | None, dict[str, list[HexCoord]]]:
+    """Generate terrain using core primitives.
+
+    Args:
+        sitrep_type: The SITREP type to generate terrain for
+        tile_set: Terrain tile set (defaults to urban)
+        map_width: Map width in hexes
+        map_height: Map height in hexes
+        seed: Optional seed for reproducible generation
+
+    Returns:
+        Tuple of (TerrainMap, SitrepResolution, zones dict)
+    """
+    from core.shared.terrain_primitives import GeneratedTerrain
+
+    template = SITREP_TEMPLATES.get(sitrep_type)
+    if template is None:
+        return None, None, {}
+
+    params = TerrainGeneratorParams(
+        map_width=map_width,
+        map_height=map_height,
+        sitrep_template=template,
+        tile_set=tile_set or "urban",
+        seed=seed,
+        density=0.3,
+    )
+
+    generated = generate_terrain_from_sitrep(template, params)
+    return generated.terrain_map, None, generated.zones
+
+
+def _npc_state_to_combatant(
+    npc: NPCState,
+    side: Literal["players", "hostiles", "neutral"] = "hostiles",
+) -> CombatantState:
+    """Convert NPCState to CombatantState.
+
+    Args:
+        npc: The NPC state to convert
+        side: Which combat side the NPC is on
+
+    Returns:
+        A CombatantState suitable for use in combat
+    """
+    stats_dict = convert_to_combat_stats(npc.stats)
+    return CombatantState(
+        id=f"combat_{npc.id}",
+        name=npc.name,
+        side=side,
+        kind="npc",
+        stats=CombatStats(**stats_dict),
+        resources=CombatResources(
+            hp_current=npc.stats.hp_max,
+            structure_current=npc.structure_current,
+        ),
+    )
+
+
+def _generate_enemy_combatants(
+    difficulty: EncounterDifficulty,
+    sitrep_type: SitrepType,
+    player_count: int,
+    avg_license_level: float,
+    npc_templates: list[NPCTemplate],
+) -> tuple[list[CombatantState], list[str]]:
+    """Generate enemy combatants based on difficulty.
+
+    Args:
+        difficulty: Encounter difficulty level
+        sitrep_type: SITREP mission type
+        player_count: Number of player characters
+        avg_license_level: Average license level of players
+        npc_templates: Available NPC templates to use
+
+    Returns:
+        Tuple of (list of CombatantState, list of reserve NPC IDs)
+    """
+    player_power = estimate_party_power(player_count, avg_license_level)
+    force = calculate_enemy_force(difficulty, sitrep_type, player_power, npc_templates)
+
+    # Select NPCs to fill victory points
+    initial_combatants: list[CombatantState] = []
+    reserve_ids: list[str] = []
+    initial_vp_remaining = force.initial_victory_points
+    reserve_vp_remaining = force.reserve_victory_points
+
+    npc_counter = 0
+    for template in npc_templates:
+        # Fill initial deployment first
+        while initial_vp_remaining >= template.victory_count:
+            npc_counter += 1
+            instance_id = f"npc_{template.id}_{npc_counter}"
+            npc_state = NPCState.from_template(template, instance_id)
+            combatant = _npc_state_to_combatant(npc_state)
+            initial_combatants.append(combatant)
+            initial_vp_remaining -= template.victory_count
+
+        # Fill reserves
+        while reserve_vp_remaining >= template.victory_count:
+            npc_counter += 1
+            reserve_ids.append(f"npc_{template.id}_{npc_counter}")
+            reserve_vp_remaining -= template.victory_count
+
+    return initial_combatants, reserve_ids
+
+
+def _assign_deployment_positions(
+    combatants: list[CombatantState],
+    zones: dict[str, list[HexCoord]],
+    side: Literal["players", "hostiles"],
+) -> list[CombatantState]:
+    """Assign positions from deployment zones.
+
+    Args:
+        combatants: List of combatants to assign positions
+        zones: Dictionary of zone_id to hex coordinates
+        side: Which side to assign positions for
+
+    Returns:
+        List of combatants with positions assigned
+    """
+    # Find deployment zones for this side
+    deployment_coords: list[HexCoord] = []
+    for key, coords in zones.items():
+        if side == "players" and "deployment" in key:
+            deployment_coords = coords
+            break
+        elif side == "hostiles" and ("ingress" in key or "deployment_1" in key):
+            deployment_coords = coords
+            break
+
+    if not deployment_coords:
+        # No deployment zones, return combatants without positions
+        return combatants
+
+    updated_combatants: list[CombatantState] = []
+    for i, combatant in enumerate(combatants):
+        if combatant.side == side and combatant.position is None:
+            # Assign position from deployment zone
+            coord_idx = i % len(deployment_coords)
+            coord = deployment_coords[coord_idx]
+            position = HexPosition(coord=coord, elevation=0)
+            updated = combatant.model_copy(update={"position": position})
+            updated_combatants.append(updated)
+        else:
+            updated_combatants.append(combatant)
+
+    return updated_combatants
 
 
 # =============================================================================
@@ -350,6 +554,29 @@ class CampaignInviteResendRequest(BaseModel):
 class CampaignMissionLaunchRequest(BaseModel):
     environment: Literal["standard", "zero_g", "underwater"] = "standard"
     notes: str | None = None
+    # Phase 34: SITREP and terrain generation fields
+    sitrep_type: SitrepType | None = Field(
+        default=None,
+        description="SITREP type (escort, control, extract, hold_out, gauntlet, recon)",
+    )
+    tile_set: TileSetType | None = Field(
+        default=None,
+        description="Terrain tile set (urban, industrial, wilderness, zero_g)",
+    )
+    difficulty: EncounterDifficulty | None = Field(
+        default=None,
+        description="Encounter difficulty (trivial, easy, standard, hard, extreme)",
+    )
+    map_width: int = Field(default=20, ge=5, le=40, description="Map width in hexes")
+    map_height: int = Field(default=16, ge=4, le=40, description="Map height in hexes")
+    terrain_seed: int | None = Field(
+        default=None,
+        description="Optional seed for reproducible terrain generation",
+    )
+    enemy_template_ids: list[str] = Field(
+        default_factory=list,
+        description="List of NPC template IDs to use for enemy generation",
+    )
 
 
 class SessionLifecycleUpdateRequest(BaseModel):
@@ -1127,12 +1354,51 @@ async def launch_campaign_mission(
             )
         combatants.append(_character_to_combatant(character_db))
 
+    # Phase 34: Generate terrain and enemies if sitrep_type is specified
+    terrain: TerrainMap | None = None
+    sitrep_resolution: SitrepResolution | None = None
+    zones: dict[str, list[HexCoord]] = {}
+    reserve_ids: list[str] = []
+
+    if body.sitrep_type:
+        # Generate terrain from SITREP template
+        terrain, _, zones = _generate_mission_terrain(
+            sitrep_type=body.sitrep_type,
+            tile_set=body.tile_set,
+            map_width=body.map_width,
+            map_height=body.map_height,
+            seed=body.terrain_seed,
+        )
+
+        # Generate enemy combatants if difficulty is specified
+        if body.difficulty and body.enemy_template_ids:
+            # For now, we only support template IDs being passed directly
+            # In the future, we could load templates from a database
+            # Here we create simple placeholder templates
+            pass  # Enemy template loading would go here
+
+        # Assign deployment positions for players
+        if zones:
+            combatants = _assign_deployment_positions(combatants, zones, "players")
+
+        # Create SITREP resolution tracker
+        template = SITREP_TEMPLATES.get(body.sitrep_type)
+        if template:
+            sitrep_resolution = create_sitrep_resolution(
+                template=template,
+                player_count=len(player_assignments),
+                reserve_ids=reserve_ids,
+                enemy_count=len([c for c in combatants if c.side == "hostiles"]),
+            )
+
     scenario = MechCombatScenario(
         combatants=combatants,
         environment=body.environment,
         rounds=[],
         grapples=[],
         deployables={},
+        terrain=terrain,
+        sitrep_resolution=sitrep_resolution,
     )
 
     combat_session_id = _generate_id("combat")

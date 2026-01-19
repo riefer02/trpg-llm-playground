@@ -65,3 +65,29 @@ class MechFrameDefinition(FrozenModel):
     system_points: int = Field(default=0, ge=0)
     core_system: CoreSystemDefinition | None = None
     traits: list[FrameTrait] = Field(default_factory=list)
+
+
+def collect_frame_trait_effects(frame: MechFrameDefinition) -> list[MechanicalEffect]:
+    """Collect all passive mechanical effects from frame traits.
+
+    Args:
+        frame: The frame definition to collect effects from.
+
+    Returns:
+        A list of MechanicalEffect objects from all frame traits.
+    """
+    return [trait.effects for trait in frame.traits]
+
+
+def get_core_power_effects(frame: MechFrameDefinition) -> MechanicalEffect | None:
+    """Get the mechanical effects from a frame's core system.
+
+    Args:
+        frame: The frame definition to get core power effects from.
+
+    Returns:
+        The MechanicalEffect from the core system, or None if no core system.
+    """
+    if frame.core_system is None:
+        return None
+    return frame.core_system.effects

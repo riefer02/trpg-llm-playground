@@ -23,6 +23,7 @@ from core.pilot.talent import (
     TalentDefinition,
     EXAMPLE_TALENTS,
     get_talent_definition,
+    collect_pilot_talent_effects,
 )
 from core.pilot.license import (
     License,
@@ -158,6 +159,7 @@ __all__ = [
     "TalentDefinition",
     "EXAMPLE_TALENTS",
     "get_talent_definition",
+    "collect_pilot_talent_effects",
     # Licenses
     "License",
     "LicenseDefinition",

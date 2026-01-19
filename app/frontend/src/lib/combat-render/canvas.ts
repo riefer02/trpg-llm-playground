@@ -1,6 +1,6 @@
 import type { ActionLogEffect, HexCoord } from "../types/lancer";
 
-import { EFFECT_ICON_BY_TYPE } from "../combat-effects";
+import { getMarkerIconConfig } from "../combat-effects";
 
 import type { HexLayout, PixelPoint } from "./hex";
 import { axialToPixel, hexCorners, pixelToAxial } from "./hex";
@@ -29,11 +29,15 @@ export type RenderToken = {
   radius?: number;
 };
 
+export type DeployableKind = "mine" | "drone" | "deployable" | "other";
+export type MarkerKind = ActionLogEffect["type"] | DeployableKind;
+
 export type RenderMarker = {
   id: string;
   coord: HexCoord;
-  kind: ActionLogEffect["type"];
+  kind: MarkerKind;
   count?: number;
+  armed?: boolean;
 };
 
 export type TokenStyle = {
@@ -184,7 +188,7 @@ export function drawMarkers(
 ): void {
   for (const marker of markers) {
     const center = axialToPixel(marker.coord, layout);
-    const config = EFFECT_ICON_BY_TYPE[marker.kind];
+    const config = getMarkerIconConfig(marker.kind, marker.armed);
     const radius = style.radius ?? layout.size * 0.22;
     const label =
       marker.count && marker.count > 1
@@ -200,8 +204,8 @@ export function drawMarkers(
     ctx.lineWidth = style.lineWidth ?? 1.5;
     ctx.stroke();
 
-    ctx.fillStyle = style.labelColor ?? "#0f172a";
-    ctx.font = style.font ?? "10px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = style.labelColor ?? "#fff";
+    ctx.font = style.font ?? `bold ${Math.round(radius)}px 'Space Grotesk', sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, center.x, center.y);
