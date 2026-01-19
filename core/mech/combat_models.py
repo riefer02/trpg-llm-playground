@@ -22,7 +22,7 @@ from core.mech.combat_state import ActionUse
 # Type Aliases
 # =============================================================================
 
-StabilizePrimary = Literal["cool_heat", "spend_repair_full_hp"]
+StabilizePrimary = Literal["cool_heat", "spend_repair_full_hp", "cancel_meltdown"]
 StabilizeSecondary = Literal["reload_loading", "clear_burn", "clear_condition"]
 
 
@@ -40,6 +40,10 @@ class ActionExecutionInput(FrozenModel):
     target_ids: list[str] = Field(default_factory=list, description="Target combatant IDs")
     target_position: HexPosition | None = Field(default=None, description="Target position for area/movement")
     weapon_id: str | None = Field(default=None, description="Weapon being used")
+    weapon_profile_id: str | None = Field(
+        default=None,
+        description="Weapon profile to use for weapons with multiple profiles (e.g., kinetic/energy/explosive)",
+    )
     system_id: str | None = Field(default=None, description="System being activated")
     full_tech_first: FullTechOptionSelection | None = Field(
         default=None, description="First Full Tech option selection"
@@ -68,6 +72,16 @@ class ActionExecutionInput(FrozenModel):
     eject_direction: HexCoord | None = Field(
         default=None, description="Direction for eject (pilot flies 6 spaces in this direction)"
     )
+    # Deploy action parameters (PR2 5070-5088)
+    deploy_kind: Literal["drone", "mine", "deployable"] | None = Field(
+        default=None, description="Kind of deployable to create"
+    )
+    deploy_name: str | None = Field(
+        default=None, description="Name for the deployed entity"
+    )
+    mine_type: Literal["explosive", "shroud", "breaching", "cluster", "emp"] | None = Field(
+        default=None, description="Type of mine being deployed"
+    )
 
 
 class ReactionInput(FrozenModel):
@@ -78,6 +92,10 @@ class ReactionInput(FrozenModel):
     trigger_action_id: str | None = Field(default=None, description="Action that triggered this reaction")
     target_ids: list[str] = Field(default_factory=list, description="Targets for reaction (e.g., overwatch)")
     weapon_id: str | None = Field(default=None, description="Weapon for overwatch attack")
+    weapon_profile_id: str | None = Field(
+        default=None,
+        description="Weapon profile to use for weapons with multiple profiles",
+    )
 
 
 # =============================================================================
@@ -94,6 +112,32 @@ class ResourceChange(FrozenModel):
     structure_change: int = 0
     stress_change: int = 0
     repairs_change: int = 0
+
+
+class AttackOutcome(FrozenModel):
+    """Result of resolving a single attack.
+
+    Used for both normal attacks and overwatch reactions to capture
+    all relevant attack resolution details.
+    """
+
+    hit: bool = Field(..., description="Whether the attack hit")
+    critical: bool = Field(default=False, description="Whether the attack was a critical hit")
+    damage_dealt: int = Field(default=0, description="Total damage dealt to target")
+    roll: int = Field(..., description="The d20 roll result")
+    total: int = Field(..., description="Total attack value (roll + bonuses)")
+    target_defense: int = Field(..., description="Target's defense value that was beaten")
+    accuracy_bonus: int = Field(default=0, description="Net accuracy bonus applied")
+    difficulty_bonus: int = Field(default=0, description="Net difficulty applied")
+    effects: list[dict] = Field(
+        default_factory=list, description="Effects applied (cover, status mods, etc.)"
+    )
+    resource_change: ResourceChange | None = Field(
+        default=None, description="Resource change from damage"
+    )
+    structure_check: dict | None = Field(
+        default=None, description="Structure check result if triggered"
+    )
 
 
 class OverwatchOpportunityInfo(FrozenModel):
@@ -159,6 +203,42 @@ class TurnStartResult(FrozenModel):
         default_factory=list, description="Effect IDs whose cooldowns were decremented"
     )
 
+    # Meltdown resolution
+    meltdown_countdown_active: bool = Field(
+        default=False,
+        description="Whether combatant had active meltdown countdown"
+    )
+    meltdown_countdown_remaining: int | None = Field(
+        default=None,
+        description="Turns remaining after decrement (None if no countdown)"
+    )
+    meltdown_triggered: bool = Field(
+        default=False,
+        description="Whether meltdown explosion triggered this turn"
+    )
+    meltdown_explosion_damage: int = Field(
+        default=0,
+        description="Total damage from meltdown explosion (4d6)"
+    )
+    meltdown_affected_targets: list[str] = Field(
+        default_factory=list,
+        description="IDs of combatants damaged by meltdown explosion"
+    )
+
+    # Deployable/Drone turn processing (PR2 5070-5088)
+    mines_armed: list[str] = Field(
+        default_factory=list,
+        description="IDs of mines that armed at start of this turn"
+    )
+    drone_heat_to_owner: int = Field(
+        default=0,
+        description="Heat from active latch drones applied to owner"
+    )
+    drones_ready_to_act: list[str] = Field(
+        default_factory=list,
+        description="IDs of drones that can act this turn"
+    )
+
 
 class BurnTickResult(FrozenModel):
     """Result of burn damage tick at end of turn."""
@@ -190,6 +270,12 @@ class TurnEndResult(FrozenModel):
         default=None, description="Burn tick resolution if actor had burn"
     )
 
+    # Deployable/Drone turn processing (PR2 5070-5088)
+    drones_primed: list[str] = Field(
+        default_factory=list,
+        description="IDs of drones that primed at end of this turn"
+    )
+
 
 class ReactionResult(FrozenModel):
     """Result of declaring a reaction."""
@@ -199,6 +285,16 @@ class ReactionResult(FrozenModel):
     reaction_used: str | None = Field(default=None, description="Reaction type that was used")
     effects_applied: list[dict] = Field(default_factory=list, description="Effects from the reaction")
     damage_dealt: int = Field(default=0, description="Damage dealt by overwatch")
+    # Extended fields for overwatch attack resolution
+    attack_hit: bool | None = Field(default=None, description="Whether overwatch attack hit")
+    attack_critical: bool | None = Field(default=None, description="Whether attack was critical")
+    attack_roll: int | None = Field(default=None, description="The d20 roll for overwatch attack")
+    resource_changes: list[ResourceChange] = Field(
+        default_factory=list, description="Resource changes from overwatch attack"
+    )
+    structure_checks: list[dict] = Field(
+        default_factory=list, description="Structure check results from overwatch damage"
+    )
 
 
 class AvailableAction(FrozenModel):
@@ -242,6 +338,7 @@ __all__ = [
     "ReactionInput",
     # Output models
     "ResourceChange",
+    "AttackOutcome",
     "OverwatchOpportunityInfo",
     "ActionExecutionResult",
     "TurnStartResult",

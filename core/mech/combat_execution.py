@@ -76,8 +76,11 @@ from core.mech.combat_helpers import (
     _resolve_mount,
     _resolve_dismount,
     _resolve_eject,
+    _resolve_deploy,
+    _check_mine_triggers,
     _clear_statuses_by_trigger,
     _expire_turn_duration_statuses,
+    resolve_single_attack,
 )
 
 from core.mech.combat_state import (
@@ -141,6 +144,18 @@ from core.shared.full_tech import (
     InvadeTechParams,
     resolve_full_tech,
 )
+from core.shared.heat import decrement_meltdown_countdown, trigger_meltdown
+from core.shared.self_destruct import (
+    SelfDestructExplosionInput,
+    resolve_self_destruct_explosion,
+)
+from core.shared.deployables import arm_mines_at_turn_start
+from core.shared.drone_turn import (
+    DroneTurnStartInput,
+    DroneTurnEndInput,
+    resolve_drone_turn_start,
+    resolve_drone_turn_end,
+)
 
 
 # =============================================================================
@@ -194,6 +209,7 @@ def start_turn(
     - Expires any prepared actions
     - Decrements cooldowns that trigger on turn start
     - Resets overcharge uses for the turn
+    - Processes meltdown countdown (triggers explosion at 0)
 
     Args:
         scenario: Current combat scenario
@@ -231,6 +247,76 @@ def start_turn(
         prepared_action_expired = True
         updated_actor = actor.model_copy(update={"prepared_action": None})
 
+    # Track meltdown result fields
+    meltdown_countdown_active = False
+    meltdown_countdown_remaining: int | None = None
+    meltdown_triggered = False
+    meltdown_explosion_damage = 0
+    meltdown_affected_targets: list[str] = []
+
+    # Process meltdown countdown (PR2 4692-4706)
+    # Countdown decrements at the start of the mech's turn
+    if updated_actor.meltdown_state is not None:
+        meltdown_countdown_active = True
+        updated_actor, meltdown_triggered = decrement_meltdown_countdown(updated_actor)
+
+        if meltdown_triggered:
+            # Meltdown explosion: burst 2, 4d6 explosive damage (same as self-destruct)
+            # Only resolve if actor has a position
+            if updated_actor.position is not None:
+                explosion_input = SelfDestructExplosionInput(
+                    mech_id=updated_actor.id,
+                    mech_position=updated_actor.position,
+                )
+                # Build combatants list for explosion (with updated actor state)
+                temp_combatants = list(scenario.combatants)
+                temp_combatants[actor_index] = updated_actor
+                explosion_result = resolve_self_destruct_explosion(
+                    explosion_input,
+                    all_combatants=temp_combatants,
+                )
+                meltdown_explosion_damage = explosion_result.total_damage
+
+                # Apply destruction to actor via trigger_meltdown
+                destroyed_actor, _wreckage = trigger_meltdown(updated_actor)
+                updated_actor = destroyed_actor
+                meltdown_countdown_remaining = None
+
+                # Build scenario with destroyed actor for damage application
+                updated_combatants = list(scenario.combatants)
+                updated_combatants[actor_index] = updated_actor
+                temp_scenario = MechCombatScenario(
+                    combatants=updated_combatants,
+                    grapples=list(scenario.grapples),
+                    rounds=list(scenario.rounds),
+                    terrain=scenario.terrain,
+                    environment=scenario.environment,
+                    deployables=dict(scenario.deployables),
+                )
+
+                # Apply damage to affected combatants
+                for target_result in explosion_result.target_results:
+                    if target_result.damage_dealt > 0:
+                        meltdown_affected_targets.append(target_result.target_id)
+                        temp_scenario, _, _ = apply_damage(
+                            temp_scenario,
+                            target_result.target_id,
+                            target_result.damage_dealt,
+                            armor_piercing=0,
+                        )
+
+                # Update actor from temp_scenario (in case damage cascaded to them somehow)
+                for c in temp_scenario.combatants:
+                    if c.id == actor_id:
+                        updated_actor = c
+                        break
+
+                scenario = temp_scenario
+        else:
+            # Countdown decremented but not triggered
+            if updated_actor.meltdown_state is not None:
+                meltdown_countdown_remaining = updated_actor.meltdown_state.turns_remaining
+
     # Decrement cooldowns
     cooldowns_decremented: list[str] = []
     if updated_actor.cooldown_states:
@@ -248,8 +334,8 @@ def start_turn(
     updated_combatants = list(scenario.combatants)
     updated_combatants[actor_index] = updated_actor
 
-    # Build updated scenario
-    updated_scenario = MechCombatScenario(
+    # Build intermediate scenario for deployable processing
+    intermediate_scenario = MechCombatScenario(
         combatants=updated_combatants,
         grapples=list(scenario.grapples),
         rounds=list(scenario.rounds),
@@ -257,6 +343,57 @@ def start_turn(
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
     )
+
+    # Arm mines at turn start (PR2 5083-5084)
+    # Mines arm at the start of the deployer's next turn
+    current_round_num = len(scenario.rounds) if scenario.rounds else 1
+    intermediate_scenario, mines_armed = arm_mines_at_turn_start(
+        intermediate_scenario, current_round_num
+    )
+
+    # Process drone turn start for owner's drones (PR2 5070-5074)
+    # Filter to drones owned by this actor
+    owner_drones = {
+        drone_id: drone
+        for drone_id, drone in intermediate_scenario.deployables.items()
+        if drone.kind == "drone" and drone.owner_id == actor_id
+    }
+
+    drone_heat_to_owner = 0
+    drones_ready_to_act: list[str] = []
+
+    if owner_drones:
+        drone_start_input = DroneTurnStartInput(
+            owner_id=actor_id,
+            deployed_drones=owner_drones,
+            current_turn=current_round_num,
+            latch_drone_active=False,  # Would need to check for active latch mode
+            latch_drone_target_id=None,
+            tier=1,
+        )
+        drone_start_result = resolve_drone_turn_start(drone_start_input)
+        drone_heat_to_owner = drone_start_result.heat_to_owner
+        drones_ready_to_act = drone_start_result.drones_ready_to_act
+
+        # Apply latch drone heat to owner if applicable
+        if drone_heat_to_owner > 0:
+            new_heat = updated_actor.resources.heat_current + drone_heat_to_owner
+            new_resources = updated_actor.resources.model_copy(update={"heat_current": new_heat})
+            updated_actor = updated_actor.model_copy(update={"resources": new_resources})
+
+            # Update combatants with new actor state
+            updated_combatants = list(intermediate_scenario.combatants)
+            updated_combatants[actor_index] = updated_actor
+            intermediate_scenario = MechCombatScenario(
+                combatants=updated_combatants,
+                grapples=list(intermediate_scenario.grapples),
+                rounds=list(intermediate_scenario.rounds),
+                terrain=intermediate_scenario.terrain,
+                environment=intermediate_scenario.environment,
+                deployables=dict(intermediate_scenario.deployables),
+            )
+
+    updated_scenario = intermediate_scenario
 
     # Determine available actions
     available_actions = _get_basic_available_actions(updated_actor)
@@ -268,6 +405,14 @@ def start_turn(
         available_actions=available_actions,
         prepared_action_expired=prepared_action_expired,
         cooldowns_decremented=cooldowns_decremented,
+        meltdown_countdown_active=meltdown_countdown_active,
+        meltdown_countdown_remaining=meltdown_countdown_remaining,
+        meltdown_triggered=meltdown_triggered,
+        meltdown_explosion_damage=meltdown_explosion_damage,
+        meltdown_affected_targets=meltdown_affected_targets,
+        mines_armed=mines_armed,
+        drone_heat_to_owner=drone_heat_to_owner,
+        drones_ready_to_act=drones_ready_to_act,
     )
 
 
@@ -363,6 +508,44 @@ def end_turn(
     )
     end_of_turn_effects.extend(expired_effects)
 
+    # Process drone turn end for owner's drones (PR2 5070-5074)
+    # Drones prime at end of owner's turn
+    owner_drones = {
+        drone_id: drone
+        for drone_id, drone in intermediate_scenario.deployables.items()
+        if drone.kind == "drone" and drone.owner_id == actor_id
+    }
+
+    drones_primed: list[str] = []
+    if owner_drones:
+        drone_end_input = DroneTurnEndInput(
+            owner_id=actor_id,
+            deployed_drones=owner_drones,
+            current_turn=current_round,
+            owner_is_stunned="stunned" in (actor.statuses if actor else []),
+            latch_drone_active=False,
+            latch_drone_target_id=None,
+            tier=1,
+        )
+        drone_end_result = resolve_drone_turn_end(drone_end_input)
+        drones_primed = drone_end_result.drones_to_prime
+
+        # Prime drones (set is_armed to True for restock-type drones)
+        if drones_primed:
+            updated_deployables = dict(intermediate_scenario.deployables)
+            for drone_id in drones_primed:
+                if drone_id in updated_deployables:
+                    drone = updated_deployables[drone_id]
+                    updated_deployables[drone_id] = drone.model_copy(update={"is_armed": True})
+            intermediate_scenario = MechCombatScenario(
+                combatants=list(intermediate_scenario.combatants),
+                grapples=list(intermediate_scenario.grapples),
+                rounds=list(intermediate_scenario.rounds),
+                terrain=intermediate_scenario.terrain,
+                environment=intermediate_scenario.environment,
+                deployables=updated_deployables,
+            )
+
     # Re-fetch combatants after expiration
     updated_combatants = list(intermediate_scenario.combatants)
 
@@ -425,6 +608,7 @@ def end_turn(
         end_of_turn_effects=end_of_turn_effects,
         cooldowns_decremented=cooldowns_decremented,
         burn_tick_result=burn_tick_result,
+        drones_primed=drones_primed,
     )
 
     return updated_scenario, result, next_round, next_turn_index
@@ -435,13 +619,17 @@ def end_turn(
 # =============================================================================
 
 
-def lookup_weapon_damage_and_ap(weapon_id: str | None) -> tuple[int, int]:
+def lookup_weapon_damage_and_ap(
+    weapon_id: str | None,
+    profile_id: str | None = None,
+) -> tuple[int, int]:
     """Look up weapon damage and AP value from compendium.
 
     Rolls the weapon's damage dice and extracts the AP tag value.
 
     Args:
         weapon_id: Weapon ID to look up, or None for default damage
+        profile_id: Optional profile ID for weapons with multiple profiles
 
     Returns:
         Tuple of (damage_rolled, armor_piercing)
@@ -454,7 +642,7 @@ def lookup_weapon_damage_and_ap(weapon_id: str | None) -> tuple[int, int]:
     if weapon_def is None:
         return 6, 0  # Graceful fallback for unknown weapons
 
-    profile = resolve_weapon_profile(weapon_def)
+    profile = resolve_weapon_profile(weapon_def, profile_id)
 
     # Roll damage from all damage components
     total_damage = 0
@@ -588,7 +776,10 @@ def execute_action(
     area_origin: HexPosition | None = None
     area_direction: HexCoord | None = None
     area_affected: list[HexCoord] = []
-    weapon_profile = _resolve_weapon_profile(action_input.weapon_id)
+    weapon_profile = _resolve_weapon_profile(
+        action_input.weapon_id,
+        action_input.weapon_profile_id,
+    )
     weapon_tags: list[WeaponTag] = list(weapon_profile.tags) if weapon_profile else []
     accuracy_bonus = sum(1 for tag in weapon_tags if tag.tag == "accurate")
     difficulty_bonus = sum(1 for tag in weapon_tags if tag.tag == "inaccurate")
@@ -600,7 +791,10 @@ def execute_action(
     knockback_value = _extract_tag_value(weapon_tags, "knockback") or 0
     has_overkill = any(tag.tag == "overkill" for tag in weapon_tags)
     smart_attack = any(tag.tag == "smart" for tag in weapon_tags)
-    thrown_range = _get_thrown_range(action_input.weapon_id) if action_input.use_thrown else None
+    thrown_range = _get_thrown_range(
+        action_input.weapon_id,
+        action_input.weapon_profile_id,
+    ) if action_input.use_thrown else None
     thrown_coord: HexCoord | None = None
 
     # Validate weapon usability (loading, limited, ordnance restrictions)
@@ -774,7 +968,7 @@ def execute_action(
                 success=False,
                 error="Thrown attack requires a weapon",
             )
-        if not _is_melee_weapon(action_input.weapon_id):
+        if not _is_melee_weapon(action_input.weapon_id, action_input.weapon_profile_id):
             return scenario, current_turn, economy, ActionExecutionResult(
                 success=False,
                 error="Only melee weapons can be thrown",
@@ -1475,6 +1669,14 @@ def execute_action(
         )
         effects_applied.extend(move_effects)
 
+        # Check for mine triggers along movement path (PR2 5085-5086)
+        scenario, mine_effects = _check_mine_triggers(
+            scenario,
+            action_input.actor_id,
+            action_input.movement_path,
+        )
+        effects_applied.extend(mine_effects)
+
     # Handle mount/dismount/eject actions
     if action_input.action_id == "mount" and action_input.target_ids:
         actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
@@ -1491,6 +1693,22 @@ def execute_action(
         actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
         scenario, eject_effects = _resolve_eject(scenario, actor, action_input.eject_direction)
         effects_applied.extend(eject_effects)
+
+    # Handle Deploy action (PR2 5070-5088)
+    if action_input.action_id == "deploy" and action_input.target_position and action_input.deploy_kind:
+        actor = next((c for c in scenario.combatants if c.id == action_input.actor_id), actor)
+        current_round_num = len(scenario.rounds) if scenario.rounds else 1
+        scenario, deploy_effects = _resolve_deploy(
+            scenario,
+            actor,
+            action_input.target_position,
+            action_input.deploy_kind,
+            action_input.deploy_name,
+            action_input.system_id,
+            action_input.mine_type,
+            current_round_num,
+        )
+        effects_applied.extend(deploy_effects)
 
     # Clear statuses based on action triggers (PR2 status clear rules)
     statuses_cleared: list[StatusType] = []
@@ -1615,7 +1833,11 @@ def execute_reaction(
 
     # Block ordnance weapons from overwatch (PR2 5035-5037)
     if reaction_input.reaction_type == "overwatch" and reaction_input.weapon_id:
-        has_ordnance = _has_weapon_tag(reaction_input.weapon_id, "ordnance")
+        has_ordnance = _has_weapon_tag(
+            reaction_input.weapon_id,
+            "ordnance",
+            reaction_input.weapon_profile_id,
+        )
         # Also check weapon state tags
         weapon_state = _get_weapon_state(reactor, reaction_input.weapon_id)
         if weapon_state is not None and "ordnance" in weapon_state.tags:
@@ -1661,15 +1883,149 @@ def execute_reaction(
             "duration": "until_start_of_next_turn",
         })
     elif reaction_input.reaction_type == "overwatch":
-        # Overwatch allows a skirmish attack
-        effects_applied.append({
-            "type": "overwatch",
-            "effect": "skirmish_attack",
-            "targets": reaction_input.target_ids,
-        })
-        # Actual damage would be resolved by calling combat_helpers
+        # Overwatch allows a skirmish attack (PR2 4395-4401)
+        # Validate weapon is provided
+        weapon_id = reaction_input.weapon_id
+        if not weapon_id:
+            return scenario, economy, ReactionResult(
+                success=False,
+                error="Overwatch requires a weapon",
+            )
 
-    # Update scenario
+        # Validate target is provided
+        if not reaction_input.target_ids:
+            return scenario, economy, ReactionResult(
+                success=False,
+                error="Overwatch requires a target",
+            )
+        target_id = reaction_input.target_ids[0]  # Overwatch = 1 target per skirmish rules
+
+        # Find target
+        target = next((c for c in scenario.combatants if c.id == target_id), None)
+        if target is None:
+            return scenario, economy, ReactionResult(
+                success=False,
+                error=f"Target {target_id} not found",
+            )
+
+        # Validate weapon usable (loading, limited, destroyed)
+        weapon_state = _get_weapon_state(reactor, weapon_id)
+        valid, error_msg = _validate_weapon_usable(
+            weapon_state=weapon_state,
+            weapon_id=weapon_id,
+            actor=reactor,
+            has_moved_or_acted=False,  # Reactions don't count as having moved/acted
+        )
+        if not valid:
+            return scenario, economy, ReactionResult(
+                success=False,
+                error=f"Cannot attack with {weapon_id}: {error_msg}",
+            )
+
+        # Validate range and LOS (target must be in weapon threat range)
+        valid, error_msg = _validate_attack_range_and_los(
+            scenario=scenario,
+            attacker=reactor,
+            target=target,
+            weapon_id=weapon_id,
+            is_tech_attack=False,
+        )
+        if not valid:
+            return scenario, economy, ReactionResult(
+                success=False,
+                error=error_msg,
+            )
+
+        # Resolve the attack
+        scenario, outcome = resolve_single_attack(
+            scenario=scenario,
+            attacker=reactor,
+            target=target,
+            weapon_id=weapon_id,
+            profile_id=reaction_input.weapon_profile_id,
+        )
+
+        damage_dealt = outcome.damage_dealt
+
+        # Record overwatch attack effect
+        effects_applied.append({
+            "type": "overwatch_attack",
+            "target_id": target_id,
+            "hit": outcome.hit,
+            "critical": outcome.critical,
+            "damage": outcome.damage_dealt,
+            "roll": outcome.roll,
+            "total": outcome.total,
+            "target_defense": outcome.target_defense,
+        })
+        effects_applied.extend(outcome.effects)
+
+        # Update weapon state after attack (loading, limited charges)
+        # Need to re-fetch reactor from scenario after attack resolution
+        updated_reactor_after_attack = next(
+            (c for c in scenario.combatants if c.id == reaction_input.reactor_id), None
+        )
+        if updated_reactor_after_attack is not None:
+            updated_reactor = _update_weapon_after_attack(
+                updated_reactor_after_attack, weapon_id
+            )
+            # Update per-round reactions on the already-updated reactor
+            new_per_round = dict(updated_reactor.per_round_reactions)
+            current_count = new_per_round.get(reaction_input.reaction_type, 0)
+            new_per_round[reaction_input.reaction_type] = current_count + 1
+            updated_reactor = updated_reactor.model_copy(update={"per_round_reactions": new_per_round})
+
+        # Build resource_changes and structure_checks for result
+        resource_changes: list[ResourceChange] = []
+        structure_checks: list[dict] = []
+        if outcome.resource_change is not None:
+            resource_changes.append(outcome.resource_change)
+        if outcome.structure_check is not None:
+            structure_checks.append(outcome.structure_check)
+
+        # Update scenario with updated reactor
+        reactor_idx_in_scenario = next(
+            (i for i, c in enumerate(scenario.combatants) if c.id == reaction_input.reactor_id), -1
+        )
+        if reactor_idx_in_scenario >= 0:
+            updated_combatants = list(scenario.combatants)
+            updated_combatants[reactor_idx_in_scenario] = updated_reactor
+            scenario = MechCombatScenario(
+                combatants=updated_combatants,
+                grapples=list(scenario.grapples),
+                rounds=list(scenario.rounds),
+                terrain=scenario.terrain,
+                environment=scenario.environment,
+                deployables=dict(scenario.deployables),
+            )
+
+        # Reactions clear hidden status (PR2 status clear rules)
+        scenario, cleared_statuses = _clear_statuses_by_trigger(
+            scenario, reaction_input.reactor_id, "reaction"
+        )
+
+        # Record cleared statuses in effects
+        if cleared_statuses:
+            effects_applied.append({
+                "type": "statuses_cleared",
+                "actor_id": reaction_input.reactor_id,
+                "statuses": [str(s) for s in cleared_statuses],
+                "trigger": "reaction",
+            })
+
+        return scenario, updated_economy, ReactionResult(
+            success=True,
+            reaction_used=reaction_input.reaction_type,
+            effects_applied=effects_applied,
+            damage_dealt=damage_dealt,
+            attack_hit=outcome.hit,
+            attack_critical=outcome.critical,
+            attack_roll=outcome.roll,
+            resource_changes=resource_changes,
+            structure_checks=structure_checks,
+        )
+
+    # Update scenario (for brace reaction)
     updated_combatants = list(scenario.combatants)
     updated_combatants[reactor_idx] = updated_reactor
 

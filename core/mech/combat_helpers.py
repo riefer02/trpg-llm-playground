@@ -57,14 +57,25 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-def _resolve_weapon_profile(weapon_id: str | None) -> WeaponProfile | None:
-    """Resolve weapon profile from weapon ID."""
+def _resolve_weapon_profile(
+    weapon_id: str | None,
+    profile_id: str | None = None,
+) -> WeaponProfile | None:
+    """Resolve weapon profile from weapon ID.
+
+    Args:
+        weapon_id: Weapon ID to look up
+        profile_id: Optional profile ID for weapons with multiple profiles
+
+    Returns:
+        WeaponProfile or None if weapon not found
+    """
     if weapon_id is None:
         return None
     weapon_def = get_weapon_definition(weapon_id)
     if weapon_def is None:
         return None
-    return resolve_weapon_profile(weapon_def)
+    return resolve_weapon_profile(weapon_def, profile_id)
 
 
 def _extract_tag_value(tags: list[WeaponTag], tag_name: str) -> int | None:
@@ -92,6 +103,7 @@ def _extract_area_pattern(profile: WeaponProfile) -> AttackPatternDefinition | N
 def _get_weapon_range(
     weapon_id: str | None,
     is_melee: bool = False,
+    profile_id: str | None = None,
 ) -> int:
     """Get effective range for a weapon.
 
@@ -101,6 +113,7 @@ def _get_weapon_range(
     Args:
         weapon_id: Weapon ID to look up, or None for default
         is_melee: Whether to look for threat (melee) or range (ranged)
+        profile_id: Optional profile ID for weapons with multiple profiles
 
     Returns:
         The effective range/threat value
@@ -114,7 +127,7 @@ def _get_weapon_range(
     if weapon_def is None:
         return default_range
 
-    profile = resolve_weapon_profile(weapon_def)
+    profile = resolve_weapon_profile(weapon_def, profile_id)
 
     # Look for the appropriate range type in ranges
     for range_entry in profile.ranges:
@@ -126,12 +139,19 @@ def _get_weapon_range(
     return default_range
 
 
-def _get_thrown_range(weapon_id: str | None) -> int | None:
+def _get_thrown_range(
+    weapon_id: str | None,
+    profile_id: str | None = None,
+) -> int | None:
     """Get thrown range for a weapon (if any).
 
     Thrown ranges may be represented as:
     - Range entries with range_type="thrown"
     - Weapon tags with tag="thrown" and a numeric value
+
+    Args:
+        weapon_id: Weapon ID to look up
+        profile_id: Optional profile ID for weapons with multiple profiles
     """
     if weapon_id is None:
         return None
@@ -140,7 +160,7 @@ def _get_thrown_range(weapon_id: str | None) -> int | None:
     if weapon_def is None:
         return None
 
-    profile = resolve_weapon_profile(weapon_def)
+    profile = resolve_weapon_profile(weapon_def, profile_id)
 
     thrown_values = [
         range_entry.value
@@ -156,12 +176,17 @@ def _get_thrown_range(weapon_id: str | None) -> int | None:
     return max(thrown_values) if thrown_values else None
 
 
-def _has_weapon_tag(weapon_id: str | None, tag_name: str) -> bool:
+def _has_weapon_tag(
+    weapon_id: str | None,
+    tag_name: str,
+    profile_id: str | None = None,
+) -> bool:
     """Check if a weapon has a specific tag.
 
     Args:
         weapon_id: Weapon ID to look up
         tag_name: Tag name to search for
+        profile_id: Optional profile ID for weapons with multiple profiles
 
     Returns:
         True if weapon has the tag, False otherwise
@@ -173,15 +198,19 @@ def _has_weapon_tag(weapon_id: str | None, tag_name: str) -> bool:
     if weapon_def is None:
         return False
 
-    profile = resolve_weapon_profile(weapon_def)
+    profile = resolve_weapon_profile(weapon_def, profile_id)
     return any(tag.tag == tag_name for tag in profile.tags)
 
 
-def _is_melee_weapon(weapon_id: str | None) -> bool:
+def _is_melee_weapon(
+    weapon_id: str | None,
+    profile_id: str | None = None,
+) -> bool:
     """Check if a weapon is melee (has threat range).
 
     Args:
         weapon_id: Weapon ID to look up
+        profile_id: Optional profile ID for weapons with multiple profiles
 
     Returns:
         True if weapon is melee, False otherwise
@@ -193,7 +222,7 @@ def _is_melee_weapon(weapon_id: str | None) -> bool:
     if weapon_def is None:
         return False
 
-    profile = resolve_weapon_profile(weapon_def)
+    profile = resolve_weapon_profile(weapon_def, profile_id)
 
     for range_entry in profile.ranges:
         if range_entry.range_type == "threat":
@@ -1257,6 +1286,51 @@ def _resolve_stabilize(
                 "failed": True,
                 "reason": "No repairs remaining",
             })
+
+    elif primary_option == "cancel_meltdown":
+        # Attempt to cancel meltdown via engineering check (PR2 4700-4706)
+        # Requires meltdown_state to be present
+        if updated_actor.meltdown_state is None:
+            effects.append({
+                "type": "stabilize_primary",
+                "option": "cancel_meltdown",
+                "failed": True,
+                "reason": "No active meltdown countdown",
+            })
+        else:
+            # Engineering check: 1d20 + engineering vs DC 10
+            import random
+            engineering_bonus = updated_actor.stats.engineering_skill if updated_actor.stats else 0
+            roll = random.randint(1, 20)
+            total = roll + engineering_bonus
+            dc = 10
+            success = total >= dc
+
+            if success:
+                # Clear meltdown state
+                updated_actor = updated_actor.model_copy(update={"meltdown_state": None})
+                effects.append({
+                    "type": "stabilize_primary",
+                    "option": "cancel_meltdown",
+                    "success": True,
+                    "roll": roll,
+                    "engineering_bonus": engineering_bonus,
+                    "total": total,
+                    "dc": dc,
+                    "meltdown_cancelled": True,
+                })
+            else:
+                effects.append({
+                    "type": "stabilize_primary",
+                    "option": "cancel_meltdown",
+                    "success": False,
+                    "roll": roll,
+                    "engineering_bonus": engineering_bonus,
+                    "total": total,
+                    "dc": dc,
+                    "meltdown_cancelled": False,
+                    "reason": f"Engineering check failed ({total} vs DC {dc})",
+                })
 
     # Secondary option
     if secondary_option == "reload_loading":
@@ -2457,6 +2531,459 @@ def _resolve_eject(
 
 
 # =============================================================================
+# Deployable Resolution Helpers (PR2 5070-5088)
+# =============================================================================
+
+
+def _resolve_deploy(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+    target_position: HexPosition,
+    deploy_kind: str,
+    deploy_name: str | None,
+    system_id: str | None,
+    mine_type: str | None = None,
+    current_round: int = 1,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Resolve Deploy quick action - place a deployable on the field.
+
+    Per PR2 rules:
+    - Deploy is a quick action
+    - Deployables are placed at target position
+    - Mines arm at the start of the deployer's next turn
+    - Drones act on owner's turn
+
+    Args:
+        scenario: Current combat scenario
+        actor: The combatant deploying
+        target_position: Position to deploy to
+        deploy_kind: Kind of deployable (drone, mine, deployable)
+        deploy_name: Optional name for the deployable
+        system_id: Optional system ID that provides the deployable
+        mine_type: Type of mine if deploying a mine
+        current_round: Current round number for arming calculation
+
+    Returns:
+        Tuple of (updated scenario, effects list)
+    """
+    from core.shared.deployables import create_drone, create_mine, create_deployable
+
+    effects: list[dict] = []
+
+    # Generate unique deployable ID
+    existing_ids = set(scenario.deployables.keys())
+    base_id = f"{actor.id}_{deploy_kind}"
+    deploy_id = base_id
+    counter = 1
+    while deploy_id in existing_ids:
+        deploy_id = f"{base_id}_{counter}"
+        counter += 1
+
+    # Generate name if not provided
+    if deploy_name is None:
+        deploy_name = f"{actor.name}'s {deploy_kind.title()}"
+
+    # Create the deployable based on kind
+    if deploy_kind == "mine":
+        # Default mine type if not specified
+        actual_mine_type = mine_type or "explosive"
+        deployable = create_mine(
+            id=deploy_id,
+            name=deploy_name,
+            owner_id=actor.id,
+            position=target_position,
+            mine_type=actual_mine_type,  # type: ignore
+            tier=1,
+        )
+        # Set arming turn to next turn
+        arming_turn = current_round + 1
+        deployable = deployable.model_copy(update={"arming_turn": arming_turn})
+
+        effects.append({
+            "type": "deploy",
+            "deploy_kind": "mine",
+            "deploy_id": deploy_id,
+            "deploy_name": deploy_name,
+            "mine_type": actual_mine_type,
+            "position": {
+                "q": target_position.coord.q,
+                "r": target_position.coord.r,
+                "elevation": target_position.elevation,
+            },
+            "arming_turn": arming_turn,
+            "owner_id": actor.id,
+        })
+
+    elif deploy_kind == "drone":
+        deployable = create_drone(
+            id=deploy_id,
+            name=deploy_name,
+            owner_id=actor.id,
+            position=target_position,
+            can_act=False,  # Default to no actions unless system specifies
+            can_move=True,
+            speed=4,
+        )
+
+        effects.append({
+            "type": "deploy",
+            "deploy_kind": "drone",
+            "deploy_id": deploy_id,
+            "deploy_name": deploy_name,
+            "position": {
+                "q": target_position.coord.q,
+                "r": target_position.coord.r,
+                "elevation": target_position.elevation,
+            },
+            "owner_id": actor.id,
+            "acts_on_owner_turn": True,
+        })
+
+    else:  # generic deployable
+        deployable = create_deployable(
+            id=deploy_id,
+            name=deploy_name,
+            owner_id=actor.id,
+            position=target_position,
+            size=1,
+            cover=None,
+            armor=0,
+        )
+
+        effects.append({
+            "type": "deploy",
+            "deploy_kind": "deployable",
+            "deploy_id": deploy_id,
+            "deploy_name": deploy_name,
+            "position": {
+                "q": target_position.coord.q,
+                "r": target_position.coord.r,
+                "elevation": target_position.elevation,
+            },
+            "owner_id": actor.id,
+        })
+
+    # Add deployable to scenario
+    updated_deployables = dict(scenario.deployables)
+    updated_deployables[deploy_id] = deployable
+
+    scenario = MechCombatScenario(
+        combatants=list(scenario.combatants),
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=updated_deployables,
+    )
+
+    return scenario, effects
+
+
+def _check_mine_triggers(
+    scenario: MechCombatScenario,
+    mover_id: str,
+    path: list[HexPosition],
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Check if movement path triggers armed mines.
+
+    Per PR2 5085-5086:
+    "Mines activate as soon as any character enters an adjacent space...
+    creating a burst attack starting from the space in which they were placed."
+
+    Args:
+        scenario: Current combat scenario
+        mover_id: ID of the combatant moving
+        path: Movement path being taken
+
+    Returns:
+        Tuple of (updated scenario with detonated mines removed, detonation effects)
+    """
+    from core.shared.deployables import MineDetonationInput, resolve_mine_detonation, get_mine_effect_profile
+
+    effects: list[dict] = []
+    mines_to_remove: list[str] = []
+
+    # Get the mover for faction check
+    mover = next((c for c in scenario.combatants if c.id == mover_id), None)
+    if mover is None:
+        return scenario, effects
+
+    # Check each hex in the path
+    path_coords = {(pos.coord.q, pos.coord.r) for pos in path}
+
+    for mine_id, mine in scenario.deployables.items():
+        # Only armed mines with trigger_on_adjacent_entry
+        if mine.kind != "mine" or not mine.is_armed or not mine.trigger_on_adjacent_entry:
+            continue
+
+        # Don't trigger on owner's movement
+        if mine.owner_id == mover_id:
+            continue
+
+        # Check if any path hex is adjacent to mine
+        mine_coord = mine.position.coord
+        mine_neighbors = {(n.q, n.r) for n in mine_coord.neighbors()}
+
+        # Include the mine's own hex as a trigger
+        mine_neighbors.add((mine_coord.q, mine_coord.r))
+
+        if path_coords & mine_neighbors:
+            # Mine triggered!
+            # Get mine effect profile for detonation
+            mine_type = "explosive"  # Default
+            profile = get_mine_effect_profile(mine_type, tier=1)
+
+            detonation_input = MineDetonationInput(
+                mine_id=mine_id,
+                triggerer_id=mover_id,
+                scenario=scenario,
+                effect_profile=profile,
+                tier=1,
+            )
+            detonation_result = resolve_mine_detonation(detonation_input)
+
+            if detonation_result.detonated:
+                mines_to_remove.append(mine_id)
+                effects.append({
+                    "type": "mine_detonation",
+                    "mine_id": mine_id,
+                    "mine_name": mine.name,
+                    "triggerer_id": mover_id,
+                    "affected_combatant_ids": detonation_result.affected_combatant_ids,
+                    "burst_radius": profile.burst_radius,
+                    "reason": detonation_result.reason,
+                })
+
+    # Remove detonated mines from scenario
+    if mines_to_remove:
+        updated_deployables = {
+            k: v for k, v in scenario.deployables.items()
+            if k not in mines_to_remove
+        }
+        scenario = MechCombatScenario(
+            combatants=list(scenario.combatants),
+            grapples=list(scenario.grapples),
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=updated_deployables,
+        )
+
+    return scenario, effects
+
+
+# =============================================================================
+# Single Attack Resolution (for overwatch and extracted attack logic)
+# =============================================================================
+
+
+def resolve_single_attack(
+    scenario: MechCombatScenario,
+    attacker: CombatantState,
+    target: CombatantState,
+    weapon_id: str,
+    apply_damage_func=None,
+    profile_id: str | None = None,
+) -> tuple[MechCombatScenario, "AttackOutcome"]:
+    """Resolve a single attack from attacker to target.
+
+    This is a reusable helper for attack resolution that can be called from
+    both execute_action() (skirmish/barrage) and execute_reaction() (overwatch).
+
+    Per PR2 rules:
+    - Roll 1d20 + grit vs target evasion (or e-defense for smart weapons)
+    - Apply accuracy/difficulty modifiers from statuses
+    - Apply cover difficulty for ranged attacks
+    - Check invisibility 50% miss chance
+    - Roll damage on hit (critical = 2x damage)
+    - Apply armor and AP
+
+    Args:
+        scenario: Current combat scenario
+        attacker: The attacking combatant
+        target: The target combatant
+        weapon_id: Weapon ID being used
+        apply_damage_func: Optional damage application function (for dependency injection)
+        profile_id: Optional weapon profile ID for weapons with multiple profiles
+
+    Returns:
+        Tuple of (updated scenario, AttackOutcome with hit/miss/damage info)
+    """
+    from core.shared.rolls import resolve_attack
+    from core.mech.combat_models import AttackOutcome, ResourceChange
+
+    # Lazy import to avoid circular dependency
+    if apply_damage_func is None:
+        from core.mech.combat_execution import apply_damage
+        apply_damage_func = apply_damage
+
+    effects: list[dict] = []
+
+    # Get weapon profile and tags
+    weapon_profile = _resolve_weapon_profile(weapon_id, profile_id)
+    weapon_tags = list(weapon_profile.tags) if weapon_profile else []
+
+    # Extract relevant weapon properties
+    accuracy_bonus = sum(1 for tag in weapon_tags if tag.tag == "accurate")
+    difficulty_bonus = sum(1 for tag in weapon_tags if tag.tag == "inaccurate")
+    armor_piercing = _extract_tag_value(weapon_tags, "ap") or 0
+    reliable_value = _extract_tag_value(weapon_tags, "reliable")
+    has_overkill = any(tag.tag == "overkill" for tag in weapon_tags)
+    smart_attack = any(tag.tag == "smart" for tag in weapon_tags)
+
+    # Get attack bonus from attacker's grit
+    attack_bonus = attacker.stats.grit if attacker.stats else 0
+
+    # Determine if attack is ranged
+    is_ranged_attack = True
+    if weapon_profile is not None:
+        for range_entry in weapon_profile.ranges:
+            if range_entry.range_type == "threat":
+                is_ranged_attack = False
+                break
+
+    # Get target defense
+    target_defense = target.stats.e_defense if smart_attack else target.stats.evasion
+    if target.stats is None:
+        target_defense = 8 if smart_attack else 10
+
+    # Get attacker status modifiers
+    attacker_acc_mod, attacker_diff_mod = _get_attacker_status_modifiers(attacker)
+
+    # Get target status modifiers
+    target_acc_mod, target_diff_mod, has_lock_on = _get_target_status_modifiers(
+        target, is_ranged_attack
+    )
+
+    # Get cover modifier for ranged attacks
+    cover_difficulty = 0
+    if is_ranged_attack:
+        cover_difficulty, cover_info = _get_cover_modifier(scenario, attacker, target)
+        if cover_info is not None:
+            effects.append(cover_info)
+
+    # Combine all accuracy/difficulty modifiers
+    final_accuracy_bonus = accuracy_bonus + attacker_acc_mod + target_acc_mod
+    final_difficulty_bonus = (
+        difficulty_bonus + attacker_diff_mod + target_diff_mod + cover_difficulty
+    )
+
+    # Resolve attack roll
+    attack_result = resolve_attack(
+        attack_bonus=attack_bonus,
+        target_defense=target_defense,
+        accuracy_bonus=final_accuracy_bonus,
+        difficulty_bonus=final_difficulty_bonus,
+    )
+
+    # Check for invisibility miss (50% miss chance)
+    if attack_result.hit and _check_invisibility_miss(target):
+        attack_result = attack_result.model_copy(update={"hit": False})
+        effects.append({
+            "type": "invisibility_miss",
+            "target_id": target.id,
+            "reason": "50% miss chance from invisible status",
+        })
+
+    # Record attack effect
+    effects.append({
+        "type": "attack",
+        "target_id": target.id,
+        "roll": attack_result.roll,
+        "total": attack_result.total_accuracy,
+        "hit": attack_result.hit,
+        "critical": attack_result.is_critical,
+        "accuracy_bonus": final_accuracy_bonus,
+        "difficulty_bonus": final_difficulty_bonus,
+        "status_modifiers": {
+            "attacker_acc": attacker_acc_mod,
+            "attacker_diff": attacker_diff_mod,
+            "target_acc": target_acc_mod,
+            "target_diff": target_diff_mod,
+            "cover_diff": cover_difficulty,
+        },
+    })
+
+    # Initialize outcome tracking
+    damage_dealt = 0
+    resource_change: ResourceChange | None = None
+    structure_check: dict | None = None
+
+    # Apply damage if hit
+    if attack_result.hit:
+        # Roll damage (overkill heat not tracked for reactions)
+        base_damage, _overkill_heat = _roll_weapon_damage(
+            weapon_profile, apply_overkill=has_overkill
+        )
+
+        # Critical = 2x damage
+        final_damage = base_damage * 2 if attack_result.is_critical else base_damage
+
+        # Apply exposed damage multiplier
+        if "exposed" in target.statuses:
+            final_damage = final_damage * 2
+            effects.append({
+                "type": "exposed_multiplier",
+                "target_id": target.id,
+                "multiplier": 2,
+            })
+
+        # Reliable minimum
+        if reliable_value is not None and final_damage < reliable_value:
+            final_damage = reliable_value
+
+        # Shredded ignores armor
+        effective_ap = armor_piercing
+        if "shredded" in target.statuses:
+            effective_ap = target.stats.armor if target.stats else 0
+            effects.append({
+                "type": "shredded_armor_bypass",
+                "target_id": target.id,
+                "armor_bypassed": effective_ap,
+            })
+
+        # Apply damage
+        scenario, change, structure_result = apply_damage_func(
+            scenario, target.id, final_damage, effective_ap
+        )
+        resource_change = change
+        damage_dealt = abs(change.hp_change or 0)
+
+        if structure_result:
+            structure_check = {
+                "type": "structure_check",
+                "target_id": target.id,
+                "outcome": structure_result.outcome,
+                "mech_destroyed": structure_result.mech_destroyed,
+                "statuses": [str(s) for s in structure_result.statuses_to_apply],
+                "dice_rolls": structure_result.dice_rolls,
+                "lowest_roll": structure_result.lowest_roll,
+            }
+
+        # Consume lock-on if it was used
+        if has_lock_on:
+            scenario = _remove_status_from_target(scenario, target.id, "lock_on")
+            effects.append({
+                "type": "lock_on_consumed",
+                "target_id": target.id,
+            })
+
+    return scenario, AttackOutcome(
+        hit=attack_result.hit,
+        critical=attack_result.is_critical,
+        damage_dealt=damage_dealt,
+        roll=attack_result.roll,
+        total=attack_result.total_accuracy,
+        target_defense=target_defense,
+        accuracy_bonus=final_accuracy_bonus,
+        difficulty_bonus=final_difficulty_bonus,
+        effects=effects,
+        resource_change=resource_change,
+        structure_check=structure_check,
+    )
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
@@ -2514,4 +3041,6 @@ __all__ = [
     "_resolve_mount",
     "_resolve_dismount",
     "_resolve_eject",
+    # Single Attack Resolution
+    "resolve_single_attack",
 ]

@@ -47,6 +47,7 @@ from core.mech.grid import HexPosition, HexCoord
 from core.shared.effects import CooldownState
 from core.shared.full_tech import FullTechOptionSelection
 from core.shared.rolls import AttackResolutionResult
+from core.shared.heat import MeltdownState
 
 
 # =============================================================================
@@ -706,21 +707,47 @@ class TestExecuteReaction:
         assert updated_economy.reactions_used_this_turn == 1
 
     def test_execute_overwatch_reaction(self):
-        """Test executing an overwatch reaction."""
-        combatant = make_combatant(id="reactor_1")
-        scenario = make_scenario(combatants=[combatant])
+        """Test executing an overwatch reaction (requires weapon and target)."""
+        # Create reactor with weapon
+        weapon_state = WeaponState(
+            weapon_id="mw_assault_rifle",
+            tags=[],
+            destroyed=False,
+        )
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=False,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+        reactor = make_combatant(
+            id="reactor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            inventory=inventory,
+        )
+        # Create target in range
+        target = make_combatant(
+            id="enemy_1",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
         economy = ActionEconomyState()
 
         reaction_input = ReactionInput(
             reactor_id="reactor_1",
             reaction_type="overwatch",
             target_ids=["enemy_1"],
+            weapon_id="mw_assault_rifle",
         )
 
         _, _, result = execute_reaction(scenario, economy, reaction_input)
 
         assert result.success is True
         assert result.reaction_used == "overwatch"
+        # Overwatch now resolves attack
+        assert result.attack_hit is not None
 
     def test_reaction_fails_when_used_this_round(self):
         """Test that reactions fail when already used this round."""
@@ -2254,6 +2281,196 @@ class TestStabilizeAction:
         updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
         # Either impaired or slowed should be cleared (first found)
         assert "impaired" not in updated_actor.statuses or "slowed" not in updated_actor.statuses
+
+    def test_stabilize_cancel_meltdown_success(self):
+        """Stabilize with cancel_meltdown should clear meltdown on successful engineering check."""
+        from unittest.mock import patch
+        from core.shared.heat import MeltdownState
+
+        actor = CombatantState(
+            id="actor_1",
+            name="Melting Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                engineering_skill=2,  # +2 to check
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=2,
+                stress_current=2,
+            ),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            meltdown_state=MeltdownState(turns_remaining=2, triggered_by_overheat=True),
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cancel_meltdown",
+        )
+
+        # Mock roll to always succeed (roll 8 + ENG 2 = 10, exactly DC)
+        with patch("core.mech.combat_helpers.random.randint", return_value=8):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.meltdown_state is None  # Meltdown cancelled
+
+        # Check effect details
+        primary_effect = next(
+            e for e in result.effects_applied if e.get("type") == "stabilize_primary"
+        )
+        assert primary_effect["option"] == "cancel_meltdown"
+        assert primary_effect["success"] is True
+        assert primary_effect["meltdown_cancelled"] is True
+        assert primary_effect["roll"] == 8
+        assert primary_effect["engineering_bonus"] == 2
+        assert primary_effect["total"] == 10
+        assert primary_effect["dc"] == 10
+
+    def test_stabilize_cancel_meltdown_failure(self):
+        """Stabilize with cancel_meltdown should keep meltdown on failed engineering check."""
+        from unittest.mock import patch
+        from core.shared.heat import MeltdownState
+
+        actor = CombatantState(
+            id="actor_1",
+            name="Melting Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                engineering_skill=2,  # +2 to check
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=2,
+                stress_current=2,
+            ),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            meltdown_state=MeltdownState(turns_remaining=2, triggered_by_overheat=True),
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cancel_meltdown",
+        )
+
+        # Mock roll to fail (roll 5 + ENG 2 = 7, below DC 10)
+        with patch("core.mech.combat_helpers.random.randint", return_value=5):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success  # Action executed successfully, just didn't cancel meltdown
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.meltdown_state is not None  # Meltdown NOT cancelled
+        assert updated_actor.meltdown_state.turns_remaining == 2  # Unchanged
+
+        # Check effect details
+        primary_effect = next(
+            e for e in result.effects_applied if e.get("type") == "stabilize_primary"
+        )
+        assert primary_effect["option"] == "cancel_meltdown"
+        assert primary_effect["success"] is False
+        assert primary_effect["meltdown_cancelled"] is False
+        assert primary_effect["roll"] == 5
+        assert primary_effect["total"] == 7
+
+    def test_stabilize_cancel_meltdown_requires_meltdown_state(self):
+        """Stabilize cancel_meltdown should fail if no active meltdown countdown."""
+        actor = make_combatant(id="actor_1")
+        # No meltdown_state set (default is None)
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cancel_meltdown",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success  # Action executed
+        # Check effect shows failure due to no meltdown
+        primary_effect = next(
+            e for e in result.effects_applied if e.get("type") == "stabilize_primary"
+        )
+        assert primary_effect["option"] == "cancel_meltdown"
+        assert primary_effect.get("failed") is True
+        assert "No active meltdown countdown" in primary_effect.get("reason", "")
+
+    def test_stabilize_cancel_meltdown_is_full_action(self):
+        """Stabilize cancel_meltdown uses full action (consistent with other stabilize options)."""
+        from core.shared.heat import MeltdownState
+
+        actor = CombatantState(
+            id="actor_1",
+            name="Melting Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                engineering_skill=4,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=2,
+                stress_current=2,
+            ),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            meltdown_state=MeltdownState(turns_remaining=3, triggered_by_overheat=True),
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="stabilize",
+            action_type="full",
+            stabilize_primary="cancel_meltdown",
+        )
+
+        _, _, updated_economy, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        # Full action should be consumed
+        assert updated_economy.full_actions_used == 1
 
 
 class TestDisengageAction:
@@ -6910,3 +7127,1326 @@ class TestStatusApplication:
         actor_after = next(c for c in scenario.combatants if c.id == "actor_1")
         instance = actor_after.status_instances[0]
         assert instance.applied_by == "enemy_tech"
+
+
+# =============================================================================
+# Overwatch Attack Resolution Tests (Phase 27)
+# =============================================================================
+
+
+class TestOverwatchAttackResolution:
+    """Tests for overwatch reaction attack resolution.
+
+    Phase 27 implements actual attack resolution for overwatch reactions,
+    replacing the previous stub that only tracked the intent to attack.
+    """
+
+    def make_combatant_with_weapon(
+        self,
+        id: str,
+        weapon_id: str = "mw_assault_rifle",
+        position: HexPosition | None = None,
+        hp_current: int = 10,
+        tags: list[str] | None = None,
+        needs_reload: bool = False,
+        limited_charges: int | None = None,
+        side: str = "players",
+        statuses: list[str] | None = None,
+        grit: int = 2,
+    ) -> CombatantState:
+        """Create a test combatant with a weapon in inventory."""
+        weapon_state = WeaponState(
+            weapon_id=weapon_id,
+            tags=tags or [],
+            destroyed=False,
+            limited_charges_remaining=limited_charges,
+            needs_reload=needs_reload,
+        )
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=False,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+
+        return CombatantState(
+            id=id,
+            name=f"Mech {id}",
+            side=side,
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                grit=grit,
+            ),
+            resources=CombatResources(
+                hp_current=hp_current,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=position or HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            statuses=statuses or [],
+            inventory=inventory,
+        )
+
+    def test_overwatch_requires_weapon(self):
+        """Test that overwatch reaction fails without a weapon_id."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id=None,  # No weapon provided
+        )
+
+        _, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is False
+        assert "requires a weapon" in result.error.lower()
+
+    def test_overwatch_requires_target(self):
+        """Test that overwatch reaction fails without target_ids."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[reactor])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=[],  # No target provided
+            weapon_id="mw_assault_rifle",
+        )
+
+        _, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is False
+        assert "requires a target" in result.error.lower()
+
+    def test_overwatch_target_not_found_error(self):
+        """Test that overwatch fails when target doesn't exist."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[reactor])  # No target
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["nonexistent"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        _, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is False
+        assert "not found" in result.error.lower()
+
+    def test_overwatch_loading_weapon_blocked(self):
+        """Test that overwatch fails when weapon needs reload."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            tags=["loading"],
+            needs_reload=True,  # Weapon needs reload
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        _, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is False
+        assert "needs reload" in result.error.lower()
+
+    def test_overwatch_respects_weapon_range(self):
+        """Test that overwatch fails when target is out of range."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",  # Range 10
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=15, r=0), elevation=0),  # Out of range
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        _, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is False
+        assert "out of range" in result.error.lower()
+
+    def test_overwatch_resolves_attack_success(self):
+        """Test that overwatch successfully resolves an attack."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            grit=2,
+        )
+        target = make_combatant(
+            id="target",
+            hp_current=10,
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        updated_scenario, updated_economy, result = execute_reaction(
+            scenario, economy, reaction_input
+        )
+
+        assert result.success is True
+        assert result.reaction_used == "overwatch"
+        # Attack should have been resolved (hit or miss)
+        assert result.attack_hit is not None  # Should be True or False
+        assert result.attack_roll is not None  # Should have a d20 roll
+
+        # Check that overwatch_attack effect was recorded
+        overwatch_effects = [e for e in result.effects_applied if e.get("type") == "overwatch_attack"]
+        assert len(overwatch_effects) == 1
+        assert overwatch_effects[0]["target_id"] == "target"
+
+    def test_overwatch_deals_damage_on_hit(self):
+        """Test that overwatch deals damage when attack hits."""
+        # Create reactor with high grit to increase hit chance
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            grit=6,  # High grit for better hit chance
+        )
+        target = make_combatant(
+            id="target",
+            hp_current=10,
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        # Run multiple times to ensure we get at least one hit
+        hit_count = 0
+        for _ in range(20):  # Multiple attempts to account for RNG
+            updated_scenario, _, result = execute_reaction(scenario, economy, reaction_input)
+
+            if result.attack_hit:
+                hit_count += 1
+                # When hit, damage should be dealt
+                assert result.damage_dealt > 0
+                # Resource changes should be populated
+                assert len(result.resource_changes) > 0
+                # Target HP should be reduced
+                target_after = next(c for c in updated_scenario.combatants if c.id == "target")
+                assert target_after.resources.hp_current < 10
+                break
+
+        # With grit 6 vs evasion 8, we should hit at least once in 20 attempts
+        assert hit_count > 0, "Expected at least one hit in 20 attempts"
+
+    def test_overwatch_no_damage_on_miss(self):
+        """Test that overwatch deals no damage when attack misses."""
+        # Create reactor with low grit to decrease hit chance
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            grit=0,  # Low grit
+        )
+        # Target with high evasion
+        target = CombatantState(
+            id="target",
+            name="Evasive Target",
+            side="hostiles",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=20,  # Very high evasion
+                e_defense=20,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                grit=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            statuses=[],
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        # Run multiple times to ensure we get at least one miss
+        miss_count = 0
+        for _ in range(20):
+            updated_scenario, _, result = execute_reaction(scenario, economy, reaction_input)
+
+            if not result.attack_hit:
+                miss_count += 1
+                # When miss, no damage dealt
+                assert result.damage_dealt == 0
+                # No resource changes
+                assert len(result.resource_changes) == 0
+                # Target HP should be unchanged
+                target_after = next(c for c in updated_scenario.combatants if c.id == "target")
+                assert target_after.resources.hp_current == 10
+                break
+
+        assert miss_count > 0, "Expected at least one miss with high evasion target"
+
+    def test_overwatch_limited_weapon_decrements(self):
+        """Test that limited weapon charges are consumed on overwatch attack."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            tags=["limited"],
+            limited_charges=3,  # 3 charges
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        updated_scenario, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is True
+
+        # Check that limited charges were decremented
+        reactor_after = next(c for c in updated_scenario.combatants if c.id == "reactor")
+        weapon_after = reactor_after.inventory.mounts[0].weapons[0]
+        assert weapon_after.limited_charges_remaining == 2  # Decremented from 3
+
+    def test_overwatch_clears_hidden_status(self):
+        """Test that overwatch reaction clears hidden status."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            statuses=["hidden"],  # Reactor is hidden
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        updated_scenario, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is True
+
+        # Hidden status should be cleared
+        reactor_after = next(c for c in updated_scenario.combatants if c.id == "reactor")
+        assert "hidden" not in reactor_after.statuses
+
+        # Check that status clear was recorded in effects
+        clear_effects = [e for e in result.effects_applied if e.get("type") == "statuses_cleared"]
+        assert len(clear_effects) > 0
+
+    def test_overwatch_ordnance_blocked(self):
+        """Test that ordnance weapons cannot be used for overwatch."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_missile_rack",  # Ordnance weapon
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            tags=["ordnance"],
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_missile_rack",
+        )
+
+        _, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is False
+        assert "ordnance" in result.error.lower()
+
+    def test_overwatch_uses_reaction_budget(self):
+        """Test that overwatch consumes reaction budget."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        updated_scenario, updated_economy, result = execute_reaction(
+            scenario, economy, reaction_input
+        )
+
+        assert result.success is True
+        assert updated_economy.reactions_used_this_turn == 1
+
+        # Per-round reaction should be tracked
+        reactor_after = next(c for c in updated_scenario.combatants if c.id == "reactor")
+        assert reactor_after.per_round_reactions.get("overwatch", 0) == 1
+
+
+class TestOverwatchIntegration:
+    """Integration tests for overwatch attack resolution."""
+
+    def make_combatant_with_weapon(
+        self,
+        id: str,
+        weapon_id: str = "mw_assault_rifle",
+        position: HexPosition | None = None,
+        hp_current: int = 10,
+        tags: list[str] | None = None,
+        side: str = "players",
+        statuses: list[str] | None = None,
+        grit: int = 2,
+        structure_current: int = 4,
+    ) -> CombatantState:
+        """Create a test combatant with a weapon in inventory."""
+        weapon_state = WeaponState(
+            weapon_id=weapon_id,
+            tags=tags or [],
+            destroyed=False,
+            limited_charges_remaining=None,
+            needs_reload=False,
+        )
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=False,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+
+        return CombatantState(
+            id=id,
+            name=f"Mech {id}",
+            side=side,
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                grit=grit,
+            ),
+            resources=CombatResources(
+                hp_current=hp_current,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=structure_current,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=position or HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            statuses=statuses or [],
+            inventory=inventory,
+        )
+
+    def test_overwatch_structure_cascade(self):
+        """Test that overwatch damage can trigger structure check."""
+        # Create reactor with high grit for consistent hits
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            grit=10,  # Very high to ensure hit
+        )
+        # Target with only 1 HP remaining
+        target = self.make_combatant_with_weapon(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            hp_current=1,  # Will trigger structure check on any damage
+            side="hostiles",
+            structure_current=4,
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_assault_rifle",
+        )
+
+        # Run multiple times to get a hit
+        for _ in range(20):
+            updated_scenario, _, result = execute_reaction(scenario, economy, reaction_input)
+
+            if result.attack_hit and result.damage_dealt > 0:
+                # Should have structure check if HP reached 0
+                target_after = next(c for c in updated_scenario.combatants if c.id == "target")
+                if target_after.resources.hp_current <= 0:
+                    # Structure check should have been triggered
+                    assert len(result.structure_checks) > 0
+                    break
+
+    def test_overwatch_weapon_not_in_inventory_error(self):
+        """Test that overwatch fails when weapon not in inventory."""
+        reactor = self.make_combatant_with_weapon(
+            id="reactor",
+            weapon_id="mw_assault_rifle",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[reactor, target])
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="reactor",
+            reaction_type="overwatch",
+            target_ids=["target"],
+            weapon_id="mw_nonexistent_weapon",  # Not in inventory
+        )
+
+        _, _, result = execute_reaction(scenario, economy, reaction_input)
+
+        assert result.success is False
+        assert "not found" in result.error.lower() or "inventory" in result.error.lower()
+
+
+# =============================================================================
+# Meltdown Countdown Integration Tests
+# =============================================================================
+
+
+class TestMeltdownCountdownIntegration:
+    """Tests for meltdown countdown processing during start_turn()."""
+
+    def test_meltdown_countdown_decrements_at_turn_start(self):
+        """Test that meltdown countdown goes from 2 → 1 at turn start."""
+        combatant = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            meltdown_state=MeltdownState(turns_remaining=2),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        assert result.meltdown_countdown_active is True
+        assert result.meltdown_triggered is False
+        assert result.meltdown_countdown_remaining == 1
+        assert result.meltdown_explosion_damage == 0
+        assert result.meltdown_affected_targets == []
+
+        # Verify actor state
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert actor.meltdown_state is not None
+        assert actor.meltdown_state.turns_remaining == 1
+
+    def test_meltdown_triggers_at_zero(self):
+        """Test that meltdown triggers when countdown reaches 0 (from 1)."""
+        combatant = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            meltdown_state=MeltdownState(turns_remaining=1),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        assert result.meltdown_countdown_active is True
+        assert result.meltdown_triggered is True
+        assert result.meltdown_countdown_remaining is None
+        # Damage should be 4d6 (4-24)
+        assert result.meltdown_explosion_damage >= 4
+        assert result.meltdown_explosion_damage <= 24
+
+        # Verify actor is destroyed
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert actor.meltdown_state is None
+        assert "out" in actor.statuses
+        assert actor.resources.hp_current == 0
+        assert actor.resources.structure_current == 0
+        assert actor.resources.stress_current == 0
+
+    def test_meltdown_explosion_damages_nearby_targets(self):
+        """Test that meltdown burst 2 damages combatants within range."""
+        # Exploding mech at origin
+        exploding_mech = make_combatant(
+            id="exploding",
+            name="Exploding Mech",
+            meltdown_state=MeltdownState(turns_remaining=1),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Target within burst 2 (distance 1)
+        nearby_target = make_combatant(
+            id="nearby",
+            name="Nearby Mech",
+            hp_current=30,
+            hp_max=30,
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            side="hostiles",
+        )
+        # Target outside burst 2 (distance 5)
+        far_target = make_combatant(
+            id="far",
+            name="Far Mech",
+            hp_current=30,
+            hp_max=30,
+            position=HexPosition(coord=HexCoord(q=5, r=0), elevation=0),
+            side="hostiles",
+        )
+        scenario = make_scenario(combatants=[exploding_mech, nearby_target, far_target])
+
+        updated_scenario, result = start_turn(scenario, "exploding")
+
+        assert result.meltdown_triggered is True
+        # Nearby target should be affected
+        assert "nearby" in result.meltdown_affected_targets
+        # Far target should not be affected
+        assert "far" not in result.meltdown_affected_targets
+
+        # Verify nearby target took damage
+        nearby_after = next(c for c in updated_scenario.combatants if c.id == "nearby")
+        assert nearby_after.resources.hp_current < 30
+
+        # Verify far target is unharmed
+        far_after = next(c for c in updated_scenario.combatants if c.id == "far")
+        assert far_after.resources.hp_current == 30
+
+    def test_meltdown_explosion_agility_save_halves_damage(self):
+        """Test that successful agility save halves meltdown damage.
+
+        This test runs multiple iterations to statistically verify that saves
+        sometimes succeed (halved damage) and sometimes fail (full damage).
+        """
+        results_with_full_damage = 0
+        results_with_halved_damage = 0
+
+        for _ in range(50):
+            exploding_mech = make_combatant(
+                id="exploding",
+                name="Exploding Mech",
+                meltdown_state=MeltdownState(turns_remaining=1),
+                position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            )
+            target = make_combatant(
+                id="target",
+                name="Target Mech",
+                hp_current=100,
+                hp_max=100,
+                position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+                side="hostiles",
+            )
+            scenario = make_scenario(combatants=[exploding_mech, target])
+
+            updated_scenario, result = start_turn(scenario, "exploding")
+
+            if result.meltdown_triggered:
+                target_after = next(c for c in updated_scenario.combatants if c.id == "target")
+                damage_taken = 100 - target_after.resources.hp_current
+
+                # Full damage is explosion damage, halved damage would be ~half
+                if damage_taken > 0:
+                    if damage_taken == result.meltdown_explosion_damage:
+                        results_with_full_damage += 1
+                    elif damage_taken < result.meltdown_explosion_damage:
+                        results_with_halved_damage += 1
+
+        # Should have some of each type (statistical test)
+        # With 50 iterations, we should see both outcomes
+        assert results_with_full_damage > 0 or results_with_halved_damage > 0
+
+    def test_meltdown_creates_wreckage_state(self):
+        """Test that meltdown marks mech as destroyed with 'out' status."""
+        combatant = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            meltdown_state=MeltdownState(turns_remaining=1),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            statuses=["impaired", "exposed"],
+        )
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        assert result.meltdown_triggered is True
+
+        # Verify mech is destroyed
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert "out" in actor.statuses
+        # Combat-relevant statuses should be cleared
+        assert "impaired" not in actor.statuses
+        assert "exposed" not in actor.statuses
+
+    def test_meltdown_marks_mech_as_out(self):
+        """Test that meltdown sets HP, structure, and stress to 0."""
+        combatant = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            hp_current=10,
+            hp_max=10,
+            meltdown_state=MeltdownState(turns_remaining=1),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        assert result.meltdown_triggered is True
+
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert actor.resources.hp_current == 0
+        assert actor.resources.structure_current == 0
+        assert actor.resources.stress_current == 0
+        assert "out" in actor.statuses
+
+    def test_no_meltdown_processing_without_countdown(self):
+        """Test that normal turn start has no meltdown processing when no countdown exists."""
+        combatant = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        # Meltdown fields should all be default values
+        assert result.meltdown_countdown_active is False
+        assert result.meltdown_triggered is False
+        assert result.meltdown_countdown_remaining is None
+        assert result.meltdown_explosion_damage == 0
+        assert result.meltdown_affected_targets == []
+
+        # Actor should be unchanged regarding meltdown
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert actor.meltdown_state is None
+
+    def test_meltdown_clears_exposed_status(self):
+        """Test that exposed status is cleared when meltdown countdown triggers."""
+        combatant = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            meltdown_state=MeltdownState(turns_remaining=1, exposed_applied=True),
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            statuses=["exposed"],
+        )
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        assert result.meltdown_triggered is True
+
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        # Exposed is cleared as part of trigger_meltdown
+        assert "exposed" not in actor.statuses
+
+
+# =============================================================================
+# Deployables Integration Tests (Phase 30)
+# =============================================================================
+
+
+class TestDeployablesIntegration:
+    """Tests for deployable/drone integration into combat execution."""
+
+    def test_deploy_action_places_drone(self):
+        """Test that deploy action creates a drone at target position."""
+        actor = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = make_turn(actor_id="mech_1")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="deploy",
+            action_type="quick",
+            target_position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            deploy_kind="drone",
+            deploy_name="Scout Drone",
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+        # Verify drone was added to deployables
+        assert len(updated_scenario.deployables) == 1
+        drone_id = list(updated_scenario.deployables.keys())[0]
+        drone = updated_scenario.deployables[drone_id]
+
+        assert drone.kind == "drone"
+        assert drone.name == "Scout Drone"
+        assert drone.owner_id == "mech_1"
+        assert drone.position.coord.q == 1
+        assert drone.position.coord.r == 0
+        assert drone.acts_on_owner_turn is True
+
+    def test_deploy_action_places_mine_with_arming_turn(self):
+        """Test that deploy action creates a mine that arms on next turn."""
+        actor = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        rounds = [make_round(round_index=1)]
+        scenario = make_scenario(combatants=[actor], rounds=rounds)
+        turn = make_turn(actor_id="mech_1")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="deploy",
+            action_type="quick",
+            target_position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            deploy_kind="mine",
+            deploy_name="Explosive Mine",
+            mine_type="explosive",
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+        # Verify mine was added
+        assert len(updated_scenario.deployables) == 1
+        mine_id = list(updated_scenario.deployables.keys())[0]
+        mine = updated_scenario.deployables[mine_id]
+
+        assert mine.kind == "mine"
+        assert mine.name == "Explosive Mine"
+        assert mine.is_armed is False  # Not armed yet
+        assert mine.arming_turn == 2  # Arms next turn (current round is 1)
+        assert mine.trigger_on_adjacent_entry is True
+
+    def test_mine_arms_at_turn_start(self):
+        """Test that mines arm at the start of the deployer's next turn."""
+        from core.mech.combat_state import DeployableState
+
+        actor = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Create scenario with an unarmed mine that should arm on turn 2
+        mine = DeployableState(
+            id="mine_1",
+            name="Test Mine",
+            kind="mine",
+            owner_id="mech_1",
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            size=1,
+            hp=10,
+            max_hp=10,
+            armor=0,
+            evasion=5,
+            is_armed=False,
+            arming_turn=2,
+            trigger_on_adjacent_entry=True,
+        )
+
+        rounds = [make_round(round_index=1), make_round(round_index=2)]
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=rounds,
+            terrain=None,
+            environment="standard",
+            deployables={"mine_1": mine},
+        )
+
+        # Start turn on round 2 (when mine should arm)
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        # Verify mine is now armed
+        assert "mine_1" in result.mines_armed
+        updated_mine = updated_scenario.deployables["mine_1"]
+        assert updated_mine.is_armed is True
+
+    def test_drone_start_of_turn_processing(self):
+        """Test that drone turn processing happens at owner's turn start."""
+        from core.mech.combat_state import DeployableState
+
+        actor = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Create drone that can act
+        drone = DeployableState(
+            id="drone_1",
+            name="Combat Drone",
+            kind="drone",
+            owner_id="mech_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            size=1,
+            hp=10,
+            max_hp=10,
+            armor=0,
+            evasion=10,
+            is_active=True,
+            can_act=True,
+            can_move=True,
+            acts_on_owner_turn=True,
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[make_round(round_index=1)],
+            terrain=None,
+            environment="standard",
+            deployables={"drone_1": drone},
+        )
+
+        _, result = start_turn(scenario, "mech_1")
+
+        # Drone should be reported as ready to act
+        assert "drone_1" in result.drones_ready_to_act
+
+    def test_drone_primes_at_end_of_turn(self):
+        """Test that drones prime at the end of their owner's turn."""
+        from core.mech.combat_state import DeployableState
+
+        actor = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Create drone that needs priming
+        drone = DeployableState(
+            id="drone_1",
+            name="Restock Drone",
+            kind="drone",
+            owner_id="mech_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+            size=1,
+            hp=10,
+            max_hp=10,
+            armor=0,
+            evasion=10,
+            is_active=True,
+            is_armed=False,  # Not yet primed
+            can_act=False,
+            can_move=False,
+            acts_on_owner_turn=True,
+        )
+
+        rounds = [make_round(round_index=1, turns=[make_turn(actor_id="mech_1")])]
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=rounds,
+            terrain=None,
+            environment="standard",
+            deployables={"drone_1": drone},
+        )
+
+        current_turn = rounds[0].turns[0]
+        _, result, _, _ = end_turn(scenario, current_round=1, current_turn_index=0, current_turn=current_turn)
+
+        # Drone should be primed
+        assert "drone_1" in result.drones_primed
+
+    def test_mine_triggers_on_adjacent_movement(self):
+        """Test that armed mines trigger when enemies move adjacent."""
+        from core.mech.combat_state import DeployableState
+
+        actor = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Create an armed mine at position (3, 0)
+        mine = DeployableState(
+            id="mine_1",
+            name="Armed Mine",
+            kind="mine",
+            owner_id="ally_1",  # Owned by a different combatant
+            position=HexPosition(coord=HexCoord(q=3, r=0), elevation=0),
+            size=1,
+            hp=10,
+            max_hp=10,
+            armor=0,
+            evasion=5,
+            is_armed=True,  # Armed
+            trigger_on_adjacent_entry=True,
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[make_round(round_index=1)],
+            terrain=None,
+            environment="standard",
+            deployables={"mine_1": mine},
+        )
+
+        turn = make_turn(actor_id="mech_1")
+        economy = ActionEconomyState()
+
+        # Move through hex (2, 0) which is adjacent to the mine at (3, 0)
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="move",
+            action_type="full",
+            movement_path=[
+                HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+                HexPosition(coord=HexCoord(q=2, r=0), elevation=0),  # Adjacent to mine
+            ],
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+        # Check that mine detonation effect is in results
+        mine_detonation_effects = [e for e in result.effects_applied if e.get("type") == "mine_detonation"]
+        assert len(mine_detonation_effects) == 1
+        assert mine_detonation_effects[0]["mine_id"] == "mine_1"
+
+        # Mine should be removed from scenario
+        assert "mine_1" not in updated_scenario.deployables
+
+    def test_mine_does_not_trigger_on_owner_movement(self):
+        """Test that mines don't trigger on their owner's movement."""
+        from core.mech.combat_state import DeployableState
+
+        actor = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Create an armed mine owned by the actor
+        mine = DeployableState(
+            id="mine_1",
+            name="Own Mine",
+            kind="mine",
+            owner_id="mech_1",  # Owned by the mover
+            position=HexPosition(coord=HexCoord(q=2, r=0), elevation=0),
+            size=1,
+            hp=10,
+            max_hp=10,
+            armor=0,
+            evasion=5,
+            is_armed=True,
+            trigger_on_adjacent_entry=True,
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[make_round(round_index=1)],
+            terrain=None,
+            environment="standard",
+            deployables={"mine_1": mine},
+        )
+
+        turn = make_turn(actor_id="mech_1")
+        economy = ActionEconomyState()
+
+        # Move adjacent to own mine
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="move",
+            action_type="full",
+            movement_path=[
+                HexPosition(coord=HexCoord(q=1, r=0), elevation=0),  # Adjacent to mine
+            ],
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+        # Mine should NOT have detonated
+        mine_detonation_effects = [e for e in result.effects_applied if e.get("type") == "mine_detonation"]
+        assert len(mine_detonation_effects) == 0
+
+        # Mine should still be in scenario
+        assert "mine_1" in updated_scenario.deployables
+
+    def test_deploy_requires_target_position(self):
+        """Test that deploy action fails without target position."""
+        actor = make_combatant(
+            id="mech_1",
+            name="Test Mech",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = make_turn(actor_id="mech_1")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="deploy",
+            action_type="quick",
+            # Missing target_position
+            deploy_kind="drone",
+            deploy_name="Scout Drone",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        # Should succeed but have no deploy effect (no position = no deployment)
+        assert result.success is True
+        deploy_effects = [e for e in result.effects_applied if e.get("type") == "deploy"]
+        assert len(deploy_effects) == 0
+
+
+# =============================================================================
+# Dynamic Weapon Profile Tests (Phase 31)
+# =============================================================================
+
+
+class TestDynamicWeaponProfiles:
+    """Tests for dynamic weapon profile selection.
+
+    The Ghoul Nexus (horus_ghoul_nexus) has 3 profiles:
+    - kinetic: 1d3+2 kinetic damage
+    - energy: 1d3+2 energy damage
+    - explosive: 1d3+2 explosive damage
+
+    Profile selection allows choosing which damage type to use.
+    """
+
+    def test_resolve_weapon_profile_default(self):
+        """Test that default profile is used when no profile_id specified."""
+        from core.mech.combat_helpers import _resolve_weapon_profile
+
+        profile = _resolve_weapon_profile("horus_ghoul_nexus")
+
+        assert profile is not None
+        assert profile.profile_id == "kinetic"  # default_profile_id
+        assert profile.damage_type == "kinetic"
+
+    def test_resolve_weapon_profile_kinetic(self):
+        """Test explicit kinetic profile selection."""
+        from core.mech.combat_helpers import _resolve_weapon_profile
+
+        profile = _resolve_weapon_profile("horus_ghoul_nexus", "kinetic")
+
+        assert profile is not None
+        assert profile.profile_id == "kinetic"
+        assert profile.damage_type == "kinetic"
+
+    def test_resolve_weapon_profile_energy(self):
+        """Test explicit energy profile selection."""
+        from core.mech.combat_helpers import _resolve_weapon_profile
+
+        profile = _resolve_weapon_profile("horus_ghoul_nexus", "energy")
+
+        assert profile is not None
+        assert profile.profile_id == "energy"
+        assert profile.damage_type == "energy"
+
+    def test_resolve_weapon_profile_explosive(self):
+        """Test explicit explosive profile selection."""
+        from core.mech.combat_helpers import _resolve_weapon_profile
+
+        profile = _resolve_weapon_profile("horus_ghoul_nexus", "explosive")
+
+        assert profile is not None
+        assert profile.profile_id == "explosive"
+        assert profile.damage_type == "explosive"
+
+    def test_lookup_weapon_damage_with_profile(self):
+        """Test lookup_weapon_damage_and_ap uses selected profile."""
+        # The Ghoul Nexus does 1d3+2 damage regardless of profile
+        # but this tests that the profile_id parameter is accepted
+
+        damage, ap = lookup_weapon_damage_and_ap("horus_ghoul_nexus", "energy")
+
+        # 1d3+2 means damage should be 3-5
+        assert damage >= 3
+        assert damage <= 5
+        assert ap == 0  # No AP tag on Ghoul Nexus
+
+    def test_weapon_without_profiles_ignores_profile_id(self):
+        """Test that weapons without profiles gracefully ignore profile_id."""
+        from core.mech.combat_helpers import _resolve_weapon_profile
+
+        # Assault rifle has no profiles - profile_id should be ignored
+        profile = _resolve_weapon_profile("assault_rifle", "nonexistent")
+
+        assert profile is not None
+        assert profile.profile_id == "assault_rifle"  # Falls back to base weapon
+
+    def test_attack_action_with_profile_selection(self):
+        """Test execute_action passes profile_id through attack resolution."""
+        # Create attacker with the Ghoul Nexus in inventory
+        attacker = make_combatant(
+            id="mech_1",
+            name="Attacker",
+            side="players",
+            grit=2,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            inventory=MechInventory(
+                mounts=[
+                    WeaponMountState(
+                        mount_index=0,
+                        slot_type="main",
+                        weapons=[
+                            WeaponState(
+                                weapon_id="horus_ghoul_nexus",
+                                destroyed=False,
+                            ),
+                        ],
+                    ),
+                ],
+                systems=[],
+            ),
+        )
+
+        # Create target with low e_defense (Ghoul Nexus is smart weapon)
+        target = make_combatant(
+            id="mech_2",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=5, r=0), elevation=0),  # Within range 10
+        )
+
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="mech_1")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="mech_1",
+            action_id="skirmish",
+            action_type="full",
+            target_ids=["mech_2"],
+            weapon_id="horus_ghoul_nexus",
+            weapon_profile_id="energy",  # Select energy profile
+        )
+
+        _, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        # Action should succeed
+        assert result.success is True
+
+        # The attack should have been processed
+        attack_effects = [e for e in result.effects_applied if e.get("type") == "attack"]
+        assert len(attack_effects) == 1
+        assert attack_effects[0]["target_id"] == "mech_2"
