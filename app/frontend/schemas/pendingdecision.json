@@ -1,0 +1,120 @@
+{
+  "description": "A pending decision that requires player input.\n\nThis model captures all context needed to present a decision prompt\nto the player and resolve their choice.",
+  "properties": {
+    "decision_id": {
+      "description": "Unique identifier for this decision",
+      "title": "Decision Id",
+      "type": "string"
+    },
+    "decision_type": {
+      "description": "Type of decision required",
+      "enum": [
+        "hull_save",
+        "engineering_save",
+        "engineering_check",
+        "system_trauma"
+      ],
+      "title": "Decision Type",
+      "type": "string"
+    },
+    "combatant_id": {
+      "description": "ID of combatant who must make the decision",
+      "title": "Combatant Id",
+      "type": "string"
+    },
+    "trigger_source": {
+      "description": "What triggered this decision (e.g., 'structure_cascade', 'meltdown', 'dangerous_terrain')",
+      "title": "Trigger Source",
+      "type": "string"
+    },
+    "trigger_round": {
+      "description": "Round number when this decision was created",
+      "minimum": 1,
+      "title": "Trigger Round",
+      "type": "integer"
+    },
+    "save_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "hull",
+            "agility",
+            "systems",
+            "engineering"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Type of save required (hull, engineering, etc.)",
+      "title": "Save Type"
+    },
+    "save_target": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Save target DC",
+      "title": "Save Target"
+    },
+    "save_bonus": {
+      "default": 0,
+      "description": "Bonus to save roll from skills",
+      "title": "Save Bonus",
+      "type": "integer"
+    },
+    "eligible_mounts": {
+      "description": "Mount indices eligible for destruction",
+      "items": {
+        "type": "integer"
+      },
+      "title": "Eligible Mounts",
+      "type": "array"
+    },
+    "eligible_systems": {
+      "description": "System IDs eligible for destruction",
+      "items": {
+        "type": "string"
+      },
+      "title": "Eligible Systems",
+      "type": "array"
+    },
+    "reroll_available": {
+      "default": false,
+      "description": "Whether a reroll is available from talents",
+      "title": "Reroll Available",
+      "type": "boolean"
+    },
+    "reroll_source": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Source of reroll if available",
+      "title": "Reroll Source"
+    }
+  },
+  "required": [
+    "decision_id",
+    "decision_type",
+    "combatant_id",
+    "trigger_source",
+    "trigger_round"
+  ],
+  "title": "PendingDecision",
+  "type": "object"
+}

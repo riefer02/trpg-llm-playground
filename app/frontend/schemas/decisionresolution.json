@@ -1,0 +1,53 @@
+{
+  "description": "Player's resolution of a pending decision.\n\nContains the player's choice and any additional parameters\nneeded to resolve the decision.",
+  "properties": {
+    "choice": {
+      "description": "Player's chosen action",
+      "enum": [
+        "roll",
+        "voluntary_fail",
+        "use_reroll"
+      ],
+      "title": "Choice",
+      "type": "string"
+    },
+    "selected_mount_index": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Mount index selected for system trauma",
+      "title": "Selected Mount Index"
+    },
+    "selected_system_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "System ID selected for system trauma",
+      "title": "Selected System Id"
+    },
+    "used_reroll": {
+      "default": false,
+      "description": "Whether the player used their reroll",
+      "title": "Used Reroll",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "choice"
+  ],
+  "title": "DecisionResolution",
+  "type": "object"
+}

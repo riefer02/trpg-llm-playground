@@ -1,0 +1,144 @@
+{
+  "$defs": {
+    "SaveResult": {
+      "description": "Result of a save resolution.\n\nAttributes:\n    save_type: Type of save that was made\n    roll: The d20 roll (None if auto-succeed/fail)\n    roll_with_bonus: Roll plus flat bonus\n    total: Final total including all modifiers\n    target: Save target that was needed\n    success: Whether the save succeeded (total >= target)\n    degree: Success/failure classification including criticals\n    difficulty_modifier: Total difficulty from conditions\n    accuracy_modifier: Total accuracy from effects\n    flat_bonus: Flat bonus from skill/grit\n    modifier_breakdown: Human-readable breakdown of modifiers\n    reason: Explanation of the result",
+      "properties": {
+        "save_type": {
+          "enum": [
+            "hull",
+            "agility",
+            "systems",
+            "engineering"
+          ],
+          "title": "Save Type",
+          "type": "string"
+        },
+        "roll": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Roll"
+        },
+        "roll_with_bonus": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Roll With Bonus"
+        },
+        "total": {
+          "title": "Total",
+          "type": "integer"
+        },
+        "target": {
+          "title": "Target",
+          "type": "integer"
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        },
+        "degree": {
+          "enum": [
+            "critical_success",
+            "success",
+            "failure",
+            "critical_failure"
+          ],
+          "title": "Degree",
+          "type": "string"
+        },
+        "difficulty_modifier": {
+          "title": "Difficulty Modifier",
+          "type": "integer"
+        },
+        "accuracy_modifier": {
+          "title": "Accuracy Modifier",
+          "type": "integer"
+        },
+        "flat_bonus": {
+          "title": "Flat Bonus",
+          "type": "integer"
+        },
+        "modifier_breakdown": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Modifier Breakdown",
+          "type": "object"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "save_type",
+        "roll",
+        "roll_with_bonus",
+        "total",
+        "target",
+        "success",
+        "degree",
+        "difficulty_modifier",
+        "accuracy_modifier",
+        "flat_bonus"
+      ],
+      "title": "SaveResult",
+      "type": "object"
+    }
+  },
+  "description": "Result of resolving a save decision.\n\nContains the save result and whether the save was voluntarily failed.",
+  "properties": {
+    "decision_id": {
+      "description": "ID of the resolved decision",
+      "title": "Decision Id",
+      "type": "string"
+    },
+    "save_result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SaveResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Save roll result if roll was made"
+    },
+    "voluntarily_failed": {
+      "default": false,
+      "description": "Whether the save was voluntarily failed",
+      "title": "Voluntarily Failed",
+      "type": "boolean"
+    },
+    "reroll_used": {
+      "default": false,
+      "description": "Whether a reroll was used",
+      "title": "Reroll Used",
+      "type": "boolean"
+    },
+    "success": {
+      "description": "Whether the save/check succeeded",
+      "title": "Success",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "decision_id",
+    "success"
+  ],
+  "title": "SaveDecisionResult",
+  "type": "object"
+}

@@ -263,7 +263,11 @@ export type LancerTTRPGSchema =
   | SitrepVictoryCondition
   | ZoneControlStateTracker
   | PlayerPartyPower
-  | EnemyForceRecommendation;
+  | EnemyForceRecommendation
+  | PendingDecision
+  | DecisionResolution
+  | SaveDecisionResult
+  | TraumaDecisionResult;
 export type Id = string;
 /**
  * The pilot's callsign
@@ -30100,6 +30104,58 @@ export type ReservePool = string[];
 export type ReservesSpawnedPerRound = number | null;
 export type LastIngressZone = string | null;
 export type ReservePattern = "none" | "half" | "normal" | "double" | "increasing";
+/**
+ * Unique identifier for this decision
+ */
+export type DecisionId = string;
+/**
+ * Type of decision required
+ */
+export type DecisionType = "hull_save" | "engineering_save" | "engineering_check" | "system_trauma";
+/**
+ * ID of combatant who must make the decision
+ */
+export type CombatantId1 = string;
+/**
+ * What triggered this decision (e.g., 'structure_cascade', 'meltdown', 'dangerous_terrain')
+ */
+export type TriggerSource = string;
+/**
+ * Round number when this decision was created
+ */
+export type TriggerRound = number;
+/**
+ * Type of save required (hull, engineering, etc.)
+ */
+export type SaveType = ("hull" | "agility" | "systems" | "engineering") | null;
+/**
+ * Save target DC
+ */
+export type SaveTarget3 = number | null;
+/**
+ * Bonus to save roll from skills
+ */
+export type SaveBonus = number;
+/**
+ * Mount indices eligible for destruction
+ */
+export type EligibleMounts = number[];
+/**
+ * System IDs eligible for destruction
+ */
+export type EligibleSystems = string[];
+/**
+ * Whether a reroll is available from talents
+ */
+export type RerollAvailable = boolean;
+/**
+ * Source of reroll if available
+ */
+export type RerollSource = string | null;
+/**
+ * Pending decisions awaiting player input (saves, trauma selection)
+ */
+export type PendingDecisions = PendingDecision[];
 export type Code4 = string;
 export type Message4 = string;
 export type Severity5 = "error" | "warning";
@@ -30110,8 +30166,8 @@ export type Chosen = number[];
 export type Roll1 = number;
 export type InitialTarget = "mount" | "system";
 export type ResolvedTarget = "mount" | "system" | "direct_hit";
-export type EligibleMounts = number[];
-export type EligibleSystems = string[];
+export type EligibleMounts1 = number[];
+export type EligibleSystems1 = string[];
 export type DestroyedMountIndex = number | null;
 export type DestroyedSystemId = string | null;
 export type FallbackReason = "none" | "no_mounts" | "no_systems" | "none_available";
@@ -30753,6 +30809,73 @@ export type InitialVictoryPoints = number;
 export type ReserveVictoryPoints = number;
 export type SuggestedTier = "tier_1" | "tier_2" | "tier_3";
 export type RecommendedTemplateIds = string[];
+/**
+ * Player's chosen action
+ */
+export type Choice = "roll" | "voluntary_fail" | "use_reroll";
+/**
+ * Mount index selected for system trauma
+ */
+export type SelectedMountIndex = number | null;
+/**
+ * System ID selected for system trauma
+ */
+export type SelectedSystemId = string | null;
+/**
+ * Whether the player used their reroll
+ */
+export type UsedReroll = boolean;
+/**
+ * ID of the resolved decision
+ */
+export type DecisionId1 = string;
+export type SaveType1 = "hull" | "agility" | "systems" | "engineering";
+export type Roll2 = number | null;
+export type RollWithBonus = number | null;
+export type Total1 = number;
+export type Target83 = number;
+export type Success5 = boolean;
+export type Degree = "critical_success" | "success" | "failure" | "critical_failure";
+export type DifficultyModifier1 = number;
+export type AccuracyModifier2 = number;
+export type FlatBonus1 = number;
+export type Reason = string;
+/**
+ * Whether the save was voluntarily failed
+ */
+export type VoluntarilyFailed = boolean;
+/**
+ * Whether a reroll was used
+ */
+export type RerollUsed = boolean;
+/**
+ * Whether the save/check succeeded
+ */
+export type Success6 = boolean;
+/**
+ * ID of the resolved decision
+ */
+export type DecisionId2 = string;
+/**
+ * What type of target was selected
+ */
+export type SelectedTarget = "mount" | "system";
+/**
+ * Mount index if mount was selected
+ */
+export type MountIndex2 = number | null;
+/**
+ * System ID if system was selected
+ */
+export type SystemId3 = string | null;
+/**
+ * Whether the selection was valid
+ */
+export type ValidSelection = boolean;
+/**
+ * Error message if selection was invalid
+ */
+export type ErrorMessage = string | null;
 
 /**
  * A Lancer pilot character.
@@ -36358,6 +36481,7 @@ export interface MechCombatScenario {
    * Active SITREP mission state tracking (zones, scores, victory conditions)
    */
   sitrep_resolution?: SitrepResolution | null;
+  pending_decisions?: PendingDecisions;
   [k: string]: unknown;
 }
 /**
@@ -36513,6 +36637,27 @@ export interface SitrepZone {
   [k: string]: unknown;
 }
 /**
+ * A pending decision that requires player input.
+ *
+ * This model captures all context needed to present a decision prompt
+ * to the player and resolve their choice.
+ */
+export interface PendingDecision {
+  decision_id: DecisionId;
+  decision_type: DecisionType;
+  combatant_id: CombatantId1;
+  trigger_source: TriggerSource;
+  trigger_round: TriggerRound;
+  save_type?: SaveType;
+  save_target?: SaveTarget3;
+  save_bonus?: SaveBonus;
+  eligible_mounts?: EligibleMounts;
+  eligible_systems?: EligibleSystems;
+  reroll_available?: RerollAvailable;
+  reroll_source?: RerollSource;
+  [k: string]: unknown;
+}
+/**
  * A combat validation issue.
  */
 export interface CombatValidationIssue {
@@ -36560,8 +36705,8 @@ export interface SystemTraumaSelection {
   roll: Roll1;
   initial_target: InitialTarget;
   resolved_target: ResolvedTarget;
-  eligible_mounts?: EligibleMounts;
-  eligible_systems?: EligibleSystems;
+  eligible_mounts?: EligibleMounts1;
+  eligible_systems?: EligibleSystems1;
   destroyed_mount_index?: DestroyedMountIndex;
   destroyed_system_id?: DestroyedSystemId;
   fallback_reason?: FallbackReason;
@@ -37262,5 +37407,83 @@ export interface EnemyForceRecommendation {
   reserve_victory_points: ReserveVictoryPoints;
   suggested_tier?: SuggestedTier;
   recommended_template_ids?: RecommendedTemplateIds;
+  [k: string]: unknown;
+}
+/**
+ * Player's resolution of a pending decision.
+ *
+ * Contains the player's choice and any additional parameters
+ * needed to resolve the decision.
+ */
+export interface DecisionResolution {
+  choice: Choice;
+  selected_mount_index?: SelectedMountIndex;
+  selected_system_id?: SelectedSystemId;
+  used_reroll?: UsedReroll;
+  [k: string]: unknown;
+}
+/**
+ * Result of resolving a save decision.
+ *
+ * Contains the save result and whether the save was voluntarily failed.
+ */
+export interface SaveDecisionResult {
+  decision_id: DecisionId1;
+  /**
+   * Save roll result if roll was made
+   */
+  save_result?: SaveResult | null;
+  voluntarily_failed?: VoluntarilyFailed;
+  reroll_used?: RerollUsed;
+  success: Success6;
+  [k: string]: unknown;
+}
+/**
+ * Result of a save resolution.
+ *
+ * Attributes:
+ *     save_type: Type of save that was made
+ *     roll: The d20 roll (None if auto-succeed/fail)
+ *     roll_with_bonus: Roll plus flat bonus
+ *     total: Final total including all modifiers
+ *     target: Save target that was needed
+ *     success: Whether the save succeeded (total >= target)
+ *     degree: Success/failure classification including criticals
+ *     difficulty_modifier: Total difficulty from conditions
+ *     accuracy_modifier: Total accuracy from effects
+ *     flat_bonus: Flat bonus from skill/grit
+ *     modifier_breakdown: Human-readable breakdown of modifiers
+ *     reason: Explanation of the result
+ */
+export interface SaveResult {
+  save_type: SaveType1;
+  roll: Roll2;
+  roll_with_bonus: RollWithBonus;
+  total: Total1;
+  target: Target83;
+  success: Success5;
+  degree: Degree;
+  difficulty_modifier: DifficultyModifier1;
+  accuracy_modifier: AccuracyModifier2;
+  flat_bonus: FlatBonus1;
+  modifier_breakdown?: ModifierBreakdown;
+  reason?: Reason;
+  [k: string]: unknown;
+}
+export interface ModifierBreakdown {
+  [k: string]: number;
+}
+/**
+ * Result of resolving a system trauma decision.
+ *
+ * Contains the selected target and validation status.
+ */
+export interface TraumaDecisionResult {
+  decision_id: DecisionId2;
+  selected_target: SelectedTarget;
+  mount_index?: MountIndex2;
+  system_id?: SystemId3;
+  valid_selection: ValidSelection;
+  error_message?: ErrorMessage;
   [k: string]: unknown;
 }

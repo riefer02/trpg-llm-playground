@@ -10,11 +10,14 @@ import {
   useAvailableActions,
   useSubmitReaction,
   useReactionOpportunity,
+  usePendingDecisions,
+  useSubmitDecision,
   useWeapons,
   type ActionRequest,
   type ActionEconomyState,
   type AvailableActionItem,
   type ReactionRequest,
+  type DecisionSubmitRequest,
 } from "../../lib/api";
 import { CombatCanvas, type TargetingMode } from "../../components/combat/CombatCanvas";
 import {
@@ -27,6 +30,8 @@ import { TurnControls, type TurnState } from "../../components/combat/TurnContro
 import { ActionPanel, type TargetMode } from "../../components/combat/ActionPanel";
 import { OverchargeConfirm } from "../../components/combat/OverchargeConfirm";
 import { ReactionPrompt } from "../../components/combat/ReactionPrompt";
+import { SaveCheckPrompt } from "../../components/combat/SaveCheckPrompt";
+import { TraumaSelectionPrompt } from "../../components/combat/TraumaSelectionPrompt";
 import {
   adaptCombatScenario,
   type CombatRenderAdapterOutput,
@@ -134,6 +139,17 @@ function CombatSessionPage() {
     }
   );
 
+  // Poll for pending decisions (save prompts, system trauma)
+  const { data: pendingDecisions } = usePendingDecisions(
+    combatId,
+    firstPlayerCombatant?.id ?? null,
+    {
+      enabled: !!firstPlayerCombatant,
+      pollingInterval: 3000, // Poll every 3 seconds
+    }
+  );
+  const submitDecision = useSubmitDecision(combatId);
+
   // Derive turn state
   const turnState: TurnState = useMemo(() => {
     if (startTurn.isPending) return "not_started";
@@ -222,6 +238,14 @@ function CombatSessionPage() {
       submitReaction.mutate(reaction);
     },
     [submitReaction]
+  );
+
+  // Handle decision submission (save prompts, system trauma)
+  const handleDecisionSubmit = useCallback(
+    (request: DecisionSubmitRequest) => {
+      submitDecision.mutate(request);
+    },
+    [submitDecision]
   );
 
   // Handle target mode changes from ActionPanel
@@ -533,6 +557,44 @@ function CombatSessionPage() {
                 isSubmitting={submitReaction.isPending}
               />
             )}
+
+          {/* Pending Decision Prompts (save checks, system trauma) */}
+          {pendingDecisions?.has_pending &&
+            pendingDecisions.pending_decisions.map((decision) => {
+              // Render appropriate prompt based on decision type
+              if (decision.decision_type === "system_trauma") {
+                return (
+                  <TraumaSelectionPrompt
+                    key={decision.decision_id}
+                    decision={decision}
+                    combatantId={pendingDecisions.combatant_id}
+                    combatantName={pendingDecisions.combatant_name}
+                    inventory={firstPlayerCombatant?.inventory}
+                    onSubmit={handleDecisionSubmit}
+                    onDecline={() => {
+                      // User cancelled - no action taken
+                    }}
+                    isOpen={true}
+                    isSubmitting={submitDecision.isPending}
+                  />
+                );
+              }
+              // Save prompts (hull_save, engineering_save, engineering_check)
+              return (
+                <SaveCheckPrompt
+                  key={decision.decision_id}
+                  decision={decision}
+                  combatantId={pendingDecisions.combatant_id}
+                  combatantName={pendingDecisions.combatant_name}
+                  onSubmit={handleDecisionSubmit}
+                  onDecline={() => {
+                    // User cancelled - no action taken
+                  }}
+                  isOpen={true}
+                  isSubmitting={submitDecision.isPending}
+                />
+              );
+            })}
 
           <Card>
             <CardHeader className="py-3">

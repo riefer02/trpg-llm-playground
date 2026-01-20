@@ -322,6 +322,12 @@ from core.gm_toolkit.encounter_builder import (
     PlayerPartyPower,
     EnemyForceRecommendation,
 )
+from core.shared.decisions import (
+    PendingDecision,
+    DecisionResolution,
+    SaveDecisionResult,
+    TraumaDecisionResult,
+)
 
 
 # All exportable models
@@ -601,6 +607,11 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "ZoneControlStateTracker": ZoneControlStateTracker,
     "PlayerPartyPower": PlayerPartyPower,
     "EnemyForceRecommendation": EnemyForceRecommendation,
+    # Decision models for save prompts and player choices
+    "PendingDecision": PendingDecision,
+    "DecisionResolution": DecisionResolution,
+    "SaveDecisionResult": SaveDecisionResult,
+    "TraumaDecisionResult": TraumaDecisionResult,
 }
 
 

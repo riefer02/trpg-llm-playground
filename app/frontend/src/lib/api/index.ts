@@ -131,6 +131,8 @@ export {
   useSubmitReaction,
   useAvailableActions,
   useReactionOpportunity,
+  usePendingDecisions,
+  useSubmitDecision,
   combatKeys,
 } from './combat'
 export type {
@@ -149,6 +151,15 @@ export type {
   UseReactionOpportunityOptions,
   ReactionOpportunityResponse,
   ReactionTrigger,
+  // Decision types
+  DecisionType,
+  DecisionChoice,
+  SaveType,
+  PendingDecisionItem,
+  PendingDecisionsResponse,
+  DecisionSubmitRequest,
+  DecisionResultResponse,
+  UsePendingDecisionsOptions,
 } from './combat'
 
 // Combat WebSocket hook for real-time updates

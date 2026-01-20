@@ -299,3 +299,112 @@ export function useReactionOpportunity(
     refetchInterval: options?.pollingInterval,
   });
 }
+
+// =============================================================================
+// Pending Decisions Types and Hooks
+// =============================================================================
+
+export type DecisionType =
+  | "hull_save"
+  | "engineering_save"
+  | "engineering_check"
+  | "system_trauma";
+
+export type DecisionChoice = "roll" | "voluntary_fail" | "use_reroll";
+
+export type SaveType = "hull" | "agility" | "systems" | "engineering";
+
+export interface PendingDecisionItem {
+  decision_id: string;
+  decision_type: DecisionType;
+  trigger_source: string;
+  trigger_round: number;
+
+  // Save-specific
+  save_type?: SaveType;
+  save_target?: number;
+  save_bonus: number;
+
+  // Trauma-specific
+  eligible_mounts: number[];
+  eligible_systems: string[];
+
+  // Reroll availability
+  reroll_available: boolean;
+  reroll_source?: string;
+}
+
+export interface PendingDecisionsResponse {
+  combatant_id: string;
+  combatant_name: string;
+  pending_decisions: PendingDecisionItem[];
+  has_pending: boolean;
+}
+
+export interface DecisionSubmitRequest {
+  decision_id: string;
+  combatant_id: string;
+  choice: DecisionChoice;
+  selected_mount_index?: number;
+  selected_system_id?: string;
+}
+
+export interface DecisionResultResponse {
+  success: boolean;
+  error?: string;
+  roll_result?: number;
+  save_succeeded?: boolean;
+  effects_applied: Record<string, unknown>[];
+  scenario: MechCombatScenario;
+}
+
+export interface UsePendingDecisionsOptions {
+  enabled?: boolean;
+  pollingInterval?: number;
+}
+
+export function usePendingDecisions(
+  sessionId: string,
+  combatantId: string | null,
+  options?: UsePendingDecisionsOptions,
+) {
+  return useQuery({
+    queryKey: [
+      ...combatKeys.detail(sessionId),
+      "pending-decisions",
+      combatantId,
+    ] as const,
+    queryFn: () =>
+      api.get<PendingDecisionsResponse>(
+        `/combat/${sessionId}/pending-decisions/${combatantId}`
+      ),
+    enabled: Boolean(sessionId) && Boolean(combatantId) && (options?.enabled ?? true),
+    refetchInterval: options?.pollingInterval,
+  });
+}
+
+export function useSubmitDecision(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (decision: DecisionSubmitRequest) =>
+      api.post<DecisionResultResponse>(`/combat/${sessionId}/decisions`, decision),
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.setQueryData<CombatSessionResponse>(
+          combatKeys.detail(sessionId),
+          (prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              scenario: data.scenario,
+            };
+          },
+        );
+        // Invalidate pending decisions query to refresh
+        queryClient.invalidateQueries({
+          queryKey: [...combatKeys.detail(sessionId), "pending-decisions"],
+        });
+      }
+    },
+  });
+}

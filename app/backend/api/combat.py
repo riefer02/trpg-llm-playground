@@ -45,6 +45,14 @@ from core.mech.combat_execution import (
 from core.shared.overwatch import check_overwatch_triggers_for_movement
 from core.shared.full_tech import FullTechOptionSelection
 from core.shared.enums import ActionType
+from core.shared.decisions import (
+    PendingDecision,
+    DecisionResolution,
+    resolve_save_decision,
+    resolve_trauma_decision,
+    get_pending_decisions_for_combatant,
+    remove_decision_from_scenario,
+)
 
 router = APIRouter(prefix="/combat", tags=["combat"])
 
@@ -664,6 +672,69 @@ class ReactionOpportunityResponse(BaseModel):
     combatant_name: str
     has_reaction_available: bool
     pending_triggers: list[ReactionTrigger]
+
+
+# =============================================================================
+# Decision Request/Response Schemas
+# =============================================================================
+
+
+class PendingDecisionItem(BaseModel):
+    """A pending decision for a combatant."""
+
+    decision_id: str
+    decision_type: Literal["hull_save", "engineering_save", "engineering_check", "system_trauma"]
+    trigger_source: str
+    trigger_round: int
+
+    # Save-specific
+    save_type: Literal["hull", "agility", "systems", "engineering"] | None = None
+    save_target: int | None = None
+    save_bonus: int = 0
+
+    # Trauma-specific
+    eligible_mounts: list[int] = Field(default_factory=list)
+    eligible_systems: list[str] = Field(default_factory=list)
+
+    # Reroll availability
+    reroll_available: bool = False
+    reroll_source: str | None = None
+
+
+class PendingDecisionsResponse(BaseModel):
+    """Response model for pending decisions."""
+
+    combatant_id: str
+    combatant_name: str
+    pending_decisions: list[PendingDecisionItem]
+    has_pending: bool
+
+
+class DecisionSubmitRequest(BaseModel):
+    """Request body for submitting a decision."""
+
+    decision_id: str = Field(..., description="ID of the decision to resolve")
+    combatant_id: str = Field(..., description="ID of the combatant making the decision")
+    choice: Literal["roll", "voluntary_fail", "use_reroll"] = Field(
+        ..., description="Player's chosen action"
+    )
+    selected_mount_index: int | None = Field(
+        default=None, description="Mount index for system trauma"
+    )
+    selected_system_id: str | None = Field(
+        default=None, description="System ID for system trauma"
+    )
+
+
+class DecisionResultResponse(BaseModel):
+    """Response model for decision submission."""
+
+    success: bool
+    error: str | None = None
+    roll_result: int | None = None
+    save_succeeded: bool | None = None
+    effects_applied: list[dict[str, Any]]
+    scenario: dict[str, Any]
 
 
 # =============================================================================
@@ -1352,3 +1423,236 @@ async def combat_websocket(
     except Exception:
         # Handle any other exceptions by cleaning up
         combat_ws_manager.disconnect(session_id, websocket)
+
+
+# =============================================================================
+# Pending Decision Endpoints
+# =============================================================================
+
+
+@router.get(
+    "/{session_id}/pending-decisions/{combatant_id}",
+    response_model=PendingDecisionsResponse,
+)
+async def get_pending_decisions(
+    session_id: str,
+    combatant_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> PendingDecisionsResponse:
+    """Get pending decisions for a specific combatant.
+
+    This endpoint is polled by clients to detect when save prompts
+    or system trauma selections are needed.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Find the combatant
+    combatant = next(
+        (c for c in scenario.combatants if c.id == combatant_id),
+        None,
+    )
+    if combatant is None:
+        raise NotFoundError("Combatant", combatant_id)
+
+    # Get pending decisions from scenario
+    pending = get_pending_decisions_for_combatant(scenario, combatant_id)
+
+    # Convert to response items
+    items = [
+        PendingDecisionItem(
+            decision_id=d.decision_id,
+            decision_type=d.decision_type,
+            trigger_source=d.trigger_source,
+            trigger_round=d.trigger_round,
+            save_type=d.save_type,
+            save_target=d.save_target,
+            save_bonus=d.save_bonus,
+            eligible_mounts=d.eligible_mounts,
+            eligible_systems=d.eligible_systems,
+            reroll_available=d.reroll_available,
+            reroll_source=d.reroll_source,
+        )
+        for d in pending
+    ]
+
+    return PendingDecisionsResponse(
+        combatant_id=combatant_id,
+        combatant_name=combatant.name,
+        pending_decisions=items,
+        has_pending=len(items) > 0,
+    )
+
+
+@router.post("/{session_id}/decisions", response_model=DecisionResultResponse)
+async def submit_decision(
+    session_id: str,
+    body: DecisionSubmitRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> DecisionResultResponse:
+    """Submit a decision resolution for a save or system trauma.
+
+    Handles hull saves, engineering saves/checks, and system trauma selections.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    if combat_session.status != "active":
+        raise ValidationError(
+            f"Cannot submit decision: session status is '{combat_session.status}'",
+            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+        )
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Find the decision
+    decision = next(
+        (d for d in scenario.pending_decisions if d.decision_id == body.decision_id),
+        None,
+    )
+    if decision is None:
+        raise NotFoundError("Decision", body.decision_id)
+
+    # Verify combatant matches
+    if decision.combatant_id != body.combatant_id:
+        raise ValidationError(
+            f"Decision belongs to combatant '{decision.combatant_id}', not '{body.combatant_id}'",
+            errors=[{"loc": ["combatant_id"], "msg": "Combatant mismatch", "type": "value_error"}],
+        )
+
+    # Find the combatant
+    combatant = next(
+        (c for c in scenario.combatants if c.id == body.combatant_id),
+        None,
+    )
+    if combatant is None:
+        raise NotFoundError("Combatant", body.combatant_id)
+
+    # Build resolution
+    resolution = DecisionResolution(
+        choice=body.choice,
+        selected_mount_index=body.selected_mount_index,
+        selected_system_id=body.selected_system_id,
+    )
+
+    effects_applied: list[dict[str, Any]] = []
+    roll_result: int | None = None
+    save_succeeded: bool | None = None
+
+    # Handle save decisions
+    if decision.decision_type in ("hull_save", "engineering_save", "engineering_check"):
+        save_result = resolve_save_decision(
+            decision,
+            resolution,
+            target_conditions=list(combatant.conditions) if combatant.conditions else [],
+        )
+        roll_result = save_result.save_result.roll if save_result.save_result else None
+        save_succeeded = save_result.success
+
+        if save_result.voluntarily_failed:
+            effects_applied.append({
+                "type": "voluntary_fail",
+                "decision_type": decision.decision_type,
+            })
+        elif save_result.save_result:
+            effects_applied.append({
+                "type": "save_roll",
+                "roll": save_result.save_result.roll,
+                "total": save_result.save_result.total,
+                "target": save_result.save_result.target,
+                "success": save_result.success,
+                "degree": save_result.save_result.degree,
+            })
+
+        # Apply failure effects based on decision type
+        if not save_result.success:
+            if decision.decision_type == "hull_save":
+                # Hull save failure at 2 structure = mech destroyed
+                effects_applied.append({
+                    "type": "mech_destroyed",
+                    "reason": "hull_save_failed",
+                })
+            elif decision.decision_type == "engineering_save":
+                # Engineering save failure = meltdown countdown starts
+                effects_applied.append({
+                    "type": "meltdown_countdown",
+                    "reason": "engineering_save_failed",
+                })
+            elif decision.decision_type == "engineering_check":
+                # Engineering check failure (dangerous terrain) = take damage
+                effects_applied.append({
+                    "type": "terrain_damage",
+                    "reason": "engineering_check_failed",
+                    "trigger_source": decision.trigger_source,
+                })
+
+    # Handle system trauma decisions
+    elif decision.decision_type == "system_trauma":
+        trauma_result = resolve_trauma_decision(decision, resolution)
+
+        if not trauma_result.valid_selection:
+            return DecisionResultResponse(
+                success=False,
+                error=trauma_result.error_message,
+                effects_applied=[],
+                scenario=combat_session.scenario,
+            )
+
+        if trauma_result.selected_target == "mount":
+            effects_applied.append({
+                "type": "mount_destroyed",
+                "mount_index": trauma_result.mount_index,
+            })
+        else:
+            effects_applied.append({
+                "type": "system_destroyed",
+                "system_id": trauma_result.system_id,
+            })
+
+    # Remove the resolved decision from scenario
+    updated_scenario = remove_decision_from_scenario(scenario, body.decision_id)
+
+    # Persist
+    combat_session.scenario = updated_scenario.model_dump(mode="json")
+    combat_session.updated_at = utc_now()
+
+    session.add(combat_session)
+    await session.commit()
+    await session.refresh(combat_session)
+
+    # Broadcast state update to all connected WebSocket clients
+    ws_response = _session_to_response(combat_session)
+    await combat_ws_manager.broadcast(
+        session_id,
+        {"type": "state", "data": ws_response.model_dump(mode="json")},
+    )
+
+    return DecisionResultResponse(
+        success=True,
+        roll_result=roll_result,
+        save_succeeded=save_succeeded,
+        effects_applied=effects_applied,
+        scenario=combat_session.scenario,
+    )

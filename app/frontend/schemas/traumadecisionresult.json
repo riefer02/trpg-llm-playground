@@ -1,0 +1,70 @@
+{
+  "description": "Result of resolving a system trauma decision.\n\nContains the selected target and validation status.",
+  "properties": {
+    "decision_id": {
+      "description": "ID of the resolved decision",
+      "title": "Decision Id",
+      "type": "string"
+    },
+    "selected_target": {
+      "description": "What type of target was selected",
+      "enum": [
+        "mount",
+        "system"
+      ],
+      "title": "Selected Target",
+      "type": "string"
+    },
+    "mount_index": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Mount index if mount was selected",
+      "title": "Mount Index"
+    },
+    "system_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "System ID if system was selected",
+      "title": "System Id"
+    },
+    "valid_selection": {
+      "description": "Whether the selection was valid",
+      "title": "Valid Selection",
+      "type": "boolean"
+    },
+    "error_message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Error message if selection was invalid",
+      "title": "Error Message"
+    }
+  },
+  "required": [
+    "decision_id",
+    "selected_target",
+    "valid_selection"
+  ],
+  "title": "TraumaDecisionResult",
+  "type": "object"
+}

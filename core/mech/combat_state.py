@@ -19,6 +19,7 @@ from core.shared.effects import (
     ProgressionResetTrigger,
 )
 from core.shared.sitrep_resolution import SitrepResolution
+from core.shared.decisions import PendingDecision
 from core.shared.rolls import ContestedCheck
 from core.shared.dice import DiceExpression
 from core.mech.grid import HexPosition, HexCoord
@@ -409,6 +410,11 @@ class MechCombatScenario(FrozenModel):
     sitrep_resolution: SitrepResolution | None = Field(
         default=None,
         description="Active SITREP mission state tracking (zones, scores, victory conditions)",
+    )
+    # Pending player decisions (saves, system trauma selection)
+    pending_decisions: list[PendingDecision] = Field(
+        default_factory=list,
+        description="Pending decisions awaiting player input (saves, trauma selection)",
     )
 
 

@@ -50516,6 +50516,126 @@
       "title": "DeployableState",
       "type": "object"
     },
+    "PendingDecision": {
+      "description": "A pending decision that requires player input.\n\nThis model captures all context needed to present a decision prompt\nto the player and resolve their choice.",
+      "properties": {
+        "decision_id": {
+          "description": "Unique identifier for this decision",
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "decision_type": {
+          "description": "Type of decision required",
+          "enum": [
+            "hull_save",
+            "engineering_save",
+            "engineering_check",
+            "system_trauma"
+          ],
+          "title": "Decision Type",
+          "type": "string"
+        },
+        "combatant_id": {
+          "description": "ID of combatant who must make the decision",
+          "title": "Combatant Id",
+          "type": "string"
+        },
+        "trigger_source": {
+          "description": "What triggered this decision (e.g., 'structure_cascade', 'meltdown', 'dangerous_terrain')",
+          "title": "Trigger Source",
+          "type": "string"
+        },
+        "trigger_round": {
+          "description": "Round number when this decision was created",
+          "minimum": 1,
+          "title": "Trigger Round",
+          "type": "integer"
+        },
+        "save_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "hull",
+                "agility",
+                "systems",
+                "engineering"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type of save required (hull, engineering, etc.)",
+          "title": "Save Type"
+        },
+        "save_target": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Save target DC",
+          "title": "Save Target"
+        },
+        "save_bonus": {
+          "default": 0,
+          "description": "Bonus to save roll from skills",
+          "title": "Save Bonus",
+          "type": "integer"
+        },
+        "eligible_mounts": {
+          "description": "Mount indices eligible for destruction",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Eligible Mounts",
+          "type": "array"
+        },
+        "eligible_systems": {
+          "description": "System IDs eligible for destruction",
+          "items": {
+            "type": "string"
+          },
+          "title": "Eligible Systems",
+          "type": "array"
+        },
+        "reroll_available": {
+          "default": false,
+          "description": "Whether a reroll is available from talents",
+          "title": "Reroll Available",
+          "type": "boolean"
+        },
+        "reroll_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source of reroll if available",
+          "title": "Reroll Source"
+        }
+      },
+      "required": [
+        "decision_id",
+        "decision_type",
+        "combatant_id",
+        "trigger_source",
+        "trigger_round"
+      ],
+      "title": "PendingDecision",
+      "type": "object"
+    },
     "SitrepDeployment": {
       "description": "Deployment zone configuration for active mission resolution.\n\nAttributes:\n    player_zones: Where player characters deploy\n    enemy_zones: Where enemy forces deploy\n    ingress_zones: Where reinforcements can enter\n    reserve_pool: NPC IDs held in reserve for delayed deployment\n    reserves_spawned_per_round: How many reserves enter per round\n    last_ingress_zone: The most recently used ingress zone (for rotation rule)\n    reserve_pattern: How reserves are managed (none, half, normal, double, increasing)",
       "properties": {
@@ -50936,6 +51056,14 @@
           ],
           "default": null,
           "description": "Active SITREP mission state tracking (zones, scores, victory conditions)"
+        },
+        "pending_decisions": {
+          "description": "Pending decisions awaiting player input (saves, trauma selection)",
+          "items": {
+            "$ref": "#/$defs/PendingDecision"
+          },
+          "title": "Pending Decisions",
+          "type": "array"
         }
       },
       "title": "MechCombatScenario",
@@ -53964,6 +54092,271 @@
       ],
       "title": "EnemyForceRecommendation",
       "type": "object"
+    },
+    "DecisionResolution": {
+      "description": "Player's resolution of a pending decision.\n\nContains the player's choice and any additional parameters\nneeded to resolve the decision.",
+      "properties": {
+        "choice": {
+          "description": "Player's chosen action",
+          "enum": [
+            "roll",
+            "voluntary_fail",
+            "use_reroll"
+          ],
+          "title": "Choice",
+          "type": "string"
+        },
+        "selected_mount_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mount index selected for system trauma",
+          "title": "Selected Mount Index"
+        },
+        "selected_system_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "System ID selected for system trauma",
+          "title": "Selected System Id"
+        },
+        "used_reroll": {
+          "default": false,
+          "description": "Whether the player used their reroll",
+          "title": "Used Reroll",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "choice"
+      ],
+      "title": "DecisionResolution",
+      "type": "object"
+    },
+    "SaveResult": {
+      "description": "Result of a save resolution.\n\nAttributes:\n    save_type: Type of save that was made\n    roll: The d20 roll (None if auto-succeed/fail)\n    roll_with_bonus: Roll plus flat bonus\n    total: Final total including all modifiers\n    target: Save target that was needed\n    success: Whether the save succeeded (total >= target)\n    degree: Success/failure classification including criticals\n    difficulty_modifier: Total difficulty from conditions\n    accuracy_modifier: Total accuracy from effects\n    flat_bonus: Flat bonus from skill/grit\n    modifier_breakdown: Human-readable breakdown of modifiers\n    reason: Explanation of the result",
+      "properties": {
+        "save_type": {
+          "enum": [
+            "hull",
+            "agility",
+            "systems",
+            "engineering"
+          ],
+          "title": "Save Type",
+          "type": "string"
+        },
+        "roll": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Roll"
+        },
+        "roll_with_bonus": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Roll With Bonus"
+        },
+        "total": {
+          "title": "Total",
+          "type": "integer"
+        },
+        "target": {
+          "title": "Target",
+          "type": "integer"
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        },
+        "degree": {
+          "enum": [
+            "critical_success",
+            "success",
+            "failure",
+            "critical_failure"
+          ],
+          "title": "Degree",
+          "type": "string"
+        },
+        "difficulty_modifier": {
+          "title": "Difficulty Modifier",
+          "type": "integer"
+        },
+        "accuracy_modifier": {
+          "title": "Accuracy Modifier",
+          "type": "integer"
+        },
+        "flat_bonus": {
+          "title": "Flat Bonus",
+          "type": "integer"
+        },
+        "modifier_breakdown": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Modifier Breakdown",
+          "type": "object"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "save_type",
+        "roll",
+        "roll_with_bonus",
+        "total",
+        "target",
+        "success",
+        "degree",
+        "difficulty_modifier",
+        "accuracy_modifier",
+        "flat_bonus"
+      ],
+      "title": "SaveResult",
+      "type": "object"
+    },
+    "SaveDecisionResult": {
+      "description": "Result of resolving a save decision.\n\nContains the save result and whether the save was voluntarily failed.",
+      "properties": {
+        "decision_id": {
+          "description": "ID of the resolved decision",
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "save_result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SaveResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Save roll result if roll was made"
+        },
+        "voluntarily_failed": {
+          "default": false,
+          "description": "Whether the save was voluntarily failed",
+          "title": "Voluntarily Failed",
+          "type": "boolean"
+        },
+        "reroll_used": {
+          "default": false,
+          "description": "Whether a reroll was used",
+          "title": "Reroll Used",
+          "type": "boolean"
+        },
+        "success": {
+          "description": "Whether the save/check succeeded",
+          "title": "Success",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "decision_id",
+        "success"
+      ],
+      "title": "SaveDecisionResult",
+      "type": "object"
+    },
+    "TraumaDecisionResult": {
+      "description": "Result of resolving a system trauma decision.\n\nContains the selected target and validation status.",
+      "properties": {
+        "decision_id": {
+          "description": "ID of the resolved decision",
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "selected_target": {
+          "description": "What type of target was selected",
+          "enum": [
+            "mount",
+            "system"
+          ],
+          "title": "Selected Target",
+          "type": "string"
+        },
+        "mount_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mount index if mount was selected",
+          "title": "Mount Index"
+        },
+        "system_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "System ID if system was selected",
+          "title": "System Id"
+        },
+        "valid_selection": {
+          "description": "Whether the selection was valid",
+          "title": "Valid Selection",
+          "type": "boolean"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Error message if selection was invalid",
+          "title": "Error Message"
+        }
+      },
+      "required": [
+        "decision_id",
+        "selected_target",
+        "valid_selection"
+      ],
+      "title": "TraumaDecisionResult",
+      "type": "object"
     }
   },
   "oneOf": [
@@ -54746,6 +55139,18 @@
     },
     {
       "$ref": "#/$defs/EnemyForceRecommendation"
+    },
+    {
+      "$ref": "#/$defs/PendingDecision"
+    },
+    {
+      "$ref": "#/$defs/DecisionResolution"
+    },
+    {
+      "$ref": "#/$defs/SaveDecisionResult"
+    },
+    {
+      "$ref": "#/$defs/TraumaDecisionResult"
     }
   ]
 }
