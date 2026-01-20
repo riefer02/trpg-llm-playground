@@ -22,7 +22,7 @@ from core.shared.enums import ActionType, SizeClass
 from core.shared.id_helpers import CombatantIdField
 from core.npc.models import NPCRole
 from core.npc.state import NPCState, NPCTemplate
-from core.mech.grid import HexCoord
+from core.mech.grid import HexCoord, is_adjacent_by_size
 
 
 TargetPriority = Literal["low_hp", "high_threat", "nearest", "objective", "low_hp_ally"]
@@ -301,22 +301,7 @@ def is_adjacent(
 ) -> bool:
     """Check if two units are adjacent considering size.
 
-    Adjacent means orthogonal (not diagonal) and within adjacency distance.
-    Same position is not adjacent.
+    Delegates to the centralized is_adjacent_by_size helper from grid.py
+    which properly handles hex distance and all size classes.
     """
-    if pos1 == pos2:
-        return False
-
-    dx = abs(pos1.q - pos2.q)
-    dy = abs(pos1.r - pos2.r)
-
-    max_dist = max(dx, dy)
-    min_dist = min(dx, dy)
-
-    if min_dist != 0:
-        return False
-
-    size_bonus = 0
-    if size1 == "size_2" or size2 == "size_2":
-        size_bonus = 1
-    return max_dist <= (1 + size_bonus)
+    return is_adjacent_by_size(pos1, pos2, size1, size2)

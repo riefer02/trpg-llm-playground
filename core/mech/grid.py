@@ -7,11 +7,14 @@ from typing import Iterable
 from pydantic import Field, computed_field
 
 from core.shared.models import FrozenModel
+from core.shared.enums import SizeClass
 
 
 __all__ = [
     "HexCoord",
     "HexPosition",
+    "size_to_radius",
+    "footprint_coords",
     "hex_line",
     "hexes_between",
     "hexes_in_radius",
@@ -22,6 +25,8 @@ __all__ = [
     "hex_scale",
     "iter_neighbors",
     "normalize_hex_direction",
+    "adjacency_distance",
+    "is_adjacent_by_size",
 ]
 
 
@@ -119,6 +124,81 @@ _AXIAL_DIRECTIONS: tuple[tuple[int, int], ...] = (
 HEX_DIRECTIONS: tuple[HexCoord, ...] = tuple(
     HexCoord(q=q, r=r) for q, r in _AXIAL_DIRECTIONS
 )
+
+_SIZE_TO_RADIUS: dict[SizeClass, int] = {
+    "size_half": 0,
+    "size_1": 0,
+    "size_2": 1,
+    "size_3": 2,
+    "size_4": 3,
+    "size_5": 4,
+}
+
+
+def size_to_radius(size: SizeClass) -> int:
+    """Map Lancer size class to hex radius for footprint occupancy."""
+    return _SIZE_TO_RADIUS.get(size, 0)
+
+
+_SIZE_TO_ADJACENCY: dict[SizeClass, int] = {
+    "size_half": 1,
+    "size_1": 1,
+    "size_2": 2,
+    "size_3": 3,
+    "size_4": 4,
+    "size_5": 5,
+}
+
+
+def adjacency_distance(size_a: SizeClass, size_b: SizeClass) -> int:
+    """Compute max adjacency distance based on unit sizes.
+
+    Per PR2 rules, size represents "area of influence" - larger units
+    can engage/interact at extended range. Returns the maximum distance
+    at which two units are considered adjacent for engagement, mine
+    triggers, and similar mechanics.
+
+    Examples:
+        size_1 vs size_1: 1 (standard adjacency)
+        size_2 vs size_1: 2 (size 2 extends reach)
+        size_3 vs size_2: 3 (use larger size)
+    """
+    dist_a = _SIZE_TO_ADJACENCY.get(size_a, 1)
+    dist_b = _SIZE_TO_ADJACENCY.get(size_b, 1)
+    return max(dist_a, dist_b)
+
+
+def is_adjacent_by_size(
+    coord_a: "HexCoord",
+    coord_b: "HexCoord",
+    size_a: SizeClass,
+    size_b: SizeClass,
+) -> bool:
+    """Check adjacency considering unit sizes.
+
+    Two units are adjacent if their hex distance is within the adjacency
+    distance determined by their sizes. Same position is not adjacent.
+
+    Args:
+        coord_a: First unit's hex coordinate
+        coord_b: Second unit's hex coordinate
+        size_a: First unit's size class
+        size_b: Second unit's size class
+
+    Returns:
+        True if units are adjacent (within size-based adjacency distance)
+    """
+    if coord_a == coord_b:
+        return False
+    distance = coord_a.distance_to(coord_b)
+    max_adj_dist = adjacency_distance(size_a, size_b)
+    return distance <= max_adj_dist
+
+
+def footprint_coords(center: HexCoord, size: SizeClass) -> set[HexCoord]:
+    """Return occupied hexes for a size class centered on a coord."""
+    radius = size_to_radius(size)
+    return set(hexes_in_radius(center, radius))
 
 
 def hex_line(start: HexCoord, end: HexCoord) -> list[HexCoord]:

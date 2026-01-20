@@ -372,7 +372,11 @@ class TestCheckMineTrigger:
     """Tests for check_mine_trigger resolution helper."""
 
     def _make_scenario_with_mines(self) -> MechCombatScenario:
-        """Create scenario with armed and unarmed mines."""
+        """Create scenario with armed and unarmed mines.
+
+        Uses size_1 mech to test mine arming behavior independent of
+        size-aware adjacency rules.
+        """
         return MechCombatScenario(
             combatants=[
                 CombatantState(
@@ -381,7 +385,7 @@ class TestCheckMineTrigger:
                     side="players",
                     kind="mech",
                     stats=CombatStats(
-                        size="size_2",
+                        size="size_1",
                         hp_max=30,
                         evasion=10,
                         e_defense=10,

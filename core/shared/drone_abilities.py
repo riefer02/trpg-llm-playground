@@ -30,10 +30,10 @@ from __future__ import annotations
 from typing import Literal, Any, Union
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.shared.enums import DamageType
+from core.shared.enums import DamageType, SizeClass
 from core.shared.id_helpers import CombatantIdField
 from core.shared.dice import roll_dice
-from core.mech.grid import HexPosition, HexCoord, hexes_in_radius
+from core.mech.grid import HexPosition, HexCoord, hexes_in_radius, adjacency_distance
 from core.mech.combat_state import MechCombatScenario
 
 
@@ -102,6 +102,10 @@ class RestockDroneInput(FrozenModel):
         ..., description="Position of the activating combatant"
     )
     drone_position: HexPosition = Field(..., description="Position of the drone")
+    activating_combatant_size: SizeClass = Field(
+        default="size_1",
+        description="Size class of the activating combatant for adjacency calculation",
+    )
     action_choice: RestockAction = Field(
         ..., description="Action to perform: cool, reload, or clear_condition"
     )
@@ -413,7 +417,9 @@ def resolve_restock_drone(input: RestockDroneInput) -> RestockDroneResult:
     Returns what SHOULD happen - caller applies state changes.
     """
     distance = input.activating_combatant_position.distance_2d(input.drone_position)
-    is_adjacent = distance <= 1
+    # Drones are size_half; use size-aware adjacency based on activating combatant's size
+    adj_dist = adjacency_distance(input.activating_combatant_size, "size_half")
+    is_adjacent = distance <= adj_dist
 
     if not is_adjacent:
         return RestockDroneResult(

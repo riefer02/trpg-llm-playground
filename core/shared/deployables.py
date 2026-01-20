@@ -27,7 +27,7 @@ from __future__ import annotations
 from typing import Literal, Any
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.shared.enums import DamageType, SaveType
+from core.shared.enums import DamageType, SaveType, SizeClass
 from core.shared.id_helpers import CombatantIdField
 from core.shared.dice import roll_dice
 from core.shared.terrain import TerrainMap, get_terrain_at, calculate_movement_cost
@@ -40,7 +40,7 @@ from core.shared.damage import (
 from core.shared.movement import (
     resolve_drone_movement,
 )
-from core.mech.grid import HexCoord, HexPosition, hexes_in_radius
+from core.mech.grid import HexCoord, HexPosition, hexes_in_radius, adjacency_distance
 from core.mech.combat_state import DeployableState, DeployableKind, MechCombatScenario
 
 
@@ -656,15 +656,32 @@ def can_detect_mine(
 def is_adjacent_to_mine(
     combatant_position: HexPosition | None,
     mine_position: HexPosition,
+    combatant_size: SizeClass = "size_1",
 ) -> bool:
-    """Check if a combatant is adjacent to a mine.
+    """Check if a combatant is adjacent to a mine considering size.
 
     Per PR2 5088: "A mine can be disarmed by moving adjacent to the mine..."
+    Per PR2 size rules: larger units have extended "area of influence"
+    meaning they can interact at greater distances.
+
+    Args:
+        combatant_position: Position of the combatant
+        mine_position: Position of the mine
+        combatant_size: Size class of the combatant (default size_1)
+
+    Returns:
+        True if combatant is within adjacency range of the mine
     """
     if combatant_position is None:
         return False
 
-    return combatant_position.coord.is_adjacent(mine_position.coord)
+    distance = combatant_position.coord.distance_to(mine_position.coord)
+    # Same position is not adjacent
+    if distance == 0:
+        return False
+    # Mines are effectively size_1 for adjacency purposes
+    adj_dist = adjacency_distance(combatant_size, "size_1")
+    return distance <= adj_dist
 
 
 from core.shared.movement import (

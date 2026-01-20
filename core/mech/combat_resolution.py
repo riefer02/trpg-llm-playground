@@ -24,7 +24,7 @@ from core.mech.combat_state import (
     MechCombatScenario,
     HexPosition,
 )
-from core.mech.grid import HexCoord
+from core.mech.grid import HexCoord, is_adjacent_by_size
 from core.shared.effects import (
     PerTargetCounter,
     CooldownState,
@@ -1919,8 +1919,6 @@ def check_mine_trigger(
     Returns:
         List of MineTriggerResult for each triggered mine
     """
-    from core.mech.grid import HexCoord
-
     moving_combatant = None
     for c in scenario.combatants:
         if c.id == moving_combatant_id:
@@ -1929,6 +1927,9 @@ def check_mine_trigger(
 
     if moving_combatant is None:
         return []
+
+    # Get mover's size for adjacency calculation
+    mover_size = moving_combatant.stats.size if moving_combatant.stats else "size_1"
 
     results = []
 
@@ -1939,7 +1940,8 @@ def check_mine_trigger(
         mine_coord = HexCoord(q=mine.position.coord.q, r=mine.position.coord.r)
         new_coord = HexCoord(q=new_position.coord.q, r=new_position.coord.r)
 
-        if mine_coord.is_adjacent(new_coord):
+        # Use size-aware adjacency - mines are effectively size 1
+        if is_adjacent_by_size(mine_coord, new_coord, "size_1", mover_size):
             result = MineTriggerResult(
                 mine_id=mine_id,
                 mine_name=mine.name,

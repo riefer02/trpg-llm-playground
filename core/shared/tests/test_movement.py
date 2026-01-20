@@ -292,6 +292,68 @@ class TestCheckEngagementStop(unittest.TestCase):
         should_stop, pos = check_engagement_stop("mech-1", "size_1", path, scenario)
         self.assertFalse(should_stop)
 
+    def test_size_2_mech_engages_at_distance_2(self):
+        """Size 2 mech stops when within 2 hexes of size 1+ hostile."""
+        # Size 2 mech at (0,0), size 1 hostile at (3,0)
+        moving = make_test_combatant("mech-1", (0, 0), size="size_2")
+        hostile = make_test_combatant("hostile-1", (3, 0), "size_1", side="hostiles")
+        scenario = make_test_scenario([moving, hostile])
+
+        # Path from (0,0) to (2,0) - hex (2,0) is distance 1 from hostile at (3,0)
+        # But with size 2 adjacency, distance 2 should trigger
+        path = [HexCoord(q=0, r=0), HexCoord(q=1, r=0), HexCoord(q=2, r=0)]
+        should_stop, pos = check_engagement_stop("mech-1", "size_2", path, scenario)
+
+        # Size 2 mech should NOT stop at distance 2 from hostile when hostile is SMALLER
+        # Wait - size_1 hostile is same or smaller than size_2, so no stop
+        self.assertFalse(should_stop)
+
+    def test_size_2_mech_engages_same_size_at_distance_2(self):
+        """Size 2 mech stops when within adjacency range of same-size hostile."""
+        # Size 2 mech at (0,0), size 2 hostile at (3,0)
+        moving = make_test_combatant("mech-1", (0, 0), size="size_2")
+        hostile = make_test_combatant("hostile-1", (3, 0), "size_2", side="hostiles")
+        scenario = make_test_scenario([moving, hostile])
+
+        # Path from (0,0) towards hostile. Hex (1,0) is distance 2 from hostile at (3,0)
+        path = [HexCoord(q=0, r=0), HexCoord(q=1, r=0)]
+        should_stop, pos = check_engagement_stop("mech-1", "size_2", path, scenario)
+
+        # Size 2 vs size 2: adjacency distance is 2
+        # At (1,0), distance to (3,0) is 2, which is within adjacency
+        # Same size triggers stop
+        self.assertTrue(should_stop)
+        self.assertEqual(pos, HexCoord(q=1, r=0))
+
+    def test_size_3_mech_engages_at_distance_3(self):
+        """Size 3 mech stops when within 3 hexes of same/larger hostile."""
+        moving = make_test_combatant("mech-1", (0, 0), size="size_3")
+        hostile = make_test_combatant("hostile-1", (4, 0), "size_3", side="hostiles")
+        scenario = make_test_scenario([moving, hostile])
+
+        # Moving from (0,0) to (1,0). Distance from (1,0) to (4,0) is 3.
+        path = [HexCoord(q=0, r=0), HexCoord(q=1, r=0)]
+        should_stop, pos = check_engagement_stop("mech-1", "size_3", path, scenario)
+
+        # Size 3 adjacency distance is 3, and hostile is same size
+        self.assertTrue(should_stop)
+        self.assertEqual(pos, HexCoord(q=1, r=0))
+
+    def test_size_1_mech_engages_size_3_hostile_at_distance_3(self):
+        """Size 1 mech stops at distance 3 from size 3 hostile (larger hostile)."""
+        moving = make_test_combatant("mech-1", (0, 0), size="size_1")
+        hostile = make_test_combatant("hostile-1", (4, 0), "size_3", side="hostiles")
+        scenario = make_test_scenario([moving, hostile])
+
+        # Moving from (0,0) to (1,0). Distance from (1,0) to (4,0) is 3.
+        path = [HexCoord(q=0, r=0), HexCoord(q=1, r=0)]
+        should_stop, pos = check_engagement_stop("mech-1", "size_1", path, scenario)
+
+        # Size 1 vs size 3: adjacency distance is 3 (max of sizes)
+        # Hostile is larger, so must stop
+        self.assertTrue(should_stop)
+        self.assertEqual(pos, HexCoord(q=1, r=0))
+
 
 class TestCheckObstructions(unittest.TestCase):
     """Tests for obstruction checking per PR2 3812-3815."""

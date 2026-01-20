@@ -23,7 +23,7 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import SizeClass
 from core.shared.terrain import TerrainMap, get_terrain_at, calculate_movement_cost
-from core.mech.grid import HexCoord, HexPosition, hex_line
+from core.mech.grid import HexCoord, HexPosition, hex_line, adjacency_distance
 from core.mech.combat_state import MechCombatScenario
 
 
@@ -264,7 +264,9 @@ def check_engagement_stop(
                 continue
             if not _is_hostile(entity_id, combatant.id, scenario):
                 continue
-            if coord.distance_to(combatant.position.coord) == 1:
+            distance = coord.distance_to(combatant.position.coord)
+            adj_dist = adjacency_distance(entity_size, combatant.stats.size)
+            if distance <= adj_dist:
                 if _size_value(combatant.stats.size) >= _size_value(entity_size):
                     return True, coord
     return False, None

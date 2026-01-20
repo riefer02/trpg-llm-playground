@@ -28,7 +28,15 @@ from core.shared.full_tech import (
     LockOnTechParams,
     InvadeTechParams,
 )
-from core.mech.grid import HexCoord, HexPosition, hex_add, hex_scale
+from core.mech.grid import (
+    HexCoord,
+    HexPosition,
+    hex_add,
+    hex_scale,
+    adjacency_distance,
+    is_adjacent_by_size,
+    hexes_in_radius,
+)
 from core.mech.compendium import get_weapon_definition
 from core.mech.combat_rules import AttackPatternDefinition
 from core.mech.weapon import WeaponProfile, WeaponTag, WeaponDamageType, resolve_weapon_profile
@@ -696,7 +704,16 @@ def _build_damage_context(
     if attacker and attacker.position and target.position:
         distance = attacker.position.coord.distance_to(target.position.coord)
         ctx["attack_range"] = distance
-        ctx["is_adjacent"] = distance == 1
+        # Use size-aware adjacency if stats available
+        if attacker.stats and target.stats:
+            ctx["is_adjacent"] = is_adjacent_by_size(
+                attacker.position.coord,
+                target.position.coord,
+                attacker.stats.size,
+                target.stats.size,
+            )
+        else:
+            ctx["is_adjacent"] = distance == 1
 
     if attacker and attacker.stats and target.stats:
         size_map = {
@@ -3296,14 +3313,14 @@ def _check_mine_triggers(
         if mine.owner_id == mover_id:
             continue
 
-        # Check if any path hex is adjacent to mine
+        # Check if any path hex is adjacent to mine (considering mover's size)
         mine_coord = mine.position.coord
-        mine_neighbors = {(n.q, n.r) for n in mine_coord.neighbors()}
+        # Mover's size determines trigger radius - larger mechs trigger at greater distance
+        mover_size = mover.stats.size if mover.stats else "size_1"
+        adj_dist = adjacency_distance(mover_size, "size_1")  # Mines are size 1
+        mine_trigger_hexes = {(h.q, h.r) for h in hexes_in_radius(mine_coord, adj_dist)}
 
-        # Include the mine's own hex as a trigger
-        mine_neighbors.add((mine_coord.q, mine_coord.r))
-
-        if path_coords & mine_neighbors:
+        if path_coords & mine_trigger_hexes:
             # Mine triggered!
             # Get mine effect profile for detonation
             mine_type = "explosive"  # Default

@@ -646,6 +646,34 @@ class TestIsAdjacentToMine(unittest.TestCase):
         mine_pos = HexPosition(coord=HexCoord(q=0, r=0))
         self.assertFalse(is_adjacent_to_mine(None, mine_pos))
 
+    def test_size_2_adjacent_at_distance_2(self):
+        """Size 2 combatant is adjacent to mine at distance 2."""
+        combatant_pos = HexPosition(coord=HexCoord(q=0, r=0))
+        mine_pos = HexPosition(coord=HexCoord(q=2, r=0))
+        # With default size_1, distance 2 is NOT adjacent
+        self.assertFalse(is_adjacent_to_mine(combatant_pos, mine_pos))
+        # With size_2, distance 2 IS adjacent
+        self.assertTrue(is_adjacent_to_mine(combatant_pos, mine_pos, "size_2"))
+
+    def test_size_3_adjacent_at_distance_3(self):
+        """Size 3 combatant is adjacent to mine at distance 3."""
+        combatant_pos = HexPosition(coord=HexCoord(q=0, r=0))
+        mine_pos = HexPosition(coord=HexCoord(q=3, r=0))
+        # With size_1, distance 3 is NOT adjacent
+        self.assertFalse(is_adjacent_to_mine(combatant_pos, mine_pos))
+        # With size_2, distance 3 is NOT adjacent
+        self.assertFalse(is_adjacent_to_mine(combatant_pos, mine_pos, "size_2"))
+        # With size_3, distance 3 IS adjacent
+        self.assertTrue(is_adjacent_to_mine(combatant_pos, mine_pos, "size_3"))
+
+    def test_size_1_still_adjacent_at_distance_1(self):
+        """Size 1 combatant is adjacent at distance 1 (backward compatible)."""
+        combatant_pos = HexPosition(coord=HexCoord(q=0, r=0))
+        mine_pos = HexPosition(coord=HexCoord(q=1, r=0))
+        # Both default and explicit size_1 should work
+        self.assertTrue(is_adjacent_to_mine(combatant_pos, mine_pos))
+        self.assertTrue(is_adjacent_to_mine(combatant_pos, mine_pos, "size_1"))
+
 
 class TestMineDetonation(unittest.TestCase):
     """Tests for mine detonation resolution."""
