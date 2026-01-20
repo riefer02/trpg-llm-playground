@@ -410,3 +410,55 @@ export function useSubmitDecision(sessionId: string) {
     },
   });
 }
+
+// =============================================================================
+// Mission Completion Types and Hooks
+// =============================================================================
+
+export type MissionOutcome = "success" | "partial" | "failure" | "catastrophic";
+
+export interface CombatCompleteRequest {
+  outcome: MissionOutcome;
+  completion_score?: number;
+  debrief_notes?: string;
+  reserves_spent?: Record<string, unknown>[];
+  reserves_earned?: Record<string, unknown>[];
+  rewards?: string[];
+  notes?: string;
+}
+
+export function useCompleteCombat(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: CombatCompleteRequest) =>
+      api.post<CombatSessionResponse>(`/combat/${sessionId}/complete`, request),
+    onSuccess: (data) => {
+      queryClient.setQueryData<CombatSessionResponse>(
+        combatKeys.detail(sessionId),
+        data,
+      );
+    },
+  });
+}
+
+// =============================================================================
+// Reserve Spending Types and Hooks
+// =============================================================================
+
+export interface SpendReserveRequest {
+  reserve_id: string;
+}
+
+export function useSpendReserve(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: SpendReserveRequest) =>
+      api.post<CombatSessionResponse>(`/combat/${sessionId}/reserves/spend`, request),
+    onSuccess: (data) => {
+      queryClient.setQueryData<CombatSessionResponse>(
+        combatKeys.detail(sessionId),
+        data,
+      );
+    },
+  });
+}

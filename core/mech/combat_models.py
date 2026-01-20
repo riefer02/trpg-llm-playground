@@ -250,6 +250,28 @@ class TurnStartResult(FrozenModel):
         description="IDs of drones that can act this turn"
     )
 
+    # Dangerous terrain start-of-turn check (PR2 3859-3860)
+    dangerous_terrain_check_required: bool = Field(
+        default=False,
+        description="Whether actor started turn in dangerous terrain and needs a check"
+    )
+    dangerous_terrain_decision_created: bool = Field(
+        default=False,
+        description="Whether a pending decision was created for the terrain check"
+    )
+    dangerous_terrain_auto_resolved: bool = Field(
+        default=False,
+        description="Whether the terrain check was auto-resolved (non-player combatant)"
+    )
+    dangerous_terrain_check_passed: bool | None = Field(
+        default=None,
+        description="Result of auto-resolved check (None if not auto-resolved)"
+    )
+    dangerous_terrain_damage: int = Field(
+        default=0,
+        description="Damage taken from failed dangerous terrain check"
+    )
+
 
 class BurnTickResult(FrozenModel):
     """Result of burn damage tick at end of turn."""

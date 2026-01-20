@@ -153,6 +153,20 @@
           "default": null,
           "description": "Linked CombatSessionDB id once launched",
           "title": "Combat Session Id"
+        },
+        "enemy_force_preview": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Preview of enemy force composition (EnemyForcePreview as dict)",
+          "title": "Enemy Force Preview"
         }
       },
       "required": [

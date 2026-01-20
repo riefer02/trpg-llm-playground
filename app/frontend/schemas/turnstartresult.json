@@ -129,6 +129,43 @@
       },
       "title": "Drones Ready To Act",
       "type": "array"
+    },
+    "dangerous_terrain_check_required": {
+      "default": false,
+      "description": "Whether actor started turn in dangerous terrain and needs a check",
+      "title": "Dangerous Terrain Check Required",
+      "type": "boolean"
+    },
+    "dangerous_terrain_decision_created": {
+      "default": false,
+      "description": "Whether a pending decision was created for the terrain check",
+      "title": "Dangerous Terrain Decision Created",
+      "type": "boolean"
+    },
+    "dangerous_terrain_auto_resolved": {
+      "default": false,
+      "description": "Whether the terrain check was auto-resolved (non-player combatant)",
+      "title": "Dangerous Terrain Auto Resolved",
+      "type": "boolean"
+    },
+    "dangerous_terrain_check_passed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Result of auto-resolved check (None if not auto-resolved)",
+      "title": "Dangerous Terrain Check Passed"
+    },
+    "dangerous_terrain_damage": {
+      "default": 0,
+      "description": "Damage taken from failed dangerous terrain check",
+      "title": "Dangerous Terrain Damage",
+      "type": "integer"
     }
   },
   "required": [

@@ -1,0 +1,31 @@
+{
+  "description": "A single NPC type in the enemy force composition.\n\nAttributes:\n    template_id: ID of the NPC template\n    name: Display name of the NPC type\n    count: Number of this NPC type in the force\n    victory_points: Total VP contribution from this type",
+  "properties": {
+    "template_id": {
+      "title": "Template Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "count": {
+      "minimum": 0,
+      "title": "Count",
+      "type": "integer"
+    },
+    "victory_points": {
+      "minimum": 0.0,
+      "title": "Victory Points",
+      "type": "number"
+    }
+  },
+  "required": [
+    "template_id",
+    "name",
+    "count",
+    "victory_points"
+  ],
+  "title": "EnemyForceCompositionEntry",
+  "type": "object"
+}

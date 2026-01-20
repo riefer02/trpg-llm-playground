@@ -31,6 +31,7 @@ import {
   CardTitle,
   Button,
 } from "../../components/ui";
+import { MissionBriefingModal } from "../../components/campaign/MissionBriefingModal";
 
 export const Route = createFileRoute("/campaigns/$campaignId")({
   component: CampaignDetailPage,
@@ -108,6 +109,7 @@ function CampaignDetailPage() {
   >({});
   const [showTemplates, setShowTemplates] = useState(false);
   const [templateCategory, setTemplateCategory] = useState<string | undefined>(undefined);
+  const [showBriefingModal, setShowBriefingModal] = useState(false);
   const reserveTemplates = useReserveTemplates(templateCategory);
 
   const sortedInvites = useMemo(
@@ -727,6 +729,13 @@ function CampaignDetailPage() {
               />
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowBriefingModal(true)}
+              >
+                View Briefing
+              </Button>
               <Button
                 type="button"
                 disabled={!readiness.can_launch || launchMission.isPending}
@@ -1493,6 +1502,19 @@ function CampaignDetailPage() {
           ))}
         </CardContent>
       </Card>
+
+      {/* Mission Briefing Modal */}
+      <MissionBriefingModal
+        isOpen={showBriefingModal}
+        onClose={() => setShowBriefingModal(false)}
+        missionName={lobbyState?.mission_plan?.mission_name}
+        briefingNotes={lobbyState?.mission_plan?.briefing_notes}
+        stakes={lobbyState?.mission_plan?.stakes}
+        objectives={lobbyState?.mission_plan?.objectives}
+        supportAssets={lobbyState?.mission_plan?.support_assets}
+        reserves={lobbyState?.mission_plan?.reserves}
+        enemyForcePreview={lobbyState?.enemy_force_preview}
+      />
     </div>
   );
 }

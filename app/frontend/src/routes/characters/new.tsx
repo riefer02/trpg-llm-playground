@@ -30,6 +30,7 @@ import {
   CardContent,
   Button,
 } from "../../components/ui";
+import { LicenseBadge } from "../../components/ui/LicenseBadge";
 
 export const Route = createFileRoute("/characters/new" as const)({
   component: NewCharacterPage,
@@ -942,7 +943,10 @@ function NewCharacterPage() {
                 </div>
 
                 <div className="mt-4 p-4 bg-muted/50 border border-border rounded-md">
-                  <div className="font-semibold mb-2">GMS Everest</div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="font-semibold">GMS Everest</div>
+                    <LicenseBadge licenseId={null} />
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm text-muted-foreground">
                     <div>HP 10</div>
                     <div>Evasion 8</div>

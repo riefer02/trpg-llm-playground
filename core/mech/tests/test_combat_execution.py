@@ -247,6 +247,136 @@ class TestStartTurn:
         assert "mount_dismount" in result.available_actions
         assert "skirmish" not in result.available_actions
 
+    def test_start_turn_dangerous_terrain_auto_resolves_for_hostiles(self):
+        """Test that hostiles in dangerous terrain auto-resolve at turn start."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+        from unittest.mock import patch
+
+        combatant = make_combatant(
+            id="actor_1",
+            side="hostiles",
+            engineering_skill=2,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=0, r=0), dangerous=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[combatant],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+
+        # Force a failed check (roll 5 + 2 skill = 7 < 10)
+        with patch("core.shared.terrain.roll_dice", return_value=5):
+            updated_scenario, result = start_turn(scenario, "actor_1")
+
+        assert result.dangerous_terrain_check_required is True
+        assert result.dangerous_terrain_auto_resolved is True
+        assert result.dangerous_terrain_check_passed is False
+        assert result.dangerous_terrain_damage == 5
+
+        # Check damage was applied
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.resources.hp_current < combatant.resources.hp_current
+
+    def test_start_turn_dangerous_terrain_creates_decision_for_players(self):
+        """Test that players in dangerous terrain get a decision prompt at turn start."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        combatant = make_combatant(
+            id="actor_1",
+            side="players",
+            engineering_skill=2,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=0, r=0), dangerous=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[combatant],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+
+        updated_scenario, result = start_turn(scenario, "actor_1")
+
+        assert result.dangerous_terrain_check_required is True
+        assert result.dangerous_terrain_decision_created is True
+        assert result.dangerous_terrain_auto_resolved is False
+        assert result.dangerous_terrain_damage == 0  # No auto damage for players
+
+        # Check pending decision was created
+        decisions = [
+            d for d in updated_scenario.pending_decisions
+            if d.decision_type == "engineering_check"
+        ]
+        assert len(decisions) == 1
+        assert decisions[0].combatant_id == "actor_1"
+        assert decisions[0].trigger_source.startswith("dangerous_terrain:")
+
+    def test_start_turn_dangerous_terrain_no_duplicate_check_same_round(self):
+        """Test that dangerous terrain check doesn't repeat if already checked this round."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        combatant = make_combatant(
+            id="actor_1",
+            side="hostiles",
+            engineering_skill=2,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+            dangerous_terrain_last_check_round=1,  # Already checked round 1
+        )
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=0, r=0), dangerous=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[combatant],
+            grapples=[],
+            rounds=[CombatRound(round_index=1, turn_order=[], turns=[])],  # Round 1
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+
+        updated_scenario, result = start_turn(scenario, "actor_1")
+
+        # Should NOT require a check because already checked this round
+        assert result.dangerous_terrain_check_required is False
+        assert result.dangerous_terrain_auto_resolved is False
+        assert result.dangerous_terrain_damage == 0
+
+    def test_start_turn_no_dangerous_terrain_check_if_not_in_dangerous(self):
+        """Test that no check is triggered if not in dangerous terrain."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        combatant = make_combatant(
+            id="actor_1",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), dangerous=True),  # Different hex
+        ])
+        scenario = MechCombatScenario(
+            combatants=[combatant],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+
+        updated_scenario, result = start_turn(scenario, "actor_1")
+
+        assert result.dangerous_terrain_check_required is False
+        assert result.dangerous_terrain_damage == 0
+
 
 # =============================================================================
 # Turn End Tests

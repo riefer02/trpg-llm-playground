@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 import {
   useCombatSession,
@@ -12,12 +12,15 @@ import {
   useReactionOpportunity,
   usePendingDecisions,
   useSubmitDecision,
+  useCompleteCombat,
+  useSpendReserve,
   useWeapons,
   type ActionRequest,
   type ActionEconomyState,
   type AvailableActionItem,
   type ReactionRequest,
   type DecisionSubmitRequest,
+  type CombatCompleteRequest,
 } from "../../lib/api";
 import { CombatCanvas, type TargetingMode } from "../../components/combat/CombatCanvas";
 import {
@@ -32,6 +35,10 @@ import { OverchargeConfirm } from "../../components/combat/OverchargeConfirm";
 import { ReactionPrompt } from "../../components/combat/ReactionPrompt";
 import { SaveCheckPrompt } from "../../components/combat/SaveCheckPrompt";
 import { TraumaSelectionPrompt } from "../../components/combat/TraumaSelectionPrompt";
+import { MissionCompleteModal } from "../../components/combat/MissionCompleteModal";
+import { VictoryConditionPanel } from "../../components/combat/VictoryConditionPanel";
+import { ObjectiveTracker } from "../../components/combat/ObjectiveTracker";
+import { ReservesPanel } from "../../components/combat/ReservesPanel";
 import {
   adaptCombatScenario,
   type CombatRenderAdapterOutput,
@@ -39,6 +46,7 @@ import {
 import { createHexLayout } from "../../lib/combat-render/hex";
 import type { HexCoord, AttackPatternDefinition } from "../../lib/types/lancer";
 import {
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -69,6 +77,12 @@ function CombatSessionPage() {
   const endTurn = useEndTurn(combatId);
   const executeAction = useExecuteAction(combatId);
   const submitReaction = useSubmitReaction(combatId);
+  const completeCombat = useCompleteCombat(combatId);
+  const spendReserve = useSpendReserve(combatId);
+  const navigate = useNavigate();
+
+  // Mission completion state
+  const [showMissionCompleteModal, setShowMissionCompleteModal] = useState(false);
 
   // Turn state tracking
   const [turnActive, setTurnActive] = useState(false);
@@ -248,6 +262,32 @@ function CombatSessionPage() {
     [submitDecision]
   );
 
+  // Handle mission completion
+  const handleMissionComplete = useCallback(
+    (request: CombatCompleteRequest) => {
+      completeCombat.mutate(request, {
+        onSuccess: (result) => {
+          setShowMissionCompleteModal(false);
+          // Redirect to campaign if linked, otherwise to dashboard
+          if (result.campaign_id) {
+            navigate({ to: "/campaigns/$campaignId", params: { campaignId: result.campaign_id } });
+          } else {
+            navigate({ to: "/" });
+          }
+        },
+      });
+    },
+    [completeCombat, navigate]
+  );
+
+  // Handle reserve spending
+  const handleSpendReserve = useCallback(
+    (reserveId: string) => {
+      spendReserve.mutate({ reserve_id: reserveId });
+    },
+    [spendReserve]
+  );
+
   // Handle target mode changes from ActionPanel
   const handleTargetModeChange = useCallback((mode: TargetMode | null) => {
     setTargetMode(mode);
@@ -403,19 +443,39 @@ function CombatSessionPage() {
               Status: {data.status} · Round {data.current_round}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span
-                className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-500" : "bg-amber-500"}`}
-              />
-              {wsConnected ? "Live" : "Polling"}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Session ID: {data.id}
+          <div className="flex items-center gap-4">
+            {data.status === "active" && (
+              <Button
+                variant="outline"
+                onClick={() => setShowMissionCompleteModal(true)}
+              >
+                End Mission
+              </Button>
+            )}
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span
+                  className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-500" : "bg-amber-500"}`}
+                />
+                {wsConnected ? "Live" : "Polling"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Session ID: {data.id}
+              </div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Mission Complete Modal */}
+      <MissionCompleteModal
+        isOpen={showMissionCompleteModal}
+        onComplete={handleMissionComplete}
+        onCancel={() => setShowMissionCompleteModal(false)}
+        isSubmitting={completeCombat.isPending}
+        campaignId={data.campaign_id}
+        missionReserves={scenario?.mission_reserves}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Card className="h-full">
@@ -491,6 +551,19 @@ function CombatSessionPage() {
             onEndTurn={handleEndTurn}
             isStarting={startTurn.isPending}
             isEnding={endTurn.isPending}
+          />
+
+          {/* Victory Conditions (if SITREP active) */}
+          <VictoryConditionPanel sitrepResolution={scenario?.sitrep_resolution} />
+
+          {/* Mission Objectives (if available) */}
+          <ObjectiveTracker objectives={scenario?.objectives} />
+
+          {/* Mission Reserves (if available) */}
+          <ReservesPanel
+            reserves={scenario?.mission_reserves}
+            onSpendReserve={handleSpendReserve}
+            isSpending={spendReserve.isPending}
           />
 
           {/* Economy Display (only when turn is active) */}

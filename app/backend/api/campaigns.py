@@ -60,7 +60,7 @@ from core.shared.campaign.campaign import (
     SessionLifecycleCheckpoint,
 )
 from core.shared.campaign.serialization import get_campaign_summary
-from core.shared.scenario import SitrepType, SITREP_TEMPLATES
+from core.shared.scenario import SitrepType, SITREP_TEMPLATES, MissionObjective
 from core.shared.terrain_generation import (
     TileSetType,
     TerrainGeneratorParams,
@@ -75,6 +75,8 @@ from core.gm_toolkit.encounter_builder import (
     EncounterDifficulty,
     estimate_party_power,
     calculate_enemy_force,
+    build_enemy_force_preview,
+    EnemyForcePreview,
 )
 from core.npc.state import NPCState, convert_to_combat_stats
 from core.npc.models import NPCTemplate
@@ -394,7 +396,7 @@ def _generate_enemy_combatants(
     player_count: int,
     avg_license_level: float,
     npc_templates: list[NPCTemplate],
-) -> tuple[list[CombatantState], list[str]]:
+) -> tuple[list[CombatantState], list[str], EnemyForcePreview]:
     """Generate enemy combatants based on difficulty.
 
     Args:
@@ -405,8 +407,17 @@ def _generate_enemy_combatants(
         npc_templates: Available NPC templates to use
 
     Returns:
-        Tuple of (list of CombatantState, list of reserve NPC IDs)
+        Tuple of (list of CombatantState, list of reserve NPC IDs, EnemyForcePreview)
     """
+    # Build force preview for UI transparency
+    force_preview = build_enemy_force_preview(
+        difficulty=difficulty,
+        sitrep_type=sitrep_type,
+        player_count=player_count,
+        avg_license_level=avg_license_level,
+        npc_templates=npc_templates,
+    )
+
     player_power = estimate_party_power(player_count, avg_license_level)
     force = calculate_enemy_force(difficulty, sitrep_type, player_power, npc_templates)
 
@@ -433,7 +444,7 @@ def _generate_enemy_combatants(
             reserve_ids.append(f"npc_{template.id}_{npc_counter}")
             reserve_vp_remaining -= template.victory_count
 
-    return initial_combatants, reserve_ids
+    return initial_combatants, reserve_ids, force_preview
 
 
 def _assign_deployment_positions(
@@ -1282,6 +1293,22 @@ async def upsert_campaign_lobby(
     return await _build_campaign_detail_response(session, campaign_db, user["id"])
 
 
+def _convert_objective_brief_to_mission_objective(
+    brief: MissionObjectiveBrief,
+) -> MissionObjective:
+    """Convert a lobby MissionObjectiveBrief to a combat MissionObjective."""
+    # Map lobby priority strings to numeric priorities
+    priority_map = {"primary": 3, "secondary": 2, "optional": 1}
+    return MissionObjective(
+        id=brief.id,
+        description=brief.success_condition,
+        objective_type="custom",
+        status="pending",
+        priority=priority_map.get(brief.priority, 1),
+        is_optional=brief.priority == "optional",
+    )
+
+
 @router.post("/{campaign_id}/launch", response_model=CampaignDetailResponse)
 async def launch_campaign_mission(
     campaign_id: str,
@@ -1360,6 +1387,7 @@ async def launch_campaign_mission(
     sitrep_resolution: SitrepResolution | None = None
     zones: dict[str, list[HexCoord]] = {}
     reserve_ids: list[str] = []
+    enemy_force_preview: EnemyForcePreview | None = None
 
     if body.sitrep_type:
         # Generate terrain from SITREP template
@@ -1373,10 +1401,22 @@ async def launch_campaign_mission(
 
         # Generate enemy combatants if difficulty is specified
         if body.difficulty and body.enemy_template_ids:
-            # For now, we only support template IDs being passed directly
-            # In the future, we could load templates from a database
-            # Here we create simple placeholder templates
-            pass  # Enemy template loading would go here
+            # Load NPC templates by ID (TODO: load from database/compendium)
+            # For now, create a basic force preview without actual NPCs
+            avg_license_level = sum(
+                (core_campaign.character_level(m.assigned_character_id) or 0)
+                for m in assigned_members
+                if m.assigned_character_id
+            ) / max(len(assigned_members), 1)
+
+            # Build a force preview for UI even without loaded templates
+            enemy_force_preview = build_enemy_force_preview(
+                difficulty=body.difficulty,
+                sitrep_type=body.sitrep_type,
+                player_count=len(player_assignments),
+                avg_license_level=avg_license_level,
+                npc_templates=[],  # Templates would be loaded here in full implementation
+            )
 
         # Assign deployment positions for players
         if zones:
@@ -1392,6 +1432,12 @@ async def launch_campaign_mission(
                 enemy_count=len([c for c in combatants if c.side == "hostiles"]),
             )
 
+    # Convert lobby objectives to combat objectives
+    mission_objectives = [
+        _convert_objective_brief_to_mission_objective(obj)
+        for obj in lobby_state.mission_plan.objectives
+    ]
+
     scenario = MechCombatScenario(
         combatants=combatants,
         environment=body.environment,
@@ -1400,6 +1446,8 @@ async def launch_campaign_mission(
         deployables={},
         terrain=terrain,
         sitrep_resolution=sitrep_resolution,
+        objectives=mission_objectives,
+        mission_reserves=lobby_state.mission_plan.reserves,
     )
 
     combat_session_id = _generate_id("combat")
@@ -1435,6 +1483,8 @@ async def launch_campaign_mission(
     lobby_state.status = "launched"
     lobby_state.combat_session_id = combat_session_id
     lobby_state.last_ready_check = now
+    if enemy_force_preview:
+        lobby_state.enemy_force_preview = enemy_force_preview.model_dump(mode="json")
     core_campaign.lobby_state = lobby_state
 
     _save_campaign_model(campaign_db, core_campaign)

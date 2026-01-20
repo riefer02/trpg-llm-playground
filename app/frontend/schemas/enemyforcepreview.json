@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "EnemyForceCompositionEntry": {
+      "description": "A single NPC type in the enemy force composition.\n\nAttributes:\n    template_id: ID of the NPC template\n    name: Display name of the NPC type\n    count: Number of this NPC type in the force\n    victory_points: Total VP contribution from this type",
+      "properties": {
+        "template_id": {
+          "title": "Template Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "count": {
+          "minimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "victory_points": {
+          "minimum": 0.0,
+          "title": "Victory Points",
+          "type": "number"
+        }
+      },
+      "required": [
+        "template_id",
+        "name",
+        "count",
+        "victory_points"
+      ],
+      "title": "EnemyForceCompositionEntry",
+      "type": "object"
+    }
+  },
+  "description": "Preview of enemy force composition for UI display.\n\nProvides transparency into the enemy force calculation results\nbefore mission launch.\n\nAttributes:\n    total_victory_points: Total VP budget for this encounter\n    initial_victory_points: VP allocated to initially deployed enemies\n    reserve_victory_points: VP allocated to reserve enemies\n    initial_count: Number of enemies in initial deployment\n    reserve_count: Number of enemies in reserves\n    composition: Breakdown by NPC type\n    difficulty: The difficulty level used for calculation\n    sitrep_type: The SITREP type used for calculation",
+  "properties": {
+    "total_victory_points": {
+      "minimum": 0.0,
+      "title": "Total Victory Points",
+      "type": "number"
+    },
+    "initial_victory_points": {
+      "minimum": 0.0,
+      "title": "Initial Victory Points",
+      "type": "number"
+    },
+    "reserve_victory_points": {
+      "minimum": 0.0,
+      "title": "Reserve Victory Points",
+      "type": "number"
+    },
+    "initial_count": {
+      "minimum": 0,
+      "title": "Initial Count",
+      "type": "integer"
+    },
+    "reserve_count": {
+      "minimum": 0,
+      "title": "Reserve Count",
+      "type": "integer"
+    },
+    "composition": {
+      "items": {
+        "$ref": "#/$defs/EnemyForceCompositionEntry"
+      },
+      "title": "Composition",
+      "type": "array"
+    },
+    "difficulty": {
+      "anyOf": [
+        {
+          "enum": [
+            "trivial",
+            "easy",
+            "standard",
+            "hard",
+            "extreme"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Difficulty"
+    },
+    "sitrep_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sitrep Type"
+    }
+  },
+  "required": [
+    "total_victory_points",
+    "initial_victory_points",
+    "reserve_victory_points",
+    "initial_count",
+    "reserve_count"
+  ],
+  "title": "EnemyForcePreview",
+  "type": "object"
+}

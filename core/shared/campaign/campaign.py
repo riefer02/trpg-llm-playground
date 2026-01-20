@@ -151,6 +151,10 @@ class CampaignLobbyState(BaseModel):
     combat_session_id: str | None = Field(
         default=None, description="Linked CombatSessionDB id once launched"
     )
+    enemy_force_preview: dict | None = Field(
+        default=None,
+        description="Preview of enemy force composition (EnemyForcePreview as dict)",
+    )
 
     @model_validator(mode="after")
     def validate_seat_limits(self) -> "CampaignLobbyState":

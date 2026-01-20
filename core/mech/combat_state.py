@@ -20,6 +20,8 @@ from core.shared.effects import (
 )
 from core.shared.sitrep_resolution import SitrepResolution
 from core.shared.decisions import PendingDecision
+from core.shared.scenario import MissionObjective
+from core.shared.campaign.campaign import ReservePlanEntry
 from core.shared.rolls import ContestedCheck
 from core.shared.dice import DiceExpression
 from core.mech.grid import HexPosition, HexCoord
@@ -420,6 +422,16 @@ class MechCombatScenario(FrozenModel):
     pending_decisions: list[PendingDecision] = Field(
         default_factory=list,
         description="Pending decisions awaiting player input (saves, trauma selection)",
+    )
+    # Mission objectives from campaign lobby (for display during combat)
+    objectives: list[MissionObjective] = Field(
+        default_factory=list,
+        description="Mission objectives from campaign lobby for tracking during combat",
+    )
+    # Mission reserves from campaign lobby (available for spending during combat)
+    mission_reserves: list[ReservePlanEntry] = Field(
+        default_factory=list,
+        description="Reserves from campaign lobby available for spending during combat",
     )
 
 

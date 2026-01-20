@@ -118,6 +118,12 @@ class CombatSessionCompleteRequest(BaseModel):
     notes: str | None = None
 
 
+class SpendReserveRequest(BaseModel):
+    """Request body for spending a mission reserve."""
+
+    reserve_id: str = Field(..., description="ID of the reserve to spend")
+
+
 # =============================================================================
 # Response Schemas
 # =============================================================================
@@ -1711,3 +1717,84 @@ async def submit_decision(
         effects_applied=effects_applied,
         scenario=combat_session.scenario,
     )
+
+
+# =============================================================================
+# Reserve Spending Endpoint
+# =============================================================================
+
+
+@router.post("/{session_id}/reserves/spend", response_model=CombatSessionResponse)
+async def spend_reserve(
+    session_id: str,
+    body: SpendReserveRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> CombatSessionResponse:
+    """Spend a mission reserve during combat.
+
+    Updates the reserve status from 'planned' to 'spent' and broadcasts
+    the updated state to all connected clients.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    if combat_session.status != "active":
+        raise ValidationError(
+            f"Cannot spend reserve: session status is '{combat_session.status}'",
+            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+        )
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Find the reserve
+    reserve_idx = None
+    for idx, reserve in enumerate(scenario.mission_reserves):
+        if reserve.reserve_id == body.reserve_id:
+            reserve_idx = idx
+            break
+
+    if reserve_idx is None:
+        raise NotFoundError("Reserve", body.reserve_id)
+
+    reserve = scenario.mission_reserves[reserve_idx]
+
+    if reserve.status != "planned":
+        raise ValidationError(
+            f"Reserve '{body.reserve_id}' has already been spent or earned",
+            errors=[{"loc": ["reserve_id"], "msg": f"Reserve status is '{reserve.status}'", "type": "value_error"}],
+        )
+
+    # Update reserve status to 'spent'
+    updated_reserve = reserve.model_copy(update={"status": "spent"})
+    updated_reserves = list(scenario.mission_reserves)
+    updated_reserves[reserve_idx] = updated_reserve
+
+    # Create updated scenario with spent reserve
+    updated_scenario = scenario.model_copy(update={"mission_reserves": updated_reserves})
+
+    # Persist
+    combat_session.scenario = updated_scenario.model_dump(mode="json")
+    combat_session.updated_at = utc_now()
+
+    session.add(combat_session)
+    await session.commit()
+    await session.refresh(combat_session)
+
+    # Broadcast state update to all connected WebSocket clients
+    ws_response = _session_to_response(combat_session)
+    await combat_ws_manager.broadcast(
+        session_id,
+        {"type": "state", "data": ws_response.model_dump(mode="json")},
+    )
+
+    return _session_to_response(combat_session)

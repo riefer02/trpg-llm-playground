@@ -156,6 +156,8 @@ from core.shared.self_destruct import (
     resolve_self_destruct_explosion,
 )
 from core.shared.deployables import arm_mines_at_turn_start
+from core.shared.terrain import terrain_index, resolve_dangerous_terrain
+from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
 from core.shared.drone_turn import (
     DroneTurnStartInput,
     DroneTurnEndInput,
@@ -338,6 +340,74 @@ def start_turn(
         new_overcharge_state = increment_overcharge_on_turn_start(updated_actor.overcharge_state)
         updated_actor = updated_actor.model_copy(update={"overcharge_state": new_overcharge_state})
 
+    # Check for dangerous terrain at start of turn (PR2 3859-3860)
+    # "A character only needs to make one check a round for dangerous terrain"
+    dangerous_terrain_check_required = False
+    dangerous_terrain_decision_created = False
+    dangerous_terrain_auto_resolved = False
+    dangerous_terrain_check_passed: bool | None = None
+    dangerous_terrain_damage = 0
+
+    current_round_num = len(scenario.rounds) if scenario.rounds else 1
+    terrain_rules = DEFAULT_MECH_COMBAT_RULES.terrain
+
+    if updated_actor.position is not None and scenario.terrain is not None:
+        terrain_idx = terrain_index(scenario.terrain)
+        terrain_hex = terrain_idx.get(updated_actor.position.coord)
+
+        if terrain_hex and terrain_hex.dangerous:
+            # Check if already made a check this round
+            check_once_per_round = terrain_rules.dangerous_terrain_check_once_per_round
+            already_checked = (
+                check_once_per_round
+                and updated_actor.dangerous_terrain_last_check_round == current_round_num
+            )
+
+            if not already_checked:
+                dangerous_terrain_check_required = True
+                skill_bonus = updated_actor.stats.engineering_skill if updated_actor.stats else 0
+
+                # Player combatants get a decision prompt (unless AI-controlled)
+                if updated_actor.side == "players" and not updated_actor.ai_controlled:
+                    from core.shared.decisions import (
+                        add_decision_to_scenario,
+                        check_dangerous_terrain_decision,
+                    )
+
+                    decision = check_dangerous_terrain_decision(
+                        combatant=updated_actor,
+                        terrain_name="dangerous",
+                        check_target=10,
+                        current_round=current_round_num,
+                    )
+                    # We'll add the decision to the scenario after building it
+                    dangerous_terrain_decision_created = True
+                    # Update last check round to prevent duplicate checks during movement
+                    updated_actor = updated_actor.model_copy(
+                        update={"dangerous_terrain_last_check_round": current_round_num}
+                    )
+                else:
+                    # Auto-resolve for non-player combatants
+                    danger_result = resolve_dangerous_terrain(
+                        terrain=scenario.terrain,
+                        coord=updated_actor.position.coord,
+                        skill_bonus=skill_bonus,
+                        damage=terrain_rules.dangerous_terrain_damage,
+                        damage_type=terrain_rules.dangerous_terrain_damage_type,
+                        check_once_per_round=check_once_per_round,
+                        round_checked=current_round_num,
+                    )
+                    dangerous_terrain_auto_resolved = True
+                    dangerous_terrain_check_passed = danger_result.check_passed
+                    dangerous_terrain_damage = danger_result.damage_dealt
+
+                    # Update last check round
+                    updated_actor = updated_actor.model_copy(
+                        update={"dangerous_terrain_last_check_round": current_round_num}
+                    )
+
+                    # Apply damage if check failed (will be applied after scenario is built)
+
     # Build updated combatants list
     updated_combatants = list(scenario.combatants)
     updated_combatants[actor_index] = updated_actor
@@ -407,6 +477,32 @@ def start_turn(
 
     updated_scenario = intermediate_scenario
 
+    # Add pending decision for dangerous terrain if needed
+    if dangerous_terrain_decision_created:
+        from core.shared.decisions import (
+            add_decision_to_scenario,
+            check_dangerous_terrain_decision,
+        )
+
+        decision = check_dangerous_terrain_decision(
+            combatant=updated_actor,
+            terrain_name="dangerous",
+            check_target=10,
+            current_round=current_round_num,
+        )
+        updated_scenario = add_decision_to_scenario(updated_scenario, decision)
+
+    # Apply dangerous terrain damage for auto-resolved checks
+    if dangerous_terrain_auto_resolved and dangerous_terrain_damage > 0:
+        updated_scenario, _change, _structure_result = apply_damage(
+            updated_scenario, actor_id, dangerous_terrain_damage, armor_piercing=0
+        )
+        # Update actor reference from scenario after damage
+        for c in updated_scenario.combatants:
+            if c.id == actor_id:
+                updated_actor = c
+                break
+
     # Determine available actions
     available_actions = _get_basic_available_actions(updated_actor)
 
@@ -425,6 +521,11 @@ def start_turn(
         mines_armed=mines_armed,
         drone_heat_to_owner=drone_heat_to_owner,
         drones_ready_to_act=drones_ready_to_act,
+        dangerous_terrain_check_required=dangerous_terrain_check_required,
+        dangerous_terrain_decision_created=dangerous_terrain_decision_created,
+        dangerous_terrain_auto_resolved=dangerous_terrain_auto_resolved,
+        dangerous_terrain_check_passed=dangerous_terrain_check_passed,
+        dangerous_terrain_damage=dangerous_terrain_damage,
     )
 
 

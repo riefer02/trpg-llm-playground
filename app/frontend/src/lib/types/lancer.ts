@@ -264,6 +264,8 @@ export type LancerTTRPGSchema =
   | ZoneControlStateTracker
   | PlayerPartyPower
   | EnemyForceRecommendation
+  | EnemyForcePreview1
+  | EnemyForceCompositionEntry
   | PendingDecision
   | DecisionResolution
   | SaveDecisionResult
@@ -28487,6 +28489,12 @@ export type LastReadyCheck = string | null;
  */
 export type CombatSessionId = string | null;
 /**
+ * Preview of enemy force composition (EnemyForcePreview as dict)
+ */
+export type EnemyForcePreview = {
+  [k: string]: unknown;
+} | null;
+/**
  * Campaign creation time
  */
 export type CreatedAt = string;
@@ -30164,6 +30172,68 @@ export type RerollSource = string | null;
  * Pending decisions awaiting player input (saves, trauma selection)
  */
 export type PendingDecisions = PendingDecision[];
+/**
+ * Unique identifier
+ */
+export type Id26 = string;
+/**
+ * What this objective requires
+ */
+export type Description9 = string;
+export type ObjectiveType =
+  | "escort"
+  | "defend"
+  | "extract"
+  | "destroy"
+  | "infiltrate"
+  | "investigate"
+  | "control"
+  | "custom";
+export type Status17 = "pending" | "in_progress" | "blocked" | "completed" | "failed";
+/**
+ * Higher = more important
+ */
+export type Priority1 = number;
+/**
+ * Objective IDs that must complete first
+ */
+export type DependsOn = string[];
+export type CriterionType =
+  | "target_destroyed"
+  | "position_reached"
+  | "target_escorted"
+  | "area_secured"
+  | "intel_gathered"
+  | "time_elapsed"
+  | "custom";
+/**
+ * What must be true for this criterion
+ */
+export type Description10 = string;
+/**
+ * Target ID for target-based criteria
+ */
+export type TargetId10 = string | null;
+/**
+ * Quantity needed for amount-based criteria
+ */
+export type RequiredAmount2 = number | null;
+/**
+ * Criteria that define when objective is complete
+ */
+export type CompletionCriteria = ObjectiveCriterion[];
+/**
+ * If True, can fail without mission failure
+ */
+export type IsOptional = boolean;
+/**
+ * Mission objectives from campaign lobby for tracking during combat
+ */
+export type Objectives1 = MissionObjective[];
+/**
+ * Reserves from campaign lobby available for spending during combat
+ */
+export type MissionReserves = ReservePlanEntry[];
 export type Code4 = string;
 export type Message4 = string;
 export type Severity5 = "error" | "warning";
@@ -30213,7 +30283,7 @@ export type WeaponProfileId = string | null;
  */
 export type SystemId2 = string | null;
 export type Option = "scan" | "bolster" | "lock_on" | "invade";
-export type TargetId10 = string;
+export type TargetId11 = string;
 export type ScanOptions1 = ("stats" | "hidden_info" | "public_info")[] | null;
 /**
  * Movement path for move actions
@@ -30383,6 +30453,26 @@ export type DroneHeatToOwner = number;
  */
 export type DronesReadyToAct = string[];
 /**
+ * Whether actor started turn in dangerous terrain and needs a check
+ */
+export type DangerousTerrainCheckRequired = boolean;
+/**
+ * Whether a pending decision was created for the terrain check
+ */
+export type DangerousTerrainDecisionCreated = boolean;
+/**
+ * Whether the terrain check was auto-resolved (non-player combatant)
+ */
+export type DangerousTerrainAutoResolved = boolean;
+/**
+ * Result of auto-resolved check (None if not auto-resolved)
+ */
+export type DangerousTerrainCheckPassed = boolean | null;
+/**
+ * Damage taken from failed dangerous terrain check
+ */
+export type DangerousTerrainDamage1 = number;
+/**
  * ID of the actor whose turn ended
  */
 export type ActorId3 = string;
@@ -30415,7 +30505,7 @@ export type CooldownsDecremented1 = string[];
 /**
  * Combatant who took the burn tick
  */
-export type TargetId11 = string;
+export type TargetId12 = string;
 /**
  * Total burn marked before resolution
  */
@@ -30588,7 +30678,7 @@ export type WeaponThreat1 = number;
 /**
  * ID of moving combatant (target)
  */
-export type TargetId12 = string;
+export type TargetId13 = string;
 /**
  * True if reactor has available reaction budget
  */
@@ -30642,7 +30732,7 @@ export type Armor6 = number;
 export type HpPerSize1 = number;
 export type Evasion8 = number;
 export type IsFlammable = boolean;
-export type Id26 = string;
+export type Id27 = string;
 export type Kind2 = "floor" | "obstacle" | "zone" | "hazard" | "objective";
 export type Name46 = string;
 export type Coords = HexCoord[];
@@ -30654,7 +30744,7 @@ export type HardCoverSize1 = ("size_half" | "size_1" | "size_2" | "size_3" | "si
 export type Difficult1 = boolean;
 export type Dangerous1 = boolean;
 export type ZoneType1 = ("deployment" | "extraction" | "objective" | "ingress") | null;
-export type Id27 = string;
+export type Id28 = string;
 export type Kind3 = "floor";
 export type Name47 = string;
 export type Coords1 = HexCoord[];
@@ -30665,7 +30755,7 @@ export type ProvidesSoftCover3 = boolean;
 export type ProvidesHardCover2 = boolean;
 export type HardCoverSize2 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
 export type ZoneType2 = ("deployment" | "extraction" | "objective" | "ingress") | null;
-export type Id28 = string;
+export type Id29 = string;
 export type Kind4 = "obstacle";
 export type Name48 = string;
 export type Coords2 = HexCoord[];
@@ -30680,7 +30770,7 @@ export type Size18 = number;
 export type Hp7 = number | null;
 export type IsDestructible = boolean;
 export type ZoneType3 = ("deployment" | "extraction" | "objective" | "ingress") | null;
-export type Id29 = string;
+export type Id30 = string;
 export type Kind5 = "zone";
 export type Name49 = string;
 export type Coords3 = HexCoord[];
@@ -30695,7 +30785,7 @@ export type Dangerous3 = boolean;
 export type DurationRounds = number | null;
 export type CreatedRound = number | null;
 export type ZoneType4 = ("deployment" | "extraction" | "objective" | "ingress") | null;
-export type Id30 = string;
+export type Id31 = string;
 export type Kind6 = "hazard";
 export type Name50 = string;
 export type Coords4 = HexCoord[];
@@ -30711,11 +30801,11 @@ export type Damage4 = number;
 export type DamageType15 = "kinetic" | "explosive" | "energy" | "burn";
 export type CheckDc = number;
 export type ZoneType5 = ("deployment" | "extraction" | "objective" | "ingress") | null;
-export type Id31 = string;
+export type Id32 = string;
 export type Kind7 = "objective";
 export type Name51 = string;
 export type Coords5 = HexCoord[];
-export type ObjectiveType = "control_point" | "escort_target" | "extraction" | "ingress";
+export type ObjectiveType1 = "control_point" | "escort_target" | "extraction" | "ingress";
 export type Elevation7 = number;
 export type BlocksLineOfSight7 = boolean;
 export type ProvidesSoftCover7 = boolean;
@@ -30784,7 +30874,7 @@ export type Name53 = string;
 /**
  * Mission type description
  */
-export type Description9 = string;
+export type Description11 = string;
 export type DurationRounds1 = number;
 export type DeploymentType = "players_first" | "enemies_first" | "roll_off";
 export type DeploymentZones = SitrepZone[];
@@ -30803,7 +30893,7 @@ export type Threshold1 = number | null;
 /**
  * Human-readable description
  */
-export type Description10 = string;
+export type Description12 = string;
 export type VictoryConditions1 = VictoryCondition[];
 export type SpecialRules1 = string[];
 export type TileSet = "urban" | "industrial" | "wilderness" | "zero_g";
@@ -30821,6 +30911,18 @@ export type InitialVictoryPoints = number;
 export type ReserveVictoryPoints = number;
 export type SuggestedTier = "tier_1" | "tier_2" | "tier_3";
 export type RecommendedTemplateIds = string[];
+export type TotalVictoryPoints = number;
+export type InitialVictoryPoints1 = number;
+export type ReserveVictoryPoints1 = number;
+export type InitialCount = number;
+export type ReserveCount = number;
+export type TemplateId = string;
+export type Name54 = string;
+export type Count9 = number;
+export type VictoryPoints = number;
+export type Composition = EnemyForceCompositionEntry[];
+export type Difficulty1 = ("trivial" | "easy" | "standard" | "hard" | "extreme") | null;
+export type SitrepType1 = string | null;
 /**
  * Player's chosen action
  */
@@ -34518,6 +34620,7 @@ export interface CampaignLobbyState {
   status?: Status11;
   last_ready_check?: LastReadyCheck;
   combat_session_id?: CombatSessionId;
+  enemy_force_preview?: EnemyForcePreview;
   [k: string]: unknown;
 }
 /**
@@ -36495,6 +36598,8 @@ export interface MechCombatScenario {
    */
   sitrep_resolution?: SitrepResolution | null;
   pending_decisions?: PendingDecisions;
+  objectives?: Objectives1;
+  mission_reserves?: MissionReserves;
   [k: string]: unknown;
 }
 /**
@@ -36672,6 +36777,40 @@ export interface PendingDecision {
   [k: string]: unknown;
 }
 /**
+ * Single mission objective with dependencies and completion criteria.
+ *
+ * Attributes:
+ *     id: Unique identifier for this objective
+ *     description: What this objective requires
+ *     objective_type: Type of mission objective
+ *     status: Current status of this objective
+ *     priority: Higher = more important (used for scoring)
+ *     depends_on: List of objective IDs that must complete first
+ *     completion_criteria: List of criteria that define completion
+ *     is_optional: If True, can fail without mission failure
+ */
+export interface MissionObjective {
+  id: Id26;
+  description: Description9;
+  objective_type: ObjectiveType;
+  status?: Status17;
+  priority?: Priority1;
+  depends_on?: DependsOn;
+  completion_criteria?: CompletionCriteria;
+  is_optional?: IsOptional;
+  [k: string]: unknown;
+}
+/**
+ * Criterion that must be met for objective completion.
+ */
+export interface ObjectiveCriterion {
+  criterion_type: CriterionType;
+  description: Description10;
+  target_id?: TargetId10;
+  required_amount?: RequiredAmount2;
+  [k: string]: unknown;
+}
+/**
  * A combat validation issue.
  */
 export interface CombatValidationIssue {
@@ -36792,7 +36931,7 @@ export interface ActionExecutionInput {
  */
 export interface FullTechOptionSelection {
   option: Option;
-  target_id: TargetId10;
+  target_id: TargetId11;
   scan_options?: ScanOptions1;
   [k: string]: unknown;
 }
@@ -36905,6 +37044,11 @@ export interface TurnStartResult {
   mines_armed?: MinesArmed;
   drone_heat_to_owner?: DroneHeatToOwner;
   drones_ready_to_act?: DronesReadyToAct;
+  dangerous_terrain_check_required?: DangerousTerrainCheckRequired;
+  dangerous_terrain_decision_created?: DangerousTerrainDecisionCreated;
+  dangerous_terrain_auto_resolved?: DangerousTerrainAutoResolved;
+  dangerous_terrain_check_passed?: DangerousTerrainCheckPassed;
+  dangerous_terrain_damage?: DangerousTerrainDamage1;
   [k: string]: unknown;
 }
 /**
@@ -36939,7 +37083,7 @@ export interface TurnEndResult {
  * Result of burn damage tick at end of turn.
  */
 export interface BurnTickResult {
-  target_id: TargetId11;
+  target_id: TargetId12;
   burn_amount: BurnAmount;
   engineering_roll: EngineeringRoll;
   engineering_bonus: EngineeringBonus;
@@ -37040,7 +37184,7 @@ export interface OverwatchOpportunity {
   reactor_id: ReactorId2;
   weapon_id: WeaponId8;
   weapon_threat: WeaponThreat1;
-  target_id: TargetId12;
+  target_id: TargetId13;
   target_position: HexCoord1;
   can_react: CanReact1;
   prevention_reason?: PreventionReason1;
@@ -37123,7 +37267,7 @@ export interface MaterialProperties {
  * Later primitives in the composition list override earlier ones for overlapping coords.
  */
 export interface TerrainPrimitive {
-  id: Id26;
+  id: Id27;
   kind: Kind2;
   name: Name46;
   coords?: Coords;
@@ -37142,7 +37286,7 @@ export interface TerrainPrimitive {
  * Floor tile primitive for normal/difficult/dangerous/climbing terrain.
  */
 export interface FloorTile {
-  id: Id27;
+  id: Id28;
   kind?: Kind3;
   name: Name47;
   coords?: Coords1;
@@ -37165,7 +37309,7 @@ export interface FloorTile {
  * - Objects have evasion 5
  */
 export interface Obstacle {
-  id: Id28;
+  id: Id29;
   kind?: Kind4;
   name: Name48;
   coords?: Coords2;
@@ -37189,7 +37333,7 @@ export interface Obstacle {
  * These zones provide soft cover for hiding and may have limited duration.
  */
 export interface SoftCoverZone {
-  id: Id29;
+  id: Id30;
   kind?: Kind5;
   name: Name49;
   coords?: Coords3;
@@ -37213,7 +37357,7 @@ export interface SoftCoverZone {
  * Per PR2: Default 5 damage, engineering check DC 10.
  */
 export interface Hazard {
-  id: Id30;
+  id: Id31;
   kind?: Kind6;
   name: Name50;
   coords?: Coords4;
@@ -37236,11 +37380,11 @@ export interface Hazard {
  * Objective primitive for control points, extraction markers, etc.
  */
 export interface Objective {
-  id: Id31;
+  id: Id32;
   kind?: Kind7;
   name: Name51;
   coords?: Coords5;
-  objective_type?: ObjectiveType;
+  objective_type?: ObjectiveType1;
   elevation?: Elevation7;
   blocks_line_of_sight?: BlocksLineOfSight7;
   provides_soft_cover?: ProvidesSoftCover7;
@@ -37347,7 +37491,7 @@ export interface TerrainGeneratorParams {
 export interface SitrepTemplate {
   sitrep_type: SitrepType;
   name: Name53;
-  description: Description9;
+  description: Description11;
   duration_rounds?: DurationRounds1;
   deployment_type?: DeploymentType;
   deployment_zones?: DeploymentZones;
@@ -37371,7 +37515,7 @@ export interface SitrepTemplate {
 export interface VictoryCondition {
   condition_type: ConditionType2;
   threshold?: Threshold1;
-  description: Description10;
+  description: Description12;
   [k: string]: unknown;
 }
 /**
@@ -37422,6 +37566,49 @@ export interface EnemyForceRecommendation {
   reserve_victory_points: ReserveVictoryPoints;
   suggested_tier?: SuggestedTier;
   recommended_template_ids?: RecommendedTemplateIds;
+  [k: string]: unknown;
+}
+/**
+ * Preview of enemy force composition for UI display.
+ *
+ * Provides transparency into the enemy force calculation results
+ * before mission launch.
+ *
+ * Attributes:
+ *     total_victory_points: Total VP budget for this encounter
+ *     initial_victory_points: VP allocated to initially deployed enemies
+ *     reserve_victory_points: VP allocated to reserve enemies
+ *     initial_count: Number of enemies in initial deployment
+ *     reserve_count: Number of enemies in reserves
+ *     composition: Breakdown by NPC type
+ *     difficulty: The difficulty level used for calculation
+ *     sitrep_type: The SITREP type used for calculation
+ */
+export interface EnemyForcePreview1 {
+  total_victory_points: TotalVictoryPoints;
+  initial_victory_points: InitialVictoryPoints1;
+  reserve_victory_points: ReserveVictoryPoints1;
+  initial_count: InitialCount;
+  reserve_count: ReserveCount;
+  composition?: Composition;
+  difficulty?: Difficulty1;
+  sitrep_type?: SitrepType1;
+  [k: string]: unknown;
+}
+/**
+ * A single NPC type in the enemy force composition.
+ *
+ * Attributes:
+ *     template_id: ID of the NPC template
+ *     name: Display name of the NPC type
+ *     count: Number of this NPC type in the force
+ *     victory_points: Total VP contribution from this type
+ */
+export interface EnemyForceCompositionEntry {
+  template_id: TemplateId;
+  name: Name54;
+  count: Count9;
+  victory_points: VictoryPoints;
   [k: string]: unknown;
 }
 /**

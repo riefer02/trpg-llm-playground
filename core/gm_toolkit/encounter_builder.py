@@ -43,6 +43,49 @@ TIER_MULTIPLIERS: dict[NPCTier, float] = {
 }
 
 
+class EnemyForceCompositionEntry(FrozenModel):
+    """A single NPC type in the enemy force composition.
+
+    Attributes:
+        template_id: ID of the NPC template
+        name: Display name of the NPC type
+        count: Number of this NPC type in the force
+        victory_points: Total VP contribution from this type
+    """
+
+    template_id: str
+    name: str
+    count: int = Field(..., ge=0)
+    victory_points: float = Field(..., ge=0.0)
+
+
+class EnemyForcePreview(FrozenModel):
+    """Preview of enemy force composition for UI display.
+
+    Provides transparency into the enemy force calculation results
+    before mission launch.
+
+    Attributes:
+        total_victory_points: Total VP budget for this encounter
+        initial_victory_points: VP allocated to initially deployed enemies
+        reserve_victory_points: VP allocated to reserve enemies
+        initial_count: Number of enemies in initial deployment
+        reserve_count: Number of enemies in reserves
+        composition: Breakdown by NPC type
+        difficulty: The difficulty level used for calculation
+        sitrep_type: The SITREP type used for calculation
+    """
+
+    total_victory_points: float = Field(..., ge=0.0)
+    initial_victory_points: float = Field(..., ge=0.0)
+    reserve_victory_points: float = Field(..., ge=0.0)
+    initial_count: int = Field(..., ge=0)
+    reserve_count: int = Field(..., ge=0)
+    composition: list[EnemyForceCompositionEntry] = Field(default_factory=list)
+    difficulty: EncounterDifficulty | None = None
+    sitrep_type: str | None = None
+
+
 class PlayerPartyPower(FrozenModel):
     """Player party power estimation for encounter scaling.
 
@@ -201,3 +244,88 @@ def get_sitrep_template(sitrep_type: str) -> SitrepTemplate | None:
         The matching SitrepTemplate, or None if not found
     """
     return SITREP_TEMPLATES.get(sitrep_type)
+
+
+def build_enemy_force_preview(
+    difficulty: EncounterDifficulty,
+    sitrep_type: str,
+    player_count: int,
+    avg_license_level: float,
+    npc_templates: list[NPCTemplate | SpecialNPCTemplate],
+) -> EnemyForcePreview:
+    """Build a preview of enemy force composition for UI display.
+
+    Calculates VP budget and assigns NPCs from the template list until
+    the budget is filled, tracking counts for initial vs reserve deployment.
+
+    Args:
+        difficulty: Encounter difficulty level
+        sitrep_type: SITREP mission type
+        player_count: Number of player characters
+        avg_license_level: Average license level of players
+        npc_templates: Available NPC templates to fill the force
+
+    Returns:
+        EnemyForcePreview with full composition breakdown
+
+    Raises:
+        ValueError: If sitrep_type is invalid
+    """
+    player_power = estimate_party_power(player_count, avg_license_level)
+    force = calculate_enemy_force(difficulty, sitrep_type, player_power)
+
+    initial_vp_remaining = force.initial_victory_points
+    reserve_vp_remaining = force.reserve_victory_points
+    initial_count = 0
+    reserve_count = 0
+
+    # Track composition by template
+    composition_map: dict[str, EnemyForceCompositionEntry] = {}
+
+    for template in npc_templates:
+        tier_mult = TIER_MULTIPLIERS.get(template.tier, 1.0)
+        effective_vp = template.victory_count * tier_mult
+        template_initial = 0
+        template_reserve = 0
+
+        # Fill initial deployment
+        while initial_vp_remaining >= effective_vp:
+            template_initial += 1
+            initial_count += 1
+            initial_vp_remaining -= effective_vp
+
+        # Fill reserves
+        while reserve_vp_remaining >= effective_vp:
+            template_reserve += 1
+            reserve_count += 1
+            reserve_vp_remaining -= effective_vp
+
+        total_for_template = template_initial + template_reserve
+        if total_for_template > 0:
+            if template.id in composition_map:
+                existing = composition_map[template.id]
+                composition_map[template.id] = EnemyForceCompositionEntry(
+                    template_id=template.id,
+                    name=template.name,
+                    count=existing.count + total_for_template,
+                    victory_points=existing.victory_points
+                    + (total_for_template * effective_vp),
+                )
+            else:
+                composition_map[template.id] = EnemyForceCompositionEntry(
+                    template_id=template.id,
+                    name=template.name,
+                    count=total_for_template,
+                    victory_points=total_for_template * effective_vp,
+                )
+
+    return EnemyForcePreview(
+        total_victory_points=force.target_victory_points,
+        initial_victory_points=force.initial_victory_points,
+        reserve_victory_points=force.reserve_victory_points,
+        initial_count=initial_count,
+        reserve_count=reserve_count,
+        composition=list(composition_map.values()),
+        difficulty=difficulty,
+        sitrep_type=sitrep_type,
+    )

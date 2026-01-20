@@ -321,6 +321,8 @@ from core.shared.sitrep_resolution import (
 from core.gm_toolkit.encounter_builder import (
     PlayerPartyPower,
     EnemyForceRecommendation,
+    EnemyForcePreview,
+    EnemyForceCompositionEntry,
 )
 from core.shared.decisions import (
     PendingDecision,
@@ -607,6 +609,8 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "ZoneControlStateTracker": ZoneControlStateTracker,
     "PlayerPartyPower": PlayerPartyPower,
     "EnemyForceRecommendation": EnemyForceRecommendation,
+    "EnemyForcePreview": EnemyForcePreview,
+    "EnemyForceCompositionEntry": EnemyForceCompositionEntry,
     # Decision models for save prompts and player choices
     "PendingDecision": PendingDecision,
     "DecisionResolution": DecisionResolution,

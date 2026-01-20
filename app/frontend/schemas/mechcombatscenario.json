@@ -20118,6 +20118,83 @@
       "title": "MeltdownState",
       "type": "object"
     },
+    "MissionObjective": {
+      "description": "Single mission objective with dependencies and completion criteria.\n\nAttributes:\n    id: Unique identifier for this objective\n    description: What this objective requires\n    objective_type: Type of mission objective\n    status: Current status of this objective\n    priority: Higher = more important (used for scoring)\n    depends_on: List of objective IDs that must complete first\n    completion_criteria: List of criteria that define completion\n    is_optional: If True, can fail without mission failure",
+      "properties": {
+        "id": {
+          "description": "Unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "description": "What this objective requires",
+          "title": "Description",
+          "type": "string"
+        },
+        "objective_type": {
+          "enum": [
+            "escort",
+            "defend",
+            "extract",
+            "destroy",
+            "infiltrate",
+            "investigate",
+            "control",
+            "custom"
+          ],
+          "title": "Objective Type",
+          "type": "string"
+        },
+        "status": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "in_progress",
+            "blocked",
+            "completed",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "priority": {
+          "default": 1,
+          "description": "Higher = more important",
+          "minimum": 1,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "depends_on": {
+          "description": "Objective IDs that must complete first",
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "completion_criteria": {
+          "description": "Criteria that define when objective is complete",
+          "items": {
+            "$ref": "#/$defs/ObjectiveCriterion"
+          },
+          "title": "Completion Criteria",
+          "type": "array"
+        },
+        "is_optional": {
+          "default": false,
+          "description": "If True, can fail without mission failure",
+          "title": "Is Optional",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "objective_type"
+      ],
+      "title": "MissionObjective",
+      "type": "object"
+    },
     "ModeEffect": {
       "description": "Toggleable mode that bundles multiple effects.\n\nExamples:\n    ModeEffect(\n        name=\"Reserve Power Mode\",\n        activation_action_id=\"shutdown\",\n        activation_action_type=\"quick\",\n        deactivation_action_id=\"boot_up\",\n        deactivation_action_type=\"full\",\n        effects=MechanicalEffect(...),\n    )",
       "properties": {
@@ -24793,6 +24870,62 @@
         }
       },
       "title": "NonCombatCapacityEffect",
+      "type": "object"
+    },
+    "ObjectiveCriterion": {
+      "description": "Criterion that must be met for objective completion.",
+      "properties": {
+        "criterion_type": {
+          "enum": [
+            "target_destroyed",
+            "position_reached",
+            "target_escorted",
+            "area_secured",
+            "intel_gathered",
+            "time_elapsed",
+            "custom"
+          ],
+          "title": "Criterion Type",
+          "type": "string"
+        },
+        "description": {
+          "description": "What must be true for this criterion",
+          "title": "Description",
+          "type": "string"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target ID for target-based criteria",
+          "title": "Target Id"
+        },
+        "required_amount": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Quantity needed for amount-based criteria",
+          "title": "Required Amount"
+        }
+      },
+      "required": [
+        "criterion_type",
+        "description"
+      ],
+      "title": "ObjectiveCriterion",
       "type": "object"
     },
     "OutOfPlayEffect": {
@@ -29499,6 +29632,57 @@
         }
       },
       "title": "RepairShareEffect",
+      "type": "object"
+    },
+    "ReservePlanEntry": {
+      "description": "Tracks reserve usage/assignments planned for a mission.",
+      "properties": {
+        "reserve_id": {
+          "description": "Identifier for the reserve asset",
+          "title": "Reserve Id",
+          "type": "string"
+        },
+        "assigned_character_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Character expected to use this reserve",
+          "title": "Assigned Character Id"
+        },
+        "usage_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When/how it will be used",
+          "title": "Usage Notes"
+        },
+        "status": {
+          "default": "planned",
+          "enum": [
+            "planned",
+            "spent",
+            "earned"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reserve_id"
+      ],
+      "title": "ReservePlanEntry",
       "type": "object"
     },
     "Resistance": {
@@ -41320,6 +41504,22 @@
         "$ref": "#/$defs/PendingDecision"
       },
       "title": "Pending Decisions",
+      "type": "array"
+    },
+    "objectives": {
+      "description": "Mission objectives from campaign lobby for tracking during combat",
+      "items": {
+        "$ref": "#/$defs/MissionObjective"
+      },
+      "title": "Objectives",
+      "type": "array"
+    },
+    "mission_reserves": {
+      "description": "Reserves from campaign lobby available for spending during combat",
+      "items": {
+        "$ref": "#/$defs/ReservePlanEntry"
+      },
+      "title": "Mission Reserves",
       "type": "array"
     }
   },

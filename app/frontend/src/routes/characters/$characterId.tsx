@@ -26,6 +26,10 @@ import {
   Button,
 } from "../../components/ui";
 import type { PilotLoadout, MechBuild } from "../../lib/types/lancer";
+import { useLoadoutValidation } from "../../lib/hooks/useLoadoutValidation";
+import { ValidationSummary } from "../../components/character/ValidationSummary";
+import { LicenseBadge } from "../../components/ui/LicenseBadge";
+import { formatLicenseRequirement } from "../../lib/utils/license";
 
 export const Route = createFileRoute("/characters/$characterId" as const)({
   component: CharacterDetailPage,
@@ -889,7 +893,11 @@ function MechBuildSection({ character }: { character: CharacterResponse }) {
     ? `Over budget by ${spSpent - spLimit} SP. Remove systems to save.`
     : "Within SP budget.";
 
-  const canSave = Boolean(activeMech) && !updateMechBuild.isPending;
+  // Real-time validation
+  const validation = useLoadoutValidation(draft, frame, character);
+
+  // Disable save if validation errors exist
+  const canSave = Boolean(activeMech) && !updateMechBuild.isPending && validation.valid;
   const mechBuildError =
     updateMechBuild.error instanceof Error
       ? updateMechBuild.error.message
@@ -980,6 +988,9 @@ function MechBuildSection({ character }: { character: CharacterResponse }) {
           </div>
         ) : (
           <div className="space-y-6">
+            {validation.issues.length > 0 && (
+              <ValidationSummary issues={validation.issues} />
+            )}
             <div>
               <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
                 Mounts
@@ -1052,7 +1063,7 @@ function MechBuildSection({ character }: { character: CharacterResponse }) {
                                 entry.weapon.weapon_id
                               ).map((weapon) => (
                                 <option key={weapon.id} value={weapon.id}>
-                                  {weapon.name}
+                                  {weapon.name} [{formatLicenseRequirement(weapon.license_id, weapon.license_rank)}]
                                 </option>
                               ))}
                             </select>
@@ -1111,7 +1122,10 @@ function MechBuildSection({ character }: { character: CharacterResponse }) {
                         }`}
                       >
                         <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium">{system.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{system.name}</span>
+                            <LicenseBadge licenseId={system.license_id} licenseRank={system.license_rank} />
+                          </div>
                           <span className="text-xs text-muted-foreground">
                             SP {system.sp_cost}
                           </span>
