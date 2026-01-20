@@ -1,7 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./client";
-import type { Campaign as LancerCampaign } from "../types/lancer";
+import type {
+  Campaign as LancerCampaign,
+  EncounterDifficulty as LancerEncounterDifficulty,
+  MissionObjectiveBrief,
+  MissionStakesBrief,
+  ReservePlanEntry,
+  SitrepType as LancerSitrepType,
+  TileSetType as LancerTileSetType,
+} from "../types/lancer";
 
 export interface CampaignMember {
   id: string;
@@ -165,28 +173,9 @@ export interface CampaignIdentityUpdateRequest {
     gm_prompts?: string[];
 }
 
-export interface CampaignLobbyObjectiveInput {
-    id: string;
-    title: string;
-    success_condition: string;
-    priority?: "primary" | "secondary" | "optional";
-    related_objective_id?: string | null;
-}
-
-export interface CampaignLobbyStakesInput {
-    stakes_type: "personal" | "faction" | "immediate" | "gradual" | "custom";
-    summary: string;
-    consequences_success?: string;
-    consequences_failure?: string;
-    consequences_partial?: string;
-}
-
-export interface CampaignLobbyReserveInput {
-    reserve_id: string;
-    assigned_character_id?: string | null;
-    usage_notes?: string | null;
-    status?: "planned" | "spent" | "earned";
-}
+export type CampaignLobbyObjectiveInput = MissionObjectiveBrief;
+export type CampaignLobbyStakesInput = MissionStakesBrief;
+export type CampaignLobbyReserveInput = ReservePlanEntry;
 
 export interface CampaignLobbyUpdateRequest {
     mission_name: string;
@@ -206,9 +195,9 @@ export interface CampaignLobbyUpdateRequest {
 }
 
 // SITREP types for Phase 34 mission pipeline
-export type SitrepType = "escort" | "control" | "extract" | "hold_out" | "gauntlet" | "recon";
-export type TileSetType = "urban" | "industrial" | "wilderness" | "zero_g";
-export type EncounterDifficulty = "trivial" | "easy" | "standard" | "hard" | "extreme";
+export type SitrepType = LancerSitrepType;
+export type TileSetType = LancerTileSetType;
+export type EncounterDifficulty = LancerEncounterDifficulty;
 
 export interface CampaignMissionLaunchRequest {
     environment?: "standard" | "zero_g" | "underwater";

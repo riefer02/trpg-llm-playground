@@ -37,6 +37,12 @@ from core.mech.combat_state import (
 StructureOutcomeLiteral = Literal[
     "glancing_blow", "system_trauma", "direct_hit", "crushing_hit"
 ]
+DirectHitOutcomeLiteral = Literal[
+    "direct_hit",
+    "direct_hit_stunned",
+    "direct_hit_hull_check",
+    "direct_hit_destroyed",
+]
 
 
 class StructureInput(FrozenModel):
@@ -114,6 +120,9 @@ class StructureResolutionResult(FrozenModel):
     hull_check_request: SaveRequest | None = Field(
         default=None, description="Hull check required for Direct Hit at 2 structure"
     )
+    direct_hit_outcome: DirectHitOutcomeLiteral | None = Field(
+        default=None, description="Direct hit sub-outcome for UI display"
+    )
     inventory_update: MechInventory | None = Field(
         default=None, description="Updated inventory after system trauma"
     )
@@ -186,6 +195,7 @@ def resolve_structure_damage(
     system_trauma_result: SystemTraumaSelection | None = None
     inventory_update: MechInventory | None = None
     hull_check: SaveRequest | None = None
+    direct_hit_outcome: DirectHitOutcomeLiteral | None = None
     mech_destroyed = False
     spillover = max(input.damage_dealt, 0)
 
@@ -207,13 +217,11 @@ def resolve_structure_damage(
 
                 if trauma_result.resolved_target == "direct_hit":
                     outcome = "direct_hit"
-                    inventory_update = input.inventory
                 else:
-                    inventory_update = apply_system_trauma(
-                        input.inventory, trauma_result
-                    )
+                    inventory_update = None
 
         elif outcome == "direct_hit":
+            direct_hit_outcome = _lookup_direct_hit_outcome(remaining, rules)
             if remaining >= 3:
                 statuses.append("stunned")
             elif remaining == 2:
@@ -226,6 +234,8 @@ def resolve_structure_damage(
                 )
             elif remaining == 1:
                 mech_destroyed = True
+        if outcome == "direct_hit" and direct_hit_outcome is None:
+            direct_hit_outcome = _lookup_direct_hit_outcome(remaining, rules)
 
     return StructureResolutionResult(
         outcome=outcome,
@@ -234,6 +244,7 @@ def resolve_structure_damage(
         system_trauma=system_trauma_result,
         statuses_to_apply=statuses,
         hull_check_request=hull_check,
+        direct_hit_outcome=direct_hit_outcome,
         inventory_update=inventory_update,
         mech_destroyed=mech_destroyed,
         spillover_damage=spillover,
@@ -340,43 +351,41 @@ def _resolve_system_trauma(
     eligible_systems = _eligible_systems(inventory, rules.exclude_limited_no_charges)
 
     resolved_target: Literal["mount", "system", "direct_hit"] = initial_target
-    mount_index: int | None = None
-    system_id: str | None = None
     fallback_reason: Literal["none", "no_mounts", "no_systems", "none_available"] = (
         "none"
     )
 
     if initial_target == "mount":
         if eligible_mounts:
-            mount_index = eligible_mounts[0]
+            resolved_target = "mount"
         elif eligible_systems and rules.fallback_to_other_if_none:
             resolved_target = "system"
-            system_id = eligible_systems[0]
             fallback_reason = "no_mounts"
         elif rules.fallback_to_direct_hit_if_none:
             resolved_target = "direct_hit"
             fallback_reason = "none_available"
         else:
+            resolved_target = "direct_hit"
             fallback_reason = "no_mounts"
     else:
         if eligible_systems:
-            system_id = eligible_systems[0]
+            resolved_target = "system"
         elif eligible_mounts and rules.fallback_to_other_if_none:
             resolved_target = "mount"
-            mount_index = eligible_mounts[0]
             fallback_reason = "no_systems"
         elif rules.fallback_to_direct_hit_if_none:
             resolved_target = "direct_hit"
             fallback_reason = "none_available"
         else:
+            resolved_target = "direct_hit"
             fallback_reason = "no_systems"
 
     return SystemTraumaSelection(
         trauma_roll=trauma_roll,
         initial_target=initial_target,
         resolved_target=resolved_target,
-        mount_index=mount_index,
-        system_id=system_id,
+        mount_index=None,
+        system_id=None,
         eligible_mounts=eligible_mounts,
         eligible_systems=eligible_systems,
         fallback_reason=fallback_reason,
@@ -668,12 +677,12 @@ def _lookup_direct_hit_outcome(
             entry.remaining_structure_max is None
             or remaining_structure <= entry.remaining_structure_max
         ):
-            if entry.outcome.stunned_until_end_next_turn and remaining_structure >= 2:
-                return "direct_hit_stunned"
-            elif entry.outcome.hull_check_required:
+            if entry.outcome.hull_check_required:
                 return "direct_hit_hull_check"
             elif entry.outcome.destroyed:
                 return "direct_hit_destroyed"
+            elif entry.outcome.stunned_until_end_next_turn and remaining_structure >= 2:
+                return "direct_hit_stunned"
             return "direct_hit"
     return "direct_hit"
 

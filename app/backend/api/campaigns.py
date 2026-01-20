@@ -600,6 +600,7 @@ class CampaignSessionOutcomeRequest(BaseModel):
 # =============================================================================
 
 
+# Response shapes are API-only because they include DB metadata and membership data.
 class CampaignMemberResponse(BaseModel):
     id: str
     user_id: str
@@ -699,7 +700,7 @@ class CampaignDetailResponse(DatabaseMetadata):
     description: str
     status: str
     visibility: str
-    data: dict[str, Any]
+    data: Campaign
     members: list[CampaignMemberResponse]
     invites: list[CampaignInviteResponse]
     characters: list[CampaignCharacterResponse]
@@ -1585,7 +1586,7 @@ async def _build_campaign_detail_response(
         description=campaign_db.description,
         status=campaign_db.status,
         visibility=campaign_db.visibility,
-        data=core_campaign.model_dump(mode="json"),
+        data=core_campaign,
         members=member_payload,
         invites=invite_payload,
         characters=character_payload,

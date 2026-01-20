@@ -39,9 +39,11 @@ from core.mech.combat_execution import (
     execute_reaction,
     get_available_actions,
     get_current_actor,
+    apply_damage,
     ActionExecutionInput,
     ReactionInput,
 )
+from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
 from core.shared.overwatch import check_overwatch_triggers_for_movement
 from core.shared.full_tech import FullTechOptionSelection
 from core.shared.enums import ActionType
@@ -52,6 +54,8 @@ from core.shared.decisions import (
     resolve_trauma_decision,
     get_pending_decisions_for_combatant,
     remove_decision_from_scenario,
+    apply_system_trauma_selection,
+    apply_failed_hull_save,
 )
 
 router = APIRouter(prefix="/combat", tags=["combat"])
@@ -573,6 +577,10 @@ class ActionRequest(BaseModel):
         default=None, description="Second Full Tech option"
     )
     movement_path: list[dict[str, Any]] = Field(default_factory=list, description="Movement path")
+    prompt_dangerous_terrain: bool = Field(
+        default=False,
+        description="Whether to prompt for dangerous terrain checks (players only)",
+    )
     is_overcharge: bool = Field(default=False, description="Whether this uses overcharge")
     use_thrown: bool = Field(
         default=False,
@@ -693,6 +701,7 @@ class PendingDecisionItem(BaseModel):
     save_bonus: int = 0
 
     # Trauma-specific
+    trauma_target: Literal["mount", "system"] | None = None
     eligible_mounts: list[int] = Field(default_factory=list)
     eligible_systems: list[str] = Field(default_factory=list)
 
@@ -937,6 +946,7 @@ async def execute_combat_action(
         full_tech_first=body.full_tech_first,
         full_tech_second=body.full_tech_second,
         movement_path=movement_path,
+        prompt_dangerous_terrain=body.prompt_dangerous_terrain,
         is_overcharge=body.is_overcharge,
         use_thrown=body.use_thrown,
     )
@@ -1480,6 +1490,7 @@ async def get_pending_decisions(
             save_type=d.save_type,
             save_target=d.save_target,
             save_bonus=d.save_bonus,
+            trauma_target=d.trauma_target,
             eligible_mounts=d.eligible_mounts,
             eligible_systems=d.eligible_systems,
             reroll_available=d.reroll_available,
@@ -1560,6 +1571,18 @@ async def submit_decision(
     effects_applied: list[dict[str, Any]] = []
     roll_result: int | None = None
     save_succeeded: bool | None = None
+    updated_scenario = scenario
+
+    def _replace_combatant(
+        scenario_state: MechCombatScenario,
+        updated_combatant: CombatantState,
+    ) -> MechCombatScenario:
+        combatants = list(scenario_state.combatants)
+        for idx, existing in enumerate(combatants):
+            if existing.id == updated_combatant.id:
+                combatants[idx] = updated_combatant
+                break
+        return scenario_state.model_copy(update={"combatants": combatants})
 
     # Handle save decisions
     if decision.decision_type in ("hull_save", "engineering_save", "engineering_check"):
@@ -1590,6 +1613,8 @@ async def submit_decision(
         if not save_result.success:
             if decision.decision_type == "hull_save":
                 # Hull save failure at 2 structure = mech destroyed
+                updated_combatant = apply_failed_hull_save(combatant)
+                updated_scenario = _replace_combatant(updated_scenario, updated_combatant)
                 effects_applied.append({
                     "type": "mech_destroyed",
                     "reason": "hull_save_failed",
@@ -1602,11 +1627,37 @@ async def submit_decision(
                 })
             elif decision.decision_type == "engineering_check":
                 # Engineering check failure (dangerous terrain) = take damage
+                terrain_rules = DEFAULT_MECH_COMBAT_RULES.terrain
+                damage_amount = terrain_rules.dangerous_terrain_damage
+                updated_scenario, _change, _structure_result = apply_damage(
+                    updated_scenario,
+                    combatant.id,
+                    damage_amount,
+                    armor_piercing=0,
+                )
+                effects_applied.append({
+                    "type": "damage",
+                    "target_id": combatant.id,
+                    "amount": damage_amount,
+                    "source": "dangerous_terrain",
+                })
                 effects_applied.append({
                     "type": "terrain_damage",
                     "reason": "engineering_check_failed",
                     "trigger_source": decision.trigger_source,
+                    "damage": damage_amount,
+                    "damage_type": str(terrain_rules.dangerous_terrain_damage_type),
                 })
+
+        if decision.decision_type == "engineering_check":
+            refreshed = next(
+                (c for c in updated_scenario.combatants if c.id == combatant.id),
+                combatant,
+            )
+            refreshed = refreshed.model_copy(
+                update={"dangerous_terrain_last_check_round": decision.trigger_round}
+            )
+            updated_scenario = _replace_combatant(updated_scenario, refreshed)
 
     # Handle system trauma decisions
     elif decision.decision_type == "system_trauma":
@@ -1621,18 +1672,22 @@ async def submit_decision(
             )
 
         if trauma_result.selected_target == "mount":
+            updated_combatant = apply_system_trauma_selection(combatant, trauma_result)
+            updated_scenario = _replace_combatant(updated_scenario, updated_combatant)
             effects_applied.append({
                 "type": "mount_destroyed",
                 "mount_index": trauma_result.mount_index,
             })
         else:
+            updated_combatant = apply_system_trauma_selection(combatant, trauma_result)
+            updated_scenario = _replace_combatant(updated_scenario, updated_combatant)
             effects_applied.append({
                 "type": "system_destroyed",
                 "system_id": trauma_result.system_id,
             })
 
     # Remove the resolved decision from scenario
-    updated_scenario = remove_decision_from_scenario(scenario, body.decision_id)
+    updated_scenario = remove_decision_from_scenario(updated_scenario, body.decision_id)
 
     # Persist
     combat_session.scenario = updated_scenario.model_dump(mode="json")

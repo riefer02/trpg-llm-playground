@@ -39599,6 +39599,20 @@
       "title": "Per Round Reactions",
       "type": "object"
     },
+    "dangerous_terrain_last_check_round": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Last round this combatant resolved a dangerous terrain check",
+      "title": "Dangerous Terrain Last Check Round"
+    },
     "overcharge_state": {
       "anyOf": [
         {

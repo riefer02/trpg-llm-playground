@@ -28,6 +28,7 @@ export interface ActionRequest {
   full_tech_first?: FullTechOptionSelection;
   full_tech_second?: FullTechOptionSelection;
   movement_path?: { coord: { q: number; r: number } }[];
+  prompt_dangerous_terrain?: boolean;
   is_overcharge?: boolean;
   use_thrown?: boolean;
 }
@@ -326,6 +327,7 @@ export interface PendingDecisionItem {
   save_bonus: number;
 
   // Trauma-specific
+  trauma_target?: "mount" | "system";
   eligible_mounts: number[];
   eligible_systems: string[];
 

@@ -210,6 +210,12 @@
       "title": "Movement Path",
       "type": "array"
     },
+    "prompt_dangerous_terrain": {
+      "default": false,
+      "description": "If true, dangerous terrain checks create a decision instead of auto-rolling",
+      "title": "Prompt Dangerous Terrain",
+      "type": "boolean"
+    },
     "is_overcharge": {
       "default": false,
       "description": "Whether this action uses overcharge",

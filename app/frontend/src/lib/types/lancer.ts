@@ -29832,6 +29832,10 @@ export type BlocksReactions1 = boolean;
  * Whether this blocks regular movement
  */
 export type BlocksMovement2 = boolean;
+/**
+ * Last round this combatant resolved a dangerous terrain check
+ */
+export type DangerousTerrainLastCheckRound = number | null;
 export type CurrentLevel = number;
 export type UsesThisTurn = number;
 /**
@@ -30137,6 +30141,10 @@ export type SaveTarget3 = number | null;
  */
 export type SaveBonus = number;
 /**
+ * Resolved trauma target category (mount/system)
+ */
+export type TraumaTarget = ("mount" | "system") | null;
+/**
  * Mount indices eligible for destruction
  */
 export type EligibleMounts = number[];
@@ -30211,6 +30219,10 @@ export type ScanOptions1 = ("stats" | "hidden_info" | "public_info")[] | null;
  * Movement path for move actions
  */
 export type MovementPath1 = HexPosition[];
+/**
+ * If true, dangerous terrain checks create a decision instead of auto-rolling
+ */
+export type PromptDangerousTerrain = boolean;
 /**
  * Whether this action uses overcharge
  */
@@ -36114,6 +36126,7 @@ export interface CombatantState {
    */
   prepared_action?: PreparedActionState | null;
   per_round_reactions?: PerRoundReactions;
+  dangerous_terrain_last_check_round?: DangerousTerrainLastCheckRound;
   /**
    * Overcharge escalation state
    */
@@ -36651,6 +36664,7 @@ export interface PendingDecision {
   save_type?: SaveType;
   save_target?: SaveTarget3;
   save_bonus?: SaveBonus;
+  trauma_target?: TraumaTarget;
   eligible_mounts?: EligibleMounts;
   eligible_systems?: EligibleSystems;
   reroll_available?: RerollAvailable;
@@ -36757,6 +36771,7 @@ export interface ActionExecutionInput {
    */
   full_tech_second?: FullTechOptionSelection | null;
   movement_path?: MovementPath1;
+  prompt_dangerous_terrain?: PromptDangerousTerrain;
   is_overcharge?: IsOvercharge;
   granted_by_overcharge?: GrantedByOvercharge1;
   stabilize_primary?: StabilizePrimary1;

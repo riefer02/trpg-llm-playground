@@ -89,6 +89,7 @@ export function ActionPanel({
   const [selectedWeaponProfileId, setSelectedWeaponProfileId] = useState<string | null>(null);
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
   const [useThrown, setUseThrown] = useState(false);
+  const [promptDangerousTerrain, setPromptDangerousTerrain] = useState(false);
   const [movementPath, setMovementPath] = useState<HexCoord[]>([]);
   const [lastProcessedClick, setLastProcessedClick] = useState<HexCoord | null>(null);
   const [fullTechStep, setFullTechStep] = useState<FullTechStep>(1);
@@ -400,6 +401,7 @@ export function ActionPanel({
       action_id: selectedAction.action_id,
       action_type: selectedAction.action_type as ActionRequest["action_type"],
       movement_path: movementPath.map((c) => ({ coord: { q: c.q, r: c.r } })),
+      prompt_dangerous_terrain: promptDangerousTerrain || undefined,
     });
   };
 
@@ -630,6 +632,17 @@ export function ActionPanel({
         <div className="text-xs text-muted-foreground">
           Click hexes on the canvas to build path. Click last hex to undo.
         </div>
+
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            className="accent-primary"
+            checked={promptDangerousTerrain}
+            onChange={(event) => setPromptDangerousTerrain(event.target.checked)}
+            disabled={isExecuting}
+          />
+          Prompt for dangerous terrain checks (player only)
+        </label>
 
         <div className="flex gap-2">
           <Button

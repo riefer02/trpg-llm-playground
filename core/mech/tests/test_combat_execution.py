@@ -44,7 +44,13 @@ from core.mech.combat_state import (
     MechSystemState,
 )
 from core.mech.grid import HexPosition, HexCoord
-from core.shared.effects import CooldownState, MechanicalEffect, ReactionTriggerEffect, Resistance
+from core.shared.effects import (
+    CooldownState,
+    MechanicalEffect,
+    ReactionTriggerEffect,
+    Resistance,
+    HeatResistanceEffect,
+)
 from core.shared.full_tech import FullTechOptionSelection
 from core.shared.rolls import AttackResolutionResult
 from core.shared.heat import MeltdownState
@@ -65,6 +71,7 @@ def make_combatant(
     heat_cap: int = 6,
     grit: int = 0,
     tech_attack: int = 0,
+    engineering_skill: int = 0,
     **kwargs,
 ) -> CombatantState:
     """Create a test combatant."""
@@ -84,6 +91,7 @@ def make_combatant(
             sensor_range=10,
             tech_attack=tech_attack,
             grit=grit,
+            engineering_skill=engineering_skill,
         ),
         resources=CombatResources(
             hp_current=hp_current,
@@ -445,6 +453,42 @@ class TestExecuteAction:
         assert updated_actor.resources.heat_current == 1
         assert updated_actor.overcharge_state.current_level == 1
 
+    def test_execute_overcharge_respects_heat_resistance(self):
+        """Test that overcharge heat is reduced by heat resistance."""
+        overcharge = OverchargeState(current_level=0, uses_this_turn=0)
+        combatant = make_combatant(
+            id="actor_1",
+            heat_current=0,
+            overcharge_state=overcharge,
+            frame_trait_effects=[
+                MechanicalEffect(
+                    heat_resistances=[HeatResistanceEffect(multiplier=0)]
+                )
+            ],
+        )
+        scenario = make_scenario(combatants=[combatant])
+        turn = make_turn(actor_id="actor_1")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="overcharge",
+            action_type="free",
+            is_overcharge=True,
+        )
+
+        updated_scenario, _, updated_economy, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success is True
+        assert result.heat_generated == 0  # Heat fully resisted
+        assert updated_economy.overcharge_used is True
+
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.resources.heat_current == 0
+        assert updated_actor.overcharge_state.current_level == 1
+
     def test_execute_action_records_in_turn(self):
         """Test that executed actions are recorded in the turn."""
         combatant = make_combatant(id="actor_1")
@@ -606,6 +650,37 @@ class TestExecuteAction:
         assert defender_after.resources.heat_current == 2
         assert "impaired" in defender_after.statuses
         assert "slowed" in defender_after.statuses
+
+    def test_execute_invade_respects_heat_resistance(self):
+        """Invade heat should be reduced by heat resistance."""
+        attacker = make_combatant(id="attacker", name="Attacker", side="players", tech_attack=10)
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            heat_cap=20,
+            frame_trait_effects=[
+                MechanicalEffect(heat_resistances=[HeatResistanceEffect()])
+            ],
+        )
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="invade",
+            action_type="quick",
+            target_ids=["defender"],
+        )
+
+        updated_scenario, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+        assert result.heat_generated == 1
+
+        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+        assert defender_after.resources.heat_current == 1
 
     def test_execute_invade_miss_no_heat(self):
         """Invade should not apply heat on a miss."""
@@ -979,6 +1054,23 @@ class TestApplyHeat:
         assert updated_target.resources.heat_current == 5
         assert change.heat_change == 3
         assert overheat_result is None  # No overheat triggered
+
+    def test_apply_heat_respects_heat_resistance(self):
+        """Test that heat resistance reduces applied heat."""
+        combatant = make_combatant(id="target_1", heat_current=0)
+        scenario = make_scenario(combatants=[combatant])
+
+        updated_scenario, change, overheat_result = apply_heat(
+            scenario,
+            "target_1",
+            heat=3,
+            heat_resistance_multiplier=0.5,
+        )
+
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert updated_target.resources.heat_current == 2
+        assert change.heat_change == 2
+        assert overheat_result is None
 
     def test_apply_heat_triggers_overheat_cascade(self):
         """Test that heat exceeding cap triggers overheat cascade."""
@@ -3387,7 +3479,7 @@ class TestMovementPositionUpdates:
 
         actor = make_combatant(
             id="actor_1",
-            tech_attack=2,  # Engineering skill bonus
+            engineering_skill=2,
             position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
         )
 
@@ -3436,6 +3528,106 @@ class TestMovementPositionUpdates:
         damage_effects = [e for e in result.effects_applied if e.get("type") == "damage"]
         assert len(damage_effects) >= 1
         assert damage_effects[0]["source"] == "dangerous_terrain"
+
+    def test_dangerous_terrain_prompt_creates_decision(self):
+        """Prompting dangerous terrain should create a pending decision without auto damage."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            engineering_skill=2,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), dangerous=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+        movement_path = [
+            HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        ]
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="move",
+            action_type="free",
+            movement_path=movement_path,
+            prompt_dangerous_terrain=True,
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        decisions = [
+            d for d in updated_scenario.pending_decisions
+            if d.decision_type == "engineering_check"
+        ]
+        assert len(decisions) == 1
+        assert decisions[0].combatant_id == "actor_1"
+        assert decisions[0].trigger_round == 1
+        assert decisions[0].trigger_source.startswith("dangerous_terrain:")
+
+        damage_effects = [e for e in result.effects_applied if e.get("type") == "damage"]
+        assert damage_effects == []
+
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.dangerous_terrain_last_check_round == 1
+
+    def test_dangerous_terrain_prompt_ignored_for_hostiles(self):
+        """Hostile combatants still auto-resolve dangerous terrain even if prompt requested."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1",
+            side="hostiles",
+            engineering_skill=2,
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), dangerous=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+        movement_path = [
+            HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        ]
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="move",
+            action_type="free",
+            movement_path=movement_path,
+            prompt_dangerous_terrain=True,
+        )
+
+        with patch("core.shared.terrain.roll_dice", return_value=5):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        assert updated_scenario.pending_decisions == []
+        danger_effects = [e for e in result.effects_applied if e.get("type") == "dangerous_terrain"]
+        assert len(danger_effects) >= 1
 
 
 # =============================================================================
@@ -7528,9 +7720,12 @@ class TestOverwatchAttackResolution:
                 assert result.damage_dealt > 0
                 # Resource changes should be populated
                 assert len(result.resource_changes) > 0
-                # Target HP should be reduced
+                # Target HP should be reduced, or a structure check reset HP to full
                 target_after = next(c for c in updated_scenario.combatants if c.id == "target")
-                assert target_after.resources.hp_current < 10
+                assert (
+                    target_after.resources.hp_current < 10
+                    or target_after.resources.structure_current < 4
+                )
                 break
 
         # With grit 6 vs evasion 8, we should hit at least once in 20 attempts

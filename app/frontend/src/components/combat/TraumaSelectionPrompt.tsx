@@ -39,6 +39,9 @@ export function TraumaSelectionPrompt({
   const eligibleSystems = decision.eligible_systems;
   const hasMounts = eligibleMounts.length > 0;
   const hasSystems = eligibleSystems.length > 0;
+  const traumaTarget = decision.trauma_target;
+  const allowMount = traumaTarget ? traumaTarget === "mount" : hasMounts;
+  const allowSystem = traumaTarget ? traumaTarget === "system" : hasSystems;
 
   // Get mount details for display
   const mountDetails = inventory?.mounts
@@ -111,7 +114,7 @@ export function TraumaSelectionPrompt({
           What to Destroy
         </div>
         <div className="flex gap-2">
-          {hasMounts && (
+          {hasMounts && allowMount && (
             <TargetTypeOption
               type="mount"
               label="Weapon Mount"
@@ -120,7 +123,7 @@ export function TraumaSelectionPrompt({
               onSelect={() => handleTargetSelect("mount")}
             />
           )}
-          {hasSystems && (
+          {hasSystems && allowSystem && (
             <TargetTypeOption
               type="system"
               label="System"

@@ -10,7 +10,7 @@ import random
 from typing import TYPE_CHECKING
 
 from core.shared.enums import StatusType, DamageType, AttackType
-from core.shared.dice import roll_dice
+from core.shared.dice import roll_dice, round_up
 from core.shared.damage import DamageBreakdown
 from core.shared.state_helpers import add_statuses
 from core.mech.statuses import (
@@ -855,11 +855,36 @@ def _apply_tech_result(
         })
 
         if result.hit and result.heat_applied:
+            target = next(
+                (c for c in scenario.combatants if c.id == result.target_id), None
+            )
+            actor = next(
+                (c for c in scenario.combatants if c.id == result.actor_id), None
+            )
+            heat_multiplier = 1.0
+            if target is not None:
+                heat_context = _build_damage_context(
+                    actor,
+                    target,
+                    is_melee=False,
+                    is_ranged=False,
+                    is_tech=True,
+                )
+                heat_multiplier = _collect_heat_resistance_multiplier(
+                    target, heat_context
+                )
+                if "shredded" in target.statuses:
+                    heat_multiplier = 1.0
+            adjusted_heat = round_up(result.heat_applied * heat_multiplier)
+
             scenario, change, overheat_result = apply_heat_func(
-                scenario, result.target_id, result.heat_applied
+                scenario,
+                result.target_id,
+                result.heat_applied,
+                heat_resistance_multiplier=heat_multiplier,
             )
             resource_changes.append(change)
-            heat_generated += result.heat_applied
+            heat_generated += adjusted_heat
 
             if overheat_result:
                 overheat_checks.append({
@@ -937,6 +962,8 @@ def _apply_statuses_to_target(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     return updated_scenario, new_statuses
@@ -969,6 +996,8 @@ def _remove_status_from_target(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
 
@@ -1084,6 +1113,8 @@ def _apply_status_with_duration(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     return updated_scenario, True
@@ -1149,6 +1180,8 @@ def _clear_statuses_by_trigger(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     return updated_scenario, cleared_statuses
@@ -1228,6 +1261,8 @@ def _expire_turn_duration_statuses(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     return updated_scenario, expired_effects
@@ -1876,6 +1911,8 @@ def _resolve_stabilize(
                     terrain=scenario.terrain,
                     environment=scenario.environment,
                     deployables=dict(scenario.deployables),
+                    sitrep_resolution=scenario.sitrep_resolution,
+                    pending_decisions=list(scenario.pending_decisions),
                 )
 
                 effects.append({
@@ -1903,6 +1940,8 @@ def _resolve_stabilize(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     return scenario, effects, resource_changes
@@ -2032,6 +2071,8 @@ def _resolve_ram(
                 terrain=scenario.terrain,
                 environment=scenario.environment,
                 deployables=dict(scenario.deployables),
+                sitrep_resolution=scenario.sitrep_resolution,
+                pending_decisions=list(scenario.pending_decisions),
             )
 
     return scenario, effects
@@ -2098,6 +2139,8 @@ def _apply_knockback_on_hit(
             terrain=scenario.terrain,
             environment=scenario.environment,
             deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
         )
 
     effect: dict = {
@@ -2213,6 +2256,8 @@ def _resolve_grapple(
             terrain=scenario.terrain,
             environment=scenario.environment,
             deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
         )
 
     return scenario, effects
@@ -2351,6 +2396,8 @@ def _resolve_burn_tick(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     return scenario, BurnTickResult(
@@ -2435,6 +2482,8 @@ def _apply_engagement_status(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     return updated_scenario, effects
@@ -2447,6 +2496,7 @@ def _resolve_movement(
     is_boost: bool = False,
     apply_damage_func=None,
     ignore_engagement: bool = False,
+    prompt_dangerous_terrain: bool = False,
 ) -> tuple[MechCombatScenario, list[dict]]:
     """Resolve movement action - validate path, apply terrain effects, update position.
 
@@ -2464,6 +2514,7 @@ def _resolve_movement(
         is_boost: Whether this is a Boost action (2x speed)
         apply_damage_func: Function to apply damage (for dangerous terrain)
         ignore_engagement: Whether to ignore engagement rules (e.g., Disengage action)
+        prompt_dangerous_terrain: Whether to create a decision instead of auto-rolling (players only)
 
     Returns:
         Tuple of (updated scenario, effects list)
@@ -2473,6 +2524,7 @@ def _resolve_movement(
         calculate_movement_cost,
         resolve_dangerous_terrain,
     )
+    from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
 
     effects: list[dict] = []
 
@@ -2536,53 +2588,100 @@ def _resolve_movement(
 
     # Check dangerous terrain and resolve checks
     # Get current round for tracking checks
-    current_round = len(scenario.rounds) if scenario.rounds else 1
+    current_round = scenario.rounds[-1].round_index if scenario.rounds else 1
+    terrain_rules = DEFAULT_MECH_COMBAT_RULES.terrain
+    check_once_per_round = terrain_rules.dangerous_terrain_check_once_per_round
+    checked_this_round = (
+        check_once_per_round
+        and actor.dangerous_terrain_last_check_round == current_round
+    )
+    last_check_round = actor.dangerous_terrain_last_check_round
 
     for hex_pos in path:
         terrain_hex = terrain_idx.get(hex_pos.coord)
-        if terrain_hex and terrain_hex.dangerous:
-            # Engineering skill bonus (use tech_attack as proxy)
-            skill_bonus = actor.stats.tech_attack if actor.stats else 0
+        if not terrain_hex or not terrain_hex.dangerous:
+            continue
 
-            danger_result = resolve_dangerous_terrain(
-                terrain=scenario.terrain,
-                coord=hex_pos.coord,
-                skill_bonus=skill_bonus,
-                round_checked=current_round,
+        if check_once_per_round and checked_this_round:
+            continue
+
+        skill_bonus = actor.stats.engineering_skill if actor.stats else 0
+
+        if (
+            prompt_dangerous_terrain
+            and actor.side == "players"
+            and not actor.ai_controlled
+        ):
+            from core.shared.decisions import (
+                add_decision_to_scenario,
+                check_dangerous_terrain_decision,
             )
 
-            effects.append({
-                "type": "dangerous_terrain",
-                "coord": {"q": hex_pos.coord.q, "r": hex_pos.coord.r},
-                "check_passed": danger_result.check_passed,
-                "roll": danger_result.roll_result,
-                "damage": danger_result.damage_dealt,
-            })
+            decision = check_dangerous_terrain_decision(
+                combatant=actor,
+                terrain_name="dangerous",
+                check_target=10,
+                current_round=current_round,
+            )
+            scenario = add_decision_to_scenario(scenario, decision)
 
-            # Apply damage if check failed
-            if danger_result.check_passed is False and danger_result.damage_dealt > 0:
-                if apply_damage_func is not None:
-                    scenario, change, structure_result = apply_damage_func(
-                        scenario, actor.id, danger_result.damage_dealt, armor_piercing=0
-                    )
-                    effects.append({
-                        "type": "damage",
-                        "target_id": actor.id,
-                        "amount": danger_result.damage_dealt,
-                        "source": "dangerous_terrain",
-                    })
+            if check_once_per_round:
+                checked_this_round = True
+                last_check_round = current_round
+            continue
+
+        danger_result = resolve_dangerous_terrain(
+            terrain=scenario.terrain,
+            coord=hex_pos.coord,
+            skill_bonus=skill_bonus,
+            damage=terrain_rules.dangerous_terrain_damage,
+            damage_type=terrain_rules.dangerous_terrain_damage_type,
+            check_once_per_round=check_once_per_round,
+            round_checked=current_round,
+        )
+
+        effects.append({
+            "type": "dangerous_terrain",
+            "coord": {"q": hex_pos.coord.q, "r": hex_pos.coord.r},
+            "check_passed": danger_result.check_passed,
+            "roll": danger_result.roll_result,
+            "damage": danger_result.damage_dealt,
+        })
+
+        if check_once_per_round:
+            checked_this_round = True
+            last_check_round = current_round
+
+        # Apply damage if check failed
+        if danger_result.check_passed is False and danger_result.damage_dealt > 0:
+            if apply_damage_func is not None:
+                scenario, _change, _structure_result = apply_damage_func(
+                    scenario, actor.id, danger_result.damage_dealt, armor_piercing=0
+                )
+                effects.append({
+                    "type": "damage",
+                    "target_id": actor.id,
+                    "amount": danger_result.damage_dealt,
+                    "source": "dangerous_terrain",
+                })
 
     # Update actor position to final hex
     final_position = path[-1]
     actor_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
 
     if actor_idx >= 0:
-        updated_actor = actor.model_copy(update={"position": final_position})
+        updated_actor = next(
+            (c for c in scenario.combatants if c.id == actor.id), actor
+        )
+        update_fields = {"position": final_position}
+        if last_check_round is not None:
+            update_fields["dangerous_terrain_last_check_round"] = last_check_round
+        updated_actor = updated_actor.model_copy(update=update_fields)
 
         # Auto-retrieve thrown weapons when moving adjacent to their location.
-        if actor.inventory is not None:
+        if updated_actor.inventory is not None:
             updated_mounts = []
-            for mount in actor.inventory.mounts:
+            for mount in updated_actor.inventory.mounts:
                 new_weapons = []
                 for weapon in mount.weapons:
                     if weapon.thrown_coord is not None:
@@ -2614,6 +2713,8 @@ def _resolve_movement(
             terrain=scenario.terrain,
             environment=scenario.environment,
             deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
         )
 
     # Apply engaged status to mover and adjacent hostiles after position update
@@ -2745,6 +2846,8 @@ def _resolve_mount(
             terrain=scenario.terrain,
             environment=scenario.environment,
             deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
         )
 
     effects.append({
@@ -2852,6 +2955,8 @@ def _resolve_dismount(
             terrain=scenario.terrain,
             environment=scenario.environment,
             deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
         )
 
     effects.append({
@@ -2978,6 +3083,8 @@ def _resolve_eject(
             terrain=scenario.terrain,
             environment=scenario.environment,
             deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
         )
 
     effects.append({
@@ -3141,6 +3248,8 @@ def _resolve_deploy(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=updated_deployables,
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     return scenario, effects
@@ -3234,6 +3343,8 @@ def _check_mine_triggers(
             terrain=scenario.terrain,
             environment=scenario.environment,
             deployables=updated_deployables,
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
         )
 
     return scenario, effects

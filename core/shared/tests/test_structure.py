@@ -110,6 +110,7 @@ class TestResolveStructureDamage:
             force_roll=1,
         )
         assert result.outcome == "direct_hit"
+        assert result.direct_hit_outcome == "direct_hit_stunned"
         assert "stunned" in result.statuses_to_apply
 
     def test_direct_hit_hull_check(self):
@@ -119,6 +120,7 @@ class TestResolveStructureDamage:
             force_roll=1,
         )
         assert result.outcome == "direct_hit"
+        assert result.direct_hit_outcome == "direct_hit_hull_check"
         assert "stunned" in result.statuses_to_apply
         assert result.hull_check_request is not None
         assert result.hull_check_request.save_type == "hull"
@@ -130,6 +132,7 @@ class TestResolveStructureDamage:
             force_roll=1,
         )
         assert result.outcome == "direct_hit"
+        assert result.direct_hit_outcome == "direct_hit_destroyed"
         assert result.mech_destroyed
 
     def test_crushing_hit(self):

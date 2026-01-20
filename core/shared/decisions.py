@@ -87,6 +87,9 @@ class PendingDecision(FrozenModel):
     )
 
     # Trauma-specific fields
+    trauma_target: Literal["mount", "system"] | None = Field(
+        default=None, description="Resolved trauma target category (mount/system)"
+    )
     eligible_mounts: list[int] = Field(
         default_factory=list, description="Mount indices eligible for destruction"
     )
@@ -295,6 +298,7 @@ def create_engineering_check_decision(
 def create_system_trauma_decision(
     combatant_id: str,
     trigger_round: int,
+    trauma_target: Literal["mount", "system"],
     eligible_mounts: list[int],
     eligible_systems: list[str],
 ) -> PendingDecision:
@@ -318,6 +322,7 @@ def create_system_trauma_decision(
         combatant_id=combatant_id,
         trigger_source="system_trauma",
         trigger_round=trigger_round,
+        trauma_target=trauma_target,
         eligible_mounts=eligible_mounts,
         eligible_systems=eligible_systems,
     )
@@ -365,6 +370,7 @@ def check_structure_decisions(
             create_system_trauma_decision(
                 combatant_id=combatant.id,
                 trigger_round=current_round,
+                trauma_target=structure_result.system_trauma.resolved_target,
                 eligible_mounts=structure_result.system_trauma.eligible_mounts,
                 eligible_systems=structure_result.system_trauma.eligible_systems,
             )
@@ -584,6 +590,42 @@ def resolve_trauma_decision(
     )
 
 
+def apply_system_trauma_selection(
+    combatant: "CombatantState",
+    trauma_result: TraumaDecisionResult,
+) -> "CombatantState":
+    """Apply a validated system trauma selection to a combatant's inventory."""
+    if not trauma_result.valid_selection:
+        return combatant
+    if combatant.inventory is None:
+        return combatant
+
+    from core.shared.state_helpers import destroy_mount, destroy_system
+
+    if trauma_result.selected_target == "mount":
+        if trauma_result.mount_index is None:
+            return combatant
+        updated_inventory = destroy_mount(
+            combatant.inventory, trauma_result.mount_index
+        )
+    else:
+        if trauma_result.system_id is None:
+            return combatant
+        updated_inventory = destroy_system(
+            combatant.inventory, trauma_result.system_id
+        )
+
+    return combatant.model_copy(update={"inventory": updated_inventory})
+
+
+def apply_failed_hull_save(combatant: "CombatantState") -> "CombatantState":
+    """Apply a failed hull save from a direct hit by destroying the mech."""
+    new_resources = combatant.resources.model_copy(
+        update={"hp_current": 0, "structure_current": 0}
+    )
+    return combatant.model_copy(update={"resources": new_resources})
+
+
 def get_pending_decisions_for_combatant(
     scenario: "MechCombatScenario",
     combatant_id: str,
@@ -657,6 +699,8 @@ __all__ = [
     "check_dangerous_terrain_decision",
     "resolve_save_decision",
     "resolve_trauma_decision",
+    "apply_system_trauma_selection",
+    "apply_failed_hull_save",
     "get_pending_decisions_for_combatant",
     "remove_decision_from_scenario",
     "add_decision_to_scenario",

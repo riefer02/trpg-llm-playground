@@ -72,6 +72,23 @@
       "title": "Save Bonus",
       "type": "integer"
     },
+    "trauma_target": {
+      "anyOf": [
+        {
+          "enum": [
+            "mount",
+            "system"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Resolved trauma target category (mount/system)",
+      "title": "Trauma Target"
+    },
     "eligible_mounts": {
       "description": "Mount indices eligible for destruction",
       "items": {

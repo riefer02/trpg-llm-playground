@@ -225,6 +225,11 @@ class CombatantState(FrozenModel):
     per_round_reactions: dict[str, int] = Field(
         default_factory=dict, description="Per-round reaction usage {action_id: count}"
     )
+    dangerous_terrain_last_check_round: int | None = Field(
+        default=None,
+        ge=1,
+        description="Last round this combatant resolved a dangerous terrain check",
+    )
     overcharge_state: OverchargeState | None = Field(
         default=None, description="Overcharge escalation state"
     )

@@ -298,6 +298,8 @@ def start_turn(
                     terrain=scenario.terrain,
                     environment=scenario.environment,
                     deployables=dict(scenario.deployables),
+                    sitrep_resolution=scenario.sitrep_resolution,
+                    pending_decisions=list(scenario.pending_decisions),
                 )
 
                 # Apply damage to affected combatants
@@ -348,6 +350,8 @@ def start_turn(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     # Arm mines at turn start (PR2 5083-5084)
@@ -397,6 +401,8 @@ def start_turn(
                 terrain=intermediate_scenario.terrain,
                 environment=intermediate_scenario.environment,
                 deployables=dict(intermediate_scenario.deployables),
+                sitrep_resolution=intermediate_scenario.sitrep_resolution,
+                pending_decisions=list(intermediate_scenario.pending_decisions),
             )
 
     updated_scenario = intermediate_scenario
@@ -506,6 +512,8 @@ def end_turn(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     # Expire duration-based statuses (braced, stunned, etc.)
@@ -550,6 +558,8 @@ def end_turn(
                 terrain=intermediate_scenario.terrain,
                 environment=intermediate_scenario.environment,
                 deployables=updated_deployables,
+                sitrep_resolution=intermediate_scenario.sitrep_resolution,
+                pending_decisions=list(intermediate_scenario.pending_decisions),
             )
 
     # Re-fetch combatants after expiration
@@ -603,6 +613,8 @@ def end_turn(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     result = TurnEndResult(
@@ -1252,6 +1264,7 @@ def execute_action(
                         "type": "structure_check",
                         "target_id": target_id,
                         "outcome": structure_result.outcome,
+                        "direct_hit_outcome": structure_result.direct_hit_outcome,
                         "mech_destroyed": structure_result.mech_destroyed,
                         "statuses": [str(s) for s in structure_result.statuses_to_apply],
                         "dice_rolls": structure_result.dice_rolls,
@@ -1299,6 +1312,8 @@ def execute_action(
                             terrain=scenario.terrain,
                             environment=scenario.environment,
                             deployables=dict(scenario.deployables),
+                            sitrep_resolution=scenario.sitrep_resolution,
+                            pending_decisions=list(scenario.pending_decisions),
                         )
 
                     effects_applied.append({
@@ -1366,6 +1381,7 @@ def execute_action(
                         "type": "structure_check",
                         "target_id": target_id,
                         "outcome": structure_result.outcome,
+                        "direct_hit_outcome": structure_result.direct_hit_outcome,
                         "mech_destroyed": structure_result.mech_destroyed,
                         "statuses": [str(s) for s in structure_result.statuses_to_apply],
                         "dice_rolls": structure_result.dice_rolls,
@@ -1465,6 +1481,8 @@ def execute_action(
                     terrain=scenario.terrain,
                     environment=scenario.environment,
                     deployables=dict(scenario.deployables),
+                    sitrep_resolution=scenario.sitrep_resolution,
+                    pending_decisions=list(scenario.pending_decisions),
                 )
 
     # Handle tech actions (scan, bolster, lock on, invade)
@@ -1499,6 +1517,8 @@ def execute_action(
                 terrain=scenario.terrain,
                 environment=scenario.environment,
                 deployables=dict(scenario.deployables),
+                sitrep_resolution=scenario.sitrep_resolution,
+                pending_decisions=list(scenario.pending_decisions),
             )
 
     if action_input.action_id in ("scan", "bolster", "lock_on", "invade") and action_input.target_ids:
@@ -1690,59 +1710,60 @@ def execute_action(
     if action_input.is_overcharge and actor.overcharge_state is not None:
         from core.mech.combat_resolution import use_overcharge as apply_overcharge
         new_overcharge_state, overcharge_result = apply_overcharge(actor.overcharge_state)
-        heat_generated = overcharge_result.rolled_cost or 0
-
-        # Update actor's overcharge state and heat
-        actor_idx = next(i for i, c in enumerate(scenario.combatants) if c.id == actor.id)
-        new_heat = actor.resources.heat_current + heat_generated
-        new_resources = actor.resources.model_copy(update={"heat_current": new_heat})
-        updated_actor = actor.model_copy(
-            update={
-                "overcharge_state": new_overcharge_state,
-                "resources": new_resources,
+        raw_heat = overcharge_result.rolled_cost or 0
+        heat_context = {
+            "is_melee": False,
+            "is_ranged": False,
+            "is_tech": False,
+            "attack_type": None,
+            "is_incoming": False,
+            "is_outgoing": False,
+            "is_engaged": "engaged" in actor.statuses,
+            "structure_remaining": actor.resources.structure_current,
+            "structure_1_or_less": actor.resources.structure_current <= 1,
+        }
+        if actor.stats:
+            size_map = {
+                "size_half": 0.5,
+                "size_1": 1,
+                "size_2": 2,
+                "size_3": 3,
+                "size_4": 4,
+                "size_5": 5,
             }
+            heat_context["actor_size"] = size_map.get(actor.stats.size, 1)
+
+        heat_multiplier = _collect_heat_resistance_multiplier(actor, heat_context)
+        if "shredded" in actor.statuses:
+            heat_multiplier = 1.0
+
+        heat_generated = round_up(raw_heat * heat_multiplier)
+        scenario, change, overheat_result = apply_heat(
+            scenario,
+            actor.id,
+            raw_heat,
+            heat_resistance_multiplier=heat_multiplier,
         )
 
-        # Check for overheat cascade if heat meets or exceeds cap
-        overheat_result = None
-        if new_heat >= updated_actor.resources.heat_cap:
-            updated_actor, overheat_result = check_overheat_cascade(updated_actor)
-            if overheat_result:
-                overheat_checks.append({
-                    "type": "overheat_check",
-                    "target_id": actor.id,
-                    "outcome": overheat_result.outcome,
-                    "statuses": [str(s) for s in overheat_result.statuses_to_apply],
-                    "dice_rolls": overheat_result.dice_rolls,
-                    "lowest_roll": overheat_result.lowest_roll,
-                    "meltdown_state": overheat_result.meltdown_state is not None,
-                })
-
-        updated_combatants = list(scenario.combatants)
-        updated_combatants[actor_idx] = updated_actor
-
-        scenario = MechCombatScenario(
-            combatants=updated_combatants,
-            grapples=list(scenario.grapples),
-            rounds=list(scenario.rounds),
-            terrain=scenario.terrain,
-            environment=scenario.environment,
-            deployables=dict(scenario.deployables),
-        )
-
-        # Calculate heat change (may be negative if heat was cleared by overheat)
-        final_heat_change = heat_generated
-        stress_change = 0
         if overheat_result:
-            # Heat was cleared by overheat
-            final_heat_change = updated_actor.resources.heat_current - actor.resources.heat_current
-            stress_change = -overheat_result.stress_damage
+            overheat_checks.append({
+                "type": "overheat_check",
+                "target_id": actor.id,
+                "outcome": overheat_result.outcome,
+                "statuses": [str(s) for s in overheat_result.statuses_to_apply],
+                "dice_rolls": overheat_result.dice_rolls,
+                "lowest_roll": overheat_result.lowest_roll,
+                "meltdown_state": overheat_result.meltdown_state is not None,
+            })
 
-        resource_changes.append(ResourceChange(
-            combatant_id=actor.id,
-            heat_change=final_heat_change,
-            stress_change=stress_change,
-        ))
+        actor_idx = next(i for i, c in enumerate(scenario.combatants) if c.id == actor.id)
+        updated_combatants = list(scenario.combatants)
+        updated_combatants[actor_idx] = updated_combatants[actor_idx].model_copy(
+            update={"overcharge_state": new_overcharge_state}
+        )
+        scenario = scenario.model_copy(update={"combatants": updated_combatants})
+
+        resource_changes.append(change)
         effects_applied.append({
             "type": "overcharge",
             "heat": heat_generated,
@@ -1793,6 +1814,7 @@ def execute_action(
             is_boost=(action_input.action_id == "boost"),
             apply_damage_func=apply_damage,
             ignore_engagement=disengage_active,
+            prompt_dangerous_terrain=action_input.prompt_dangerous_terrain,
         )
         effects_applied.extend(move_effects)
 
@@ -2127,6 +2149,8 @@ def execute_reaction(
                 terrain=scenario.terrain,
                 environment=scenario.environment,
                 deployables=dict(scenario.deployables),
+                sitrep_resolution=scenario.sitrep_resolution,
+                pending_decisions=list(scenario.pending_decisions),
             )
 
         # Reactions clear hidden status (PR2 status clear rules)
@@ -2167,6 +2191,8 @@ def execute_reaction(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     # Reactions clear hidden status (PR2 status clear rules)
@@ -2685,6 +2711,29 @@ def apply_typed_damage(
         heat_change = updated_target.resources.heat_current - old_heat
         stress_change = updated_target.resources.stress_current - old_stress
 
+    pending_decisions = list(scenario.pending_decisions)
+    if structure_result or overheat_result:
+        from core.shared.decisions import (
+            check_structure_decisions,
+            check_overheat_decisions,
+        )
+
+        current_round = (
+            scenario.rounds[-1].round_index if scenario.rounds else 1
+        )
+        if structure_result:
+            pending_decisions.extend(
+                check_structure_decisions(
+                    updated_target, structure_result, current_round
+                )
+            )
+        if overheat_result:
+            pending_decisions.extend(
+                check_overheat_decisions(
+                    updated_target, overheat_result, current_round
+                )
+            )
+
     updated_combatants = list(scenario.combatants)
     updated_combatants[target_idx] = updated_target
     updated_scenario = MechCombatScenario(
@@ -2694,6 +2743,8 @@ def apply_typed_damage(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=pending_decisions,
     )
 
     structure_change = -1 if structure_result else 0
@@ -2763,6 +2814,19 @@ def apply_damage(
             updated_target, excess_damage
         )
 
+    pending_decisions = list(scenario.pending_decisions)
+    if structure_result:
+        from core.shared.decisions import check_structure_decisions
+
+        current_round = (
+            scenario.rounds[-1].round_index if scenario.rounds else 1
+        )
+        pending_decisions.extend(
+            check_structure_decisions(
+                updated_target, structure_result, current_round
+            )
+        )
+
     updated_combatants = list(scenario.combatants)
     updated_combatants[target_idx] = updated_target
 
@@ -2773,6 +2837,8 @@ def apply_damage(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=pending_decisions,
     )
 
     # Calculate structure change for resource change record
@@ -2791,6 +2857,7 @@ def apply_heat(
     scenario: MechCombatScenario,
     target_id: str,
     heat: int,
+    heat_resistance_multiplier: float | None = None,
 ) -> tuple[MechCombatScenario, ResourceChange, "OverheatResolutionResult | None"]:
     """Apply heat to a combatant, triggering stress check if heat exceeds cap.
 
@@ -2814,8 +2881,16 @@ def apply_heat(
     if target is None:
         return scenario, ResourceChange(combatant_id=target_id), None
 
+    heat_multiplier = heat_resistance_multiplier if heat_resistance_multiplier is not None else 1.0
+    if "shredded" in target.statuses:
+        heat_multiplier = 1.0
+    adjusted_heat = round_up(heat * heat_multiplier)
+
+    if adjusted_heat <= 0:
+        return scenario, ResourceChange(combatant_id=target_id), None
+
     # Apply heat (can exceed cap - triggers overheat check)
-    new_heat = target.resources.heat_current + heat
+    new_heat = target.resources.heat_current + adjusted_heat
 
     new_resources = target.resources.model_copy(update={"heat_current": new_heat})
     updated_target = target.model_copy(update={"resources": new_resources})
@@ -2824,6 +2899,19 @@ def apply_heat(
     overheat_result: "OverheatResolutionResult | None" = None
     if new_heat >= target.resources.heat_cap:
         updated_target, overheat_result = check_overheat_cascade(updated_target)
+
+    pending_decisions = list(scenario.pending_decisions)
+    if overheat_result:
+        from core.shared.decisions import check_overheat_decisions
+
+        current_round = (
+            scenario.rounds[-1].round_index if scenario.rounds else 1
+        )
+        pending_decisions.extend(
+            check_overheat_decisions(
+                updated_target, overheat_result, current_round
+            )
+        )
 
     updated_combatants = list(scenario.combatants)
     updated_combatants[target_idx] = updated_target
@@ -2835,11 +2923,13 @@ def apply_heat(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=pending_decisions,
     )
 
     # Calculate stress change for resource change record
     stress_change = 0
-    final_heat_change = heat
+    final_heat_change = adjusted_heat
     if overheat_result:
         stress_change = -overheat_result.stress_damage
         # Heat was cleared by overheat, so actual heat change is negative
@@ -2896,6 +2986,8 @@ def clear_heat(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     return updated_scenario, ResourceChange(

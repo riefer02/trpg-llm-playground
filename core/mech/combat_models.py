@@ -53,6 +53,10 @@ class ActionExecutionInput(FrozenModel):
         default=None, description="Second Full Tech option selection"
     )
     movement_path: list[HexPosition] = Field(default_factory=list, description="Movement path for move actions")
+    prompt_dangerous_terrain: bool = Field(
+        default=False,
+        description="If true, dangerous terrain checks create a decision instead of auto-rolling",
+    )
     is_overcharge: bool = Field(default=False, description="Whether this action uses overcharge")
     granted_by_overcharge: bool = Field(default=False, description="Whether this action was granted by overcharge")
     # Stabilize options (PR2 4275-4286)

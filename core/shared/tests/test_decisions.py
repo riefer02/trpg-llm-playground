@@ -16,6 +16,8 @@ from core.shared.decisions import (
     check_dangerous_terrain_decision,
     resolve_save_decision,
     resolve_trauma_decision,
+    apply_system_trauma_selection,
+    apply_failed_hull_save,
     get_pending_decisions_for_combatant,
     remove_decision_from_scenario,
     add_decision_to_scenario,
@@ -80,10 +82,12 @@ class TestPendingDecision:
             combatant_id="mech_1",
             trigger_source="system_trauma",
             trigger_round=2,
+            trauma_target="mount",
             eligible_mounts=[0, 1],
             eligible_systems=["sys_shield", "sys_reactor"],
         )
         assert decision.decision_type == "system_trauma"
+        assert decision.trauma_target == "mount"
         assert decision.eligible_mounts == [0, 1]
         assert decision.eligible_systems == ["sys_shield", "sys_reactor"]
 
@@ -205,10 +209,12 @@ class TestCreateDecisionFunctions:
         decision = create_system_trauma_decision(
             combatant_id="mech_1",
             trigger_round=1,
+            trauma_target="mount",
             eligible_mounts=[0, 2],
             eligible_systems=["sys_a", "sys_b"],
         )
         assert decision.decision_type == "system_trauma"
+        assert decision.trauma_target == "mount"
         assert decision.eligible_mounts == [0, 2]
         assert decision.eligible_systems == ["sys_a", "sys_b"]
 
@@ -287,6 +293,7 @@ class TestResolveSaveDecision:
         decision = create_system_trauma_decision(
             combatant_id="mech_1",
             trigger_round=1,
+            trauma_target="mount",
             eligible_mounts=[0],
             eligible_systems=[],
         )
@@ -304,6 +311,7 @@ class TestResolveTraumaDecision:
         decision = create_system_trauma_decision(
             combatant_id="mech_1",
             trigger_round=1,
+            trauma_target="mount",
             eligible_mounts=[0, 1, 2],
             eligible_systems=["sys_a"],
         )
@@ -321,6 +329,7 @@ class TestResolveTraumaDecision:
         decision = create_system_trauma_decision(
             combatant_id="mech_1",
             trigger_round=1,
+            trauma_target="system",
             eligible_mounts=[0],
             eligible_systems=["sys_a", "sys_b", "sys_c"],
         )
@@ -337,6 +346,7 @@ class TestResolveTraumaDecision:
         decision = create_system_trauma_decision(
             combatant_id="mech_1",
             trigger_round=1,
+            trauma_target="mount",
             eligible_mounts=[0, 1],
             eligible_systems=[],
         )
@@ -353,6 +363,7 @@ class TestResolveTraumaDecision:
         decision = create_system_trauma_decision(
             combatant_id="mech_1",
             trigger_round=1,
+            trauma_target="system",
             eligible_mounts=[],
             eligible_systems=["sys_a", "sys_b"],
         )
@@ -369,6 +380,7 @@ class TestResolveTraumaDecision:
         decision = create_system_trauma_decision(
             combatant_id="mech_1",
             trigger_round=1,
+            trauma_target="mount",
             eligible_mounts=[0],
             eligible_systems=["sys_a"],
         )
@@ -398,6 +410,7 @@ def _make_combatant(
     combatant_id: str = "mech_1",
     grit: int = 2,
     engineering_skill: int = 3,
+    inventory: MechInventory | None = None,
 ) -> CombatantState:
     """Create a test combatant."""
     return CombatantState(
@@ -425,6 +438,27 @@ def _make_combatant(
             heat_current=0,
             repairs_remaining=4,
         ),
+        inventory=inventory,
+    )
+
+
+def _make_inventory() -> MechInventory:
+    return MechInventory(
+        mounts=[
+            WeaponMountState(
+                mount_index=0,
+                slot_type="main",
+                weapons=[
+                    WeaponState(
+                        weapon_id="assault_rifle",
+                        tags=[],
+                        destroyed=False,
+                    )
+                ],
+                destroyed=False,
+            )
+        ],
+        systems=[MechSystemState(system_id="sys_a", destroyed=False)],
     )
 
 
@@ -474,7 +508,6 @@ class TestCheckStructureDecisions:
                 trauma_roll=2,
                 initial_target="mount",
                 resolved_target="mount",
-                mount_index=0,
                 eligible_mounts=[0, 1],
                 eligible_systems=["sys_a"],
             ),
@@ -484,6 +517,7 @@ class TestCheckStructureDecisions:
 
         assert len(decisions) == 1
         assert decisions[0].decision_type == "system_trauma"
+        assert decisions[0].trauma_target == "mount"
         assert decisions[0].eligible_mounts == [0, 1]
         assert decisions[0].eligible_systems == ["sys_a"]
 
@@ -620,7 +654,13 @@ class TestScenarioHelpers:
         decision1 = create_hull_save_decision("mech_1", trigger_round=1)
         scenario = add_decision_to_scenario(scenario, decision1)
 
-        decision2 = create_system_trauma_decision("mech_1", trigger_round=1, eligible_mounts=[0], eligible_systems=[])
+        decision2 = create_system_trauma_decision(
+            "mech_1",
+            trigger_round=1,
+            trauma_target="mount",
+            eligible_mounts=[0],
+            eligible_systems=[],
+        )
         scenario = add_decision_to_scenario(scenario, decision2)
 
         assert len(scenario.pending_decisions) == 2
@@ -651,3 +691,30 @@ class TestDecisionResults:
         assert result.selected_target == "mount"
         assert result.mount_index == 1
         assert result.valid_selection is True
+
+
+class TestDecisionApplication:
+    """Tests for applying decision results to combatants."""
+
+    def test_apply_system_trauma_selection_mount(self):
+        inventory = _make_inventory()
+        combatant = _make_combatant(inventory=inventory)
+        trauma_result = TraumaDecisionResult(
+            decision_id="decision_1",
+            selected_target="mount",
+            mount_index=0,
+            valid_selection=True,
+        )
+
+        updated = apply_system_trauma_selection(combatant, trauma_result)
+
+        assert updated.inventory is not None
+        destroyed = updated.inventory.mounts[0].weapons[0].destroyed
+        assert destroyed is True
+
+    def test_apply_failed_hull_save(self):
+        combatant = _make_combatant()
+        updated = apply_failed_hull_save(combatant)
+
+        assert updated.resources.hp_current == 0
+        assert updated.resources.structure_current == 0

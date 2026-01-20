@@ -1817,6 +1817,8 @@ def deploy_object(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables={**scenario.deployables, deployable_id: deployable},
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     result = DeploymentResult(
@@ -1883,6 +1885,8 @@ def damage_deployable(
         terrain=scenario.terrain,
         environment=scenario.environment,
         deployables={**scenario.deployables, deployable_id: updated_deployable},
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
     )
 
     result = DeployableDamageResult(
