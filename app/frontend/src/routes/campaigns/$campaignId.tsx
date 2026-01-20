@@ -14,6 +14,7 @@ import {
   useRevokeCampaignInvite,
   useResendCampaignInvite,
   useReserveTemplates,
+  useBeginDowntime,
 } from "../../lib/api";
 import type { ReserveTemplate } from "../../lib/api";
 import type {
@@ -77,6 +78,7 @@ function CampaignDetailPage() {
   const recordSessionOutcome = useRecordCampaignSessionOutcome();
   const revokeInvite = useRevokeCampaignInvite();
   const resendInvite = useResendCampaignInvite();
+  const beginDowntime = useBeginDowntime();
 
   const [characterId, setCharacterId] = useState("");
   const [inviteRole, setInviteRole] = useState<"player" | "co_gm">("player");
@@ -1138,6 +1140,79 @@ function CampaignDetailPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Post-mission debrief summary panel - shown when lobby is in cooldown */}
+      {lobbyState?.status === "cooldown" && (() => {
+        const lastMission = campaignModel.mission_history?.at(-1);
+        return (
+          <Card className="border-green-600/40 bg-green-600/5">
+            <CardHeader>
+              <CardTitle>Mission Complete</CardTitle>
+              <CardDescription>
+                {lastMission?.mission_name ?? "Mission"} has concluded. Review the debrief and begin planning the next operation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {lastMission && (
+                <>
+                  <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                    <div>
+                      <div className="text-muted-foreground text-xs">Outcome</div>
+                      <div className="font-medium capitalize">{lastMission.outcome}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground text-xs">Completion</div>
+                      <div className="font-medium">{((lastMission.completion_score ?? 0) * 100).toFixed(0)}%</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground text-xs">Reserves Spent</div>
+                      <div className="font-medium">{lastMission.reserves_spent?.length ?? 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground text-xs">Reserves Earned</div>
+                      <div className="font-medium">{lastMission.reserves_earned?.length ?? 0}</div>
+                    </div>
+                  </div>
+
+                  {lastMission.debrief_notes && (
+                    <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+                      <div className="text-xs text-muted-foreground mb-1">Debrief Notes</div>
+                      <div className="text-sm">{lastMission.debrief_notes}</div>
+                    </div>
+                  )}
+
+                  {lastMission.rewards && lastMission.rewards.length > 0 && (
+                    <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+                      <div className="text-xs text-muted-foreground mb-1">Rewards</div>
+                      <ul className="text-sm list-disc list-inside">
+                        {lastMission.rewards.map((reward, index) => (
+                          <li key={index}>{reward}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {lastMission.participating_character_ids && lastMission.participating_character_ids.length > 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      Participants: {lastMission.participating_character_ids.map((charId) => {
+                        const char = data.characters.find((c) => c.character_id === charId);
+                        return char?.callsign ?? charId;
+                      }).join(", ")}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <Button
+                onClick={() => beginDowntime.mutate(campaignId)}
+                disabled={beginDowntime.isPending}
+              >
+                {beginDowntime.isPending ? "Starting downtime..." : "Begin Next Mission"}
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

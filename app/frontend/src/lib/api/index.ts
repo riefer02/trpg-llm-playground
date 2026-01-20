@@ -98,6 +98,7 @@ export {
   useResendCampaignInvite,
   useRecordCampaignSessionOutcome,
   useReserveTemplates,
+  useBeginDowntime,
   campaignKeys,
 } from './campaigns'
 export type {
@@ -134,6 +135,8 @@ export {
   usePendingDecisions,
   useSubmitDecision,
   useCompleteCombat,
+  useCreateDemoCombat,
+  useAutoNpcTurn,
   combatKeys,
 } from './combat'
 export type {
@@ -164,6 +167,10 @@ export type {
   // Mission completion types
   MissionOutcome,
   CombatCompleteRequest,
+  // Demo combat types
+  DemoScenarioType,
+  // Auto NPC turn types
+  AutoNPCTurnResponse,
 } from './combat'
 
 // Combat WebSocket hook for real-time updates

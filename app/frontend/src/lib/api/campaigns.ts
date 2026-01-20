@@ -521,3 +521,14 @@ export function useResendCampaignInvite() {
         },
     });
 }
+
+export function useBeginDowntime() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (campaignId: string) =>
+            api.post<CampaignDetail>(`/campaigns/${campaignId}/begin-downtime`),
+        onSuccess: (campaign) => {
+            queryClient.setQueryData(campaignKeys.detail(campaign.id), campaign);
+        },
+    });
+}

@@ -49592,6 +49592,25 @@
           "title": "Unshackle Count",
           "type": "integer"
         },
+        "npc_role": {
+          "anyOf": [
+            {
+              "enum": [
+                "striker",
+                "defender",
+                "controller",
+                "supporter"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "NPC role for AI behavior selection",
+          "title": "Npc Role"
+        },
         "cede_turns_remaining": {
           "default": 0,
           "description": "Turns remaining in cede state",

@@ -1382,6 +1382,13 @@ async def launch_campaign_mission(
             )
         combatants.append(_character_to_combatant(character_db))
 
+    # Ensure participating characters are in the campaign's character list
+    # This is needed so mission_history.participating_character_ids can reference them
+    existing_character_ids = {c.get("id") for c in core_campaign.characters}
+    for character_db in character_map.values():
+        if character_db.id not in existing_character_ids:
+            core_campaign.characters.append(character_db.data)
+
     # Phase 34: Generate terrain and enemies if sitrep_type is specified
     terrain: TerrainMap | None = None
     sitrep_resolution: SitrepResolution | None = None
@@ -1486,6 +1493,45 @@ async def launch_campaign_mission(
     if enemy_force_preview:
         lobby_state.enemy_force_preview = enemy_force_preview.model_dump(mode="json")
     core_campaign.lobby_state = lobby_state
+
+    _save_campaign_model(campaign_db, core_campaign)
+    session.add(campaign_db)
+    await session.commit()
+
+    return await _build_campaign_detail_response(session, campaign_db, user["id"])
+
+
+@router.post("/{campaign_id}/begin-downtime", response_model=CampaignDetailResponse)
+async def begin_downtime(
+    campaign_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict[str, Any] = Depends(get_current_user),
+) -> CampaignDetailResponse:
+    """Transition lobby from cooldown to draft, starting the next mission cycle.
+
+    After a mission completes and the lobby enters "cooldown", this endpoint
+    transitions the campaign back to "draft" status, ready for planning the
+    next mission.
+    """
+    campaign_db = await _get_campaign_or_404(session, campaign_id)
+    await _require_membership(
+        session,
+        campaign_id,
+        user["id"],
+        allowed_roles=("owner", "co_gm"),
+    )
+    core_campaign = _load_campaign_model(campaign_db)
+
+    if core_campaign.lobby_state is None:
+        raise ConflictError("Campaign has no lobby state")
+    if core_campaign.lobby_state.status != "cooldown":
+        raise ConflictError(
+            f"Cannot begin downtime: lobby status is '{core_campaign.lobby_state.status}', expected 'cooldown'"
+        )
+
+    # Reset lobby to draft for next mission planning
+    core_campaign.lobby_state.status = "draft"
+    core_campaign.modified_at = utc_now()
 
     _save_campaign_model(campaign_db, core_campaign)
     session.add(campaign_db)
@@ -1653,6 +1699,7 @@ async def record_campaign_session_outcome(
     outcome: MissionOutcomeReport,
     *,
     clear_lobby: bool = True,
+    combat_session: CombatSessionDB | None = None,
 ) -> CampaignDB:
     """Persist a mission outcome onto the campaign blob."""
 
@@ -1668,12 +1715,13 @@ async def record_campaign_session_outcome(
     if outcome.debrief_notes:
         session_entry.debrief = outcome.debrief_notes
 
+    # Mark both mission and debrief checkpoints as complete
+    now = utc_now()
     for checkpoint in session_entry.lifecycle_checkpoints:
-        if checkpoint.phase == "mission":
+        if checkpoint.phase in ("mission", "debrief"):
             checkpoint.status = "complete"
             if checkpoint.completed_at is None:
-                checkpoint.completed_at = utc_now()
-            break
+                checkpoint.completed_at = now
 
     mission_plan = session_entry.mission_plan
     if mission_plan is None and core_campaign.lobby_state:
@@ -1689,13 +1737,25 @@ async def record_campaign_session_outcome(
         else session_id
     )
 
+    # Extract participating character IDs from combat scenario combatants
+    # Combatant IDs are formatted as "combat_{character_id}" for player combatants
+    participating_character_ids: list[str] = []
+    if combat_session and combat_session.scenario:
+        combatants = combat_session.scenario.get("combatants", [])
+        for combatant in combatants:
+            if combatant.get("side") == "players":
+                combatant_id = combatant.get("id", "")
+                if combatant_id.startswith("combat_"):
+                    character_id = combatant_id[len("combat_") :]
+                    participating_character_ids.append(character_id)
+
     record_payload = {
         "mission_id": mission_id,
         "session_id": session_id,
         "mission_name": mission_name,
         "outcome": outcome.outcome,
         "completion_score": outcome.completion_score,
-        "participating_character_ids": [],
+        "participating_character_ids": participating_character_ids,
         "debrief_notes": outcome.debrief_notes,
         "reserves_spent": outcome.reserves_spent,
         "reserves_earned": outcome.reserves_earned,

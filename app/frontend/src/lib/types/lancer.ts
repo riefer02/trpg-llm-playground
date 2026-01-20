@@ -29735,6 +29735,10 @@ export type NhpBehavior = ("ignore_pilot" | "overrule_pilot" | "illogical" | "re
  */
 export type UnshackleCount = number;
 /**
+ * NPC role for AI behavior selection
+ */
+export type NpcRole = ("striker" | "defender" | "controller" | "supporter") | null;
+/**
  * Turns remaining in cede state
  */
 export type CedeTurnsRemaining = number;
@@ -36218,6 +36222,7 @@ export interface CombatantState {
   ai_control_state?: AiControlState;
   nhp_behavior?: NhpBehavior;
   unshackle_count?: UnshackleCount;
+  npc_role?: NpcRole;
   cede_turns_remaining?: CedeTurnsRemaining;
   active_mode_effects?: ActiveModeEffects;
   reaction_triggers?: ReactionTriggers1;

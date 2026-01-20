@@ -213,6 +213,10 @@ class CombatantState(FrozenModel):
     unshackle_count: int = Field(
         default=0, ge=0, description="Number of times NHP has unshackled"
     )
+    npc_role: Literal["striker", "defender", "controller", "supporter"] | None = Field(
+        default=None,
+        description="NPC role for AI behavior selection",
+    )
     cede_turns_remaining: int = Field(
         default=0, ge=0, description="Turns remaining in cede state"
     )

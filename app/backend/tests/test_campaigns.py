@@ -443,3 +443,252 @@ async def test_campaign_session_outcome_updates_history(client: AsyncClient) -> 
     assert session_record["mission_outcome"]["outcome"] == "success"
     assert data["data"]["mission_history"][-1]["rewards"] == ["+1 reserve"]
     assert data["data"]["lobby_state"]["status"] == "cooldown"
+
+
+@pytest.mark.asyncio
+async def test_record_outcome_marks_debrief_checkpoint_complete(client: AsyncClient) -> None:
+    """Verify recording session outcome marks both mission and debrief checkpoints complete."""
+    owner_headers = {"X-User-Id": "debrief_owner"}
+    pilot_headers = {"X-User-Id": "debrief_pilot"}
+
+    create_resp = await client.post(
+        "/api/campaigns",
+        json={"name": "Debrief Co"},
+        headers=owner_headers,
+    )
+    campaign_id = create_resp.json()["id"]
+
+    invite_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites",
+        json={"role": "player"},
+        headers=owner_headers,
+    )
+    invite_token = invite_resp.json()["token"]
+    await client.post(
+        f"/api/campaigns/invites/{invite_token}/accept",
+        headers=pilot_headers,
+    )
+
+    char_resp = await client.post(
+        "/api/characters",
+        json={"callsign": "DEBRIEFER"},
+        headers=pilot_headers,
+    )
+    character_id = char_resp.json()["id"]
+    attach_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/characters",
+        json={"character_id": character_id},
+        headers=pilot_headers,
+    )
+    member_id = next(
+        m["id"]
+        for m in attach_resp.json()["members"]
+        if m["user_id"] == "debrief_pilot"
+    )
+    await client.post(
+        f"/api/campaigns/{campaign_id}/members/{member_id}/settings",
+        json={"ready": True, "assigned_character_id": character_id},
+        headers=pilot_headers,
+    )
+    await client.post(
+        f"/api/campaigns/{campaign_id}/lobby",
+        json={
+            "mission_name": "Operation Debrief",
+            "assigned_member_ids": [member_id],
+            "min_pilot_count": 1,
+            "preferred_pilot_count": 1,
+        },
+        headers=owner_headers,
+    )
+    launch_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/launch",
+        json={},
+        headers=owner_headers,
+    )
+    session_id = launch_resp.json()["data"]["sessions"][-1]["id"]
+
+    # Record outcome
+    outcome_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/sessions/{session_id}/outcome",
+        json={
+            "outcome": "partial",
+            "completion_score": 0.6,
+            "debrief_notes": "Hard fought",
+        },
+        headers=owner_headers,
+    )
+    assert outcome_resp.status_code == 200
+    data = outcome_resp.json()
+    session_record = data["data"]["sessions"][-1]
+
+    # Verify both mission and debrief checkpoints are marked complete
+    mission_checkpoint = next(
+        c for c in session_record["lifecycle_checkpoints"] if c["phase"] == "mission"
+    )
+    debrief_checkpoint = next(
+        c for c in session_record["lifecycle_checkpoints"] if c["phase"] == "debrief"
+    )
+    assert mission_checkpoint["status"] == "complete"
+    assert debrief_checkpoint["status"] == "complete"
+    assert mission_checkpoint["completed_at"] is not None
+    assert debrief_checkpoint["completed_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_begin_downtime_transitions_from_cooldown(client: AsyncClient) -> None:
+    """Verify begin-downtime transitions lobby from cooldown to draft."""
+    owner_headers = {"X-User-Id": "downtime_owner"}
+    pilot_headers = {"X-User-Id": "downtime_pilot"}
+
+    create_resp = await client.post(
+        "/api/campaigns",
+        json={"name": "Downtime Co"},
+        headers=owner_headers,
+    )
+    campaign_id = create_resp.json()["id"]
+
+    invite_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites",
+        json={"role": "player"},
+        headers=owner_headers,
+    )
+    invite_token = invite_resp.json()["token"]
+    await client.post(
+        f"/api/campaigns/invites/{invite_token}/accept",
+        headers=pilot_headers,
+    )
+
+    char_resp = await client.post(
+        "/api/characters",
+        json={"callsign": "RESTER"},
+        headers=pilot_headers,
+    )
+    character_id = char_resp.json()["id"]
+    attach_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/characters",
+        json={"character_id": character_id},
+        headers=pilot_headers,
+    )
+    member_id = next(
+        m["id"]
+        for m in attach_resp.json()["members"]
+        if m["user_id"] == "downtime_pilot"
+    )
+    await client.post(
+        f"/api/campaigns/{campaign_id}/members/{member_id}/settings",
+        json={"ready": True, "assigned_character_id": character_id},
+        headers=pilot_headers,
+    )
+    await client.post(
+        f"/api/campaigns/{campaign_id}/lobby",
+        json={
+            "mission_name": "Operation Rest",
+            "assigned_member_ids": [member_id],
+            "min_pilot_count": 1,
+            "preferred_pilot_count": 1,
+        },
+        headers=owner_headers,
+    )
+    launch_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/launch",
+        json={},
+        headers=owner_headers,
+    )
+    session_id = launch_resp.json()["data"]["sessions"][-1]["id"]
+
+    # Record outcome to put lobby in cooldown
+    await client.post(
+        f"/api/campaigns/{campaign_id}/sessions/{session_id}/outcome",
+        json={"outcome": "success", "completion_score": 1.0},
+        headers=owner_headers,
+    )
+
+    # Verify we're in cooldown
+    detail_resp = await client.get(
+        f"/api/campaigns/{campaign_id}",
+        headers=owner_headers,
+    )
+    assert detail_resp.json()["data"]["lobby_state"]["status"] == "cooldown"
+
+    # Begin downtime
+    downtime_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/begin-downtime",
+        headers=owner_headers,
+    )
+    assert downtime_resp.status_code == 200
+    data = downtime_resp.json()
+    assert data["data"]["lobby_state"]["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_begin_downtime_fails_if_not_cooldown(client: AsyncClient) -> None:
+    """Verify begin-downtime returns 409 if lobby is not in cooldown status."""
+    owner_headers = {"X-User-Id": "nocooldown_owner"}
+    pilot_headers = {"X-User-Id": "nocooldown_pilot"}
+
+    create_resp = await client.post(
+        "/api/campaigns",
+        json={"name": "No Cooldown Co"},
+        headers=owner_headers,
+    )
+    campaign_id = create_resp.json()["id"]
+
+    # Set up a lobby in draft state (not cooldown)
+    invite_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/invites",
+        json={"role": "player"},
+        headers=owner_headers,
+    )
+    invite_token = invite_resp.json()["token"]
+    await client.post(
+        f"/api/campaigns/invites/{invite_token}/accept",
+        headers=pilot_headers,
+    )
+
+    char_resp = await client.post(
+        "/api/characters",
+        json={"callsign": "DRAFTEE"},
+        headers=pilot_headers,
+    )
+    character_id = char_resp.json()["id"]
+    attach_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/characters",
+        json={"character_id": character_id},
+        headers=pilot_headers,
+    )
+    member_id = next(
+        m["id"]
+        for m in attach_resp.json()["members"]
+        if m["user_id"] == "nocooldown_pilot"
+    )
+    await client.post(
+        f"/api/campaigns/{campaign_id}/members/{member_id}/settings",
+        json={"ready": True, "assigned_character_id": character_id},
+        headers=pilot_headers,
+    )
+    # Create a lobby but don't launch (stays in draft)
+    await client.post(
+        f"/api/campaigns/{campaign_id}/lobby",
+        json={
+            "mission_name": "Operation Draft",
+            "assigned_member_ids": [member_id],
+            "min_pilot_count": 1,
+            "preferred_pilot_count": 1,
+        },
+        headers=owner_headers,
+    )
+
+    # Verify we're in draft status
+    detail_resp = await client.get(
+        f"/api/campaigns/{campaign_id}",
+        headers=owner_headers,
+    )
+    assert detail_resp.json()["data"]["lobby_state"]["status"] == "draft"
+
+    # Try to begin downtime while in draft status
+    downtime_resp = await client.post(
+        f"/api/campaigns/{campaign_id}/begin-downtime",
+        headers=owner_headers,
+    )
+    assert downtime_resp.status_code == 409
+    assert "cooldown" in downtime_resp.json()["detail"].lower()

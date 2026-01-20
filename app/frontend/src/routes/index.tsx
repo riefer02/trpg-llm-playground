@@ -7,9 +7,9 @@
  * - API integration
  */
 
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useHealth, useDatabaseHealth } from "../lib/api";
+import { useHealth, useDatabaseHealth, useCreateDemoCombat } from "../lib/api";
 import { CombatCanvas } from "../components/combat/CombatCanvas";
 import {
   Card,
@@ -56,6 +56,7 @@ function HomePage() {
           Quick Actions
         </h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <QuickBattleCard />
           <QuickActionCard
             title="Create Character"
             description="Build a new pilot and mech"
@@ -182,6 +183,43 @@ function QuickActionCard({
         </CardHeader>
       </Card>
     </a>
+  );
+}
+
+function QuickBattleCard() {
+  const navigate = useNavigate();
+  const createDemo = useCreateDemoCombat();
+
+  const handleQuickBattle = async () => {
+    try {
+      const session = await createDemo.mutateAsync("skirmish");
+      navigate({ to: `/combat/${session.id}` });
+    } catch (error) {
+      console.error("Failed to create demo combat:", error);
+    }
+  };
+
+  return (
+    <Card
+      className="h-full transition-colors hover:border-primary cursor-pointer"
+      onClick={handleQuickBattle}
+    >
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          {createDemo.isPending ? (
+            <span className="inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <span className="text-primary">⚔</span>
+          )}
+          Quick Battle
+        </CardTitle>
+        <CardDescription>
+          {createDemo.isPending
+            ? "Setting up demo combat..."
+            : "Jump into combat with pre-built pilots"}
+        </CardDescription>
+      </CardHeader>
+    </Card>
   );
 }
 

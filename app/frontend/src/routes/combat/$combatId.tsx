@@ -15,6 +15,7 @@ import {
   useCompleteCombat,
   useSpendReserve,
   useWeapons,
+  useAutoNpcTurn,
   type ActionRequest,
   type ActionEconomyState,
   type AvailableActionItem,
@@ -79,6 +80,7 @@ function CombatSessionPage() {
   const submitReaction = useSubmitReaction(combatId);
   const completeCombat = useCompleteCombat(combatId);
   const spendReserve = useSpendReserve(combatId);
+  const autoNpcTurn = useAutoNpcTurn(combatId);
   const navigate = useNavigate();
 
   // Mission completion state
@@ -194,6 +196,20 @@ function CombatSessionPage() {
       },
     });
   }, [endTurn]);
+
+  // Handle auto NPC turn
+  const handleAutoNpcTurn = useCallback(() => {
+    autoNpcTurn.mutate(undefined, {
+      onSuccess: () => {
+        // Turn state remains inactive since the full turn cycle completed
+        setTurnActive(false);
+        setEconomy(null);
+        setTargetMode(null);
+        setSelectedTargetIds([]);
+        setMaxTargets(1);
+      },
+    });
+  }, [autoNpcTurn]);
 
   // Handle action selection from ActionPanel
   const handleActionSelect = useCallback((action: AvailableActionItem) => {
@@ -549,8 +565,11 @@ function CombatSessionPage() {
             turnState={turnState}
             onStartTurn={handleStartTurn}
             onEndTurn={handleEndTurn}
+            onAutoNpcTurn={handleAutoNpcTurn}
             isStarting={startTurn.isPending}
             isEnding={endTurn.isPending}
+            isAutoNpc={autoNpcTurn.isPending}
+            isCurrentActorAI={currentActor?.ai_controlled ?? false}
           />
 
           {/* Victory Conditions (if SITREP active) */}

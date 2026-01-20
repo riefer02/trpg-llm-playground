@@ -9,8 +9,11 @@ export interface TurnControlsProps {
   turnState: TurnState;
   onStartTurn: () => void;
   onEndTurn: () => void;
+  onAutoNpcTurn?: () => void;
   isStarting?: boolean;
   isEnding?: boolean;
+  isAutoNpc?: boolean;
+  isCurrentActorAI?: boolean;
 }
 
 export function TurnControls({
@@ -20,8 +23,11 @@ export function TurnControls({
   turnState,
   onStartTurn,
   onEndTurn,
+  onAutoNpcTurn,
   isStarting = false,
   isEnding = false,
+  isAutoNpc = false,
+  isCurrentActorAI = false,
 }: TurnControlsProps) {
   return (
     <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
@@ -44,14 +50,27 @@ export function TurnControls({
 
       <div className="flex gap-2">
         {turnState === "not_started" && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={onStartTurn}
-            disabled={isStarting || !currentActorName}
-          >
-            {isStarting ? "Starting..." : "Start Turn"}
-          </Button>
+          <>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onStartTurn}
+              disabled={isStarting || isAutoNpc || !currentActorName}
+            >
+              {isStarting ? "Starting..." : "Start Turn"}
+            </Button>
+
+            {isCurrentActorAI && onAutoNpcTurn && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onAutoNpcTurn}
+                disabled={isAutoNpc || isStarting || !currentActorName}
+              >
+                {isAutoNpc ? "Processing..." : "Auto NPC Turn"}
+              </Button>
+            )}
+          </>
         )}
 
         {turnState === "active" && (

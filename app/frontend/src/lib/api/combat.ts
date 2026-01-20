@@ -462,3 +462,58 @@ export function useSpendReserve(sessionId: string) {
     },
   });
 }
+
+// =============================================================================
+// Demo Combat Types and Hooks
+// =============================================================================
+
+export type DemoScenarioType = "skirmish" | "control" | "boss";
+
+export function useCreateDemoCombat() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (scenarioType: DemoScenarioType = "skirmish") =>
+      api.post<CombatSessionResponse>(`/combat/demo?scenario_type=${scenarioType}`),
+    onSuccess: () => {
+      // Invalidate combat list to include the new demo session
+      queryClient.invalidateQueries({ queryKey: combatKeys.all });
+    },
+  });
+}
+
+// =============================================================================
+// Auto NPC Turn Types and Hooks
+// =============================================================================
+
+export interface AutoNPCTurnResponse {
+  success: boolean;
+  actor_id: string;
+  actor_name: string;
+  decision_action?: string;
+  decision_target?: string;
+  decision_reasoning?: string;
+  actions_taken: number;
+  skipped: boolean;
+  skip_reason?: string;
+  scenario: MechCombatScenario;
+}
+
+export function useAutoNpcTurn(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<AutoNPCTurnResponse>(`/combat/${sessionId}/turns/auto-npc`),
+    onSuccess: (data) => {
+      queryClient.setQueryData<CombatSessionResponse>(
+        combatKeys.detail(sessionId),
+        (prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            scenario: data.scenario,
+          };
+        },
+      );
+    },
+  });
+}

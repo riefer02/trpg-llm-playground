@@ -57,8 +57,17 @@ from core.shared.decisions import (
     apply_system_trauma_selection,
     apply_failed_hull_save,
 )
+from core.mech.npc_turn_execution import execute_npc_turn
 
 router = APIRouter(prefix="/combat", tags=["combat"])
+
+
+# =============================================================================
+# Demo Combat Scenario Types
+# =============================================================================
+
+
+DemoScenarioType = Literal["skirmish", "control", "boss"]
 
 
 # =============================================================================
@@ -248,8 +257,265 @@ def _session_to_list_item(session_db: CombatSessionDB) -> CombatSessionListItem:
 
 
 # =============================================================================
+# Demo Combat Helpers
+# =============================================================================
+
+
+def _build_demo_player_squad() -> list[CombatantState]:
+    """Build 4 LL0 pilots with GMS Everest mechs for demo combat.
+
+    Squad composition:
+    - VANGUARD: Melee focus
+    - SENTINEL: Ranged focus
+    - WARDEN: Support/tank
+    - GHOST: Tech/mobility
+    """
+    players = []
+    positions = [(0, -3), (-2, -2), (2, -2), (0, -1)]  # Back row deployment
+    pilot_configs = [
+        ("VANGUARD", "Alpha"),
+        ("SENTINEL", "Bravo"),
+        ("WARDEN", "Charlie"),
+        ("GHOST", "Delta"),
+    ]
+
+    for idx, (callsign, name) in enumerate(pilot_configs):
+        q, r = positions[idx]
+        combatant = CombatantState(
+            id=f"demo_player_{idx + 1}",
+            name=f"{callsign}'s Everest",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_1",
+                hp_max=10,  # GMS Everest base HP
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                tech_attack=0,
+                grit=0,  # LL0 grit
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=q, r=r), elevation=0),
+        )
+        players.append(combatant)
+
+    return players
+
+
+def _build_demo_enemy_squad(scenario_type: DemoScenarioType) -> list[CombatantState]:
+    """Build enemy squads based on scenario type.
+
+    Scenario types:
+    - skirmish: 4× GMS Grunt T1 (easy)
+    - control: 4× GMS Grunt T1 + 2× GMS Elite T2 (standard)
+    - boss: 1× IPS-N Boss T3 + 2× GMS Grunt T1 (hard)
+    """
+    enemies: list[CombatantState] = []
+
+    if scenario_type == "skirmish":
+        # 4 grunts spread across front row
+        positions = [(0, 3), (-2, 2), (2, 2), (0, 1)]
+        for idx, (q, r) in enumerate(positions):
+            enemies.append(_make_grunt(f"grunt_{idx + 1}", q, r))
+
+    elif scenario_type == "control":
+        # 4 grunts + 2 elites
+        grunt_positions = [(0, 3), (-2, 2), (2, 2), (0, 1)]
+        for idx, (q, r) in enumerate(grunt_positions):
+            enemies.append(_make_grunt(f"grunt_{idx + 1}", q, r))
+
+        elite_positions = [(-1, 2), (1, 2)]
+        for idx, (q, r) in enumerate(elite_positions):
+            enemies.append(_make_elite(f"elite_{idx + 1}", q, r))
+
+    elif scenario_type == "boss":
+        # 1 boss + 2 grunts
+        enemies.append(_make_boss("boss_1", 0, 3))
+        enemies.append(_make_grunt("grunt_1", -2, 2))
+        enemies.append(_make_grunt("grunt_2", 2, 2))
+
+    return enemies
+
+
+def _make_grunt(id: str, q: int, r: int) -> CombatantState:
+    """Create a GMS Grunt T1 NPC."""
+    return CombatantState(
+        id=f"demo_{id}",
+        name=f"GMS Grunt ({id.replace('_', ' ').title()})",
+        side="hostiles",
+        kind="npc",
+        stats=CombatStats(
+            size="size_1",
+            hp_max=8,
+            evasion=8,
+            e_defense=6,
+            armor=0,
+            speed=4,
+            sensor_range=10,
+            tech_attack=0,
+        ),
+        resources=CombatResources(
+            hp_current=8,
+            heat_current=0,
+            heat_cap=4,
+            structure_current=1,
+            stress_current=1,
+            repairs_remaining=0,
+        ),
+        position=HexPosition(coord=HexCoord(q=q, r=r), elevation=0),
+        ai_controlled=True,
+        npc_role="striker",  # Grunts are aggressive
+    )
+
+
+def _make_elite(id: str, q: int, r: int) -> CombatantState:
+    """Create a GMS Elite T2 NPC."""
+    return CombatantState(
+        id=f"demo_{id}",
+        name=f"GMS Elite ({id.replace('_', ' ').title()})",
+        side="hostiles",
+        kind="npc",
+        stats=CombatStats(
+            size="size_1",
+            hp_max=15,
+            evasion=10,
+            e_defense=8,
+            armor=1,
+            speed=5,
+            sensor_range=10,
+            tech_attack=2,
+        ),
+        resources=CombatResources(
+            hp_current=15,
+            heat_current=0,
+            heat_cap=6,
+            structure_current=2,
+            stress_current=2,
+            repairs_remaining=0,
+        ),
+        position=HexPosition(coord=HexCoord(q=q, r=r), elevation=0),
+        ai_controlled=True,
+        npc_role="defender",  # Elites hold ground
+    )
+
+
+def _make_boss(id: str, q: int, r: int) -> CombatantState:
+    """Create an IPS-N Boss T3 NPC."""
+    return CombatantState(
+        id=f"demo_{id}",
+        name="IPS-N Commander",
+        side="hostiles",
+        kind="npc",
+        stats=CombatStats(
+            size="size_2",
+            hp_max=25,
+            evasion=8,
+            e_defense=10,
+            armor=2,
+            speed=3,
+            sensor_range=8,
+            tech_attack=0,
+        ),
+        resources=CombatResources(
+            hp_current=25,
+            heat_current=0,
+            heat_cap=8,
+            structure_current=3,
+            stress_current=3,
+            repairs_remaining=0,
+        ),
+        position=HexPosition(coord=HexCoord(q=q, r=r), elevation=0),
+        ai_controlled=True,
+        npc_role="striker",  # Bosses deal damage
+    )
+
+
+def _build_demo_terrain() -> None:
+    """Build simple demo terrain.
+
+    For demo purposes, we use no terrain (open field).
+    This keeps the demo simple and focused on combat mechanics.
+    """
+    # Return None for a simple open battlefield
+    # Future enhancement: add basic terrain with cover
+    return None
+
+
+# =============================================================================
 # Endpoints
 # =============================================================================
+
+
+@router.post(
+    "/demo", response_model=CombatSessionResponse, status_code=status.HTTP_201_CREATED
+)
+async def create_demo_combat(
+    scenario_type: DemoScenarioType = "skirmish",
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> CombatSessionResponse:
+    """Create a demo combat session with pre-built combatants.
+
+    This endpoint provides a quick way to start a combat session without
+    requiring campaign setup or character creation. Perfect for testing
+    and demonstrations.
+
+    Scenario types:
+    - skirmish: 4 players vs 4 GMS grunts (easy)
+    - control: 4 players vs 6 enemies (4 grunts + 2 elites, standard)
+    - boss: 4 players vs 1 boss + 2 grunts (hard)
+    """
+    session_id = f"combat_{uuid4().hex[:12]}"
+
+    # Generate demo squads
+    player_combatants = _build_demo_player_squad()
+    enemy_combatants = _build_demo_enemy_squad(scenario_type)
+    terrain = _build_demo_terrain()
+
+    # Build scenario
+    scenario = MechCombatScenario(
+        combatants=player_combatants + enemy_combatants,
+        terrain=terrain,
+        environment="standard",
+        grapples=[],
+        rounds=[],
+        deployables={},
+    )
+
+    # Create session name based on scenario type
+    scenario_names = {
+        "skirmish": "Demo Skirmish",
+        "control": "Demo Control",
+        "boss": "Demo Boss Fight",
+    }
+
+    db_session = CombatSessionDB(
+        id=session_id,
+        name=scenario_names.get(scenario_type, "Demo Combat"),
+        status="active",
+        current_round=1,
+        current_turn_index=0,
+        scenario=scenario.model_dump(mode="json"),
+        gm_user_id=user["id"],
+        campaign_id=None,  # Demo sessions have no campaign
+        notes=f"Quick Battle demo ({scenario_type} scenario)",
+    )
+
+    session.add(db_session)
+    await session.commit()
+    await session.refresh(db_session)
+
+    return _session_to_response(db_session)
 
 
 @router.post(
@@ -405,6 +671,7 @@ async def complete_combat_session(
             combat_session.campaign_id,
             combat_session.campaign_session_id,
             mission_outcome,
+            combat_session=combat_session,
         )
 
     session.add(combat_session)
@@ -1798,3 +2065,139 @@ async def spend_reserve(
     )
 
     return _session_to_response(combat_session)
+
+
+# =============================================================================
+# Auto NPC Turn Endpoint
+# =============================================================================
+
+
+class AutoNPCTurnResponse(BaseModel):
+    """Response model for automated NPC turn execution."""
+
+    success: bool
+    actor_id: str
+    actor_name: str
+    decision_action: str | None = None
+    decision_target: str | None = None
+    decision_reasoning: str | None = None
+    actions_taken: int
+    skipped: bool
+    skip_reason: str | None = None
+    scenario: dict[str, Any]
+
+
+@router.post("/{session_id}/turns/auto-npc", response_model=AutoNPCTurnResponse)
+async def execute_auto_npc_turn(
+    session_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> AutoNPCTurnResponse:
+    """Execute an automated NPC turn.
+
+    This endpoint runs a full NPC turn cycle:
+    1. Starts the turn
+    2. Uses AI to select an action and target
+    3. Executes the selected action
+    4. Ends the turn
+
+    The current actor must be AI-controlled (ai_controlled=True).
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    if combat_session.status != "active":
+        raise ValidationError(
+            f"Cannot execute NPC turn: session status is '{combat_session.status}'",
+            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+        )
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Get current actor from turn order
+    current_actor = get_current_actor(
+        scenario,
+        combat_session.current_round,
+        combat_session.current_turn_index,
+    )
+
+    if current_actor is None:
+        raise ValidationError(
+            "No current actor found",
+            errors=[{"loc": ["turn"], "msg": "Turn order not initialized", "type": "value_error"}],
+        )
+
+    # Validate current actor is AI-controlled
+    if not current_actor.ai_controlled:
+        raise ValidationError(
+            f"Current actor '{current_actor.name}' is not AI-controlled",
+            errors=[{"loc": ["actor"], "msg": "Actor must be ai_controlled=True", "type": "value_error"}],
+        )
+
+    # Execute the NPC turn
+    updated_scenario, npc_result = execute_npc_turn(
+        scenario,
+        current_actor.id,
+        combat_session.current_round,
+        combat_session.current_turn_index,
+    )
+
+    # Update round/turn index based on turn end result
+    new_round = combat_session.current_round
+    new_turn_index = combat_session.current_turn_index
+    if npc_result.turn_end:
+        if npc_result.turn_end.round_advanced and npc_result.turn_end.new_round_number:
+            new_round = npc_result.turn_end.new_round_number
+            new_turn_index = 0
+        elif npc_result.turn_end.next_actor_id:
+            # Find next turn index
+            if new_round - 1 < len(updated_scenario.rounds):
+                round_data = updated_scenario.rounds[new_round - 1]
+                for idx, turn in enumerate(round_data.turns):
+                    if turn.actor_id == npc_result.turn_end.next_actor_id:
+                        new_turn_index = idx
+                        break
+                else:
+                    new_turn_index = combat_session.current_turn_index + 1
+
+    # Persist
+    combat_session.scenario = updated_scenario.model_dump(mode="json")
+    combat_session.current_round = new_round
+    combat_session.current_turn_index = new_turn_index
+    combat_session.updated_at = utc_now()
+
+    session.add(combat_session)
+    await session.commit()
+    await session.refresh(combat_session)
+
+    # Clear economy cache (turn ended)
+    _clear_session_economy(session_id)
+
+    # Broadcast state update to all connected WebSocket clients
+    ws_response = _session_to_response(combat_session)
+    await combat_ws_manager.broadcast(
+        session_id,
+        {"type": "state", "data": ws_response.model_dump(mode="json")},
+    )
+
+    return AutoNPCTurnResponse(
+        success=not npc_result.skipped,
+        actor_id=npc_result.actor_id,
+        actor_name=npc_result.actor_name,
+        decision_action=npc_result.decision.action if npc_result.decision else None,
+        decision_target=npc_result.decision.target_id if npc_result.decision else None,
+        decision_reasoning=npc_result.decision.reasoning if npc_result.decision else None,
+        actions_taken=npc_result.actions_taken,
+        skipped=npc_result.skipped,
+        skip_reason=npc_result.skip_reason,
+        scenario=combat_session.scenario,
+    )
