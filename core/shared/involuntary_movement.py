@@ -107,6 +107,7 @@ class KnockbackResult(FrozenModel):
     end_position: HexCoord | None
     obstructed: bool
     obstruction_coord: HexCoord | None = None
+    obstruction_type: Literal["unit", "terrain"] | None = None
     direction: HexCoord
     reason: str = ""
 
@@ -392,11 +393,21 @@ def resolve_knockback(
     )
 
     if not path.path_clear:
+        # Determine obstruction type (unit vs terrain)
+        obstruction_type: Literal["unit", "terrain"] | None = None
+        if path.obstructions:
+            obs_coord = path.obstructions[0]
+            if occupied_hexes and obs_coord in occupied_hexes:
+                obstruction_type = "unit"
+            else:
+                obstruction_type = "terrain"
+
         return KnockbackResult(
             spaces_knocked=path.spaces_moved,
             end_position=path.end or target,
             obstructed=True,
             obstruction_coord=path.obstructions[0] if path.obstructions else None,
+            obstruction_type=obstruction_type,
             direction=direction,
             reason=f"Knockback blocked by obstruction after {path.spaces_moved} spaces",
         )

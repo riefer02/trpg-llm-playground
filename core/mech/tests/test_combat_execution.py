@@ -42,6 +42,7 @@ from core.mech.combat_state import (
     MechInventory,
     ActionUse,
     MechSystemState,
+    GrappleLink,
 )
 from core.mech.grid import HexPosition, HexCoord
 from core.shared.effects import (
@@ -677,7 +678,12 @@ class TestExecuteAction:
             )
 
     def test_execute_attack_with_forced_hit(self):
-        """Attack with natural 20 should always hit and deal double damage."""
+        """Attack with natural 20 should always hit with crit (roll twice, pick highest).
+
+        Per PR2 3965-3969: Critical hits roll all damage dice twice and pick the
+        highest N dice. For a 1d6 weapon, that means rolling 2d6 and taking the
+        higher result.
+        """
         from unittest.mock import patch
 
         attacker = make_combatant(id="attacker", name="Attacker", side="players")
@@ -692,12 +698,13 @@ class TestExecuteAction:
             action_id="skirmish",
             action_type="quick",
             target_ids=["defender"],
+            weapon_id="assault_rifle",  # 1d6 damage
         )
 
         # Force a natural 20 (critical hit)
-        with patch("core.shared.rolls._roll_d20") as mock_roll:
-            mock_roll.return_value = 20  # Force roll of 20
-
+        # Mock damage dice: first roll = 3, second roll = 5, so pick highest = 5
+        with patch("core.shared.rolls._roll_d20", return_value=20), \
+             patch("core.mech.combat_helpers.random.randint", side_effect=[3, 5]):
             updated_scenario, _, _, result = execute_action(
                 scenario, turn, economy, action_input
             )
@@ -705,11 +712,11 @@ class TestExecuteAction:
         assert result.success is True
         assert result.effects_applied[0]["hit"] is True
         assert result.effects_applied[0]["critical"] is True
-        # Crit damage = base_damage * 2 = 6 * 2 = 12
-        assert result.damage_dealt == 12
+        # Crit damage: roll 2d6 [3, 5], pick highest 1 = 5
+        assert result.damage_dealt == 5
 
         defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
-        assert defender_after.resources.hp_current == 8  # 20 - 12
+        assert defender_after.resources.hp_current == 15  # 20 - 5
 
     def test_execute_attack_missing_target(self):
         """Attack with non-existent target should not error."""
@@ -1465,7 +1472,12 @@ class TestMultiDamageResolution:
         assert result.damage_dealt == 10
 
     def test_attack_with_unknown_weapon_uses_default_damage(self):
-        """Attack with unknown weapon should fall back to default damage."""
+        """Attack with unknown weapon should fall back to default flat damage.
+
+        Default damage is 6 flat (no dice). Per PR2 3965-3969, critical hits
+        only affect dice rolls (roll twice, pick highest), so flat damage
+        is NOT affected by crits.
+        """
         from unittest.mock import patch
 
         attacker = make_combatant(id="attacker", name="Attacker", side="players")
@@ -1492,11 +1504,11 @@ class TestMultiDamageResolution:
 
         assert result.success is True
         assert result.effects_applied[0]["critical"] is True
-        # Default damage is 6, doubled for crit = 12
-        assert result.damage_dealt == 12
+        # Default damage is 6 flat (no dice) - crit doesn't affect flat damage
+        assert result.damage_dealt == 6
 
         defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
-        assert defender_after.resources.hp_current == 8  # 20 - 12
+        assert defender_after.resources.hp_current == 14  # 20 - 6
 
 
 # =============================================================================
@@ -1672,12 +1684,13 @@ class TestWeaponTagEffects:
             action_id="skirmish",
             action_type="quick",
             target_ids=["defender"],
-            weapon_id="progressive_knife",
+            weapon_id="progressive_knife",  # 1d3+1 with overkill
         )
 
+        # Force non-crit hit to avoid needing extra mock values for crit mechanics
         with patch("core.shared.rolls._roll_d20") as mock_roll, \
             patch("core.mech.combat_helpers.random.randint") as mock_rand:
-            mock_roll.return_value = 20  # Force hit
+            mock_roll.return_value = 15  # Force hit but not crit
             mock_rand.side_effect = [1, 2]  # Trigger overkill once, then reroll
 
             updated_scenario, _, _, result = execute_action(
@@ -2040,6 +2053,292 @@ class TestKnockbackWeaponTag:
         assert defender_after.position.coord.r == 0
 
 
+class TestKnockbackCollision:
+    """Tests for knockback collision effects (PR2 8642, 6521).
+
+    Per PR2 rules:
+    - Line 8642, 21266, 21279: "If it collides with an obstacle or another mech,
+      it stops and is additionally knocked prone"
+    - Line 6521: "If your ram attacks knock a target into another character,
+      the other character must pass a hull save or be knocked prone"
+    """
+
+    def test_knockback_into_unit_applies_prone_to_target(self):
+        """Target knocked into another unit becomes prone (PR2 8642)."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=20,
+            hp_max=20,
+        )
+        # Blocker mech at (2, 0) - in the knockback path
+        blocker = make_combatant(
+            id="blocker",
+            name="Blocker",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=2, r=0)),
+        )
+        scenario = make_scenario(combatants=[attacker, defender, blocker])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # ipsn_concussion_missiles has knockback 2
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ipsn_concussion_missiles",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Check knockback was blocked and collision_prone applied
+        knockback_effects = [e for e in result.effects_applied if e.get("type") == "knockback"]
+        assert len(knockback_effects) == 1
+        assert knockback_effects[0]["blocked"] is True
+        assert knockback_effects[0].get("collision_prone") is True
+
+        # Target should have prone status
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        assert "prone" in defender_after.statuses
+
+    def test_knockback_into_unit_applies_prone_to_secondary(self):
+        """Unit blocking knockback also becomes prone (PR2 6521)."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=20,
+            hp_max=20,
+        )
+        # Blocker mech at (2, 0) - in the knockback path
+        blocker = make_combatant(
+            id="blocker",
+            name="Blocker",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=2, r=0)),
+        )
+        scenario = make_scenario(combatants=[attacker, defender, blocker])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # ipsn_concussion_missiles has knockback 2
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ipsn_concussion_missiles",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Check secondary_prone_target in effect
+        knockback_effects = [e for e in result.effects_applied if e.get("type") == "knockback"]
+        assert len(knockback_effects) == 1
+        assert knockback_effects[0].get("secondary_prone_target") == "blocker"
+
+        # Blocker should have prone status
+        blocker_after = next(
+            c for c in updated_scenario.combatants if c.id == "blocker"
+        )
+        assert "prone" in blocker_after.statuses
+
+    def test_knockback_no_collision_no_prone(self):
+        """Target knocked without collision doesn't become prone."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=20,
+            hp_max=20,
+        )
+        # No obstruction in path
+        scenario = make_scenario(combatants=[attacker, defender])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # ipsn_war_pike has knockback 1
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ipsn_war_pike",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Check knockback was not blocked
+        knockback_effects = [e for e in result.effects_applied if e.get("type") == "knockback"]
+        assert len(knockback_effects) == 1
+        assert knockback_effects[0]["blocked"] is False
+        assert knockback_effects[0].get("collision_prone") is None
+
+        # Target should NOT have prone status
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        assert "prone" not in defender_after.statuses
+
+    def test_knockback_collision_both_units_prone(self):
+        """When knocked into another unit, both target and blocker become prone."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=20,
+            hp_max=20,
+        )
+        # Blocker mech at (2, 0) - in the knockback path
+        blocker = make_combatant(
+            id="blocker",
+            name="Blocker",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=2, r=0)),
+        )
+        scenario = make_scenario(combatants=[attacker, defender, blocker])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # ipsn_concussion_missiles has knockback 2
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ipsn_concussion_missiles",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Both defender and blocker should have prone
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        blocker_after = next(
+            c for c in updated_scenario.combatants if c.id == "blocker"
+        )
+        assert "prone" in defender_after.statuses, "Target should be prone after collision"
+        assert "prone" in blocker_after.statuses, "Blocker should be prone after being hit"
+
+    def test_knockback_partial_distance_collision(self):
+        """Target knocked 3 spaces but blocked after 2 becomes prone."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        defender = make_combatant(
+            id="defender",
+            name="Defender",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            hp_current=50,
+            hp_max=50,
+        )
+        # Blocker at (4, 0) - knockback 3 would push from (1,0) to (4,0) but blocked
+        blocker = make_combatant(
+            id="blocker",
+            name="Blocker",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=4, r=0)),
+        )
+        scenario = make_scenario(combatants=[attacker, defender, blocker])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # ha_daisy_cutter has knockback 3
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["defender"],
+            weapon_id="ha_daisy_cutter",
+        )
+
+        with patch("core.shared.rolls._roll_d20") as mock_roll:
+            mock_roll.return_value = 20  # Force hit
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Check knockback was blocked after partial distance
+        knockback_effects = [e for e in result.effects_applied if e.get("type") == "knockback"]
+        assert len(knockback_effects) == 1
+        assert knockback_effects[0]["spaces_requested"] == 3
+        assert knockback_effects[0]["spaces_moved"] == 2  # Blocked after 2 spaces
+        assert knockback_effects[0]["blocked"] is True
+        assert knockback_effects[0].get("collision_prone") is True
+
+        # Target should be at (3, 0) - one space before blocker
+        defender_after = next(
+            c for c in updated_scenario.combatants if c.id == "defender"
+        )
+        assert defender_after.position.coord.q == 3
+        assert defender_after.position.coord.r == 0
+        assert "prone" in defender_after.statuses
+
+
 class TestAreaAttackResolution:
     """Tests for AoE targeting from weapon ranges."""
 
@@ -2156,6 +2455,242 @@ class TestAreaAttackResolution:
 
         assert any(effect["target_id"] == "target_in" for effect in result.effects_applied)
         assert not any(effect["target_id"] == "target_off" for effect in result.effects_applied)
+
+
+# =============================================================================
+# Blast Origin Validation Tests (PR2 3993-3994)
+# =============================================================================
+
+
+class TestBlastOriginValidation:
+    """Tests for blast origin range and LOS validation (PR2 3993-3994).
+
+    Per PR2 3993-3994: Blast is drawn from a point in range AND line of sight.
+    """
+
+    def test_blast_within_range_succeeds(self):
+        """Blast origin within weapon range should succeed."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=5, r=0)),
+            hp_current=10,
+            hp_max=10,
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # Howitzer has range 20, blast 2 - blast origin at distance 5 is in range
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="howitzer",
+            target_position=HexPosition(coord=HexCoord(q=5, r=0)),
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=15,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+    def test_blast_out_of_range_fails(self):
+        """Blast origin beyond weapon range should fail."""
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=25, r=0)),
+            hp_current=10,
+            hp_max=10,
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # Howitzer has range 20 - blast origin at distance 25 is out of range
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="howitzer",
+            target_position=HexPosition(coord=HexCoord(q=25, r=0)),
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "out of range" in result.error.lower()
+
+    def test_blast_blocked_los_fails(self):
+        """Blast origin with blocked LOS should fail (for non-arcing weapons)."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=5, r=0)),
+            hp_current=10,
+            hp_max=10,
+        )
+        # Terrain at (2,0) blocks LOS
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=2, r=0), blocks_line_of_sight=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[attacker, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # missile_rack has blast but NO arcing/seeking - LOS should block
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="missile_rack",
+            target_position=HexPosition(coord=HexCoord(q=5, r=0)),
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "line of sight" in result.error.lower()
+
+    def test_blast_arcing_bypasses_los(self):
+        """Blast with arcing tag should bypass LOS check."""
+        from unittest.mock import patch
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=5, r=0)),
+            hp_current=10,
+            hp_max=10,
+        )
+        # Terrain blocks LOS
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=2, r=0), blocks_line_of_sight=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[attacker, target],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # mortar has arcing tag - should bypass LOS
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="mortar",
+            target_position=HexPosition(coord=HexCoord(q=5, r=0)),
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=15,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is True
+
+    def test_blast_on_target_position_validated(self):
+        """Blast using target's position still validates range."""
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        # Target at distance 12, missile_rack only has range 10
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=12, r=0)),
+            hp_current=10,
+            hp_max=10,
+        )
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        # missile_rack has range 10, blast 1 - using target_ids places blast at target
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="missile_rack",
+            target_ids=["target"],  # No target_position, uses target's position
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert "out of range" in result.error.lower()
 
 
 # =============================================================================
@@ -3741,6 +4276,64 @@ class TestMovementPositionUpdates:
         updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
         assert updated_actor.position.coord.q == 6
 
+    def test_boost_with_difficult_terrain_costs_double(self):
+        """Boost through difficult terrain costs 2 per space against 2x speed budget."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+
+        # Create terrain with difficult terrain at (1,0), (2,0), (3,0), (4,0)
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=1, r=0), difficult=True),
+            TerrainHex(coord=HexCoord(q=2, r=0), difficult=True),
+            TerrainHex(coord=HexCoord(q=3, r=0), difficult=True),
+            TerrainHex(coord=HexCoord(q=4, r=0), difficult=True),
+        ])
+
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        # Speed 4 actor, boost allows 8 total movement cost
+        # 4 difficult terrain spaces = 4 * 2 = 8 cost (exactly at limit)
+        movement_path = [
+            HexPosition(coord=HexCoord(q=1, r=0), elevation=0),  # Difficult (cost 2)
+            HexPosition(coord=HexCoord(q=2, r=0), elevation=0),  # Difficult (cost 2)
+            HexPosition(coord=HexCoord(q=3, r=0), elevation=0),  # Difficult (cost 2)
+            HexPosition(coord=HexCoord(q=4, r=0), elevation=0),  # Difficult (cost 2)
+        ]
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="boost",
+            action_type="quick",
+            movement_path=movement_path,
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        move_effect = next(e for e in result.effects_applied if e.get("type") == "movement")
+        assert move_effect["success"] is True
+        # Cost should be 8 (4 difficult spaces * 2 each)
+        assert move_effect["cost"] == 8
+
+        # Actor should be at final position
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert updated_actor.position.coord.q == 4
+
     def test_dangerous_terrain_triggers_check(self):
         """Moving through dangerous terrain should trigger engineering check."""
         from core.shared.terrain import TerrainMap, TerrainHex
@@ -5187,7 +5780,13 @@ class TestDamageModifiers:
         assert updated_target.resources.hp_current == 50 - 6
 
     def test_exposed_stacks_with_critical(self):
-        """Critical hit + exposed should result in 4x damage."""
+        """Critical hit + exposed should apply both effects.
+
+        Per PR2 3965-3969: Critical = roll dice twice, pick highest N.
+        Exposed = 2x damage multiplier.
+
+        These stack: crit picks best roll, then exposed doubles.
+        """
         from unittest.mock import patch
 
         actor = make_combatant(
@@ -5214,9 +5813,10 @@ class TestDamageModifiers:
             weapon_id="assault_rifle",  # 1d6 damage
         )
 
-        # Force critical hit (roll 20), and fixed damage (roll 3 on d6)
+        # Force critical hit (roll 20), and fixed damage rolls
+        # For 1d6 crit: roll 2d6 [3, 5], pick highest 1 = 5
         with patch("core.shared.rolls._roll_d20", return_value=20), \
-             patch("core.mech.combat_helpers.random.randint", return_value=3):
+             patch("core.mech.combat_helpers.random.randint", side_effect=[3, 5]):
             updated_scenario, _, _, result = execute_action(
                 scenario, turn, economy, action_input
             )
@@ -5231,11 +5831,121 @@ class TestDamageModifiers:
         )
         assert exposed_effect is not None
 
-        # Verify damage was quadrupled: 3 * 2 (crit) * 2 (exposed) = 12
+        # Verify damage: crit picks highest = 5, then exposed 2x = 10
         updated_target = next(
             c for c in updated_scenario.combatants if c.id == "target_1"
         )
-        assert updated_target.resources.hp_current == 50 - 12
+        assert updated_target.resources.hp_current == 50 - 10
+
+    def test_critical_damage_picks_highest_dice(self):
+        """Critical hit should roll dice twice and pick highest N.
+
+        Per PR2 3965-3969: "Roll all damage dice twice and choose the highest
+        dice among all dice rolled... For example, if you rolled an attack that
+        dealt 2d6 damage, you would roll 4d6 and pick the highest 2d6."
+        """
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=0,  # No grit bonus to simplify damage calculation
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target_1",
+            hp_max=50,
+            hp_current=50,
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="anti_material_rifle",  # 2d6 damage, no area effect
+        )
+
+        # Force critical hit (roll 20)
+        # For 2d6 crit: roll 4d6 [2, 3, 5, 4], pick highest 2 = [5, 4] = 9
+        # Extra values provided for any accuracy dice rolls from weapon tags
+        with patch("core.shared.rolls._roll_d20", return_value=20), \
+             patch("core.mech.combat_helpers.random.randint", side_effect=[2, 3, 5, 4, 6, 6, 6, 6]):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        assert attack_effect["critical"] is True
+
+        # Crit damage: roll 4d6 [2, 3, 5, 4], pick highest 2 = [5, 4] = 9, +2 bonus = 11
+        # Key test: with old 2x mechanic: [2, 3] = 5 * 2 = 10 (less than 11 actually)
+        # But the important part is highest dice are selected, not first dice doubled
+        assert result.damage_dealt == 11
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert updated_target.resources.hp_current == 50 - 11
+
+    def test_critical_flat_damage_not_doubled(self):
+        """Critical hit should not affect flat damage bonuses.
+
+        Per PR2 3965-3969, only dice are rolled twice. Flat bonuses (like
+        dice modifiers or flat damage) are added once after dice selection.
+        """
+        from unittest.mock import patch
+
+        actor = make_combatant(
+            id="actor_1",
+            grit=0,  # No grit bonus to simplify damage calculation
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        target = make_combatant(
+            id="target_1",
+            hp_max=50,
+            hp_current=50,
+            position=HexPosition(coord=HexCoord(q=1, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor, target])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target_1"],
+            weapon_id="heavy_machine_gun",  # 2d6+4 kinetic damage, no area effect
+        )
+
+        # Force critical hit (roll 20)
+        # For 2d6+4 crit: roll 4d6 [2, 3, 5, 4], pick highest 2 = [5, 4] = 9, then +4 = 13
+        # (With old 2x mechanic this would have been [2, 3] + 4 = 9 * 2 = 18)
+        # Extra values provided for any accuracy dice rolls from weapon tags
+        with patch("core.shared.rolls._roll_d20", return_value=20), \
+             patch("core.mech.combat_helpers.random.randint", side_effect=[2, 3, 5, 4, 6, 6, 6, 6]):
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+        attack_effect = next(e for e in result.effects_applied if e.get("type") == "attack")
+        assert attack_effect["critical"] is True
+
+        # Crit damage: roll 4d6 [2, 3, 5, 4], pick [5, 4] = 9, + modifier 4 = 13, +2 bonus = 15
+        # Key test: old 2x mechanic would give ([2, 3] + 4) * 2 = 18, now we get 15
+        # This proves the +4 modifier was NOT doubled
+        assert result.damage_dealt == 15
+
+        updated_target = next(
+            c for c in updated_scenario.combatants if c.id == "target_1"
+        )
+        assert updated_target.resources.hp_current == 50 - 15
 
     def test_shredded_ignores_armor(self):
         """Shredded status should bypass all armor."""
@@ -9370,3 +10080,433 @@ class TestFallingResolution:
         assert "falling" not in actor.statuses
         assert actor.flying_status is not None
         assert actor.flying_status.is_flying is False
+
+
+# =============================================================================
+# Grapple Turn Sequencing Tests (Phase 59)
+# =============================================================================
+
+
+class TestGrappleTurnSequencing:
+    """Tests for grapple turn sequencing mechanics per PR2 4164-4175."""
+
+    def test_boost_unavailable_when_grappled_as_target(self):
+        """Test boost is unavailable when grappled as defender."""
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+        economy = ActionEconomyState()
+
+        result = get_available_actions(scenario, "target_1", economy)
+
+        boost_action = next(a for a in result.quick_actions if a.action_id == "boost")
+        assert boost_action.is_available is False
+        assert boost_action.unavailable_reason == "Cannot boost while grappled"
+
+    def test_boost_unavailable_when_grappling_as_attacker(self):
+        """Test boost is unavailable when grappling as attacker."""
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+        economy = ActionEconomyState()
+
+        result = get_available_actions(scenario, "grappler_1", economy)
+
+        boost_action = next(a for a in result.quick_actions if a.action_id == "boost")
+        assert boost_action.is_available is False
+        assert boost_action.unavailable_reason == "Cannot boost while grappled"
+
+    def test_reactions_unavailable_when_grappled(self):
+        """Test brace and overwatch are unavailable when grappled."""
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+        economy = ActionEconomyState()
+
+        result = get_available_actions(scenario, "target_1", economy)
+
+        brace = next(a for a in result.reactions if a.action_id == "brace")
+        overwatch = next(a for a in result.reactions if a.action_id == "overwatch")
+
+        assert brace.is_available is False
+        assert brace.unavailable_reason == "Cannot react while grappled"
+        assert overwatch.is_available is False
+        assert overwatch.unavailable_reason == "Cannot react while grappled"
+
+    def test_execute_reaction_blocked_when_grappled(self):
+        """Test execute_reaction returns error when reactor is grappled."""
+        from core.mech.combat_execution import execute_reaction, ReactionInput
+
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+        economy = ActionEconomyState()
+
+        reaction_input = ReactionInput(
+            reactor_id="target_1",
+            reaction_type="brace",
+        )
+
+        updated_scenario, updated_economy, result = execute_reaction(
+            scenario, economy, reaction_input
+        )
+
+        assert result.success is False
+        assert "Cannot take reactions while grappled" in result.error
+
+    def test_escape_grapple_available_for_defender(self):
+        """Test escape_grapple action is available for grapple defender."""
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+        economy = ActionEconomyState()
+
+        result = get_available_actions(scenario, "target_1", economy)
+
+        escape_action = next(
+            (a for a in result.quick_actions if a.action_id == "escape_grapple"),
+            None,
+        )
+        assert escape_action is not None
+        assert escape_action.is_available is True
+
+    def test_escape_grapple_not_available_for_attacker(self):
+        """Test escape_grapple action is NOT available for grapple attacker."""
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+        economy = ActionEconomyState()
+
+        result = get_available_actions(scenario, "grappler_1", economy)
+
+        escape_action = next(
+            (a for a in result.quick_actions if a.action_id == "escape_grapple"),
+            None,
+        )
+        # Should not have escape_grapple as attacker
+        assert escape_action is None
+
+    def test_escape_grapple_success_removes_grapple(self):
+        """Test successful escape grapple removes the grapple link."""
+        from unittest.mock import patch
+        from core.mech.combat_execution import execute_action, ActionExecutionInput
+
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=5,  # Higher HULL bonus
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            grit=0,  # Lower HULL bonus
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="target_1")])
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+            rounds=[round1],
+        )
+        economy = ActionEconomyState()
+        turn = make_turn(actor_id="target_1")
+
+        action_input = ActionExecutionInput(
+            actor_id="target_1",
+            action_id="escape_grapple",
+            action_type="quick",
+        )
+
+        # Mock the contest to ensure defender wins (target has higher grit)
+        with patch("core.shared.grapple.contest_grapple_check") as mock_contest:
+            mock_contest.return_value = ("target", 15)  # defender wins
+
+            updated_scenario, updated_turn, updated_economy, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success is True
+        assert len(updated_scenario.grapples) == 0
+
+        # Check effect was recorded
+        escape_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "escape_grapple"),
+            None,
+        )
+        assert escape_effect is not None
+        assert escape_effect["success"] is True
+
+    def test_escape_grapple_failure_keeps_grapple(self):
+        """Test failed escape grapple keeps the grapple link."""
+        from unittest.mock import patch
+        from core.mech.combat_execution import execute_action, ActionExecutionInput
+
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=0,  # Lower HULL bonus
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            grit=5,  # Higher HULL bonus
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="target_1")])
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+            rounds=[round1],
+        )
+        economy = ActionEconomyState()
+        turn = make_turn(actor_id="target_1")
+
+        action_input = ActionExecutionInput(
+            actor_id="target_1",
+            action_id="escape_grapple",
+            action_type="quick",
+        )
+
+        # Mock the contest to ensure attacker wins
+        with patch("core.shared.grapple.contest_grapple_check") as mock_contest:
+            mock_contest.return_value = ("attacker", 10)  # attacker wins
+
+            updated_scenario, updated_turn, updated_economy, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success is True
+        # Grapple should still be there
+        assert len(updated_scenario.grapples) == 1
+
+        # Check effect was recorded
+        escape_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "escape_grapple"),
+            None,
+        )
+        assert escape_effect is not None
+        assert escape_effect["success"] is False
+
+    def test_end_grapple_available_for_attacker(self):
+        """Test end_grapple action is available for grapple attacker."""
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+        economy = ActionEconomyState()
+
+        result = get_available_actions(scenario, "grappler_1", economy)
+
+        end_action = next(
+            (a for a in result.free_actions if a.action_id == "end_grapple"),
+            None,
+        )
+        assert end_action is not None
+        assert end_action.is_available is True
+
+    def test_end_grapple_not_available_for_defender(self):
+        """Test end_grapple action is NOT available for grapple defender."""
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+        economy = ActionEconomyState()
+
+        result = get_available_actions(scenario, "target_1", economy)
+
+        end_action = next(
+            (a for a in result.free_actions if a.action_id == "end_grapple"),
+            None,
+        )
+        # Should not have end_grapple as defender
+        assert end_action is None
+
+    def test_end_grapple_removes_grapple(self):
+        """Test end_grapple action removes the grapple link."""
+        from core.mech.combat_execution import execute_action, ActionExecutionInput
+
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="grappler_1")])
+        scenario = MechCombatScenario(
+            combatants=[target, grappler],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+            rounds=[round1],
+        )
+        economy = ActionEconomyState()
+        turn = make_turn(actor_id="grappler_1")
+
+        action_input = ActionExecutionInput(
+            actor_id="grappler_1",
+            action_id="end_grapple",
+            action_type="free",
+        )
+
+        updated_scenario, updated_turn, updated_economy, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success is True
+        assert len(updated_scenario.grapples) == 0
+
+        # Check effect was recorded
+        end_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "end_grapple"),
+            None,
+        )
+        assert end_effect is not None
+        assert end_effect["target_id"] == "target_1"
+
+    def test_movement_breaking_adjacency_ends_grapple(self):
+        """Test movement that breaks adjacency automatically ends grapple."""
+        from core.mech.combat_helpers import _check_and_break_grapples_on_movement
+
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),  # Adjacent
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+
+        # Move grappler away (non-adjacent position)
+        new_position = HexCoord(q=5, r=5)
+
+        updated_scenario, effects = _check_and_break_grapples_on_movement(
+            scenario, "grappler_1", new_position
+        )
+
+        assert len(updated_scenario.grapples) == 0
+
+        grapple_broken = next(
+            (e for e in effects if e.get("type") == "grapple_broken"),
+            None,
+        )
+        assert grapple_broken is not None
+        assert grapple_broken["reason"] == "adjacency_lost"
+
+    def test_movement_maintaining_adjacency_keeps_grapple(self):
+        """Test movement that maintains adjacency keeps the grapple."""
+        from core.mech.combat_helpers import _check_and_break_grapples_on_movement
+
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),  # Adjacent
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+
+        # Move grappler to another adjacent position (still adjacent to target at (1,0))
+        new_position = HexCoord(q=1, r=-1)  # Still adjacent to (1,0)
+
+        updated_scenario, effects = _check_and_break_grapples_on_movement(
+            scenario, "grappler_1", new_position
+        )
+
+        # Grapple should remain
+        assert len(updated_scenario.grapples) == 1
+
+        # No grapple_broken effect
+        grapple_broken = next(
+            (e for e in effects if e.get("type") == "grapple_broken"),
+            None,
+        )
+        assert grapple_broken is None

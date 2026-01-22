@@ -47,6 +47,7 @@ from core.mech.combat_helpers import (
     _extract_tag_value,
     _extract_area_pattern,
     _roll_weapon_damage_components,
+    _roll_weapon_damage_components_critical,
     _get_primary_damage_type,
     _build_damage_context,
     _collect_damage_resistances,
@@ -63,6 +64,7 @@ from core.mech.combat_helpers import (
     _check_invisibility_miss,
     _get_cover_modifier,
     _validate_attack_range_and_los,
+    _validate_blast_origin,
     _is_melee_weapon,
     _get_thrown_range,
     _has_weapon_tag,
@@ -99,6 +101,7 @@ from core.mech.combat_state import (
     ActionLogEffect,
     ActionUse,
     OverchargeState,
+    GrappleLink,
 )
 from core.mech.action_economy import (
     ActionEconomyState,
@@ -1024,6 +1027,20 @@ def execute_action(
                     )
                     if target is not None:
                         area_origin = target.position
+                # Validate blast origin is in range and LOS (PR2 3993-3994)
+                if area_origin is not None:
+                    valid, error = _validate_blast_origin(
+                        scenario=scenario,
+                        attacker=actor,
+                        blast_origin=area_origin,
+                        weapon_id=action_input.weapon_id,
+                        profile_id=action_input.weapon_profile_id,
+                    )
+                    if not valid:
+                        return scenario, current_turn, economy, ActionExecutionResult(
+                            success=False,
+                            error=f"Blast attack failed: {error}",
+                        )
             else:
                 area_origin = actor.position
 
@@ -1355,20 +1372,28 @@ def execute_action(
 
             if attack_result.hit:
                 if single_damage_roll:
-                    base_components = list(shared_damage_components)
+                    # For multi-target: use shared roll for non-crits
+                    # If this specific target was crit, re-roll with crit mechanics
+                    if attack_result.is_critical:
+                        base_components, overkill_heat = _roll_weapon_damage_components_critical(
+                            weapon_profile,
+                            is_critical=True,
+                            apply_overkill=has_overkill,
+                        )
+                        self_overkill_heat += overkill_heat
+                    else:
+                        base_components = list(shared_damage_components)
                 else:
-                    base_components, overkill_heat = _roll_weapon_damage_components(
+                    # Per PR2 3965-3969: critical = roll dice twice, pick highest
+                    base_components, overkill_heat = _roll_weapon_damage_components_critical(
                         weapon_profile,
+                        is_critical=attack_result.is_critical,
                         apply_overkill=has_overkill,
                     )
                     self_overkill_heat += overkill_heat
 
-                scaled_components: list[tuple[str, int]] = []
-                for damage_type, amount in base_components:
-                    scaled = amount
-                    if attack_result.is_critical:
-                        scaled *= 2
-                    scaled_components.append((damage_type, scaled))
+                # No more crit doubling needed - handled by roll function
+                scaled_components: list[tuple[str, int]] = list(base_components)
 
                 if "exposed" in current_target.statuses:
                     effects_applied.append({
@@ -1869,6 +1894,99 @@ def execute_action(
             if any(e.get("search_success") for e in search_effects):
                 scenario = _remove_status_from_target(scenario, target_id, "hidden")
 
+    # Handle Escape Grapple action (PR2 4172-4173: defender can escape via contested HULL)
+    if action_input.action_id == "escape_grapple":
+        from core.shared.grapple import contest_grapple_check
+
+        # Find the grapple where actor is the defender
+        grapple = next(
+            (g for g in scenario.grapples if g.target_id == actor.id),
+            None,
+        )
+        if grapple is None:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Not currently grappled as defender",
+            )
+
+        # Find the grappler (opponent)
+        grappler = next(
+            (c for c in scenario.combatants if c.id == grapple.grappler_id),
+            None,
+        )
+        if grappler is None:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Grappler not found",
+            )
+
+        # Get HULL bonuses (grit represents HULL skill in combat context)
+        defender_hull = actor.stats.grit if actor.stats else 0
+        attacker_hull = grappler.stats.grit if grappler.stats else 0
+
+        # Contested HULL check
+        winner, roll = contest_grapple_check(attacker_hull, defender_hull)
+
+        if winner == "target":  # defender wins
+            # Remove grapple from scenario
+            updated_grapples = [g for g in scenario.grapples if g.target_id != actor.id]
+            scenario = MechCombatScenario(
+                combatants=list(scenario.combatants),
+                grapples=updated_grapples,
+                rounds=list(scenario.rounds),
+                terrain=scenario.terrain,
+                environment=scenario.environment,
+                deployables=dict(scenario.deployables),
+                sitrep_resolution=scenario.sitrep_resolution,
+                pending_decisions=list(scenario.pending_decisions),
+            )
+            effects_applied.append({
+                "type": "escape_grapple",
+                "success": True,
+                "roll": roll,
+                "winner": "defender",
+                "grappler_id": grapple.grappler_id,
+            })
+        else:
+            # Escape failed, grapple remains
+            effects_applied.append({
+                "type": "escape_grapple",
+                "success": False,
+                "roll": roll,
+                "winner": "attacker" if winner == "attacker" else "tie",
+                "grappler_id": grapple.grappler_id,
+            })
+
+    # Handle End Grapple action (PR2 4172: attacker can end grapple as free action)
+    if action_input.action_id == "end_grapple":
+        # Find the grapple where actor is the attacker
+        grapple = next(
+            (g for g in scenario.grapples if g.grappler_id == actor.id),
+            None,
+        )
+        if grapple is None:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error="Not currently grappling as attacker",
+            )
+
+        # Remove grapple from scenario
+        updated_grapples = [g for g in scenario.grapples if g.grappler_id != actor.id]
+        scenario = MechCombatScenario(
+            combatants=list(scenario.combatants),
+            grapples=updated_grapples,
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
+        )
+        effects_applied.append({
+            "type": "end_grapple",
+            "target_id": grapple.target_id,
+        })
+
     # Handle overcharge heat
     if action_input.is_overcharge and actor.overcharge_state is not None:
         from core.mech.combat_resolution import use_overcharge as apply_overcharge
@@ -2144,6 +2262,17 @@ def execute_reaction(
             error=f"Reactor {reaction_input.reactor_id} not found",
         )
 
+    # Block reactions while grappled (PR2 4170)
+    is_reactor_grappled = any(
+        g.grappler_id == reaction_input.reactor_id or g.target_id == reaction_input.reactor_id
+        for g in scenario.grapples
+    )
+    if is_reactor_grappled:
+        return scenario, economy, ReactionResult(
+            success=False,
+            error="Cannot take reactions while grappled",
+        )
+
     # Block ordnance weapons from overwatch (PR2 5035-5037)
     if reaction_input.reaction_type == "overwatch" and reaction_input.weapon_id:
         has_ordnance = _has_weapon_tag(
@@ -2414,6 +2543,14 @@ def get_available_actions(
             can_overcharge=False,
         )
 
+    # Check grapple status for the actor (PR2 4170: neither party can boost or take reactions)
+    is_in_grapple = any(
+        g.grappler_id == actor_id or g.target_id == actor_id
+        for g in scenario.grapples
+    )
+    is_grapple_attacker = any(g.grappler_id == actor_id for g in scenario.grapples)
+    is_grapple_defender = any(g.target_id == actor_id for g in scenario.grapples)
+
     # Check economy for each action type
     can_full = economy.full_actions_remaining > 0
     can_quick = economy.quick_actions_remaining > 0
@@ -2489,7 +2626,8 @@ def get_available_actions(
                 action_id="boost",
                 action_name="Boost",
                 action_type="quick",
-                is_available=True,
+                is_available=not is_in_grapple,
+                unavailable_reason="Cannot boost while grappled" if is_in_grapple else None,
                 requires_path=True,
             ),
             AvailableAction(
@@ -2575,6 +2713,18 @@ def get_available_actions(
             ),
         ])
 
+    # Add escape grapple action for defender (PR2 4172-4173: quick action contested HULL)
+    if is_grapple_defender:
+        escape_available = can_quick
+        escape_reason = None if can_quick else "No quick actions remaining"
+        quick_actions.append(AvailableAction(
+            action_id="escape_grapple",
+            action_name="Escape Grapple",
+            action_type="quick",
+            is_available=escape_available,
+            unavailable_reason=escape_reason,
+        ))
+
     # Free actions (always available)
     free_actions: list[AvailableAction] = [
         AvailableAction(
@@ -2599,21 +2749,40 @@ def get_available_actions(
         ),
     ]
 
-    # Reactions
+    # Add end grapple action for attacker (PR2 4172: free action to end grapple)
+    if is_grapple_attacker:
+        free_actions.append(AvailableAction(
+            action_id="end_grapple",
+            action_name="End Grapple",
+            action_type="free",
+            is_available=True,
+        ))
+
+    # Reactions (PR2 4170: cannot take reactions while grappled)
+    brace_available = can_react and actor.per_round_reactions.get("brace", 0) < 1 and not is_in_grapple
+    overwatch_available = can_react and actor.per_round_reactions.get("overwatch", 0) < 1 and not is_in_grapple
+    brace_reason = (
+        "Cannot react while grappled" if is_in_grapple
+        else None if can_react else "No reactions remaining this turn"
+    )
+    overwatch_reason = (
+        "Cannot react while grappled" if is_in_grapple
+        else None if can_react else "No reactions remaining this turn"
+    )
     reactions: list[AvailableAction] = [
         AvailableAction(
             action_id="brace",
             action_name="Brace",
             action_type="reaction",
-            is_available=can_react and actor.per_round_reactions.get("brace", 0) < 1,
-            unavailable_reason=None if can_react else "No reactions remaining this turn",
+            is_available=brace_available,
+            unavailable_reason=brace_reason,
         ),
         AvailableAction(
             action_id="overwatch",
             action_name="Overwatch",
             action_type="reaction",
-            is_available=can_react and actor.per_round_reactions.get("overwatch", 0) < 1,
-            unavailable_reason=None if can_react else "No reactions remaining this turn",
+            is_available=overwatch_available,
+            unavailable_reason=overwatch_reason,
             requires_target=True,
             requires_weapon=True,
         ),

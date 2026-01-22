@@ -31,7 +31,7 @@ from core.shared.enums import (
     SaveType,
     StatusType,
 )
-from core.shared.dice import roll_dice, round_up
+from core.shared.dice import roll_dice, round_up, DiceExpression
 from core.shared.rolls import (
     AttackResolutionResult,
     resolve_attack,
@@ -285,9 +285,25 @@ def calculate_critical_damage(
     is_critical: bool,
     force_rolls: list[int] | None = None,
 ) -> CriticalDamageResult:
-    """Calculate damage with critical hit doubling (PR2 3965-3969)."""
+    """Calculate damage with critical hit 'roll twice, pick highest' (PR2 3965-3969).
+
+    Per PR2 3965-3969: On critical, roll all damage dice twice and pick the
+    highest N dice from the 2N rolls. Flat bonus damage is added once after
+    dice selection.
+
+    Args:
+        base_damage: Number of d6 damage dice
+        bonus_damage: Flat bonus damage (NOT doubled on crit)
+        is_critical: Whether this is a critical hit
+        force_rolls: Optional forced dice rolls for testing
+
+    Returns:
+        CriticalDamageResult with roll details
+    """
+    dice_expr = DiceExpression(count=base_damage, size=6)
+
     if not is_critical:
-        rolled_once = force_rolls if force_rolls else [roll_dice(f"{base_damage}d6")]
+        rolled_once = force_rolls if force_rolls else dice_expr.roll()
         total = sum(rolled_once) + bonus_damage
         return CriticalDamageResult(
             base_damage=base_damage,
@@ -297,12 +313,13 @@ def calculate_critical_damage(
             is_critical=False,
         )
 
+    # Critical hit: roll 2N dice, pick highest N
     if force_rolls:
         rolled_once = list(force_rolls[:base_damage])
         rolled_again = list(force_rolls[base_damage : base_damage * 2])
     else:
-        rolled_once = [roll_dice(f"{base_damage}d6")]
-        rolled_again = [roll_dice(f"{base_damage}d6")]
+        rolled_once = dice_expr.roll()
+        rolled_again = dice_expr.roll()
 
     all_rolls = rolled_once + rolled_again
     all_rolls.sort(reverse=True)

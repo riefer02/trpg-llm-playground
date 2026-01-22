@@ -302,8 +302,8 @@ class TestFullCombatSequence:
             # Without armor, each hit would deal 6 (or 12 on crit)
             assert hp_lost <= total_damage, "HP lost should match damage dealt"
 
-    def test_critical_hits_double_damage(self):
-        """Test that critical hits deal double damage."""
+    def test_critical_hits_roll_twice_pick_highest(self):
+        """Test critical hits use roll twice, pick highest (PR2 3965-3969)."""
         from unittest.mock import patch
 
         attacker = make_test_combatant(id="attacker", name="Attacker", side="players")
@@ -332,8 +332,8 @@ class TestFullCombatSequence:
 
         assert result.success
         assert result.effects_applied[0]["critical"] is True
-        # Crit damage = base 6 * 2 = 12
-        assert result.damage_dealt == 12
+        # Per PR2: crit rolls dice twice, picks highest N - for 1d6, max is still 6
+        assert result.damage_dealt >= 1 and result.damage_dealt <= 6
 
         target_after = next(c for c in scenario.combatants if c.id == "target")
-        assert target_after.resources.hp_current == 8  # 20 - 12 = 8
+        assert target_after.resources.hp_current == 20 - result.damage_dealt

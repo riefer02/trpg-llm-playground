@@ -904,7 +904,7 @@ class TestSharedModulesTypedIds:
 
         params = InvadeTechParams(
             target_id="c_enemy_1",
-            attacker_systems=5,
+            tech_attack_bonus=5,
             target_e_defense=8,
         )
         assert params.target_id == "c_enemy_1"

@@ -7,7 +7,8 @@ These are internal functions used by combat_execution.py.
 from __future__ import annotations
 
 import random
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
 
 from core.shared.enums import StatusType, DamageType, AttackType
 from core.shared.dice import roll_dice, round_up
@@ -580,6 +581,63 @@ def _validate_attack_range_and_los(
     return (True, None)
 
 
+def _validate_blast_origin(
+    scenario: MechCombatScenario,
+    attacker: CombatantState,
+    blast_origin: HexPosition,
+    weapon_id: str | None,
+    profile_id: str | None = None,
+) -> tuple[bool, str | None]:
+    """Validate blast origin is within weapon range and line of sight.
+
+    Per PR2 3993-3994: Blast is drawn from a point in range AND line of sight.
+
+    Args:
+        scenario: Current combat scenario
+        attacker: The attacking combatant
+        blast_origin: The intended blast origin position
+        weapon_id: Weapon ID being used
+        profile_id: Optional weapon profile ID
+
+    Returns:
+        Tuple of (valid, error_message)
+    """
+    if attacker.position is None:
+        return (False, "Attacker has no position")
+
+    # Calculate distance to blast origin
+    distance = attacker.position.coord.distance_to(blast_origin.coord)
+
+    # Get weapon range
+    weapon_range = _get_weapon_range(weapon_id, is_melee=False, profile_id=profile_id)
+
+    # Check range
+    if distance > weapon_range:
+        return (False, f"Blast origin out of range ({distance} > {weapon_range})")
+
+    # Check for seeking/arcing tags that bypass LOS
+    has_seeking = _has_weapon_tag(weapon_id, "seeking", profile_id)
+    has_arcing = _has_weapon_tag(weapon_id, "arcing", profile_id)
+
+    # Check LOS to blast origin
+    los_request = LOSCheckRequest(
+        attacker_pos=attacker.position,
+        target_pos=blast_origin,
+        terrain=scenario.terrain,
+    )
+    los_result = check_line_of_sight(los_request)
+
+    if los_result.los_type == "blocked":
+        if has_seeking:
+            pass  # Seeking bypasses LOS
+        elif has_arcing:
+            pass  # Arcing bypasses LOS
+        else:
+            return (False, "No line of sight to blast origin")
+
+    return (True, None)
+
+
 def _roll_damage_with_overkill(
     damage_expr,
     apply_overkill: bool,
@@ -595,6 +653,41 @@ def _roll_damage_with_overkill(
                 roll = random.randint(1, damage_expr.size)
         rolls.append(roll)
     return rolls, overkill_heat
+
+
+def _roll_damage_dice_critical(
+    dice_expr,
+    is_critical: bool,
+    apply_overkill: bool,
+) -> tuple[list[int], int]:
+    """Roll damage dice with critical hit 'roll twice, pick highest' mechanic.
+
+    Per PR2 3965-3969: On critical, roll all dice twice and pick the highest N.
+
+    Args:
+        dice_expr: The dice expression (e.g., 2d6)
+        is_critical: Whether this is a critical hit
+        apply_overkill: Whether to apply overkill rerolls (reroll 1s, gain heat)
+
+    Returns:
+        Tuple of (selected_rolls, overkill_heat)
+    """
+    if not is_critical:
+        return _roll_damage_with_overkill(dice_expr, apply_overkill)
+
+    # Roll each die twice (total 2N dice)
+    first_rolls, first_heat = _roll_damage_with_overkill(dice_expr, apply_overkill)
+    second_rolls, second_heat = _roll_damage_with_overkill(dice_expr, apply_overkill)
+
+    # Combine and sort descending
+    all_rolls = first_rolls + second_rolls
+    all_rolls.sort(reverse=True)
+
+    # Pick highest N dice (where N = original dice count)
+    selected_rolls = all_rolls[: dice_expr.count]
+    total_heat = first_heat + second_heat
+
+    return selected_rolls, total_heat
 
 
 def _roll_weapon_damage(
@@ -644,6 +737,52 @@ def _roll_weapon_damage_components(
             )
             component_total += sum(rolls) + damage_component.dice.modifier
             overkill_heat += component_overkill
+        component_total += damage_component.flat
+        components.append((damage_component.damage_type, component_total))
+
+    if not components:
+        default_type = profile.damage_type or "kinetic"
+        components.append((default_type, 6))
+
+    return components, overkill_heat
+
+
+def _roll_weapon_damage_components_critical(
+    profile: WeaponProfile | None,
+    is_critical: bool,
+    apply_overkill: bool,
+) -> tuple[list[tuple[WeaponDamageType, int]], int]:
+    """Roll weapon damage per component with critical hit handling.
+
+    For crits: rolls each die twice, picks highest N from 2N rolls.
+    Flat bonuses and modifiers are NOT doubled (per PR2 3965-3969).
+
+    Args:
+        profile: The weapon profile to roll damage for
+        is_critical: Whether this is a critical hit
+        apply_overkill: Whether to apply overkill rerolls
+
+    Returns:
+        Tuple of (damage components, overkill_heat)
+    """
+    if profile is None:
+        return [("kinetic", 6)], 0
+
+    components: list[tuple[WeaponDamageType, int]] = []
+    overkill_heat = 0
+
+    for damage_component in profile.damage:
+        component_total = 0
+        if damage_component.dice is not None:
+            rolls, component_overkill = _roll_damage_dice_critical(
+                damage_component.dice,
+                is_critical,
+                apply_overkill,
+            )
+            # Sum selected dice + modifier (modifier NOT doubled)
+            component_total += sum(rolls) + damage_component.dice.modifier
+            overkill_heat += component_overkill
+        # Flat damage is NOT doubled on crit
         component_total += damage_component.flat
         components.append((damage_component.damage_type, component_total))
 
@@ -2106,6 +2245,63 @@ def _resolve_ram(
     return scenario, effects
 
 
+@dataclass
+class KnockbackCollisionEffects:
+    """Effects to apply from knockback collision.
+
+    Per PR2 8642: "If it collides with an obstacle or another mech,
+    it stops and is additionally knocked prone"
+    """
+
+    target_prone: bool = False
+    secondary_target_id: str | None = None
+    secondary_prone: bool = False
+
+
+def _resolve_knockback_collision(
+    scenario: MechCombatScenario,
+    obstruction_coord: HexCoord | None,
+    obstruction_type: Literal["unit", "terrain"] | None,
+) -> KnockbackCollisionEffects:
+    """Determine effects from knockback collision.
+
+    Per PR2 rules:
+    - Collision with obstacle/mech: target knocked prone (PR2 8642)
+    - Collision with another character: that character makes HULL save or prone (PR2 6521)
+      (Simplified: secondary always knocked prone for now)
+
+    Args:
+        scenario: Current combat scenario
+        obstruction_coord: Coordinate of obstruction if any
+        obstruction_type: Type of obstruction ("unit" or "terrain")
+
+    Returns:
+        KnockbackCollisionEffects with effects to apply
+    """
+    effects = KnockbackCollisionEffects()
+
+    if obstruction_coord is None or obstruction_type is None:
+        return effects
+
+    # Target is always knocked prone on collision (PR2 8642)
+    effects.target_prone = True
+
+    if obstruction_type == "unit":
+        # Find the unit at obstruction coord
+        secondary = next(
+            (c for c in scenario.combatants
+             if c.position and c.position.coord == obstruction_coord),
+            None
+        )
+        if secondary:
+            effects.secondary_target_id = str(secondary.id)
+            # Secondary must pass HULL save or be knocked prone (PR2 6521)
+            # Simplified: always apply prone for now (save logic can be added later)
+            effects.secondary_prone = True
+
+    return effects
+
+
 def _apply_knockback_on_hit(
     scenario: MechCombatScenario,
     attacker: CombatantState,
@@ -2179,6 +2375,30 @@ def _apply_knockback_on_hit(
         "final_position": {"q": final_position.q, "r": final_position.r},
         "blocked": result.obstructed,
     }
+
+    # Handle collision effects (PR2 8642, 6521)
+    if result.obstructed and result.obstruction_coord:
+        collision_effects = _resolve_knockback_collision(
+            scenario=scenario,
+            obstruction_coord=result.obstruction_coord,
+            obstruction_type=result.obstruction_type,
+        )
+
+        # Apply prone to knocked target
+        if collision_effects.target_prone:
+            scenario, added = _apply_statuses_to_target(
+                scenario, str(target.id), ["prone"]
+            )
+            if added:
+                effect["collision_prone"] = True
+
+        # Apply prone to secondary unit (if knocked into another combatant)
+        if collision_effects.secondary_target_id and collision_effects.secondary_prone:
+            scenario, added = _apply_statuses_to_target(
+                scenario, collision_effects.secondary_target_id, ["prone"]
+            )
+            if added:
+                effect["secondary_prone_target"] = collision_effects.secondary_target_id
 
     return scenario, effect
 
@@ -2621,6 +2841,80 @@ def _apply_engagement_status(
     return updated_scenario, effects
 
 
+def _check_and_break_grapples_on_movement(
+    scenario: MechCombatScenario,
+    mover_id: str,
+    new_position: HexCoord,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Check if movement breaks any grapples due to adjacency loss.
+
+    Per PR2 4175: Grapple breaks if parties become non-adjacent.
+
+    Args:
+        scenario: Current combat scenario
+        mover_id: ID of the combatant that moved
+        new_position: The new position of the mover
+
+    Returns:
+        Tuple of (updated scenario, effects list)
+    """
+    effects: list[dict] = []
+    grapples_to_remove: list[int] = []
+
+    for idx, grapple in enumerate(scenario.grapples):
+        # Check if the mover is part of this grapple
+        if grapple.grappler_id != mover_id and grapple.target_id != mover_id:
+            continue
+
+        # Find the other party in the grapple
+        other_id = grapple.target_id if grapple.grappler_id == mover_id else grapple.grappler_id
+        other = next((c for c in scenario.combatants if c.id == other_id), None)
+
+        if other is None or other.position is None:
+            continue
+
+        # Get sizes for adjacency check
+        mover = next((c for c in scenario.combatants if c.id == mover_id), None)
+        mover_size = mover.stats.size if mover and mover.stats else "size_1"
+        other_size = other.stats.size if other.stats else "size_1"
+
+        # Check if still adjacent
+        still_adjacent = is_adjacent_by_size(
+            new_position,
+            other.position.coord,
+            mover_size,
+            other_size,
+        )
+
+        if not still_adjacent:
+            grapples_to_remove.append(idx)
+            effects.append({
+                "type": "grapple_broken",
+                "reason": "adjacency_lost",
+                "grappler_id": grapple.grappler_id,
+                "target_id": grapple.target_id,
+                "mover_id": mover_id,
+            })
+
+    if grapples_to_remove:
+        updated_grapples = [
+            g for i, g in enumerate(scenario.grapples)
+            if i not in grapples_to_remove
+        ]
+        scenario = MechCombatScenario(
+            combatants=list(scenario.combatants),
+            grapples=updated_grapples,
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
+        )
+
+    return scenario, effects
+
+
 def _resolve_movement(
     scenario: MechCombatScenario,
     actor: CombatantState,
@@ -2848,6 +3142,14 @@ def _resolve_movement(
             sitrep_resolution=scenario.sitrep_resolution,
             pending_decisions=list(scenario.pending_decisions),
         )
+
+    # Check and break grapples if movement causes adjacency loss (PR2 4175)
+    scenario, grapple_break_effects = _check_and_break_grapples_on_movement(
+        scenario,
+        actor.id,
+        final_position.coord,
+    )
+    effects.extend(grapple_break_effects)
 
     # Apply engaged status to mover and adjacent hostiles after position update
     # Per PR2 3817: Moving adjacent to a hostile triggers engagement

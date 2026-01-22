@@ -187,8 +187,9 @@ class TestCombatWithForcedRolls:
         assert result.success
         assert_attack_crit(result)
 
-        # Crit should deal double damage (base 6 * 2 = 12)
-        assert result.damage_dealt == 12
+        # Per PR2 3965-3969: crit rolls dice twice, picks highest N
+        # For 1d6 damage, max is still 6
+        assert result.damage_dealt >= 1 and result.damage_dealt <= 6
 
 
 class TestArmorAndDamage:

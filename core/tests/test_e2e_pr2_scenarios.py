@@ -223,11 +223,12 @@ class TestPR2LeaderDicePool:
 class TestPR2CriticalHits:
     """Tests for critical hit mechanics based on PR2.
 
-    PR2: Natural 20 is always a critical hit, dealing double damage.
+    PR2 3965-3969: Natural 20 is always a critical hit. On crit, roll all
+    damage dice twice and pick the highest N.
     """
 
     def test_natural_20_critical(self):
-        """Natural 20 always crits and deals double damage."""
+        """Natural 20 always crits with roll-twice-pick-highest damage."""
         player = make_combatant(
             id="player_1",
             side="players",
@@ -252,8 +253,9 @@ class TestPR2CriticalHits:
         assert result.success
         assert_attack_crit(result)
 
-        # Should deal 12 damage (6 base * 2)
-        assert result.damage_dealt == 12
+        # Per PR2 3965-3969: crit rolls dice twice, picks highest N
+        # For 1d6 damage, max is still 6
+        assert result.damage_dealt >= 1 and result.damage_dealt <= 6
 
     def test_brutal_predator_natural_20(self):
         """BRUTAL Predator enhances natural 20 crits.
