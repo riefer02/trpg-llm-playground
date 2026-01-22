@@ -127,6 +127,7 @@ StatusType = Literal[
     "engaged",
     "burn",
     "unshackled",  # NHP has become unshackled per PR2 5081-5082
+    "falling",  # Falling from altitude, resolves at end of turn (PR2 flight rules)
 ]
 
 # Cover Types

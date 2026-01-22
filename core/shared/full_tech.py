@@ -72,7 +72,7 @@ class InvadeTechParams(FrozenModel):
     """Parameters for Invade action in Full Tech."""
 
     target_id: CombatantIdField
-    attacker_systems: int = Field(..., ge=0)
+    tech_attack_bonus: int = Field(..., description="The actor's tech attack bonus")
     target_e_defense: int = Field(..., ge=0)
     heat_on_hit: int = Field(default=2, ge=0)
 
@@ -227,7 +227,7 @@ def _resolve_first_tech(
         return resolve_invade(
             actor_id=actor_id,
             target_id=option.invade_params.target_id,
-            attacker_systems=option.invade_params.attacker_systems,
+            tech_attack_bonus=option.invade_params.tech_attack_bonus,
             target_e_defense=option.invade_params.target_e_defense,
             heat_on_hit=option.invade_params.heat_on_hit,
             settings=settings,
@@ -282,7 +282,7 @@ def _resolve_second_tech(
         return resolve_invade(
             actor_id=actor_id,
             target_id=option.invade_params.target_id,
-            attacker_systems=option.invade_params.attacker_systems,
+            tech_attack_bonus=option.invade_params.tech_attack_bonus,
             target_e_defense=option.invade_params.target_e_defense,
             heat_on_hit=option.invade_params.heat_on_hit,
             settings=settings,

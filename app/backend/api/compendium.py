@@ -16,6 +16,7 @@ from core.pilot.background import PILOT_BACKGROUNDS
 from core.pilot.skill import TRIGGER_DEFINITIONS
 from core.pilot.talent import EXAMPLE_TALENTS
 from core.pilot.gear import PILOT_GEAR_DEFINITIONS, PilotGearItemDefinition
+from core.pilot.license import ALL_LICENSES
 from core.mech.compendium import (
     ALL_FRAMES,
     ALL_WEAPONS,
@@ -24,6 +25,7 @@ from core.mech.compendium import (
 from core.mech.frame import MechFrameDefinition
 from core.mech.weapon import MechWeaponDefinition
 from core.mech.system import MechSystemDefinition
+from core.shared.enums import ManufacturerType
 
 router = APIRouter(prefix="/compendium", tags=["compendium"])
 
@@ -54,6 +56,15 @@ class TalentResponse(BaseModel):
     id: str
     name: str
     ranks: int = Field(default=3, description="Max ranks (always 3)")
+
+
+class LicenseResponse(BaseModel):
+    """License reference data for character creation."""
+
+    id: str
+    name: str
+    manufacturer: ManufacturerType
+    frame_id: str
 
 
 # =============================================================================
@@ -117,3 +128,23 @@ async def list_systems() -> ListResponse[MechSystemDefinition]:
 async def list_pilot_gear() -> ListResponse[PilotGearItemDefinition]:
     """List all pilot gear items in the compendium."""
     return ListResponse(items=PILOT_GEAR_DEFINITIONS, total=len(PILOT_GEAR_DEFINITIONS))
+
+
+@router.get("/licenses", response_model=ListResponse[LicenseResponse])
+async def list_licenses() -> ListResponse[LicenseResponse]:
+    """List all manufacturer licenses in the compendium.
+
+    Each license corresponds to a frame and unlocks equipment at ranks 1-3.
+    LL1+ pilots can allocate license points to access manufacturer-specific
+    frames, weapons, and systems.
+    """
+    items = [
+        LicenseResponse(
+            id=lic.id,
+            name=lic.name,
+            manufacturer=lic.manufacturer,
+            frame_id=lic.frame_id,
+        )
+        for lic in ALL_LICENSES
+    ]
+    return ListResponse(items=items, total=len(items))

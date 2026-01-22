@@ -78,6 +78,7 @@ from core.mech.combat_helpers import (
     _resolve_grapple,
     _resolve_search,
     _resolve_burn_tick,
+    _resolve_falling,
     _resolve_movement,
     _resolve_mount,
     _resolve_dismount,
@@ -340,6 +341,39 @@ def start_turn(
         new_overcharge_state = increment_overcharge_on_turn_start(updated_actor.overcharge_state)
         updated_actor = updated_actor.model_copy(update={"overcharge_state": new_overcharge_state})
 
+    # Check if flying actor should fall due to status (PR2 flight rules - Phase 52)
+    # Flying units fall if immobilized, stunned, or shutdown
+    started_falling = False
+    falling_from_altitude_value: int | None = None
+
+    if (
+        updated_actor.flying_status is not None
+        and updated_actor.flying_status.is_flying
+        and updated_actor.flying_status.altitude_level > 0
+    ):
+        from core.shared.flying import should_fall_from_flying
+
+        should_fall, _reason = should_fall_from_flying(
+            is_flying=True,
+            is_immobilized="immobilized" in updated_actor.statuses,
+            is_stunned="stunned" in updated_actor.statuses,
+            is_shutdown="shutdown" in updated_actor.statuses,
+        )
+
+        if should_fall:
+            started_falling = True
+            falling_from_altitude_value = updated_actor.flying_status.altitude_level
+
+            # Mark actor as falling - will resolve at end of turn
+            new_statuses = list(updated_actor.statuses)
+            if "falling" not in new_statuses:
+                new_statuses.append("falling")
+
+            updated_actor = updated_actor.model_copy(update={
+                "statuses": new_statuses,
+                "falling_from_altitude": falling_from_altitude_value,
+            })
+
     # Check for dangerous terrain at start of turn (PR2 3859-3860)
     # "A character only needs to make one check a round for dangerous terrain"
     dangerous_terrain_check_required = False
@@ -526,6 +560,8 @@ def start_turn(
         dangerous_terrain_auto_resolved=dangerous_terrain_auto_resolved,
         dangerous_terrain_check_passed=dangerous_terrain_check_passed,
         dangerous_terrain_damage=dangerous_terrain_damage,
+        started_falling=started_falling,
+        falling_from_altitude=falling_from_altitude_value,
     )
 
 
@@ -565,6 +601,9 @@ def end_turn(
     end_of_turn_effects: list[dict] = []
     cooldowns_decremented: list[str] = []
     burn_tick_result: BurnTickResult | None = None
+    fall_resolved = False
+    fall_damage = 0
+    fell_from_altitude: int | None = None
     updated_actor: CombatantState | None = actor
 
     if actor is not None:
@@ -592,6 +631,26 @@ def end_turn(
                     "damage_taken": burn_tick_result.damage_taken,
                     "burn_cleared": burn_tick_result.burn_cleared,
                 })
+
+        # Resolve falling at end of turn (PR2 flight rules - Phase 52)
+        if "falling" in updated_actor.statuses and updated_actor.falling_from_altitude is not None:
+            fell_from_altitude = updated_actor.falling_from_altitude
+            scenario, falling_effects = _resolve_falling(scenario, updated_actor)
+            end_of_turn_effects.extend(falling_effects)
+            fall_resolved = True
+
+            # Extract fall damage from effects
+            for effect in falling_effects:
+                if effect.get("type") == "falling_damage":
+                    fall_damage = effect.get("damage", 0)
+                    break
+
+            # Re-fetch updated actor from scenario
+            for i, c in enumerate(scenario.combatants):
+                if c.id == actor_id:
+                    updated_actor = c
+                    actor_index = i
+                    break
 
         # Decrement cooldowns on turn end
         if updated_actor.cooldown_states:
@@ -728,6 +787,9 @@ def end_turn(
         cooldowns_decremented=cooldowns_decremented,
         burn_tick_result=burn_tick_result,
         drones_primed=drones_primed,
+        fall_resolved=fall_resolved,
+        fall_damage=fall_damage,
+        fell_from_altitude=fell_from_altitude,
     )
 
     return updated_scenario, result, next_round, next_turn_index
@@ -1665,7 +1727,7 @@ def execute_action(
                 tech_result = resolve_invade(
                     actor_id=actor.id,
                     target_id=target_id,
-                    attacker_systems=actor.stats.tech_attack if actor.stats else 0,
+                    tech_attack_bonus=actor.stats.tech_attack if actor.stats else 0,
                     target_e_defense=target.stats.e_defense if target.stats else 10,
                     settings=None,
                 )

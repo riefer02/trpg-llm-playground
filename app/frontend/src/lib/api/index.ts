@@ -53,6 +53,7 @@ export {
   useWeapons,
   useSystems,
   usePilotGear,
+  useLicenses,
   compendiumKeys,
 } from './compendium'
 // Note: Compendium types are simplified API responses, not full core types
@@ -60,6 +61,7 @@ export type {
   Background as CompendiumBackground,
   Trigger as CompendiumTrigger,
   Talent as CompendiumTalent,
+  License as CompendiumLicense,
 } from './compendium'
 
 // Pilot hooks (internal/low-level primitive)
@@ -135,6 +137,7 @@ export {
   usePendingDecisions,
   useSubmitDecision,
   useCompleteCombat,
+  useSpendReserve,
   useCreateDemoCombat,
   useAutoNpcTurn,
   combatKeys,

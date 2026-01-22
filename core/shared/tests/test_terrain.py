@@ -6,6 +6,7 @@ from core.shared.terrain import (
     get_terrain_effects_at,
     calculate_movement_cost,
     get_cover_difficulty,
+    get_cover_for_footprint,
     check_soft_cover,
     check_hard_cover_available,
     resolve_dangerous_terrain,
@@ -466,3 +467,125 @@ class TestCalculateClimbCost:
         """Single space climb."""
         result = calculate_climb_cost(1)
         assert result == 2
+
+
+class TestGetCoverForFootprint:
+    """Tests for get_cover_for_footprint function for Size 2+ targets."""
+
+    def test_size_1_target_uses_single_hex(self) -> None:
+        """Size 1 target uses single hex, same as regular cover check."""
+        terrain = TerrainMap(
+            tiles=[TerrainHex(coord=HexCoord(q=1, r=0), provides_soft_cover=True)]
+        )
+        result = get_cover_for_footprint(
+            attacker_coord=HexCoord(q=0, r=0),
+            target_center=HexCoord(q=1, r=0),
+            target_size="size_1",
+            terrain=terrain,
+        )
+        assert result.cover_type == "soft"
+        assert result.difficulty_modifier == 1
+
+    def test_size_2_target_no_cover_any_hex(self) -> None:
+        """Size 2 target with no cover at any footprint hex returns no cover."""
+        terrain = TerrainMap(tiles=[])
+        result = get_cover_for_footprint(
+            attacker_coord=HexCoord(q=0, r=0),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=terrain,
+        )
+        assert result.cover_type == "none"
+        assert result.difficulty_modifier == 0
+
+    def test_size_2_target_partial_cover_uses_least(self) -> None:
+        """Size 2 target with partial cover uses most exposed (least cover) hex."""
+        # Soft cover at center (3,0) but no cover at edge hex (4,0)
+        terrain = TerrainMap(
+            tiles=[TerrainHex(coord=HexCoord(q=3, r=0), provides_soft_cover=True)]
+        )
+        result = get_cover_for_footprint(
+            attacker_coord=HexCoord(q=0, r=0),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=terrain,
+        )
+        # Should return no cover since edge hexes have no cover
+        assert result.cover_type == "none"
+
+    def test_size_2_target_all_soft_cover(self) -> None:
+        """Size 2 target with soft cover at all footprint hexes returns soft cover."""
+        # Create soft cover at center and all 6 adjacent hexes for size 2
+        tiles = [
+            TerrainHex(coord=HexCoord(q=3, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=4, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=2, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=3, r=1), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=3, r=-1), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=4, r=-1), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=2, r=1), provides_soft_cover=True),
+        ]
+        terrain = TerrainMap(tiles=tiles)
+        result = get_cover_for_footprint(
+            attacker_coord=HexCoord(q=0, r=0),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=terrain,
+        )
+        assert result.cover_type == "soft"
+        assert result.difficulty_modifier == 1
+
+    def test_size_2_mixed_coverage_returns_least(self) -> None:
+        """Size 2 target with mixed coverage returns most favorable for attacker."""
+        # Soft cover at some hexes, but not all - should return no cover
+        # (because attacker targets the most exposed hex)
+        tiles = [
+            TerrainHex(coord=HexCoord(q=3, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=4, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=2, r=0), provides_soft_cover=True),
+            # Missing: (3, 1), (3, -1), (4, -1), (2, 1) - these have no cover
+        ]
+        terrain = TerrainMap(tiles=tiles)
+        result = get_cover_for_footprint(
+            attacker_coord=HexCoord(q=0, r=0),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=terrain,
+        )
+        # Should return no cover since some edge hexes have no cover
+        assert result.cover_type == "none"
+        assert result.difficulty_modifier == 0
+
+    def test_size_2_exposed_corner(self) -> None:
+        """Size 2 target with one exposed corner returns no cover."""
+        # Cover everywhere except one footprint hex
+        tiles = [
+            TerrainHex(coord=HexCoord(q=3, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=2, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=3, r=1), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=3, r=-1), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=4, r=-1), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=2, r=1), provides_soft_cover=True),
+            # Missing (4,0) - exposed corner
+        ]
+        terrain = TerrainMap(tiles=tiles)
+        result = get_cover_for_footprint(
+            attacker_coord=HexCoord(q=0, r=0),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=terrain,
+        )
+        # Should return no cover since (4,0) has no cover
+        assert result.cover_type == "none"
+        assert result.difficulty_modifier == 0
+
+    def test_no_terrain_returns_no_cover(self) -> None:
+        """No terrain returns no cover."""
+        result = get_cover_for_footprint(
+            attacker_coord=HexCoord(q=0, r=0),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=None,
+        )
+        assert result.cover_type == "none"
+        assert result.difficulty_modifier == 0

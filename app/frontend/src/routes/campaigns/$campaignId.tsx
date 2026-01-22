@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 
 import {
   useCampaign,
@@ -32,6 +33,7 @@ import {
   CardTitle,
   Button,
 } from "../../components/ui";
+import { CampaignDetailSkeleton } from "../../components/skeletons";
 import { MissionBriefingModal } from "../../components/campaign/MissionBriefingModal";
 
 export const Route = createFileRoute("/campaigns/$campaignId")({
@@ -123,11 +125,7 @@ function CampaignDetailPage() {
   );
 
   if (isLoading || !data) {
-    return (
-      <div className="p-6">
-        <p className="text-muted-foreground">Loading campaign...</p>
-      </div>
-    );
+    return <CampaignDetailSkeleton />;
   }
 
   const campaignModel = data.data as LancerCampaign;
@@ -182,14 +180,20 @@ function CampaignDetailPage() {
 
   const handleInvite = (event: React.FormEvent) => {
     event.preventDefault();
-    createInvite.mutate({
-      campaignId,
-      data: {
-        role: inviteRole,
-        invited_email: inviteEmail || undefined,
-        invite_note: inviteNote || undefined,
+    createInvite.mutate(
+      {
+        campaignId,
+        data: {
+          role: inviteRole,
+          invited_email: inviteEmail || undefined,
+          invite_note: inviteNote || undefined,
+        },
       },
-    });
+      {
+        onSuccess: () => toast.success("Invite created"),
+        onError: (err) => toast.error(err.message || "Failed to create invite"),
+      }
+    );
     setInviteEmail("");
     setInviteNote("");
   };
@@ -197,10 +201,16 @@ function CampaignDetailPage() {
   const handleAttach = (event: React.FormEvent) => {
     event.preventDefault();
     if (!characterId.trim()) return;
-    attachCharacter.mutate({
-      campaignId,
-      data: { character_id: characterId.trim() },
-    });
+    attachCharacter.mutate(
+      {
+        campaignId,
+        data: { character_id: characterId.trim() },
+      },
+      {
+        onSuccess: () => toast.success("Character attached"),
+        onError: (err) => toast.error(err.message || "Failed to attach character"),
+      }
+    );
     setCharacterId("");
   };
 
@@ -222,17 +232,23 @@ function CampaignDetailPage() {
 
   const handleIdentitySubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    updateIdentity.mutate({
-      campaignId,
-      data: {
-        squad_name: identityForm.squad_name.trim() || undefined,
-        patron: identityForm.patron.trim() || undefined,
-        who_we_are: identityForm.who_we_are.trim() || undefined,
-        relationships: identityForm.relationships.filter((item) => item.trim().length > 0),
-        themes: identityForm.themes.filter((item) => item.trim().length > 0),
-        gm_prompts: identityForm.gm_prompts.filter((item) => item.trim().length > 0),
+    updateIdentity.mutate(
+      {
+        campaignId,
+        data: {
+          squad_name: identityForm.squad_name.trim() || undefined,
+          patron: identityForm.patron.trim() || undefined,
+          who_we_are: identityForm.who_we_are.trim() || undefined,
+          relationships: identityForm.relationships.filter((item) => item.trim().length > 0),
+          themes: identityForm.themes.filter((item) => item.trim().length > 0),
+          gm_prompts: identityForm.gm_prompts.filter((item) => item.trim().length > 0),
+        },
       },
-    });
+      {
+        onSuccess: () => toast.success("Squad identity saved"),
+        onError: (err) => toast.error(err.message || "Failed to save identity"),
+      }
+    );
   };
 
   const addIdentityListItem = (
@@ -381,32 +397,38 @@ function CampaignDetailPage() {
 
   const handleLobbySubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    updateLobby.mutate({
-      campaignId,
-      data: {
-        mission_name: lobbyForm.mission_name || "Untitled Mission",
-        briefing_notes: lobbyForm.briefing_notes || undefined,
-        stakes: lobbyForm.stakes_summary
-          ? {
-              stakes_type: lobbyForm.stakes_type,
-              summary: lobbyForm.stakes_summary,
-            }
-          : undefined,
-        objectives: lobbyForm.objectives.map((objective, index) => ({
-          id: objective.id || `obj-${index + 1}`,
-          title: objective.title || `Objective ${index + 1}`,
-          success_condition:
-            objective.success_condition || objective.title || "Objective",
-          priority: objective.priority ?? "primary",
-          related_objective_id: objective.related_objective_id ?? null,
-        })),
-        support_assets: lobbyForm.support_assets.filter((asset) => asset.trim().length > 0),
-        reserves: lobbyForm.reserves.filter((reserve) => reserve.reserve_id.trim().length > 0),
-        assigned_member_ids: lobbyForm.assigned_member_ids,
-        preferred_pilot_count: lobbyForm.preferred_pilot_count,
-        min_pilot_count: lobbyForm.min_pilot_count,
+    updateLobby.mutate(
+      {
+        campaignId,
+        data: {
+          mission_name: lobbyForm.mission_name || "Untitled Mission",
+          briefing_notes: lobbyForm.briefing_notes || undefined,
+          stakes: lobbyForm.stakes_summary
+            ? {
+                stakes_type: lobbyForm.stakes_type,
+                summary: lobbyForm.stakes_summary,
+              }
+            : undefined,
+          objectives: lobbyForm.objectives.map((objective, index) => ({
+            id: objective.id || `obj-${index + 1}`,
+            title: objective.title || `Objective ${index + 1}`,
+            success_condition:
+              objective.success_condition || objective.title || "Objective",
+            priority: objective.priority ?? "primary",
+            related_objective_id: objective.related_objective_id ?? null,
+          })),
+          support_assets: lobbyForm.support_assets.filter((asset) => asset.trim().length > 0),
+          reserves: lobbyForm.reserves.filter((reserve) => reserve.reserve_id.trim().length > 0),
+          assigned_member_ids: lobbyForm.assigned_member_ids,
+          preferred_pilot_count: lobbyForm.preferred_pilot_count,
+          min_pilot_count: lobbyForm.min_pilot_count,
+        },
       },
-    });
+      {
+        onSuccess: () => toast.success("Lobby settings saved"),
+        onError: (err) => toast.error(err.message || "Failed to save lobby"),
+      }
+    );
   };
 
   const handleAssignedMemberToggle = (memberId: string) => {
@@ -419,13 +441,19 @@ function CampaignDetailPage() {
   };
 
   const handleLaunchMission = () => {
-    launchMission.mutate({
-      campaignId,
-      data: {
-        environment: "standard",
-        notes: launchNotes || undefined,
+    launchMission.mutate(
+      {
+        campaignId,
+        data: {
+          environment: "standard",
+          notes: launchNotes || undefined,
+        },
       },
-    });
+      {
+        onSuccess: () => toast.success("Mission launched"),
+        onError: (err) => toast.error(err.message || "Failed to launch mission"),
+      }
+    );
   };
 
   const handleLifecycleComplete = (sessionRecord: Session) => {
@@ -465,15 +493,21 @@ function CampaignDetailPage() {
       completion_score: 1,
       debrief_notes: "",
     };
-    recordSessionOutcome.mutate({
-      campaignId,
-      sessionId,
-      data: {
-        outcome: draft.outcome,
-        completion_score: draft.completion_score,
-        debrief_notes: draft.debrief_notes || undefined,
+    recordSessionOutcome.mutate(
+      {
+        campaignId,
+        sessionId,
+        data: {
+          outcome: draft.outcome,
+          completion_score: draft.completion_score,
+          debrief_notes: draft.debrief_notes || undefined,
+        },
       },
-    });
+      {
+        onSuccess: () => toast.success("Outcome recorded"),
+        onError: (err) => toast.error(err.message || "Failed to record outcome"),
+      }
+    );
   };
 
   const buildInviteLink = (token: string) => {
@@ -486,16 +520,18 @@ function CampaignDetailPage() {
   const copyInviteToken = async (token: string) => {
     try {
       await navigator.clipboard.writeText(token);
+      toast.success("Invite token copied to clipboard");
     } catch (_) {
-      // ignore clipboard errors
+      toast.error("Failed to copy to clipboard");
     }
   };
 
   const copyInviteLink = async (token: string) => {
     try {
       await navigator.clipboard.writeText(buildInviteLink(token));
+      toast.success("Invite link copied to clipboard");
     } catch (_) {
-      // ignore clipboard errors
+      toast.error("Failed to copy to clipboard");
     }
   };
 
@@ -1204,7 +1240,12 @@ function CampaignDetailPage() {
               )}
 
               <Button
-                onClick={() => beginDowntime.mutate(campaignId)}
+                onClick={() =>
+                  beginDowntime.mutate(campaignId, {
+                    onSuccess: () => toast.success("Downtime started"),
+                    onError: (err) => toast.error(err.message || "Failed to start downtime"),
+                  })
+                }
                 disabled={beginDowntime.isPending}
               >
                 {beginDowntime.isPending ? "Starting downtime..." : "Begin Next Mission"}
@@ -1430,10 +1471,16 @@ function CampaignDetailPage() {
                       variant="ghost"
                       disabled={invite.status !== "pending" || revokeInvite.isPending}
                       onClick={() =>
-                        revokeInvite.mutate({
-                          campaignId,
-                          inviteId: invite.id,
-                        })
+                        revokeInvite.mutate(
+                          {
+                            campaignId,
+                            inviteId: invite.id,
+                          },
+                          {
+                            onSuccess: () => toast.success("Invite revoked"),
+                            onError: (err) => toast.error(err.message || "Failed to revoke invite"),
+                          }
+                        )
                       }
                     >
                       Revoke
@@ -1444,10 +1491,16 @@ function CampaignDetailPage() {
                       variant="secondary"
                       disabled={resendInvite.isPending}
                       onClick={() =>
-                        resendInvite.mutate({
-                          campaignId,
-                          inviteId: invite.id,
-                        })
+                        resendInvite.mutate(
+                          {
+                            campaignId,
+                            inviteId: invite.id,
+                          },
+                          {
+                            onSuccess: () => toast.success("Invite resent"),
+                            onError: (err) => toast.error(err.message || "Failed to resend invite"),
+                          }
+                        )
                       }
                     >
                       Resend

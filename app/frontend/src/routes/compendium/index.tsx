@@ -26,6 +26,7 @@ import {
   CardContent,
   Button,
 } from "../../components/ui";
+import { CompendiumSkeleton } from "../../components/skeletons";
 
 export const Route = createFileRoute("/compendium/" as const)({
   component: CompendiumPage,
@@ -232,6 +233,10 @@ function CompendiumPage() {
     setGearCategory("all");
   };
 
+  if (isLoading) {
+    return <CompendiumSkeleton />;
+  }
+
   return (
     <div className="px-6 py-8 max-w-7xl mx-auto space-y-6">
       <section className="dashboard-surface p-6 animate-rise">
@@ -420,10 +425,6 @@ function CompendiumPage() {
         </aside>
 
         <section className="space-y-4">
-          {isLoading && (
-            <div className="text-muted-foreground">Loading compendium data...</div>
-          )}
-
           {activeError && (
             <Card className="border-destructive/40">
               <CardContent className="pt-6 text-destructive">
@@ -432,7 +433,7 @@ function CompendiumPage() {
             </Card>
           )}
 
-          {!isLoading && !activeError && (
+          {!activeError && (
             <div className="space-y-4">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>

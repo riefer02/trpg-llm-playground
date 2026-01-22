@@ -13,6 +13,7 @@ from core.shared.models import FrozenModel
 
 from core.shared.enums import StatusType
 from core.shared.dice import DiceExpression
+from core.shared.rolls import resolve_attack
 from core.mech.combat_resolution import DiceRollResult, ResolutionSettings
 
 
@@ -77,7 +78,7 @@ class LockOnResult(FrozenModel):
 class InvadeResult(FrozenModel):
     """Result of an Invade action.
 
-    Invade is a tech attack: Systems check vs target's E-defense.
+    Invade is a tech attack: 1d20 + tech_attack vs target's E-defense.
     On hit: target takes 2 heat and becomes impaired and slowed
     until the end of their next turn.
     """
@@ -87,14 +88,16 @@ class InvadeResult(FrozenModel):
     target_id: str
     success: bool
     hit: bool
-    systems_roll: DiceRollResult | None = Field(
-        default=None, description="Systems check result"
+    attack_roll: int = Field(..., ge=1, le=20, description="The d20 roll result")
+    attack_bonus: int = Field(default=0, description="tech_attack bonus applied")
+    total: int = Field(..., description="Total attack value (roll + bonus + accuracy)")
+    target_e_defense: int = Field(..., ge=0, description="Target's E-defense")
+    is_critical: bool = Field(default=False, description="Whether attack was a critical (natural 20)")
+    accuracy_dice_rolls: list[int] = Field(
+        default_factory=list, description="Accuracy d6 rolls (keep highest)"
     )
-    check_total: int | None = Field(
-        default=None, description="Total systems check value"
-    )
-    target_e_defense: int | None = Field(
-        default=None, description="Target's E-defense at time of check"
+    difficulty_dice_rolls: list[int] = Field(
+        default_factory=list, description="Difficulty d6 rolls (keep lowest)"
     )
     heat_applied: int | None = Field(
         default=None, ge=0, description="Heat dealt to target"
@@ -236,23 +239,32 @@ def resolve_invade(
     *,
     actor_id: str,
     target_id: str,
-    attacker_systems: int,
+    tech_attack_bonus: int,
     target_e_defense: int,
+    accuracy_bonus: int = 0,
+    difficulty_bonus: int = 0,
     heat_on_hit: int = 2,
     conditions: list[StatusType] | None = None,
     settings: ResolutionSettings | None = None,
 ) -> InvadeResult:
-    """Resolve an Invade action.
+    """Resolve an Invade tech attack: 1d20 + tech_attack vs E-defense.
 
-    Invade is a tech attack: Systems check vs target's E-defense.
+    Uses standard Lancer attack resolution (PR2 4188-4189, 4211-4212):
+    - Roll 1d20 + tech_attack_bonus vs target E-defense
+    - Hit when: total > E-defense OR (total == E-defense AND roll >= 10)
+    - Critical on natural 20 (always hits)
+    - Accuracy/difficulty dice apply as normal
+
     On hit: target takes heat_on_hit heat and becomes impaired and slowed
     until the end of their next turn.
 
     Args:
         actor_id: ID of the actor performing invade
         target_id: ID of the target being invaded
-        attacker_systems: The actor's systems score for the tech attack
+        tech_attack_bonus: The actor's tech attack bonus
         target_e_defense: The target's E-defense
+        accuracy_bonus: Number of accuracy dice to roll
+        difficulty_bonus: Number of difficulty dice to roll
         heat_on_hit: Heat to deal on hit (default 2)
         conditions: Conditions to inflict (default: impaired, slowed)
         settings: Optional resolution settings for forced rolls
@@ -263,11 +275,21 @@ def resolve_invade(
     if conditions is None:
         conditions = ["impaired", "slowed"]
 
-    rolls, total = _roll_systems_check(attacker_systems, settings)
-    hit = total >= target_e_defense
+    # Use standard attack resolution
+    attack_result = resolve_attack(
+        attack_bonus=tech_attack_bonus,
+        target_defense=target_e_defense,
+        accuracy_bonus=accuracy_bonus,
+        difficulty_bonus=difficulty_bonus,
+        forced_roll=settings.forced_roll if settings else None,
+        forced_accuracy_rolls=settings.forced_accuracy_rolls if settings else None,
+        forced_difficulty_rolls=settings.forced_difficulty_rolls if settings else None,
+    )
+
+    hit = attack_result.hit
 
     heat_applied = None
-    conditions_applied = []
+    conditions_applied: list[StatusType] = []
 
     if hit:
         heat_applied = heat_on_hit
@@ -279,9 +301,13 @@ def resolve_invade(
         target_id=target_id,
         success=hit,
         hit=hit,
-        systems_roll=_create_roll_result(rolls),
-        check_total=total,
+        attack_roll=attack_result.roll,
+        attack_bonus=attack_result.attack_bonus,
+        total=attack_result.total_accuracy,
         target_e_defense=target_e_defense,
+        is_critical=attack_result.is_critical,
+        accuracy_dice_rolls=attack_result.accuracy_dice_rolls,
+        difficulty_dice_rolls=attack_result.difficulty_dice_rolls,
         heat_applied=heat_applied,
         conditions_applied=conditions_applied,
     )

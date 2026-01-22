@@ -30,7 +30,7 @@ from core.pilot.license import (
     LicenseDefinition,
     Manufacturer,
     MANUFACTURER_NAMES,
-    EXAMPLE_LICENSES,
+    ALL_LICENSES,
     get_license_definition,
     get_licenses_by_manufacturer,
 )
@@ -165,7 +165,7 @@ __all__ = [
     "LicenseDefinition",
     "Manufacturer",
     "MANUFACTURER_NAMES",
-    "EXAMPLE_LICENSES",
+    "ALL_LICENSES",
     "get_license_definition",
     "get_licenses_by_manufacturer",
     # Core Bonuses

@@ -12,6 +12,7 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Toaster } from 'sonner'
 import { useState } from 'react'
 
 import appCss from '../styles.css?url'
@@ -92,6 +93,15 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             ]}
           />
         </QueryClientProvider>
+        <Toaster
+          theme="light"
+          position="top-right"
+          richColors
+          closeButton
+          toastOptions={{
+            duration: 4000,
+          }}
+        />
         <Scripts />
       </body>
     </html>

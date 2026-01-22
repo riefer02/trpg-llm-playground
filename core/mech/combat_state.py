@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from core.shared.protocols import ProtocolState
     from core.shared.turn_end import TurnEndEffectState
     from core.mech.statuses import StatusInstance
+    from core.shared.flying import FlyingStatus
 
 
 CombatSide = Literal["players", "hostiles", "neutral"]
@@ -277,6 +278,15 @@ class CombatantState(FrozenModel):
     eject_used: bool = Field(
         default=False, description="Whether eject has been used this combat (mech only)"
     )
+    # Flying state tracking (Phase 52)
+    flying_status: "FlyingStatus | None" = Field(
+        default=None, description="Current flying status (altitude, hover mode, etc.)"
+    )
+    falling_from_altitude: int | None = Field(
+        default=None,
+        ge=0,
+        description="If falling, the altitude level falling from (for damage calc)",
+    )
 
     def in_danger_zone(
         self, danger_zone_fraction: float = 0.5, rounding: Literal["up", "down"] = "up"
@@ -507,6 +517,7 @@ try:
     from core.shared.protocols import ProtocolState
     from core.shared.turn_end import TurnEndEffectState
     from core.mech.statuses import StatusInstance
+    from core.shared.flying import FlyingStatus
 
     CombatantState.model_rebuild(
         _types_namespace={
@@ -514,6 +525,7 @@ try:
             "ProtocolState": ProtocolState,
             "TurnEndEffectState": TurnEndEffectState,
             "StatusInstance": StatusInstance,
+            "FlyingStatus": FlyingStatus,
         }
     )
 except ImportError:

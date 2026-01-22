@@ -14,6 +14,7 @@ from core.shared.los import (
     check_elevation_blocks_los,
     get_los_blocking_hexes,
     get_los_obscuring_hexes,
+    check_line_of_sight_to_footprint,
 )
 
 
@@ -686,3 +687,123 @@ class TestLOSIntegration:
             )
         )
         assert los_result.los_type == "obscured"
+
+
+class TestCheckLineOfSightToFootprint:
+    """Tests for check_line_of_sight_to_footprint function for Size 2+ targets."""
+
+    def test_size_1_target_single_hex(self) -> None:
+        """Size 1 target has single hex footprint, behaves like regular LOS."""
+        result = check_line_of_sight_to_footprint(
+            attacker_pos=HexPosition(coord=HexCoord(q=0, r=0)),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_1",
+            terrain=None,
+        )
+        assert result.has_los is True
+        assert result.los_type == "clear"
+
+    def test_size_2_target_clear_to_center(self) -> None:
+        """Size 2 target with clear LOS to center returns clear."""
+        result = check_line_of_sight_to_footprint(
+            attacker_pos=HexPosition(coord=HexCoord(q=0, r=0)),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=None,
+        )
+        assert result.has_los is True
+        assert result.los_type == "clear"
+
+    def test_size_2_target_center_blocked_edge_clear(self) -> None:
+        """Size 2 target with blocked center but clear LOS to footprint edge."""
+        # Block the center hex (3,0) but leave edge hex (4,0) visible
+        terrain = TerrainMap(
+            tiles=[
+                TerrainHex(coord=HexCoord(q=2, r=0), blocks_line_of_sight=True),
+            ]
+        )
+        # Attacker at (0,0), target center at (3,0)
+        # Path to center (3,0) goes through blocked (2,0)
+        # But path to footprint edge (4,0) or (3,1) etc might be clear
+        result = check_line_of_sight_to_footprint(
+            attacker_pos=HexPosition(coord=HexCoord(q=0, r=0)),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=terrain,
+        )
+        # Should find LOS to one of the edge hexes
+        assert result.has_los is True
+
+    def test_size_2_target_all_footprint_blocked(self) -> None:
+        """Size 2 target with all footprint hexes blocked has no LOS."""
+        # Block all paths to a size 2 target at (3,0)
+        # Size 2 has radius 1, so footprint is: (3,0), (4,0), (2,0), (3,-1), (3,1), (4,-1), (2,1)
+        # Need a wall that blocks all of them from (0,0)
+        terrain = TerrainMap(
+            tiles=[
+                TerrainHex(coord=HexCoord(q=1, r=0), blocks_line_of_sight=True),
+                TerrainHex(coord=HexCoord(q=1, r=-1), blocks_line_of_sight=True),
+                TerrainHex(coord=HexCoord(q=1, r=1), blocks_line_of_sight=True),
+            ]
+        )
+        result = check_line_of_sight_to_footprint(
+            attacker_pos=HexPosition(coord=HexCoord(q=0, r=0)),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=terrain,
+        )
+        assert result.has_los is False
+        assert result.los_type == "blocked"
+
+    def test_size_2_target_obscured_better_than_blocked(self) -> None:
+        """Size 2 target returns obscured if that's best available LOS."""
+        # Block center path, obscure edge path
+        terrain = TerrainMap(
+            tiles=[
+                TerrainHex(coord=HexCoord(q=2, r=0), blocks_line_of_sight=True),
+                TerrainHex(coord=HexCoord(q=2, r=1), provides_soft_cover=True),
+            ]
+        )
+        result = check_line_of_sight_to_footprint(
+            attacker_pos=HexPosition(coord=HexCoord(q=0, r=0)),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=terrain,
+        )
+        # Should find at least obscured LOS to some edge hex
+        assert result.has_los is True
+
+    def test_size_3_target_larger_footprint(self) -> None:
+        """Size 3 target has larger footprint (radius 2)."""
+        # Block a line but size 3 footprint extends beyond
+        terrain = TerrainMap(
+            tiles=[
+                TerrainHex(coord=HexCoord(q=2, r=0), blocks_line_of_sight=True),
+            ]
+        )
+        result = check_line_of_sight_to_footprint(
+            attacker_pos=HexPosition(coord=HexCoord(q=0, r=0)),
+            target_center=HexCoord(q=5, r=0),
+            target_size="size_3",
+            terrain=terrain,
+        )
+        # Size 3 has radius 2, so should have clear LOS to edge hexes
+        assert result.has_los is True
+
+    def test_returns_best_los_type(self) -> None:
+        """Returns the best (most favorable for attacker) LOS type found."""
+        # Create terrain where some footprint hexes are blocked,
+        # some obscured, and at least one clear
+        terrain = TerrainMap(
+            tiles=[
+                TerrainHex(coord=HexCoord(q=3, r=-1), provides_soft_cover=True),
+            ]
+        )
+        result = check_line_of_sight_to_footprint(
+            attacker_pos=HexPosition(coord=HexCoord(q=0, r=0)),
+            target_center=HexCoord(q=3, r=0),
+            target_size="size_2",
+            terrain=terrain,
+        )
+        # Should find clear LOS to center (3,0) or other clear footprint hex
+        assert result.los_type == "clear"

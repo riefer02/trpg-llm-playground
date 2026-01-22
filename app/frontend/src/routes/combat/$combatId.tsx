@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 
 import {
   useCombatSession,
@@ -54,6 +55,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui";
+import { CombatSessionSkeleton } from "../../components/skeletons";
 
 export const Route = createFileRoute("/combat/$combatId")({
   component: CombatSessionPage,
@@ -180,7 +182,9 @@ function CombatSessionPage() {
       onSuccess: (result) => {
         setTurnActive(true);
         setEconomy(result.economy);
+        toast.success("Turn started");
       },
+      onError: (err) => toast.error(err.message || "Failed to start turn"),
     });
   }, [startTurn]);
 
@@ -193,7 +197,9 @@ function CombatSessionPage() {
         setTargetMode(null);
         setSelectedTargetIds([]);
         setMaxTargets(1);
+        toast.success("Turn ended");
       },
+      onError: (err) => toast.error(err.message || "Failed to end turn"),
     });
   }, [endTurn]);
 
@@ -207,7 +213,9 @@ function CombatSessionPage() {
         setTargetMode(null);
         setSelectedTargetIds([]);
         setMaxTargets(1);
+        toast.success("NPC turn completed");
       },
+      onError: (err) => toast.error(err.message || "NPC turn failed"),
     });
   }, [autoNpcTurn]);
 
@@ -236,8 +244,12 @@ function CombatSessionPage() {
             setMaxTargets(1);
             setAreaPattern(null);
             setAreaDirection(null);
+            toast.success("Action executed");
+          } else {
+            toast.error("Action failed");
           }
         },
+        onError: (err) => toast.error(err.message || "Action failed"),
       });
     },
     [executeAction]
@@ -256,8 +268,10 @@ function CombatSessionPage() {
         onSuccess: (result) => {
           if (result.success) {
             setEconomy(result.economy);
+            toast.success("Overcharge activated");
           }
         },
+        onError: (err) => toast.error(err.message || "Overcharge failed"),
       }
     );
   }, [executeAction]);
@@ -265,7 +279,10 @@ function CombatSessionPage() {
   // Handle reaction submission
   const handleReactionSubmit = useCallback(
     (reaction: ReactionRequest) => {
-      submitReaction.mutate(reaction);
+      submitReaction.mutate(reaction, {
+        onSuccess: () => toast.success("Reaction executed"),
+        onError: (err) => toast.error(err.message || "Reaction failed"),
+      });
     },
     [submitReaction]
   );
@@ -273,7 +290,10 @@ function CombatSessionPage() {
   // Handle decision submission (save prompts, system trauma)
   const handleDecisionSubmit = useCallback(
     (request: DecisionSubmitRequest) => {
-      submitDecision.mutate(request);
+      submitDecision.mutate(request, {
+        onSuccess: () => toast.success("Decision submitted"),
+        onError: (err) => toast.error(err.message || "Decision failed"),
+      });
     },
     [submitDecision]
   );
@@ -284,6 +304,7 @@ function CombatSessionPage() {
       completeCombat.mutate(request, {
         onSuccess: (result) => {
           setShowMissionCompleteModal(false);
+          toast.success("Mission completed");
           // Redirect to campaign if linked, otherwise to dashboard
           if (result.campaign_id) {
             navigate({ to: "/campaigns/$campaignId", params: { campaignId: result.campaign_id } });
@@ -291,6 +312,7 @@ function CombatSessionPage() {
             navigate({ to: "/" });
           }
         },
+        onError: (err) => toast.error(err.message || "Failed to complete mission"),
       });
     },
     [completeCombat, navigate]
@@ -299,7 +321,13 @@ function CombatSessionPage() {
   // Handle reserve spending
   const handleSpendReserve = useCallback(
     (reserveId: string) => {
-      spendReserve.mutate({ reserve_id: reserveId });
+      spendReserve.mutate(
+        { reserve_id: reserveId },
+        {
+          onSuccess: () => toast.success("Reserve spent"),
+          onError: (err) => toast.error(err.message || "Failed to spend reserve"),
+        }
+      );
     },
     [spendReserve]
   );
@@ -406,13 +434,7 @@ function CombatSessionPage() {
   }, [action, hovered, round, scenario, turn, areaPattern, areaDirection, currentActor]);
 
   if (isLoading) {
-    return (
-      <div className="p-6 max-w-6xl mx-auto">
-        <div className="text-center py-8 text-muted-foreground">
-          Loading combat session...
-        </div>
-      </div>
-    );
+    return <CombatSessionSkeleton />;
   }
 
   if (error) {

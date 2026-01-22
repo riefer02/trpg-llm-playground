@@ -87,7 +87,7 @@ class TestResolveFullTech:
                 option="invade",
                 invade_params=InvadeTechParams(
                     target_id="target_mech",
-                    attacker_systems=10,
+                    tech_attack_bonus=10,
                     target_e_defense=8,
                 ),
             ),
@@ -191,7 +191,7 @@ class TestResolveFullTech:
                 option="invade",
                 invade_params=InvadeTechParams(
                     target_id="target_mech",
-                    attacker_systems=10,
+                    tech_attack_bonus=10,
                     target_e_defense=8,
                 ),
             ),
@@ -210,7 +210,7 @@ class TestResolveFullTech:
                 option="invade",
                 invade_params=InvadeTechParams(
                     target_id="target_mech",
-                    attacker_systems=12,
+                    tech_attack_bonus=12,
                     target_e_defense=8,
                 ),
             ),
@@ -233,7 +233,7 @@ class TestResolveFullTech:
                 option="invade",
                 invade_params=InvadeTechParams(
                     target_id="target_mech",
-                    attacker_systems=5,
+                    tech_attack_bonus=5,
                     target_e_defense=100,
                 ),
             ),
@@ -295,7 +295,7 @@ class TestApplyFullTechResult:
                 option="invade",
                 invade_params=InvadeTechParams(
                     target_id="target_mech",
-                    attacker_systems=12,
+                    tech_attack_bonus=12,
                     target_e_defense=8,
                     heat_on_hit=2,
                 ),
@@ -322,7 +322,7 @@ class TestApplyFullTechResult:
                 option="invade",
                 invade_params=InvadeTechParams(
                     target_id="target_mech",
-                    attacker_systems=12,
+                    tech_attack_bonus=12,
                     target_e_defense=8,
                 ),
             ),
@@ -345,7 +345,7 @@ class TestApplyFullTechResult:
                 option="invade",
                 invade_params=InvadeTechParams(
                     target_id="target_mech",
-                    attacker_systems=5,
+                    tech_attack_bonus=5,
                     target_e_defense=100,
                 ),
             ),
@@ -437,7 +437,7 @@ class TestFullTechInputValidation:
                 option="invade",
                 invade_params=InvadeTechParams(
                     target_id="target_mech",
-                    attacker_systems=10,
+                    tech_attack_bonus=10,
                     target_e_defense=8,
                     heat_on_hit=4,
                 ),

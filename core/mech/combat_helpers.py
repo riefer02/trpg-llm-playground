@@ -68,6 +68,7 @@ from core.shared.effects import (
 from core.shared.involuntary_movement import resolve_knockback
 from core.shared.los import LOSCheckRequest, check_line_of_sight
 from core.shared.movement import check_engagement_stop, _is_hostile
+from core.shared.hide_search import get_cover_for_hiding
 
 if TYPE_CHECKING:
     from core.mech.combat_models import ResourceChange, StabilizePrimary, StabilizeSecondary, BurnTickResult
@@ -808,7 +809,7 @@ def _build_full_tech_option(
     if selection.option == "invade":
         invade_params = InvadeTechParams(
             target_id=selection.target_id,
-            attacker_systems=attacker_systems,
+            tech_attack_bonus=attacker_systems,
             target_e_defense=target_e_defense,
         )
         return option_cls(option="invade", invade_params=invade_params)
@@ -865,10 +866,12 @@ def _apply_tech_result(
         effects_applied.append({
             "type": "invade",
             "target_id": result.target_id,
-            "rolls": result.systems_roll.rolls if result.systems_roll else [],
-            "total": result.check_total,
+            "attack_roll": result.attack_roll,
+            "attack_bonus": result.attack_bonus,
+            "total": result.total,
             "target_e_defense": result.target_e_defense,
             "hit": result.hit,
+            "is_critical": result.is_critical,
         })
 
         if result.hit and result.heat_applied:
@@ -1986,15 +1989,23 @@ def _resolve_hide(
     if "engaged" in actor.statuses:
         return scenario, False, "Cannot hide while engaged"
 
-    # Check for cover at actor's position
-    # For now, assume hiding is allowed (terrain/cover checks would go here)
-    # A full implementation would check scenario.terrain for cover
-    has_cover = True  # Simplified - assume cover available
+    # Actor must have a position to check cover
+    if actor.position is None:
+        return scenario, False, "No position to check for cover"
 
-    if has_cover:
-        return scenario, True, "Hidden in cover"
+    # Check for cover at actor's position using terrain
+    has_hard_cover, is_in_soft_cover_area, cover_reason = get_cover_for_hiding(
+        terrain=scenario.terrain,
+        target_coord=actor.position.coord,
+    )
 
-    return scenario, False, "No cover available for hiding"
+    if has_hard_cover:
+        return scenario, True, "Hidden behind hard cover"
+
+    if is_in_soft_cover_area:
+        return scenario, True, "Hidden in soft cover area"
+
+    return scenario, False, cover_reason or "No cover available for hiding"
 
 
 def _resolve_ram(
@@ -2428,6 +2439,110 @@ def _resolve_burn_tick(
         damage_taken=damage_taken,
         burn_cleared=burn_cleared,
     )
+
+
+def _resolve_falling(
+    scenario: MechCombatScenario,
+    actor: CombatantState,
+) -> tuple[MechCombatScenario, list[dict]]:
+    """Resolve falling at end of turn (PR2 flight rules).
+
+    Falling damage: 1 damage per altitude level fallen (armor-piercing).
+    After falling, actor lands at elevation 0 and is no longer flying.
+
+    Args:
+        scenario: Current combat scenario
+        actor: The combatant whose turn is ending
+
+    Returns:
+        Tuple of (updated scenario, list of falling effect dicts)
+    """
+    from core.shared.flying import calculate_fall_damage, FlyingStatus
+
+    effects: list[dict] = []
+
+    # Check if actor is in falling state
+    if "falling" not in actor.statuses or actor.falling_from_altitude is None:
+        return scenario, effects
+
+    # Find actor index
+    actor_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == actor.id), -1)
+    if actor_idx < 0:
+        return scenario, effects
+
+    # Calculate fall damage
+    fall_result = calculate_fall_damage(actor.falling_from_altitude)
+
+    updated_resources = actor.resources
+    if fall_result.damage_taken > 0:
+        # Apply damage (armor-piercing per FallingRules)
+        new_hp = max(0, actor.resources.hp_current - fall_result.damage_taken)
+        updated_resources = actor.resources.model_copy(update={"hp_current": new_hp})
+
+        effects.append({
+            "type": "falling_damage",
+            "target_id": str(actor.id),
+            "damage": fall_result.damage_taken,
+            "fell_from_altitude": actor.falling_from_altitude,
+            "armor_piercing": True,
+        })
+
+    # Clear falling status, reset altitude to 0
+    new_statuses = [s for s in actor.statuses if s != "falling"]
+
+    # Reset flying status to grounded
+    updated_flying_status: FlyingStatus | None = None
+    if actor.flying_status is not None:
+        updated_flying_status = actor.flying_status.model_copy(update={
+            "is_flying": False,
+            "altitude_level": 0,
+            "movement_mode": "ground",
+        })
+    else:
+        # Create a grounded flying status if none exists
+        updated_flying_status = FlyingStatus(
+            is_flying=False,
+            altitude_level=0,
+            is_hover=False,
+            movement_mode="ground",
+        )
+
+    # Update position elevation to 0
+    updated_position = actor.position
+    if actor.position is not None:
+        updated_position = actor.position.model_copy(update={"elevation": 0})
+
+    # Update actor
+    updated_actor = actor.model_copy(update={
+        "resources": updated_resources,
+        "statuses": new_statuses,
+        "falling_from_altitude": None,
+        "flying_status": updated_flying_status,
+        "position": updated_position,
+    })
+
+    # Update scenario
+    updated_combatants = list(scenario.combatants)
+    updated_combatants[actor_idx] = updated_actor
+
+    scenario = MechCombatScenario(
+        combatants=updated_combatants,
+        grapples=list(scenario.grapples),
+        rounds=list(scenario.rounds),
+        terrain=scenario.terrain,
+        environment=scenario.environment,
+        deployables=dict(scenario.deployables),
+        sitrep_resolution=scenario.sitrep_resolution,
+        pending_decisions=list(scenario.pending_decisions),
+    )
+
+    effects.append({
+        "type": "fall_resolved",
+        "target_id": str(actor.id),
+        "landed_at_elevation": 0,
+    })
+
+    return scenario, effects
 
 
 # =============================================================================

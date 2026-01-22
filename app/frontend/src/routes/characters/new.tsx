@@ -9,18 +9,22 @@
  * 5. Mech - name + GMS Everest (LL0)
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   useCreateCharacter,
   useBackgrounds,
   useTriggers,
   useTalents,
   usePilotGear,
+  useLicenses,
+  useFrames,
+  useAddMech,
 } from "../../lib/api";
 import type {
   CharacterCreateRequest,
-  Background,
+  CompendiumBackground,
 } from "../../lib/api";
 import {
   Card,
@@ -30,17 +34,36 @@ import {
   CardContent,
   Button,
 } from "../../components/ui";
-import { LicenseBadge } from "../../components/ui/LicenseBadge";
+import { CharacterFormSkeleton } from "../../components/skeletons";
+import {
+  LevelSelector,
+  LEVEL_PROGRESSION,
+} from "../../components/character/LevelSelector";
+import {
+  LicenseSelector,
+  type LicenseAllocation,
+} from "../../components/character/LicenseSelector";
+import { FrameBrowser } from "../../components/character/FrameBrowser";
 
 export const Route = createFileRoute("/characters/new" as const)({
   component: NewCharacterPage,
 });
 
 // Form steps
-type Step = "background" | "triggers" | "skills" | "talents" | "gear" | "mech";
+type Step =
+  | "background"
+  | "level"
+  | "licenses"
+  | "triggers"
+  | "skills"
+  | "talents"
+  | "gear"
+  | "mech";
 
-const STEP_ORDER: Step[] = [
+// Base step order - licenses step is conditionally included
+const BASE_STEP_ORDER: Step[] = [
   "background",
+  "level",
   "triggers",
   "skills",
   "talents",
@@ -57,20 +80,30 @@ const STEP_META: Record<
     summary: "Identity + origin",
     description: "Callsign and background set the tone for your pilot.",
   },
+  level: {
+    title: "License Level",
+    summary: "LL0-3 progression",
+    description: "Choose your pilot's experience level and unlocks.",
+  },
+  licenses: {
+    title: "Licenses",
+    summary: "Manufacturer access",
+    description: "Allocate license points to unlock manufacturer frames and equipment.",
+  },
   triggers: {
     title: "Triggers",
     summary: "4 narrative skills",
-    description: "Pick four triggers to anchor your LL0 playstyle.",
+    description: "Pick four triggers to anchor your playstyle.",
   },
   skills: {
     title: "Mech Skills",
-    summary: "2 HASE points",
+    summary: "HASE points",
     description: "Allocate HASE points to define mech performance.",
   },
   talents: {
     title: "Talents",
-    summary: "3 rank I picks",
-    description: "Choose three talents that shape your combat plan.",
+    summary: "Rank I picks",
+    description: "Choose talents that shape your combat plan.",
   },
   gear: {
     title: "Pilot Gear",
@@ -79,16 +112,23 @@ const STEP_META: Record<
   },
   mech: {
     title: "Mech",
-    summary: "GMS Everest",
-    description: "Name your starting frame and review the summary.",
+    summary: "Your frame(s)",
+    description: "Select and name your mech(s) based on available licenses.",
   },
 };
+
+interface MechSelection {
+  frameId: string;
+  name: string;
+}
 
 interface FormData {
   callsign: string;
   name: string;
   backgroundId: string | null;
   backgroundName: string;
+  level: number; // LL0-3
+  licenseAllocations: LicenseAllocation[];
   triggers: string[]; // 4 trigger IDs
   skills: {
     hull: number;
@@ -96,14 +136,14 @@ interface FormData {
     systems: number;
     engineering: number;
   };
-  talents: string[]; // 3 talent IDs
+  talents: string[]; // talent IDs (3 at LL0, increases with level)
   pilotGear: {
     clothing: string | null;
     armor: string | null;
     weapons: string[];
     gear: string[];
   };
-  mechName: string;
+  mechs: MechSelection[]; // Support multiple mechs at higher levels
   notes: string;
 }
 
@@ -112,6 +152,8 @@ const defaultFormData: FormData = {
   name: "",
   backgroundId: null,
   backgroundName: "",
+  level: 0,
+  licenseAllocations: [],
   triggers: [],
   skills: { hull: 0, agility: 0, systems: 0, engineering: 0 },
   talents: [],
@@ -121,23 +163,49 @@ const defaultFormData: FormData = {
     weapons: [],
     gear: [],
   },
-  mechName: "",
+  mechs: [],
   notes: "",
 };
 
 function NewCharacterPage() {
   const navigate = useNavigate();
   const createMutation = useCreateCharacter();
+  const addMechMutation = useAddMech();
 
   // Reference data
   const { data: backgrounds, isLoading: loadingBackgrounds } = useBackgrounds();
   const { data: allTriggers, isLoading: loadingTriggers } = useTriggers();
   const { data: allTalents, isLoading: loadingTalents } = useTalents();
   const { data: pilotGear, isLoading: loadingPilotGear } = usePilotGear();
+  const { data: licenses, isLoading: loadingLicenses } = useLicenses();
+  const { data: frames, isLoading: loadingFrames } = useFrames();
 
   const [step, setStep] = useState<Step>("background");
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [error, setError] = useState<string | null>(null);
+
+  // Dynamic step order based on level
+  const STEP_ORDER = useMemo(() => {
+    if (formData.level >= 1) {
+      // Insert licenses step after level for LL1+
+      return [
+        "background",
+        "level",
+        "licenses",
+        "triggers",
+        "skills",
+        "talents",
+        "gear",
+        "mech",
+      ] as Step[];
+    }
+    return BASE_STEP_ORDER;
+  }, [formData.level]);
+
+  // Progression values based on level
+  const progression =
+    LEVEL_PROGRESSION[formData.level as keyof typeof LEVEL_PROGRESSION] ??
+    LEVEL_PROGRESSION[0];
 
   // Create lookup maps
   const triggerMap = new Map(allTriggers?.map((t) => [t.id, t]) ?? []);
@@ -154,64 +222,121 @@ function NewCharacterPage() {
     pilotGear?.filter((item) => item.category === "gear") ?? [];
 
   // When background is selected, pre-populate triggers
-  const handleBackgroundSelect = (bg: Background) => {
+  const handleBackgroundSelect = (bg: CompendiumBackground) => {
     setFormData((prev) => ({
       ...prev,
       backgroundId: bg.id,
       backgroundName: bg.name,
       triggers: [...bg.triggers], // Copy suggested triggers
     }));
-    setStep("triggers");
+    setStep("level");
+  };
+
+  // Handle level change - reset allocations when level changes
+  const handleLevelChange = (newLevel: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      level: newLevel,
+      licenseAllocations: [],
+      // Reset mechs when changing level
+      mechs: [],
+      // Reset skills to 0 when level changes to let user reallocate
+      skills: { hull: 0, agility: 0, systems: 0, engineering: 0 },
+      // Reset talents when level changes
+      talents: [],
+    }));
   };
 
   const handleSubmit = async () => {
     setError(null);
 
     if (!formData.callsign.trim()) {
+      toast.error("Callsign is required");
       setError("Callsign is required");
       return;
     }
 
     if (!formData.pilotGear.clothing) {
+      toast.error("Pilot gear requires a clothing selection");
       setError("Pilot gear requires a clothing selection");
       return;
     }
 
+    if (formData.mechs.length === 0) {
+      toast.error("At least one mech is required");
+      setError("At least one mech is required");
+      return;
+    }
+
+    // Get primary mech (first selected)
+    const primaryMech = formData.mechs[0];
+
     // Build request with all the selected data
+    // Type assertions needed because TypeScript generates strict tuple types
     const request: CharacterCreateRequest = {
       callsign: formData.callsign,
       name: formData.name || undefined,
+      level: formData.level,
       use_ll0_defaults: false, // We're providing custom data
       skills: formData.skills,
       triggers: formData.triggers.map((id) => ({ trigger_id: id, rank: 2 })),
       talents: formData.talents.map((id) => ({ talent_id: id, rank: 1 })),
+      licenses:
+        formData.level > 0
+          ? formData.licenseAllocations.map((a) => ({
+              license_id: a.licenseId,
+              rank: a.rank,
+            }))
+          : undefined,
       background: formData.backgroundId
         ? {
             id: formData.backgroundId,
             name: formData.backgroundName,
-            triggers: formData.triggers,
+            triggers: formData.triggers as [string, string, string, string],
           }
         : undefined,
       pilot_gear: {
         clothing: formData.pilotGear.clothing,
         armor: formData.pilotGear.armor || null,
-        weapons: formData.pilotGear.weapons,
-        gear: formData.pilotGear.gear,
+        weapons: formData.pilotGear.weapons as [] | [string] | [string, string],
+        gear: formData.pilotGear.gear as
+          | []
+          | [string]
+          | [string, string]
+          | [string, string, string],
       },
-      mech_name: formData.mechName || undefined,
+      mech_frame_id: primaryMech.frameId,
+      mech_name: primaryMech.name || undefined,
       notes: formData.notes || undefined,
     };
 
     try {
       const result = await createMutation.mutateAsync(request);
+
+      // Add additional mechs for LL1+ if there are more than one
+      if (formData.mechs.length > 1) {
+        for (let i = 1; i < formData.mechs.length; i++) {
+          const mech = formData.mechs[i];
+          await addMechMutation.mutateAsync({
+            characterId: result.id,
+            data: {
+              name: mech.name || mech.frameId,
+              frame_id: mech.frameId,
+            },
+          });
+        }
+      }
+
+      toast.success(`Character "${formData.callsign}" created`);
       navigate({
         to: "/characters/$characterId",
         params: { characterId: result.id },
       });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create character"
-      );
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create character";
+      toast.error(errorMessage);
+      setError(errorMessage);
     }
   };
 
@@ -252,20 +377,32 @@ function NewCharacterPage() {
     formData.skills.systems +
     formData.skills.engineering;
 
-  const canProceedFromTriggers = formData.triggers.length === 4;
-  const canProceedFromSkills = totalSkillPoints === 2;
-  const canProceedFromTalents = formData.talents.length === 3;
-  const canProceedFromGear = formData.pilotGear.clothing !== null;
+  const totalLicensePoints = formData.licenseAllocations.reduce(
+    (sum, a) => sum + a.rank,
+    0
+  );
+
   const canProceedFromBackground =
     formData.callsign.trim().length > 0 && Boolean(formData.backgroundId);
+  const canProceedFromLevel = true; // Always valid since default is LL0
+  const canProceedFromLicenses =
+    formData.level === 0 || totalLicensePoints === progression.licensePoints;
+  const canProceedFromTriggers = formData.triggers.length === 4;
+  const canProceedFromSkills = totalSkillPoints === progression.skillPoints;
+  const canProceedFromTalents =
+    formData.talents.length === progression.talentPoints;
+  const canProceedFromGear = formData.pilotGear.clothing !== null;
+  const canProceedFromMech = formData.mechs.length >= 1;
 
   const stepStatus: Record<Step, boolean> = {
     background: canProceedFromBackground,
+    level: canProceedFromLevel,
+    licenses: canProceedFromLicenses,
     triggers: canProceedFromTriggers,
     skills: canProceedFromSkills,
     talents: canProceedFromTalents,
     gear: canProceedFromGear,
-    mech: true,
+    mech: canProceedFromMech,
   };
 
   const completedSteps = STEP_ORDER.filter((id) => stepStatus[id]).length;
@@ -274,12 +411,15 @@ function NewCharacterPage() {
   );
   const currentStepMeta = STEP_META[step];
 
-  if (loadingBackgrounds || loadingTriggers || loadingTalents || loadingPilotGear) {
-    return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <p className="text-muted-foreground">Loading reference data...</p>
-      </div>
-    );
+  if (
+    loadingBackgrounds ||
+    loadingTriggers ||
+    loadingTalents ||
+    loadingPilotGear ||
+    loadingLicenses ||
+    loadingFrames
+  ) {
+    return <CharacterFormSkeleton />;
   }
 
   return (
@@ -294,7 +434,7 @@ function NewCharacterPage() {
               Create New Character
             </h1>
             <p className="text-muted-foreground">
-              LL0 build with guided validation and live readiness checks
+              LL{formData.level} build with guided validation and live readiness checks
             </p>
           </div>
           <div className="rounded-full border border-border px-4 py-1 text-xs text-muted-foreground">
@@ -376,11 +516,11 @@ function NewCharacterPage() {
         </nav>
 
         <div className="space-y-6">
-          {/* Step 1: Background */}
+          {/* Background */}
           {step === "background" && (
             <Card>
               <CardHeader>
-                <CardTitle>Step 1: Background</CardTitle>
+                <CardTitle>Background</CardTitle>
                 <CardDescription>{STEP_META.background.description}</CardDescription>
               </CardHeader>
               <CardContent>
@@ -461,11 +601,89 @@ function NewCharacterPage() {
             </Card>
           )}
 
-          {/* Step 2: Triggers */}
+          {/* Step 2: Level */}
+          {step === "level" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Step 2: License Level</CardTitle>
+                <CardDescription>
+                  {STEP_META.level.description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LevelSelector
+                  value={formData.level}
+                  onChange={handleLevelChange}
+                />
+
+                <div className="flex gap-3 mt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep("background")}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      setStep(formData.level >= 1 ? "licenses" : "triggers")
+                    }
+                  >
+                    Next: {formData.level >= 1 ? "Licenses" : "Triggers"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 3: Licenses (LL1+ only) */}
+          {step === "licenses" && formData.level >= 1 && licenses && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Step 3: Licenses</CardTitle>
+                <CardDescription>
+                  {STEP_META.licenses.description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LicenseSelector
+                  licenses={licenses}
+                  allocations={formData.licenseAllocations}
+                  availablePoints={progression.licensePoints}
+                  onChange={(allocations) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      licenseAllocations: allocations,
+                    }))
+                  }
+                />
+
+                <div className="flex gap-3 mt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep("level")}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setStep("triggers")}
+                    disabled={!canProceedFromLicenses}
+                  >
+                    Next: Triggers
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Triggers */}
           {step === "triggers" && (
             <Card>
               <CardHeader>
-                <CardTitle>Step 2: Triggers</CardTitle>
+                <CardTitle>Triggers</CardTitle>
                 <CardDescription>{STEP_META.triggers.description}</CardDescription>
               </CardHeader>
               <CardContent>
@@ -532,7 +750,9 @@ function NewCharacterPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setStep("background")}
+                    onClick={() =>
+                      setStep(formData.level >= 1 ? "licenses" : "level")
+                    }
                   >
                     Back
                   </Button>
@@ -548,11 +768,11 @@ function NewCharacterPage() {
             </Card>
           )}
 
-          {/* Step 3: Skills */}
+          {/* Skills */}
           {step === "skills" && (
             <Card>
               <CardHeader>
-                <CardTitle>Step 3: Mech Skills</CardTitle>
+                <CardTitle>Mech Skills</CardTitle>
                 <CardDescription>{STEP_META.skills.description}</CardDescription>
               </CardHeader>
               <CardContent>
@@ -615,14 +835,15 @@ function NewCharacterPage() {
                 <div className="mt-4 text-sm">
                   <span
                     className={
-                      totalSkillPoints === 2 ? "text-primary" : "text-destructive"
+                      canProceedFromSkills ? "text-primary" : "text-destructive"
                     }
                   >
-                    Total: {totalSkillPoints} / 2 points
+                    Total: {totalSkillPoints} / {progression.skillPoints} points
                   </span>
-                  {totalSkillPoints !== 2 && (
+                  {!canProceedFromSkills && (
                     <span className="text-destructive ml-2">
-                      (Must be exactly 2 for LL0)
+                      (Must be exactly {progression.skillPoints} for LL
+                      {formData.level})
                     </span>
                   )}
                 </div>
@@ -647,29 +868,31 @@ function NewCharacterPage() {
             </Card>
           )}
 
-          {/* Step 4: Talents */}
+          {/* Talents */}
           {step === "talents" && (
             <Card>
               <CardHeader>
-                <CardTitle>Step 4: Talents</CardTitle>
+                <CardTitle>Talents</CardTitle>
                 <CardDescription>{STEP_META.talents.description}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="mb-4 rounded-md border border-border bg-muted/50 px-3 py-2">
                   <div className="text-xs text-muted-foreground">
-                    Selected: {formData.talents.length} / 3 talents
+                    Selected: {formData.talents.length} / {progression.talentPoints}{" "}
+                    talents
                   </div>
                 </div>
                 {!canProceedFromTalents && (
                   <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                    Select exactly 3 talents to continue.
+                    Select exactly {progression.talentPoints} talents to continue.
                   </div>
                 )}
 
                 <div className="grid gap-2 max-h-96 overflow-y-auto">
                   {allTalents?.map((talent) => {
                     const isSelected = formData.talents.includes(talent.id);
-                    const isFull = formData.talents.length >= 3;
+                    const isFull =
+                      formData.talents.length >= progression.talentPoints;
                     return (
                       <button
                         key={talent.id}
@@ -729,11 +952,11 @@ function NewCharacterPage() {
             </Card>
           )}
 
-          {/* Step 5: Pilot Gear */}
+          {/* Pilot Gear */}
           {step === "gear" && (
             <Card>
               <CardHeader>
-                <CardTitle>Step 5: Pilot Gear</CardTitle>
+                <CardTitle>Pilot Gear</CardTitle>
                 <CardDescription>{STEP_META.gear.description}</CardDescription>
               </CardHeader>
               <CardContent>
@@ -918,45 +1141,49 @@ function NewCharacterPage() {
             </Card>
           )}
 
-          {/* Step 6: Mech */}
-          {step === "mech" && (
+          {/* Mech */}
+          {step === "mech" && frames && licenses && (
             <Card>
               <CardHeader>
-                <CardTitle>Step 6: Your Mech</CardTitle>
+                <CardTitle>Your Mech{formData.level > 0 ? "s" : ""}</CardTitle>
                 <CardDescription>{STEP_META.mech.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Mech Name</label>
-                  <input
-                    type="text"
-                    value={formData.mechName}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, mechName: e.target.value }))
-                    }
-                    placeholder={formData.callsign || "RAIJIN"}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Optional custom name (defaults to callsign)
-                  </p>
-                </div>
-
-                <div className="mt-4 p-4 bg-muted/50 border border-border rounded-md">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="font-semibold">GMS Everest</div>
-                    <LicenseBadge licenseId={null} />
+                {!canProceedFromMech && (
+                  <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    Select at least one mech to continue.
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm text-muted-foreground">
-                    <div>HP 10</div>
-                    <div>Evasion 8</div>
-                    <div>Speed 4</div>
-                    <div>Heat Cap 6</div>
-                    <div>SP 6</div>
-                  </div>
-                </div>
+                )}
 
-                <div className="mt-4">
+                <FrameBrowser
+                  frames={frames}
+                  licenses={licenses}
+                  allocations={formData.licenseAllocations}
+                  level={formData.level}
+                  selectedMechs={formData.mechs}
+                  onAddMech={(frameId, name) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      mechs: [...prev.mechs, { frameId, name }],
+                    }))
+                  }
+                  onRemoveMech={(index) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      mechs: prev.mechs.filter((_, i) => i !== index),
+                    }))
+                  }
+                  onUpdateMechName={(index, name) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      mechs: prev.mechs.map((m, i) =>
+                        i === index ? { ...m, name } : m
+                      ),
+                    }))
+                  }
+                />
+
+                <div className="mt-6">
                   <label className="block text-sm font-medium mb-1">Notes</label>
                   <textarea
                     value={formData.notes}
@@ -976,8 +1203,22 @@ function NewCharacterPage() {
                       <strong>Callsign:</strong> {formData.callsign || "None"}
                     </li>
                     <li>
+                      <strong>Level:</strong> LL{formData.level}
+                    </li>
+                    <li>
                       <strong>Background:</strong> {formData.backgroundName || "None"}
                     </li>
+                    {formData.licenseAllocations.length > 0 && (
+                      <li>
+                        <strong>Licenses:</strong>{" "}
+                        {formData.licenseAllocations
+                          .map((a) => {
+                            const lic = licenses.find((l) => l.id === a.licenseId);
+                            return `${lic?.name ?? a.licenseId} ${a.rank}`;
+                          })
+                          .join(", ")}
+                      </li>
+                    )}
                     <li>
                       <strong>Triggers:</strong>{" "}
                       {formData.triggers.length
@@ -1023,6 +1264,17 @@ function NewCharacterPage() {
                         )
                         .join(", ")}
                     </li>
+                    <li>
+                      <strong>Mechs:</strong>{" "}
+                      {formData.mechs.length
+                        ? formData.mechs
+                            .map((m) => {
+                              const frame = frames.find((f) => f.id === m.frameId);
+                              return `${m.name || frame?.name || m.frameId}`;
+                            })
+                            .join(", ")
+                        : "None"}
+                    </li>
                   </ul>
                 </div>
 
@@ -1030,16 +1282,22 @@ function NewCharacterPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setStep("talents")}
+                    onClick={() => setStep("gear")}
                   >
                     Back
                   </Button>
                   <Button
                     type="button"
                     onClick={handleSubmit}
-                    disabled={createMutation.isPending}
+                    disabled={
+                      createMutation.isPending ||
+                      addMechMutation.isPending ||
+                      !canProceedFromMech
+                    }
                   >
-                    {createMutation.isPending ? "Creating..." : "Create Character"}
+                    {createMutation.isPending || addMechMutation.isPending
+                      ? "Creating..."
+                      : "Create Character"}
                   </Button>
                 </div>
               </CardContent>
@@ -1051,26 +1309,39 @@ function NewCharacterPage() {
           <Card>
             <CardHeader>
               <CardTitle>Readiness Checklist</CardTitle>
-              <CardDescription>LL0 requirements before deployment</CardDescription>
+              <CardDescription>
+                LL{formData.level} requirements before deployment
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <ChecklistItem
                 label="Callsign + background"
-                detail={formData.callsign && formData.backgroundName ? "Locked" : "Required"}
+                detail={
+                  formData.callsign && formData.backgroundName
+                    ? "Locked"
+                    : "Required"
+                }
                 ok={canProceedFromBackground}
               />
+              {formData.level >= 1 && (
+                <ChecklistItem
+                  label={`${progression.licensePoints} license points`}
+                  detail={`${totalLicensePoints} / ${progression.licensePoints}`}
+                  ok={canProceedFromLicenses}
+                />
+              )}
               <ChecklistItem
                 label="4 triggers"
                 detail={`${formData.triggers.length} selected`}
                 ok={canProceedFromTriggers}
               />
               <ChecklistItem
-                label="2 HASE points"
-                detail={`${totalSkillPoints} / 2`}
+                label={`${progression.skillPoints} HASE points`}
+                detail={`${totalSkillPoints} / ${progression.skillPoints}`}
                 ok={canProceedFromSkills}
               />
               <ChecklistItem
-                label="3 talents"
+                label={`${progression.talentPoints} talents`}
                 detail={`${formData.talents.length} selected`}
                 ok={canProceedFromTalents}
               />
@@ -1078,6 +1349,11 @@ function NewCharacterPage() {
                 label="Pilot clothing"
                 detail={formData.pilotGear.clothing ? "Selected" : "Missing"}
                 ok={canProceedFromGear}
+              />
+              <ChecklistItem
+                label="Mech"
+                detail={`${formData.mechs.length} selected`}
+                ok={canProceedFromMech}
               />
             </CardContent>
           </Card>
@@ -1089,10 +1365,26 @@ function NewCharacterPage() {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>LL0 requires 4 triggers at +2 and exactly 2 HASE points.</li>
+                <li>
+                  LL{formData.level} requires 4 triggers at +2 and exactly{" "}
+                  {progression.skillPoints} HASE points.
+                </li>
+                {formData.level >= 1 && (
+                  <li>
+                    Allocate {progression.licensePoints} license point
+                    {progression.licensePoints > 1 ? "s" : ""} to unlock
+                    manufacturer frames.
+                  </li>
+                )}
                 <li>Talents start at Rank I; you can respec later.</li>
                 <li>Clothing is mandatory; armor is optional.</li>
                 <li>Weapons and gear are capped to keep loadouts lean.</li>
+                {formData.level >= 1 && (
+                  <li>
+                    LL{formData.level} pilots can have up to{" "}
+                    {formData.level + 1} mechs.
+                  </li>
+                )}
               </ul>
             </CardContent>
           </Card>

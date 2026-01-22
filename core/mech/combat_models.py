@@ -272,6 +272,16 @@ class TurnStartResult(FrozenModel):
         description="Damage taken from failed dangerous terrain check"
     )
 
+    # Flight: falling detection (PR2 flight rules - Phase 52)
+    started_falling: bool = Field(
+        default=False,
+        description="Whether the actor started falling this turn due to status (stunned/immobilized/shutdown)"
+    )
+    falling_from_altitude: int | None = Field(
+        default=None,
+        description="Altitude level the actor is falling from (if started_falling)"
+    )
+
 
 class BurnTickResult(FrozenModel):
     """Result of burn damage tick at end of turn."""
@@ -307,6 +317,20 @@ class TurnEndResult(FrozenModel):
     drones_primed: list[str] = Field(
         default_factory=list,
         description="IDs of drones that primed at end of this turn"
+    )
+
+    # Flight: falling resolution (PR2 flight rules - Phase 52)
+    fall_resolved: bool = Field(
+        default=False,
+        description="Whether a fall was resolved this turn"
+    )
+    fall_damage: int = Field(
+        default=0,
+        description="Damage taken from fall (1 per altitude level, armor-piercing)"
+    )
+    fell_from_altitude: int | None = Field(
+        default=None,
+        description="Altitude level the actor fell from"
     )
 
 

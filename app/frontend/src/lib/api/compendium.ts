@@ -39,6 +39,13 @@ export interface Talent {
   ranks: number;
 }
 
+export interface License {
+  id: string;
+  name: string;
+  manufacturer: "GMS" | "IPS-N" | "SSC" | "HORUS" | "HA";
+  frame_id: string;
+}
+
 interface ListResponse<T> {
   items: T[];
   total: number;
@@ -60,6 +67,7 @@ export const compendiumKeys = {
   weapons: () => [...compendiumKeys.all, "weapons"] as const,
   systems: () => [...compendiumKeys.all, "systems"] as const,
   pilotGear: () => [...compendiumKeys.all, "pilot-gear"] as const,
+  licenses: () => [...compendiumKeys.all, "licenses"] as const,
 };
 
 // =============================================================================
@@ -128,6 +136,15 @@ export function usePilotGear() {
     queryKey: compendiumKeys.pilotGear(),
     queryFn: () =>
       api.get<ListResponse<PilotGearItemDefinition>>("/compendium/pilot-gear"),
+    staleTime: Infinity,
+    select: (data) => data.items,
+  });
+}
+
+export function useLicenses() {
+  return useQuery({
+    queryKey: compendiumKeys.licenses(),
+    queryFn: () => api.get<ListResponse<License>>("/compendium/licenses"),
     staleTime: Infinity,
     select: (data) => data.items,
   });

@@ -54,6 +54,7 @@ from core.shared.effects import (
 from core.shared.full_tech import FullTechOptionSelection
 from core.shared.rolls import AttackResolutionResult
 from core.shared.heat import MeltdownState
+from core.shared.flying import FlyingStatus
 
 
 # =============================================================================
@@ -72,6 +73,7 @@ def make_combatant(
     grit: int = 0,
     tech_attack: int = 0,
     engineering_skill: int = 0,
+    e_defense: int = 8,
     **kwargs,
 ) -> CombatantState:
     """Create a test combatant."""
@@ -85,7 +87,7 @@ def make_combatant(
             size="size_1",
             hp_max=hp_max,
             evasion=8,
-            e_defense=8,
+            e_defense=e_defense,
             armor=0,
             speed=4,
             sensor_range=10,
@@ -813,9 +815,16 @@ class TestExecuteAction:
         assert defender_after.resources.heat_current == 1
 
     def test_execute_invade_miss_no_heat(self):
-        """Invade should not apply heat on a miss."""
+        """Invade should not apply heat on a miss.
+
+        With the 1d20 + tech_attack vs E-defense system, we set a very high E-defense
+        to ensure a miss (except on critical natural 20, which has 5% chance).
+        """
         attacker = make_combatant(id="attacker", name="Attacker", side="players", tech_attack=0)
-        defender = make_combatant(id="defender", name="Defender", side="hostiles", heat_cap=20)
+        # E-defense of 30 ensures tech_attack=0 can't hit (max roll 20 < 30) except on critical
+        defender = make_combatant(
+            id="defender", name="Defender", side="hostiles", heat_cap=20, e_defense=30
+        )
         scenario = make_scenario(combatants=[attacker, defender])
         turn = make_turn(actor_id="attacker")
         economy = ActionEconomyState()
@@ -831,11 +840,13 @@ class TestExecuteAction:
 
         assert result.success is True
         assert result.effects_applied[0]["type"] == "invade"
-        assert result.effects_applied[0]["hit"] is False
-        assert result.heat_generated == 0
+        # Note: 5% chance of critical hit (natural 20) which would make this fail
+        if not result.effects_applied[0].get("is_critical", False):
+            assert result.effects_applied[0]["hit"] is False
+            assert result.heat_generated == 0
 
-        defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
-        assert defender_after.resources.heat_current == 0
+            defender_after = next(c for c in updated_scenario.combatants if c.id == "defender")
+            assert defender_after.resources.heat_current == 0
 
     def test_execute_full_tech_scan_lock_on(self):
         """Full Tech should apply two tech options in sequence."""
@@ -2767,10 +2778,27 @@ class TestDisengageAction:
 class TestHideAction:
     """Tests for Hide action resolution (PR2 4221-4237)."""
 
-    def test_hide_applies_hidden_status(self):
-        """Hide should apply hidden status when successful."""
-        actor = make_combatant(id="actor_1")
-        scenario = make_scenario(combatants=[actor])
+    def test_hide_applies_hidden_status_with_hard_cover(self):
+        """Hide should apply hidden status when actor has hard cover."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Add terrain with hard cover adjacent to actor
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=0, r=0)),  # Actor's position
+            TerrainHex(coord=HexCoord(q=1, r=0), provides_hard_cover=True),  # Adjacent hard cover
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
         turn = CombatTurn(actor_id="actor_1", actions=[])
         economy = ActionEconomyState()
 
@@ -2787,6 +2815,117 @@ class TestHideAction:
         assert result.success
         updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
         assert "hidden" in updated_actor.statuses
+
+    def test_hide_fails_without_cover(self):
+        """Hide should fail when there is no cover (no terrain)."""
+        actor = make_combatant(
+            id="actor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        scenario = make_scenario(combatants=[actor])
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="hide",
+            action_type="quick",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success  # Action executed, but hide failed
+        hide_effect = next(e for e in result.effects_applied if e.get("type") == "hide")
+        assert hide_effect["success"] is False
+        assert "no cover" in hide_effect["reason"].lower() or "no terrain" in hide_effect["reason"].lower()
+        # Actor should not have hidden status
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert "hidden" not in updated_actor.statuses
+
+    def test_hide_succeeds_in_soft_cover_area(self):
+        """Hide should succeed when actor is in a soft cover area (3+ adjacent hexes)."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Create soft cover area (smoke cloud simulation - 3+ hexes)
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=0, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=1, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=1, r=-1), provides_soft_cover=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="hide",
+            action_type="quick",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert "hidden" in updated_actor.statuses
+        hide_effect = next(e for e in result.effects_applied if e.get("type") == "hide")
+        assert hide_effect["success"] is True
+        assert "soft cover" in hide_effect["reason"].lower()
+
+    def test_hide_fails_with_insufficient_soft_cover(self):
+        """Hide should fail when soft cover is not sufficient (less than 3 hexes)."""
+        from core.shared.terrain import TerrainMap, TerrainHex
+
+        actor = make_combatant(
+            id="actor_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=0),
+        )
+        # Only 2 soft cover hexes - not enough for an "area"
+        terrain = TerrainMap(tiles=[
+            TerrainHex(coord=HexCoord(q=0, r=0), provides_soft_cover=True),
+            TerrainHex(coord=HexCoord(q=1, r=0), provides_soft_cover=True),
+        ])
+        scenario = MechCombatScenario(
+            combatants=[actor],
+            grapples=[],
+            rounds=[],
+            terrain=terrain,
+            environment="standard",
+            deployables={},
+        )
+        turn = CombatTurn(actor_id="actor_1", actions=[])
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="actor_1",
+            action_id="hide",
+            action_type="quick",
+        )
+
+        updated_scenario, _, _, result = execute_action(
+            scenario, turn, economy, action_input
+        )
+
+        assert result.success  # Action executed, but hide failed
+        hide_effect = next(e for e in result.effects_applied if e.get("type") == "hide")
+        assert hide_effect["success"] is False
+        # Actor should not have hidden status
+        updated_actor = next(c for c in updated_scenario.combatants if c.id == "actor_1")
+        assert "hidden" not in updated_actor.statuses
 
     def test_hide_fails_when_engaged(self):
         """Hide should fail when actor is engaged."""
@@ -8906,3 +9045,328 @@ class TestDynamicWeaponProfiles:
         attack_effects = [e for e in result.effects_applied if e.get("type") == "attack"]
         assert len(attack_effects) == 1
         assert attack_effects[0]["target_id"] == "mech_2"
+
+
+# =============================================================================
+# Falling Resolution Tests (Phase 52)
+# =============================================================================
+
+
+class TestFallingResolution:
+    """Tests for falling state tracking and resolution (PR2 flight rules)."""
+
+    def test_flying_actor_marked_falling_when_stunned(self):
+        """Flying actor with stunned status should be marked as falling at turn start."""
+        # Create flying combatant with stunned status
+        flying_actor = make_combatant(
+            id="mech_1",
+            name="Flying Mech",
+            hp_max=20,
+            hp_current=20,
+        )
+        # Set flying status at altitude 5
+        flying_actor = flying_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=5,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": ["stunned"],
+            }
+        )
+
+        scenario = make_scenario(combatants=[flying_actor])
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        # Should be marked as falling
+        assert result.started_falling is True
+        assert result.falling_from_altitude == 5
+
+        # Actor should have falling status
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert "falling" in actor.statuses
+        assert actor.falling_from_altitude == 5
+
+    def test_flying_actor_marked_falling_when_immobilized(self):
+        """Flying actor with immobilized status should be marked as falling at turn start."""
+        flying_actor = make_combatant(id="mech_1", name="Flying Mech")
+        flying_actor = flying_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=3,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": ["immobilized"],
+            }
+        )
+
+        scenario = make_scenario(combatants=[flying_actor])
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        assert result.started_falling is True
+        assert result.falling_from_altitude == 3
+
+    def test_flying_actor_marked_falling_when_shutdown(self):
+        """Flying actor with shutdown status should be marked as falling at turn start."""
+        flying_actor = make_combatant(id="mech_1", name="Flying Mech")
+        flying_actor = flying_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=2,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": ["shutdown"],
+            }
+        )
+
+        scenario = make_scenario(combatants=[flying_actor])
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        assert result.started_falling is True
+        assert result.falling_from_altitude == 2
+
+    def test_falling_resolves_at_end_of_turn(self):
+        """Falling status should resolve with damage at end of turn."""
+        # Create actor already marked as falling
+        falling_actor = make_combatant(
+            id="mech_1",
+            name="Falling Mech",
+            hp_max=20,
+            hp_current=20,
+        )
+        falling_actor = falling_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=5,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": ["falling"],
+                "falling_from_altitude": 5,
+            }
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="mech_1")])
+        scenario = make_scenario(combatants=[falling_actor], rounds=[round1])
+        turn = make_turn(actor_id="mech_1")
+
+        updated_scenario, result, _, _ = end_turn(scenario, 1, 0, turn)
+
+        # Fall should be resolved
+        assert result.fall_resolved is True
+        assert result.fall_damage == 5  # 1 damage per altitude level
+        assert result.fell_from_altitude == 5
+
+        # Actor should have taken damage and no longer be falling
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert actor.resources.hp_current == 15  # 20 - 5 = 15
+        assert "falling" not in actor.statuses
+        assert actor.falling_from_altitude is None
+
+    def test_falling_damage_scales_with_altitude(self):
+        """Falling damage should equal altitude level."""
+        falling_actor = make_combatant(
+            id="mech_1",
+            name="Falling Mech",
+            hp_max=20,
+            hp_current=20,
+        )
+        falling_actor = falling_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=8,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": ["falling"],
+                "falling_from_altitude": 8,
+            }
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="mech_1")])
+        scenario = make_scenario(combatants=[falling_actor], rounds=[round1])
+        turn = make_turn(actor_id="mech_1")
+
+        updated_scenario, result, _, _ = end_turn(scenario, 1, 0, turn)
+
+        assert result.fall_damage == 8  # 1 damage per altitude level
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert actor.resources.hp_current == 12  # 20 - 8 = 12
+
+    def test_falling_clears_flying_status(self):
+        """After fall resolves, actor should no longer be flying."""
+        falling_actor = make_combatant(id="mech_1", name="Falling Mech")
+        falling_actor = falling_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=3,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": ["falling"],
+                "falling_from_altitude": 3,
+            }
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="mech_1")])
+        scenario = make_scenario(combatants=[falling_actor], rounds=[round1])
+        turn = make_turn(actor_id="mech_1")
+
+        updated_scenario, result, _, _ = end_turn(scenario, 1, 0, turn)
+
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert actor.flying_status is not None
+        assert actor.flying_status.is_flying is False
+        assert actor.flying_status.altitude_level == 0
+        assert actor.flying_status.movement_mode == "ground"
+
+    def test_falling_resets_position_elevation(self):
+        """After fall resolves, actor position elevation should be 0."""
+        falling_actor = make_combatant(
+            id="mech_1",
+            name="Falling Mech",
+            position=HexPosition(coord=HexCoord(q=0, r=0), elevation=5),
+        )
+        falling_actor = falling_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=5,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": ["falling"],
+                "falling_from_altitude": 5,
+            }
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="mech_1")])
+        scenario = make_scenario(combatants=[falling_actor], rounds=[round1])
+        turn = make_turn(actor_id="mech_1")
+
+        updated_scenario, result, _, _ = end_turn(scenario, 1, 0, turn)
+
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert actor.position is not None
+        assert actor.position.elevation == 0
+
+    def test_no_falling_if_not_flying(self):
+        """Non-flying actor with stunned status should not fall."""
+        grounded_actor = make_combatant(id="mech_1", name="Grounded Mech")
+        grounded_actor = grounded_actor.model_copy(
+            update={
+                "statuses": ["stunned"],
+            }
+        )
+
+        scenario = make_scenario(combatants=[grounded_actor])
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        # Should NOT be marked as falling
+        assert result.started_falling is False
+        assert result.falling_from_altitude is None
+
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert "falling" not in actor.statuses
+
+    def test_zero_altitude_no_fall_damage(self):
+        """Flying at altitude 0 should not cause fall damage."""
+        flying_actor = make_combatant(
+            id="mech_1",
+            name="Low Flying Mech",
+            hp_max=20,
+            hp_current=20,
+        )
+        flying_actor = flying_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=0,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": ["stunned"],
+            }
+        )
+
+        scenario = make_scenario(combatants=[flying_actor])
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        # Should NOT be marked as falling (altitude is 0)
+        assert result.started_falling is False
+
+    def test_flying_without_status_does_not_fall(self):
+        """Flying actor without immobilized/stunned/shutdown should not fall."""
+        flying_actor = make_combatant(id="mech_1", name="Flying Mech")
+        flying_actor = flying_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=5,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": [],  # No disabling statuses
+            }
+        )
+
+        scenario = make_scenario(combatants=[flying_actor])
+        updated_scenario, result = start_turn(scenario, "mech_1")
+
+        # Should NOT be marked as falling
+        assert result.started_falling is False
+        assert result.falling_from_altitude is None
+
+        actor = next(c for c in updated_scenario.combatants if c.id == "mech_1")
+        assert "falling" not in actor.statuses
+
+    def test_full_turn_cycle_flying_to_fallen(self):
+        """Test complete turn cycle: flying actor gets stunned, starts falling, resolves at end."""
+        # Start with a flying actor that has stunned status
+        flying_actor = make_combatant(
+            id="mech_1",
+            name="Flying Mech",
+            hp_max=20,
+            hp_current=20,
+        )
+        flying_actor = flying_actor.model_copy(
+            update={
+                "flying_status": FlyingStatus(
+                    is_flying=True,
+                    altitude_level=4,
+                    is_hover=False,
+                    movement_mode="flight",
+                ),
+                "statuses": ["stunned"],
+            }
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="mech_1")])
+        scenario = make_scenario(combatants=[flying_actor], rounds=[round1])
+
+        # Start turn - should mark as falling
+        scenario, start_result = start_turn(scenario, "mech_1")
+        assert start_result.started_falling is True
+        assert start_result.falling_from_altitude == 4
+
+        # End turn - should resolve fall with damage
+        turn = make_turn(actor_id="mech_1")
+        scenario, end_result, _, _ = end_turn(scenario, 1, 0, turn)
+        assert end_result.fall_resolved is True
+        assert end_result.fall_damage == 4
+
+        # Final state check
+        actor = next(c for c in scenario.combatants if c.id == "mech_1")
+        assert actor.resources.hp_current == 16  # 20 - 4 = 16
+        assert "falling" not in actor.statuses
+        assert actor.flying_status is not None
+        assert actor.flying_status.is_flying is False

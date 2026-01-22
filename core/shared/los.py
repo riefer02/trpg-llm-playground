@@ -18,7 +18,8 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.mech.grid import HexCoord, HexPosition
+from core.shared.enums import SizeClass
+from core.mech.grid import HexCoord, HexPosition, footprint_coords
 from core.mech.terrain import TerrainMap, TerrainHex, terrain_index
 
 
@@ -352,3 +353,56 @@ def get_los_obscuring_hexes(
             obscuring_hexes.append(hex_coord)
 
     return obscuring_hexes
+
+
+def check_line_of_sight_to_footprint(
+    attacker_pos: HexPosition,
+    target_center: HexCoord,
+    target_size: SizeClass,
+    terrain: TerrainMap | None,
+) -> LOSResult:
+    """Check LOS to any hex in target's footprint.
+
+    For Size 2+ targets, attacker only needs LOS to ONE hex in the footprint
+    for a valid shot. Returns the best result (clear > obscured > blocked).
+
+    Per Lancer rules, attackers can target any visible part of a large unit's
+    footprint. This enables flanking tactics and targeting exposed sections.
+
+    Args:
+        attacker_pos: Attacker's position (includes elevation)
+        target_center: Target's center hex coordinate
+        target_size: Target's size class (determines footprint)
+        terrain: Terrain map for checking obstructions
+
+    Returns:
+        LOSResult with best LOS available to any footprint hex.
+        has_los is True if ANY footprint hex is visible.
+    """
+    target_hexes = footprint_coords(target_center, target_size)
+
+    best_result: LOSResult | None = None
+
+    for hex_coord in target_hexes:
+        request = LOSCheckRequest(
+            attacker_pos=attacker_pos,
+            target_pos=HexPosition(coord=hex_coord, elevation=0),
+            terrain=terrain,
+        )
+        result = check_line_of_sight(request)
+
+        # Clear LOS = best possible, return immediately
+        if result.los_type == "clear":
+            return result
+
+        # Prefer obscured (has_los=True) over blocked (has_los=False)
+        if best_result is None:
+            best_result = result
+        elif result.has_los and not best_result.has_los:
+            best_result = result
+
+    return best_result or LOSResult(
+        has_los=False,
+        los_type="blocked",
+        reason="No LOS to any footprint hex",
+    )

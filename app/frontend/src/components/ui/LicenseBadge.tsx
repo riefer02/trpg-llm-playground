@@ -6,7 +6,7 @@
  *   <LicenseBadge licenseId="raleigh" licenseRank={1} /> // Shows "RALEIGH R1"
  */
 
-import { formatLicenseId } from '~/lib/utils/license'
+import { formatLicenseId } from '../../lib/utils/license'
 
 export interface LicenseBadgeProps {
   licenseId?: string | null

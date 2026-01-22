@@ -178,53 +178,128 @@ class TestResolveLockOn:
 
 
 class TestResolveInvade:
-    """Tests for the Invade action resolution."""
+    """Tests for the Invade action resolution.
+
+    Invade uses standard Lancer attack resolution: 1d20 + tech_attack vs E-defense.
+    Hit when: total > E-defense OR (total == E-defense AND roll >= 10).
+    Critical on natural 20 (always hits).
+    """
 
     def test_resolve_invade_hit(self):
-        """Invade hits when systems >= E-defense."""
+        """Invade hits when 1d20 + tech_attack > E-defense."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        # Roll 15 + tech_attack 5 = 20 vs E-defense 12 -> hit
+        settings = ResolutionSettings(forced_roll=15)
         result = resolve_invade(
             actor_id="pilot_1",
             target_id="mech_a",
-            attacker_systems=10,
-            target_e_defense=8,
+            tech_attack_bonus=5,
+            target_e_defense=12,
+            settings=settings,
         )
 
         assert result.action_id == "invade"
         assert result.actor_id == "pilot_1"
         assert result.target_id == "mech_a"
         assert result.hit is True
+        assert result.attack_roll == 15
+        assert result.attack_bonus == 5
+        assert result.total == 20
+        assert result.target_e_defense == 12
+        assert result.is_critical is False
         assert result.heat_applied == 2
         assert "impaired" in result.conditions_applied
         assert "slowed" in result.conditions_applied
-        assert result.systems_roll is not None
-        assert result.check_total is not None
-        assert result.target_e_defense == 8
 
     def test_resolve_invade_miss(self):
-        """Invade misses when systems < E-defense."""
+        """Invade misses when 1d20 + tech_attack < E-defense."""
         from core.mech.combat_resolution import ResolutionSettings
 
-        settings = ResolutionSettings(forced_rolls=[1])
+        # Roll 5 + tech_attack 2 = 7 vs E-defense 12 -> miss
+        settings = ResolutionSettings(forced_roll=5)
         result = resolve_invade(
             actor_id="pilot_1",
             target_id="mech_a",
-            attacker_systems=6,
+            tech_attack_bonus=2,
             target_e_defense=12,
             settings=settings,
         )
 
         assert result.hit is False
+        assert result.attack_roll == 5
+        assert result.total == 7
         assert result.heat_applied is None
         assert result.conditions_applied == []
 
-    def test_resolve_invade_custom_heat(self):
-        """Invade can deal custom heat amount."""
+    def test_resolve_invade_critical(self):
+        """Natural 20 always hits (critical)."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        # Roll 20 + tech_attack 0 = 20 vs E-defense 25 -> crit, always hits
+        settings = ResolutionSettings(forced_roll=20)
         result = resolve_invade(
             actor_id="pilot_1",
             target_id="mech_a",
-            attacker_systems=10,
-            target_e_defense=8,
+            tech_attack_bonus=0,
+            target_e_defense=25,
+            settings=settings,
+        )
+
+        assert result.hit is True
+        assert result.is_critical is True
+        assert result.attack_roll == 20
+        assert result.heat_applied == 2
+
+    def test_resolve_invade_boundary_hit_high_roll(self):
+        """Exact match hits when d20 roll >= 10."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        # Roll 10 + tech_attack 2 = 12 vs E-defense 12, roll >= 10 -> hit
+        settings = ResolutionSettings(forced_roll=10)
+        result = resolve_invade(
+            actor_id="pilot_1",
+            target_id="mech_a",
+            tech_attack_bonus=2,
+            target_e_defense=12,
+            settings=settings,
+        )
+
+        assert result.hit is True
+        assert result.total == 12
+        assert result.target_e_defense == 12
+        assert result.heat_applied == 2
+
+    def test_resolve_invade_boundary_miss_low_roll(self):
+        """Exact match misses when d20 roll < 10."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        # Roll 5 + tech_attack 7 = 12 vs E-defense 12, roll < 10 -> miss
+        settings = ResolutionSettings(forced_roll=5)
+        result = resolve_invade(
+            actor_id="pilot_1",
+            target_id="mech_a",
+            tech_attack_bonus=7,
+            target_e_defense=12,
+            settings=settings,
+        )
+
+        assert result.hit is False
+        assert result.total == 12
+        assert result.target_e_defense == 12
+
+    def test_resolve_invade_custom_heat(self):
+        """Invade can deal custom heat amount."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        settings = ResolutionSettings(forced_roll=15)
+        result = resolve_invade(
+            actor_id="pilot_1",
+            target_id="mech_a",
+            tech_attack_bonus=5,
+            target_e_defense=10,
             heat_on_hit=4,
+            settings=settings,
         )
 
         assert result.hit is True
@@ -232,84 +307,115 @@ class TestResolveInvade:
 
     def test_resolve_invade_custom_conditions(self):
         """Invade can inflict custom conditions."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        settings = ResolutionSettings(forced_roll=15)
         result = resolve_invade(
             actor_id="pilot_1",
             target_id="mech_a",
-            attacker_systems=10,
-            target_e_defense=8,
+            tech_attack_bonus=5,
+            target_e_defense=10,
             conditions=["stunned"],
+            settings=settings,
         )
 
         assert result.hit is True
         assert result.conditions_applied == ["stunned"]
 
-    def test_resolve_invade_boundary_hit(self):
-        """Invade hits on exact match (systems == E-defense)."""
+    def test_resolve_invade_with_accuracy(self):
+        """Accuracy dice add to the attack total."""
         from core.mech.combat_resolution import ResolutionSettings
 
-        settings = ResolutionSettings(forced_rolls=[1])
+        # Roll 8 + tech_attack 2 + accuracy (6) = 16 vs E-defense 15 -> hit
+        settings = ResolutionSettings(
+            forced_roll=8,
+            forced_accuracy_rolls=[6],
+        )
         result = resolve_invade(
             actor_id="pilot_1",
             target_id="mech_a",
-            attacker_systems=9,
+            tech_attack_bonus=2,
+            target_e_defense=15,
+            accuracy_bonus=1,
+            settings=settings,
+        )
+
+        assert result.hit is True
+        assert result.attack_roll == 8
+        assert result.total == 16
+        assert result.accuracy_dice_rolls == [6]
+
+    def test_resolve_invade_with_difficulty(self):
+        """Difficulty dice subtract from the attack total."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        # Roll 15 + tech_attack 5 - difficulty (3) = 17 vs E-defense 18 -> miss
+        settings = ResolutionSettings(
+            forced_roll=15,
+            forced_difficulty_rolls=[3],
+        )
+        result = resolve_invade(
+            actor_id="pilot_1",
+            target_id="mech_a",
+            tech_attack_bonus=5,
+            target_e_defense=18,
+            difficulty_bonus=1,
+            settings=settings,
+        )
+
+        assert result.hit is False
+        assert result.attack_roll == 15
+        assert result.total == 17
+        assert result.difficulty_dice_rolls == [3]
+
+    def test_resolve_invade_duration_end_of_next_turn(self):
+        """Invade conditions last until end of next turn."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        settings = ResolutionSettings(forced_roll=15)
+        result = resolve_invade(
+            actor_id="pilot_1",
+            target_id="mech_a",
+            tech_attack_bonus=5,
+            target_e_defense=10,
+            settings=settings,
+        )
+
+        assert result.duration == "end_of_next_turn"
+
+    def test_resolve_invade_high_bonus_hits(self):
+        """High tech attack bonus makes hits likely."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        # Roll 1 + tech_attack 12 = 13 vs E-defense 10 -> hit
+        settings = ResolutionSettings(forced_roll=1)
+        result = resolve_invade(
+            actor_id="pilot_1",
+            target_id="mech_a",
+            tech_attack_bonus=12,
             target_e_defense=10,
             settings=settings,
         )
 
         assert result.hit is True
-        assert result.heat_applied == 2
+        assert result.total == 13
 
-    def test_resolve_invade_forced_rolls(self):
-        """Invade respects forced roll settings."""
+    def test_resolve_invade_low_bonus_miss(self):
+        """Low tech attack bonus against high E-defense misses."""
         from core.mech.combat_resolution import ResolutionSettings
 
-        settings = ResolutionSettings(forced_rolls=[6])
+        # Roll 5 + tech_attack 0 = 5 vs E-defense 15 -> miss
+        settings = ResolutionSettings(forced_roll=5)
         result = resolve_invade(
             actor_id="pilot_1",
             target_id="mech_a",
-            attacker_systems=10,
-            target_e_defense=20,
-            settings=settings,
-        )
-
-        assert result.systems_roll is not None
-
-    def test_resolve_invade_duration_end_of_next_turn(self):
-        """Invade conditions last until end of next turn."""
-        result = resolve_invade(
-            actor_id="pilot_1",
-            target_id="mech_a",
-            attacker_systems=10,
-            target_e_defense=8,
-        )
-
-        assert result.duration == "end_of_next_turn"
-
-    def test_resolve_invade_high_systems_always_hits(self):
-        """High enough systems score will always hit."""
-        result = resolve_invade(
-            actor_id="pilot_1",
-            target_id="mech_a",
-            attacker_systems=20,
-            target_e_defense=8,
-        )
-
-        assert result.hit is True
-
-    def test_resolve_invade_low_systems_miss(self):
-        """Low systems score will miss high E-defense."""
-        from core.mech.combat_resolution import ResolutionSettings
-
-        settings = ResolutionSettings(forced_rolls=[1])
-        result = resolve_invade(
-            actor_id="pilot_1",
-            target_id="mech_a",
-            attacker_systems=4,
+            tech_attack_bonus=0,
             target_e_defense=15,
             settings=settings,
         )
 
         assert result.hit is False
+        assert result.total == 5
 
 
 class TestTechActionIntegration:
@@ -334,16 +440,21 @@ class TestTechActionIntegration:
 
     def test_lock_on_then_invade_same_target(self):
         """Actor can lock on then invade the same target."""
+        from core.mech.combat_resolution import ResolutionSettings
+
         lock_on_result = resolve_lock_on(
             actor_id="pilot_1",
             target_id="mech_a",
         )
 
+        # Roll 15 + tech_attack 5 = 20 vs E-defense 8 -> hit
+        settings = ResolutionSettings(forced_roll=15)
         invade_result = resolve_invade(
             actor_id="pilot_1",
             target_id="mech_a",
-            attacker_systems=10,
+            tech_attack_bonus=5,
             target_e_defense=8,
+            settings=settings,
         )
 
         assert lock_on_result.success is True
@@ -353,20 +464,24 @@ class TestTechActionIntegration:
         """Multiple invade attempts can be tracked separately."""
         from core.mech.combat_resolution import ResolutionSettings
 
+        # Roll 15 + tech_attack 5 = 20 vs E-defense 8 -> hit
+        settings_hit = ResolutionSettings(forced_roll=15)
         invade_1 = resolve_invade(
             actor_id="pilot_1",
             target_id="mech_a",
-            attacker_systems=10,
+            tech_attack_bonus=5,
             target_e_defense=8,
+            settings=settings_hit,
         )
 
-        settings = ResolutionSettings(forced_rolls=[1])
+        # Roll 1 + tech_attack 5 = 6 vs E-defense 12 -> miss
+        settings_miss = ResolutionSettings(forced_roll=1)
         invade_2 = resolve_invade(
             actor_id="pilot_1",
             target_id="mech_b",
-            attacker_systems=10,
+            tech_attack_bonus=5,
             target_e_defense=12,
-            settings=settings,
+            settings=settings_miss,
         )
 
         assert invade_1.hit is True
@@ -374,11 +489,15 @@ class TestTechActionIntegration:
 
     def test_tech_action_result_types(self):
         """All results have correct types."""
+        from core.mech.combat_resolution import ResolutionSettings
+
         scan = resolve_scan(actor_id="p", target_id="t", scan_options=["stats"])
         bolster = resolve_bolster(actor_id="p", target_id="t", attacker_systems=10)
         lock_on = resolve_lock_on(actor_id="p", target_id="t")
+        settings = ResolutionSettings(forced_roll=15)
         invade = resolve_invade(
-            actor_id="p", target_id="t", attacker_systems=10, target_e_defense=8
+            actor_id="p", target_id="t", tech_attack_bonus=5, target_e_defense=8,
+            settings=settings,
         )
 
         assert isinstance(scan, ScanResult)

@@ -16,3 +16,5 @@ export {
   CardContent,
   CardFooter,
 } from './card'
+
+export { Skeleton } from './skeleton'

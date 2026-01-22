@@ -633,6 +633,124 @@ class TestResolveMovement(unittest.TestCase):
         self.assertEqual(result.spaces_moved, 10)
 
 
+class TestSize2PlusFootprintObstructions(unittest.TestCase):
+    """Tests for Size 2+ footprint-aware obstruction checking."""
+
+    def test_size_2_mech_blocks_adjacent_hexes(self):
+        """Size 2 mech at (0,0) blocks movement through all footprint hexes."""
+        # Size 2 mech at (0,0) occupies center + 6 adjacent hexes (radius 1)
+        # A size_1 mech trying to move through (1,0) should be blocked
+        size_2_mech = make_test_combatant("size2-mech", (0, 0), "size_2", side="hostiles")
+        moving = make_test_combatant("mech-1", (-2, 0), "size_1")
+        scenario = make_test_scenario([size_2_mech, moving])
+
+        # Path from (-2,0) to (2,0) should be blocked at (-1,0) or (0,0) or (1,0)
+        # since size 2 footprint includes all those hexes
+        path = [HexCoord(q=-2, r=0), HexCoord(q=-1, r=0), HexCoord(q=0, r=0)]
+        blocked, idx = check_obstructions(path, "mech-1", "size_1", scenario, "ground")
+        self.assertTrue(blocked)
+
+    def test_size_2_footprint_covers_seven_hexes(self):
+        """Size 2 mech footprint includes center and 6 adjacent hexes."""
+        # Size 2 mech at (0,0)
+        size_2_mech = make_test_combatant("size2-mech", (0, 0), "size_2", side="hostiles")
+        moving = make_test_combatant("mech-1", (3, 0), "size_1")
+        scenario = make_test_scenario([size_2_mech, moving])
+
+        # Test that (1, 0) is blocked (adjacent to center, within footprint)
+        path_through_footprint = [HexCoord(q=3, r=0), HexCoord(q=2, r=0), HexCoord(q=1, r=0)]
+        blocked, idx = check_obstructions(path_through_footprint, "mech-1", "size_1", scenario, "ground")
+        self.assertTrue(blocked)
+        self.assertEqual(idx, 2)  # Blocked at index 2 (hex 1,0)
+
+    def test_larger_mech_can_move_through_smaller_footprint(self):
+        """Size 2 mech can move through size 1 mech's position."""
+        size_1_obstacle = make_test_combatant("obstacle", (1, 0), "size_1", side="hostiles")
+        size_2_moving = make_test_combatant("mech-1", (0, 0), "size_2")
+        scenario = make_test_scenario([size_1_obstacle, size_2_moving])
+
+        path = [HexCoord(q=0, r=0), HexCoord(q=1, r=0), HexCoord(q=2, r=0)]
+        blocked, idx = check_obstructions(path, "mech-1", "size_2", scenario, "ground")
+        self.assertFalse(blocked)
+
+    def test_flight_ignores_footprint(self):
+        """Flying movement ignores Size 2+ footprints."""
+        size_2_mech = make_test_combatant("size2-mech", (0, 0), "size_2", side="hostiles")
+        moving = make_test_combatant("mech-1", (-2, 0), "size_1")
+        scenario = make_test_scenario([size_2_mech, moving])
+
+        path = [HexCoord(q=-2, r=0), HexCoord(q=-1, r=0), HexCoord(q=0, r=0)]
+        blocked, idx = check_obstructions(path, "mech-1", "size_1", scenario, "flight")
+        self.assertFalse(blocked)
+
+
+class TestSize2PlusTeleportValidation(unittest.TestCase):
+    """Tests for Size 2+ footprint-aware teleport validation."""
+
+    def test_teleport_blocked_by_size_2_footprint(self):
+        """Cannot teleport to hex within Size 2 mech's footprint."""
+        size_2_mech = make_test_combatant("size2-mech", (0, 0), "size_2", side="hostiles")
+        scenario = make_test_scenario([size_2_mech])
+
+        start = HexPosition(coord=HexCoord(q=-5, r=0), elevation=0)
+        # Try to teleport to (1, 0) which is within Size 2 footprint
+        end = HexPosition(coord=HexCoord(q=1, r=0), elevation=0)
+
+        valid, reason = validate_teleport(start, end, "mech-1", scenario)
+        self.assertFalse(valid)
+        self.assertIn("occupied", reason.lower())
+
+    def test_teleport_to_outside_footprint_allowed(self):
+        """Can teleport to hex outside Size 2 mech's footprint."""
+        size_2_mech = make_test_combatant("size2-mech", (0, 0), "size_2", side="hostiles")
+        scenario = make_test_scenario([size_2_mech])
+
+        start = HexPosition(coord=HexCoord(q=-5, r=0), elevation=0)
+        # (2, 0) is outside Size 2 footprint (center 0,0 with radius 1)
+        end = HexPosition(coord=HexCoord(q=2, r=0), elevation=0)
+
+        valid, reason = validate_teleport(start, end, "mech-1", scenario)
+        self.assertTrue(valid)
+
+
+class TestSize2PlusEngagementFootprint(unittest.TestCase):
+    """Tests for Size 2+ footprint-aware engagement distance calculation."""
+
+    def test_engagement_uses_closest_footprint_hex(self):
+        """Engagement distance calculated from closest footprint hex."""
+        # Size 2 hostile at (0,0), footprint includes (-1,0) to (1,0) etc.
+        # Size 1 mech moving to (2,0) is adjacent to footprint hex (1,0)
+        size_2_hostile = make_test_combatant("hostile", (0, 0), "size_2", side="hostiles")
+        moving = make_test_combatant("mech-1", (-3, 0), "size_1")
+        scenario = make_test_scenario([size_2_hostile, moving])
+
+        # Move from (-3,0) to (2,0). At (2,0), distance to center (0,0) is 2,
+        # but distance to footprint hex (1,0) is 1 - should trigger engagement
+        path = [HexCoord(q=-3, r=0), HexCoord(q=-2, r=0), HexCoord(q=-1, r=0),
+                HexCoord(q=0, r=0), HexCoord(q=1, r=0), HexCoord(q=2, r=0)]
+
+        # When entering hex (2,0), the closest footprint hex is (1,0) at distance 1
+        # Size 2 vs Size 1: adjacency distance is max(2,1) = 2
+        # But engagement stops when ADJACENT (distance <= adj_dist)
+        # At (2,0), min distance to footprint is 1, adj_dist is 2, so should stop
+        should_stop, pos = check_engagement_stop("mech-1", "size_1", path, scenario)
+        self.assertTrue(should_stop)
+
+    def test_size_1_mech_adjacent_to_size_2_footprint_hex(self):
+        """Size 1 mech stops adjacent to Size 2 footprint edge hex."""
+        # Size 2 hostile centered at (3,0) - footprint includes (2,0), (4,0), etc.
+        # Path from (0,0) towards (5,0) should stop when adjacent to (2,0)
+        size_2_hostile = make_test_combatant("hostile", (3, 0), "size_2", side="hostiles")
+        moving = make_test_combatant("mech-1", (0, 0), "size_1")
+        scenario = make_test_scenario([size_2_hostile, moving])
+
+        path = [HexCoord(q=0, r=0), HexCoord(q=1, r=0)]
+        # At (1,0), closest footprint hex is (2,0) at distance 1
+        should_stop, pos = check_engagement_stop("mech-1", "size_1", path, scenario)
+        self.assertTrue(should_stop)
+        self.assertEqual(pos, HexCoord(q=1, r=0))
+
+
 class TestDroneMovementBackwardCompat(unittest.TestCase):
     """Tests for backward-compatible DroneMovementInput/Result."""
 

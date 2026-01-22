@@ -42,6 +42,7 @@ __all__ = [
     "get_terrain_effects_at",
     "calculate_movement_cost",
     "get_cover_difficulty",
+    "get_cover_for_footprint",
     "check_soft_cover",
     "check_hard_cover_available",
     "resolve_dangerous_terrain",
@@ -301,6 +302,73 @@ def get_cover_difficulty(
         cover_type="none",
         difficulty_modifier=0,
         reason="No cover",
+    )
+
+
+def get_cover_for_footprint(
+    attacker_coord: HexCoord,
+    target_center: HexCoord,
+    target_size: SizeClass,
+    terrain: TerrainMap | None,
+    soft_cover_difficulty: int = 1,
+    hard_cover_difficulty: int = 2,
+) -> CoverDifficultyResult:
+    """Get cover status for target, using most exposed footprint hex.
+
+    Per Lancer rules, attackers target the most exposed part of a large unit.
+    Returns cover based on the footprint hex with the least cover benefit.
+
+    For Size 2+ targets, checks all hexes in the footprint and returns the
+    cover result that is most favorable to the attacker (least cover).
+
+    Cover priority (from most to least favorable for attacker):
+    1. No cover (difficulty 0)
+    2. Soft cover (difficulty +1)
+    3. Hard cover (difficulty +2)
+
+    Args:
+        attacker_coord: Attacker's hex coordinate
+        target_center: Target's center hex coordinate
+        target_size: Target's size class (determines footprint)
+        terrain: Terrain map for checking cover
+        soft_cover_difficulty: Difficulty modifier for soft cover (default 1)
+        hard_cover_difficulty: Difficulty modifier for hard cover (default 2)
+
+    Returns:
+        CoverDifficultyResult with cover type based on most exposed footprint hex
+    """
+    from core.mech.grid import footprint_coords
+
+    target_hexes = footprint_coords(target_center, target_size)
+
+    best_result: CoverDifficultyResult | None = None
+
+    for hex_coord in target_hexes:
+        # Get cover for this specific footprint hex
+        cover = get_cover_difficulty(
+            terrain=terrain,
+            attacker_coord=attacker_coord,
+            target_coord=hex_coord,
+            target_size=target_size,
+            soft_cover_difficulty=soft_cover_difficulty,
+            hard_cover_difficulty=hard_cover_difficulty,
+        )
+
+        # No cover = best for attacker, return immediately
+        if cover.cover_type == "none":
+            return cover
+
+        # Prefer soft over hard (lower modifier is better for attacker)
+        if best_result is None:
+            best_result = cover
+        elif cover.difficulty_modifier < best_result.difficulty_modifier:
+            best_result = cover
+
+    # If no result (empty footprint, shouldn't happen), return no cover
+    return best_result or CoverDifficultyResult(
+        cover_type="none",
+        difficulty_modifier=0,
+        reason="No cover (empty footprint)",
     )
 
 

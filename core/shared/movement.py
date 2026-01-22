@@ -23,7 +23,7 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import SizeClass
 from core.shared.terrain import TerrainMap, get_terrain_at, calculate_movement_cost
-from core.mech.grid import HexCoord, HexPosition, hex_line, adjacency_distance
+from core.mech.grid import HexCoord, HexPosition, hex_line, adjacency_distance, footprint_coords
 from core.mech.combat_state import MechCombatScenario
 
 
@@ -245,6 +245,9 @@ def check_engagement_stop(
     "If you move adjacent to a hostile character, you become engaged.
     If you become engaged with a target the same size or larger, you must stop."
 
+    For Size 2+ combatants, calculates distance to the closest footprint hex
+    rather than just the center hex.
+
     Args:
         entity_id: Moving entity ID
         entity_size: Size of moving entity
@@ -258,15 +261,21 @@ def check_engagement_stop(
     if ignore_engagement:
         return False, None
 
-    for i, coord in enumerate(path[1:], start=1):
+    for coord in path[1:]:
         for combatant in scenario.combatants:
             if combatant.id == entity_id:
                 continue
             if not _is_hostile(entity_id, combatant.id, scenario):
                 continue
-            distance = coord.distance_to(combatant.position.coord)
+            # Calculate distance to closest footprint hex for Size 2+ units
+            combatant_footprint = footprint_coords(
+                combatant.position.coord, combatant.stats.size
+            )
+            min_distance = min(
+                coord.distance_to(fp_coord) for fp_coord in combatant_footprint
+            )
             adj_dist = adjacency_distance(entity_size, combatant.stats.size)
-            if distance <= adj_dist:
+            if min_distance <= adj_dist:
                 if _size_value(combatant.stats.size) >= _size_value(entity_size):
                     return True, coord
     return False, None
@@ -285,6 +294,9 @@ def check_obstructions(
     "Obstructions block passage. Obstructions smaller than the moving
     object do not block movement, and can be passed over freely.
     Friendly NPCs or allied players never cause obstruction."
+
+    For Size 2+ combatants, checks against their full footprint (all occupied hexes),
+    not just their center hex.
 
     Args:
         path: Movement path coordinates
@@ -305,7 +317,11 @@ def check_obstructions(
                 continue
             if _is_ally(entity_id, combatant.id, scenario):
                 continue
-            if combatant.position.coord == coord:
+            # Check footprint instead of single coord for Size 2+ units
+            combatant_footprint = footprint_coords(
+                combatant.position.coord, combatant.stats.size
+            )
+            if coord in combatant_footprint:
                 if _size_value(combatant.stats.size) < _size_value(entity_size):
                     continue
                 return True, i
@@ -363,6 +379,9 @@ def validate_teleport(
     - Teleport ignores obstructions, LOS, engagement
     - Fails if destination occupied
 
+    For Size 2+ combatants, checks destination against their full footprint
+    (all occupied hexes), not just their center hex.
+
     Args:
         start: Starting position
         end: Destination position
@@ -385,7 +404,11 @@ def validate_teleport(
     for combatant in scenario.combatants:
         if combatant.id == entity_id:
             continue
-        if combatant.position.coord == end.coord:
+        # Check destination against full footprint for Size 2+ units
+        combatant_footprint = footprint_coords(
+            combatant.position.coord, combatant.stats.size
+        )
+        if end.coord in combatant_footprint:
             return False, "Destination space occupied"
 
     return True, ""

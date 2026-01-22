@@ -87,6 +87,16 @@ class ResolutionSettings(FrozenModel):
 
     forced_rolls: list[int] | None = None
     forced_system_trauma_roll: int | None = Field(default=None, ge=1, le=6)
+    # New fields for attack resolution
+    forced_roll: int | None = Field(
+        default=None, ge=1, le=20, description="Forced d20 roll for attack resolution"
+    )
+    forced_accuracy_rolls: list[int] | None = Field(
+        default=None, description="Forced accuracy d6 rolls"
+    )
+    forced_difficulty_rolls: list[int] | None = Field(
+        default=None, description="Forced difficulty d6 rolls"
+    )
 
 
 class SystemTraumaSelection(FrozenModel):
