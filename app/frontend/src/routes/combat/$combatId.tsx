@@ -54,6 +54,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Modal,
 } from "../../components/ui";
 import { CombatSessionSkeleton } from "../../components/skeletons";
 
@@ -667,10 +668,17 @@ function CombatSessionPage() {
           )}
 
           {/* Reaction Prompt (when not our turn and reaction opportunity exists) */}
-          {!turnActive &&
-            reactionOpportunity?.pending_triggers?.length !== undefined &&
-            reactionOpportunity.pending_triggers.length > 0 &&
-            firstPlayerCombatant && (
+          <Modal
+            isOpen={
+              !turnActive &&
+              reactionOpportunity?.pending_triggers?.length !== undefined &&
+              reactionOpportunity.pending_triggers.length > 0 &&
+              !!firstPlayerCombatant
+            }
+            disableBackdropClose
+            urgent
+          >
+            {reactionOpportunity?.pending_triggers?.[0] && firstPlayerCombatant && (
               <ReactionPrompt
                 triggerType={reactionOpportunity.pending_triggers[0].trigger_type}
                 reactorId={reactionOpportunity.combatant_id}
@@ -690,19 +698,48 @@ function CombatSessionPage() {
                 isSubmitting={submitReaction.isPending}
               />
             )}
+          </Modal>
 
           {/* Pending Decision Prompts (save checks, system trauma) */}
           {pendingDecisions?.has_pending &&
             pendingDecisions.pending_decisions.map((decision) => {
+              const isUrgent = decision.decision_type === "hull_save";
               // Render appropriate prompt based on decision type
               if (decision.decision_type === "system_trauma") {
                 return (
-                  <TraumaSelectionPrompt
+                  <Modal
                     key={decision.decision_id}
+                    isOpen={true}
+                    disableBackdropClose
+                    urgent={isUrgent}
+                  >
+                    <TraumaSelectionPrompt
+                      decision={decision}
+                      combatantId={pendingDecisions.combatant_id}
+                      combatantName={pendingDecisions.combatant_name}
+                      inventory={firstPlayerCombatant?.inventory}
+                      onSubmit={handleDecisionSubmit}
+                      onDecline={() => {
+                        // User cancelled - no action taken
+                      }}
+                      isOpen={true}
+                      isSubmitting={submitDecision.isPending}
+                    />
+                  </Modal>
+                );
+              }
+              // Save prompts (hull_save, engineering_save, engineering_check)
+              return (
+                <Modal
+                  key={decision.decision_id}
+                  isOpen={true}
+                  disableBackdropClose
+                  urgent={isUrgent}
+                >
+                  <SaveCheckPrompt
                     decision={decision}
                     combatantId={pendingDecisions.combatant_id}
                     combatantName={pendingDecisions.combatant_name}
-                    inventory={firstPlayerCombatant?.inventory}
                     onSubmit={handleDecisionSubmit}
                     onDecline={() => {
                       // User cancelled - no action taken
@@ -710,22 +747,7 @@ function CombatSessionPage() {
                     isOpen={true}
                     isSubmitting={submitDecision.isPending}
                   />
-                );
-              }
-              // Save prompts (hull_save, engineering_save, engineering_check)
-              return (
-                <SaveCheckPrompt
-                  key={decision.decision_id}
-                  decision={decision}
-                  combatantId={pendingDecisions.combatant_id}
-                  combatantName={pendingDecisions.combatant_name}
-                  onSubmit={handleDecisionSubmit}
-                  onDecline={() => {
-                    // User cancelled - no action taken
-                  }}
-                  isOpen={true}
-                  isSubmitting={submitDecision.isPending}
-                />
+                </Modal>
               );
             })}
 

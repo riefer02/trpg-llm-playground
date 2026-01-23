@@ -100,6 +100,15 @@ h3,
   }
 }
 
+@keyframes pulse-border {
+  0%, 100% {
+    box-shadow: 0 0 0 2px hsl(355 75% 55% / 0.4), 0 0 20px hsl(355 75% 55% / 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 4px hsl(355 75% 55% / 0.6), 0 0 30px hsl(355 75% 55% / 0.4);
+  }
+}
+
 @layer utilities {
   .app-shell {
     @apply min-h-screen;
@@ -126,6 +135,10 @@ h3,
 
   .animate-glow {
     animation: glow-pulse 1.6s ease-out infinite alternate;
+  }
+
+  .animate-pulse-border {
+    animation: pulse-border 1.5s ease-in-out infinite;
   }
 }
 

@@ -18,3 +18,6 @@ export {
 } from './card'
 
 export { Skeleton } from './skeleton'
+
+export { Modal } from './modal'
+export type { ModalProps } from './modal'
