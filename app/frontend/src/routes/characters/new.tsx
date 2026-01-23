@@ -1630,18 +1630,20 @@ function SkillInput({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" role="group" aria-label={`${label} skill points`}>
           <button
             type="button"
             onClick={() => onChange(value - 1)}
+            aria-label={`Decrease ${label}`}
             className="w-8 h-8 flex items-center justify-center rounded bg-background border border-border hover:bg-primary/10"
           >
             -
           </button>
-          <span className="w-8 text-center font-semibold">+{value}</span>
+          <span className="w-8 text-center font-semibold" aria-live="polite">+{value}</span>
           <button
             type="button"
             onClick={() => onChange(value + 1)}
+            aria-label={`Increase ${label}`}
             className="w-8 h-8 flex items-center justify-center rounded bg-background border border-border hover:bg-primary/10"
           >
             +
