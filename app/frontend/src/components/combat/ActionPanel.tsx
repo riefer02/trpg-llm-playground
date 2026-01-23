@@ -7,6 +7,7 @@ import type {
   AvailableActionsResponse,
 } from "../../lib/api/combat";
 import type {
+  AttackPatternDefinition,
   FullTechOptionSelection,
   HexCoord,
   MechInventory,
@@ -23,6 +24,48 @@ type FullTechStep = 1 | 2;
 
 const FULL_TECH_OPTIONS: FullTechOption[] = ["scan", "bolster", "lock_on", "invade"];
 const ATTACK_ACTION_IDS = new Set(["skirmish", "barrage", "fight"]);
+const AOE_PATTERN_TYPES = new Set(["line", "cone", "blast", "burst"]);
+
+/**
+ * Extracts AoE pattern from weapon definition or selected profile.
+ * Returns null if weapon has no AoE pattern.
+ */
+function extractAreaPattern(
+  weapon: MechWeaponDefinition | undefined,
+  profileId: string | null
+): AttackPatternDefinition | null {
+  if (!weapon) return null;
+
+  const profiles = weapon.dynamic?.profile_choice?.profiles;
+  const profile = profileId && profiles
+    ? profiles.find(p => p.profile_id === profileId)
+    : null;
+
+  const ranges = profile?.ranges ?? weapon.ranges ?? [];
+  const tags = profile?.tags ?? weapon.tags ?? [];
+
+  // Check ranges first (priority) - line/cone/blast/burst are range types
+  for (const range of ranges) {
+    if (AOE_PATTERN_TYPES.has(range.range_type)) {
+      return {
+        pattern: range.range_type as AttackPatternDefinition["pattern"],
+        size: range.value,
+      };
+    }
+  }
+
+  // Check tags (some weapons use tags like "Blast 1")
+  for (const tag of tags) {
+    if (AOE_PATTERN_TYPES.has(tag.tag) && tag.value != null) {
+      return {
+        pattern: tag.tag as AttackPatternDefinition["pattern"],
+        size: tag.value,
+      };
+    }
+  }
+
+  return null;
+}
 
 export type ActionPanelState =
   | "idle"
@@ -58,6 +101,12 @@ export interface ActionPanelProps {
   onExecuteAction: (request: ActionRequest) => void;
   onTargetModeChange: (mode: TargetMode | null) => void;
   onPathModeChange: (isActive: boolean, path: HexCoord[]) => void;
+  /** Callback to update AoE preview on the canvas when weapon is selected */
+  onAreaPreviewChange?: (
+    pattern: AttackPatternDefinition | null,
+    origin: HexCoord | null,
+    direction: HexCoord | null
+  ) => void;
   isExecuting?: boolean;
   selectedTargetIds?: string[];
   actorInventory?: MechInventory | null;
@@ -75,6 +124,7 @@ export function ActionPanel({
   onExecuteAction,
   onTargetModeChange,
   onPathModeChange,
+  onAreaPreviewChange,
   isExecuting = false,
   selectedTargetIds = [],
   actorInventory,
@@ -94,6 +144,19 @@ export function ActionPanel({
   const [lastProcessedClick, setLastProcessedClick] = useState<HexCoord | null>(null);
   const [fullTechStep, setFullTechStep] = useState<FullTechStep>(1);
   const [fullTechSelections, setFullTechSelections] = useState<FullTechSelectionState>({});
+
+  const selectedWeaponDefinition =
+    selectedWeaponId && weaponDefinitions ? weaponDefinitions.get(selectedWeaponId) : undefined;
+  const canUseThrown = Boolean(
+    selectedAction &&
+      ATTACK_ACTION_IDS.has(selectedAction.action_id) &&
+      selectedWeaponDefinition &&
+      isMeleeWeapon(selectedWeaponDefinition) &&
+      getThrownRange(selectedWeaponDefinition) !== null
+  );
+  const thrownRange = selectedWeaponDefinition
+    ? getThrownRange(selectedWeaponDefinition)
+    : null;
 
   // Handle incoming hex clicks from the canvas when in path mode
   useEffect(() => {
@@ -133,6 +196,14 @@ export function ActionPanel({
     });
   }, [hexClickCoord, panelState, lastProcessedClick, onPathModeChange]);
 
+  // Reset thrown state when weapon changes and thrown is no longer valid
+  useEffect(() => {
+    if (!canUseThrown && useThrown) {
+      setUseThrown(false);
+    }
+  }, [canUseThrown, useThrown]);
+
+  // Early return AFTER all hooks are called
   if (!availableActions || !economy) {
     return (
       <div className="rounded-md border border-border bg-muted/30 p-3">
@@ -150,25 +221,6 @@ export function ActionPanel({
       formatTechOption(option),
   }));
 
-  const selectedWeaponDefinition =
-    selectedWeaponId && weaponDefinitions ? weaponDefinitions.get(selectedWeaponId) : undefined;
-  const canUseThrown = Boolean(
-    selectedAction &&
-      ATTACK_ACTION_IDS.has(selectedAction.action_id) &&
-      selectedWeaponDefinition &&
-      isMeleeWeapon(selectedWeaponDefinition) &&
-      getThrownRange(selectedWeaponDefinition) !== null
-  );
-  const thrownRange = selectedWeaponDefinition
-    ? getThrownRange(selectedWeaponDefinition)
-    : null;
-
-  useEffect(() => {
-    if (!canUseThrown && useThrown) {
-      setUseThrown(false);
-    }
-  }, [canUseThrown, useThrown]);
-
   const handleActionClick = (action: AvailableActionItem) => {
     if (!action.is_available) return;
 
@@ -181,6 +233,8 @@ export function ActionPanel({
     setFullTechStep(1);
     setFullTechSelections({});
     onActionSelect(action);
+    // Clear any existing AoE preview - it will be re-set when weapon is selected
+    onAreaPreviewChange?.(null, null, null);
 
     if (action.action_id === "full_tech") {
       setPanelState("selecting_full_tech_option");
@@ -233,9 +287,27 @@ export function ActionPanel({
     const profiles = weapon?.dynamic?.profile_choice?.profiles;
 
     if (profiles && profiles.length > 1) {
-      // Need profile selection first
+      // Need profile selection first - don't show preview until profile is selected
       setPanelState("selecting_weapon_profile");
+      onAreaPreviewChange?.(null, null, null);
       return;
+    }
+
+    // Extract area pattern for preview (single profile or no profiles)
+    const pattern = extractAreaPattern(weapon, null);
+    if (pattern && onAreaPreviewChange) {
+      if (pattern.pattern === "burst") {
+        // Burst centered on attacker - show immediately
+        onAreaPreviewChange(pattern, actorPosition ?? null, null);
+      } else if (pattern.pattern === "blast") {
+        // Blast - show pattern def, origin set on hover in parent
+        onAreaPreviewChange(pattern, null, null);
+      } else {
+        // Line/cone - show from actor, direction set by DirectionPicker
+        onAreaPreviewChange(pattern, actorPosition ?? null, null);
+      }
+    } else {
+      onAreaPreviewChange?.(null, null, null);
     }
 
     if (selectedAction?.requires_target) {
@@ -255,6 +327,24 @@ export function ActionPanel({
 
   const handleWeaponProfileSelect = (profileId: string) => {
     setSelectedWeaponProfileId(profileId);
+
+    // Extract area pattern for preview with selected profile
+    const weapon = selectedWeaponId ? weaponDefinitions?.get(selectedWeaponId) : undefined;
+    const pattern = extractAreaPattern(weapon, profileId);
+    if (pattern && onAreaPreviewChange) {
+      if (pattern.pattern === "burst") {
+        // Burst centered on attacker - show immediately
+        onAreaPreviewChange(pattern, actorPosition ?? null, null);
+      } else if (pattern.pattern === "blast") {
+        // Blast - show pattern def, origin set on hover in parent
+        onAreaPreviewChange(pattern, null, null);
+      } else {
+        // Line/cone - show from actor, direction set by DirectionPicker
+        onAreaPreviewChange(pattern, actorPosition ?? null, null);
+      }
+    } else {
+      onAreaPreviewChange?.(null, null, null);
+    }
 
     if (selectedAction?.requires_target) {
       setPanelState("selecting_target");
@@ -373,6 +463,7 @@ export function ActionPanel({
     setPanelState("idle");
     onTargetModeChange(null);
     onPathModeChange(false, []);
+    onAreaPreviewChange?.(null, null, null);
   };
 
   // Reset state when action completes
@@ -388,6 +479,7 @@ export function ActionPanel({
     setPanelState("idle");
     onTargetModeChange(null);
     onPathModeChange(false, []);
+    onAreaPreviewChange?.(null, null, null);
   };
 
   // Handle confirm path for movement actions
@@ -752,7 +844,7 @@ export function ActionPanel({
         <ActionSection
           title="Full Actions"
           actions={availableActions.full_actions}
-          disabled={economy.full_action_used}
+          disabled={economy.full_actions_used > 0}
           onActionClick={handleActionClick}
         />
       )}
@@ -762,7 +854,7 @@ export function ActionPanel({
         <ActionSection
           title="Quick Actions"
           actions={availableActions.quick_actions}
-          disabled={economy.quick_actions_available === 0}
+          disabled={economy.quick_actions_used >= 2 + (economy.overcharge_used ? 1 : 0)}
           onActionClick={handleActionClick}
         />
       )}
@@ -781,7 +873,6 @@ export function ActionPanel({
         <ActionSection
           title="Protocols"
           actions={availableActions.protocols}
-          disabled={economy.protocol_used}
           onActionClick={handleActionClick}
         />
       )}

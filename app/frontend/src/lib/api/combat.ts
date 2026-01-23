@@ -115,15 +115,14 @@ export interface ReactionOpportunityResponse {
 }
 
 export interface ActionEconomyState {
-  full_action_used: boolean;
+  /** Full actions used this turn (0 or 1) */
+  full_actions_used: number;
+  /** Quick actions used this turn (0-2+) */
   quick_actions_used: number;
-  quick_actions_available: number;
-  free_actions_used: string[];
-  reaction_used: boolean;
+  /** Whether overcharge was used this turn */
   overcharge_used: boolean;
-  protocol_used: boolean;
-  movement_used: number;
-  movement_available: number;
+  /** Reactions used this turn (0 or 1) */
+  reactions_used_this_turn: number;
 }
 
 export interface CombatSessionResponse {
@@ -167,43 +166,21 @@ export function useCombatSession(
 // =============================================================================
 
 export function useStartTurn(sessionId: string) {
-  const queryClient = useQueryClient();
+  // Note: We don't manually update the cache here because the WebSocket
+  // broadcast will handle it. This avoids race conditions where both
+  // the mutation onSuccess and WebSocket update the cache simultaneously,
+  // which can cause React DOM reconciliation errors.
   return useMutation({
     mutationFn: () =>
       api.post<TurnStartResponse>(`/combat/${sessionId}/turns/start`),
-    onSuccess: (data) => {
-      queryClient.setQueryData<CombatSessionResponse>(
-        combatKeys.detail(sessionId),
-        (prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            scenario: data.scenario,
-          };
-        },
-      );
-    },
   });
 }
 
 export function useEndTurn(sessionId: string) {
-  const queryClient = useQueryClient();
+  // Note: WebSocket broadcast handles cache updates to avoid race conditions
   return useMutation({
     mutationFn: () =>
       api.post<TurnEndResponse>(`/combat/${sessionId}/turns/end`),
-    onSuccess: (data) => {
-      queryClient.setQueryData<CombatSessionResponse>(
-        combatKeys.detail(sessionId),
-        (prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            scenario: data.scenario,
-            current_round: data.new_round_number ?? prev.current_round,
-          };
-        },
-      );
-    },
   });
 }
 
@@ -212,46 +189,18 @@ export function useEndTurn(sessionId: string) {
 // =============================================================================
 
 export function useExecuteAction(sessionId: string) {
-  const queryClient = useQueryClient();
+  // Note: WebSocket broadcast handles cache updates to avoid race conditions
   return useMutation({
     mutationFn: (action: ActionRequest) =>
       api.post<ActionResponse>(`/combat/${sessionId}/actions`, action),
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.setQueryData<CombatSessionResponse>(
-          combatKeys.detail(sessionId),
-          (prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              scenario: data.scenario,
-            };
-          },
-        );
-      }
-    },
   });
 }
 
 export function useSubmitReaction(sessionId: string) {
-  const queryClient = useQueryClient();
+  // Note: WebSocket broadcast handles cache updates to avoid race conditions
   return useMutation({
     mutationFn: (reaction: ReactionRequest) =>
       api.post<ReactionResponse>(`/combat/${sessionId}/reactions`, reaction),
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.setQueryData<CombatSessionResponse>(
-          combatKeys.detail(sessionId),
-          (prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              scenario: data.scenario,
-            };
-          },
-        );
-      }
-    },
   });
 }
 

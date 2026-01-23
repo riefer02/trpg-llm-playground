@@ -167,19 +167,27 @@ async def test_start_turn_requires_active_session(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_turn_no_turn_order(client: AsyncClient) -> None:
-    """Test that turn start fails when no turn order is initialized."""
+async def test_start_turn_auto_initializes_turn_order(client: AsyncClient) -> None:
+    """Test that turn start auto-initializes turn order when rounds are empty."""
     # Create session without rounds
-    combatants = [make_combatant(id="mech_1")]
+    combatants = [make_combatant(id="mech_1"), make_combatant(id="mech_2")]
     create_resp = await client.post(
         "/api/combat",
         json={"name": "Test", "combatants": combatants},
     )
     session_id = create_resp.json()["id"]
 
-    # Try to start turn (no rounds initialized)
+    # Start turn (should auto-initialize rounds)
     response = await client.post(f"/api/combat/{session_id}/turns/start")
-    assert response.status_code == 422
+    assert response.status_code == 200
+    data = response.json()
+    assert data["actor_id"] == "mech_1"  # First combatant gets first turn
+
+    # Verify rounds were initialized
+    get_resp = await client.get(f"/api/combat/{session_id}")
+    scenario = get_resp.json()["scenario"]
+    assert len(scenario["rounds"]) == 1
+    assert len(scenario["rounds"][0]["turns"]) == 2
 
 
 # =============================================================================

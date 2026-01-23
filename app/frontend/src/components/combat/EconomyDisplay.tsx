@@ -15,8 +15,14 @@ export function EconomyDisplay({
   overchargeLevel = 0,
   disabled = false,
 }: EconomyDisplayProps) {
-  const quickSlotsTotal = economy.quick_actions_available + economy.quick_actions_used;
-  const quickSlotsRemaining = economy.quick_actions_available;
+  // Base quick actions is 2, +1 if overcharged
+  const baseQuickActions = 2;
+  const bonusFromOvercharge = economy.overcharge_used ? 1 : 0;
+  const quickSlotsTotal = baseQuickActions + bonusFromOvercharge;
+  const quickSlotsRemaining = Math.max(0, quickSlotsTotal - economy.quick_actions_used);
+
+  const fullActionAvailable = economy.full_actions_used === 0;
+  const reactionAvailable = economy.reactions_used_this_turn === 0;
 
   return (
     <div className={`rounded-md border p-3 space-y-2 transition-opacity ${
@@ -37,7 +43,7 @@ export function EconomyDisplay({
         {/* Full Action */}
         <div className="flex items-center gap-1.5">
           <ActionSlot
-            filled={!economy.full_action_used}
+            filled={fullActionAvailable}
             label="Full"
             variant="full"
           />
@@ -58,20 +64,15 @@ export function EconomyDisplay({
         {/* Reaction */}
         <div className="flex items-center gap-1.5">
           <ActionSlot
-            filled={!economy.reaction_used}
+            filled={reactionAvailable}
             label="React"
             variant="reaction"
           />
         </div>
       </div>
 
-      {/* Protocol and Overcharge status */}
+      {/* Overcharge status */}
       <div className="flex flex-wrap gap-2 text-xs">
-        {!economy.protocol_used && (
-          <span className="px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
-            Protocol Available
-          </span>
-        )}
         {canOvercharge && !economy.overcharge_used && (
           <span className="px-2 py-0.5 rounded bg-primary/20 text-primary">
             Overcharge Available
@@ -79,7 +80,7 @@ export function EconomyDisplay({
         )}
         {economy.overcharge_used && (
           <span className="px-2 py-0.5 rounded bg-destructive/20 text-destructive">
-            Overcharged
+            Overcharged (+1 Quick)
           </span>
         )}
         {overchargeLevel > 0 && (
@@ -88,20 +89,6 @@ export function EconomyDisplay({
           </span>
         )}
       </div>
-
-      {/* Movement */}
-      {economy.movement_available > 0 && (
-        <div className="text-xs text-muted-foreground">
-          Movement: {economy.movement_available - economy.movement_used} / {economy.movement_available} spaces
-        </div>
-      )}
-
-      {/* Free actions used */}
-      {economy.free_actions_used.length > 0 && (
-        <div className="text-xs text-muted-foreground">
-          Free actions used: {economy.free_actions_used.join(", ")}
-        </div>
-      )}
     </div>
   );
 }

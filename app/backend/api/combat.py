@@ -1090,6 +1090,24 @@ async def start_combat_turn(
     # Hydrate scenario
     scenario = MechCombatScenario.model_validate(combat_session.scenario)
 
+    # Initialize turn order if empty (first turn of combat)
+    if not scenario.rounds and scenario.combatants:
+        turns = [CombatTurn(actor_id=c.id) for c in scenario.combatants]
+        round_1 = CombatRound(round_index=1, turns=turns)
+        scenario = MechCombatScenario(
+            combatants=scenario.combatants,
+            rounds=[round_1],
+            grapples=list(scenario.grapples),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
+        )
+        # Reset turn index to start of round
+        combat_session.current_round = 1
+        combat_session.current_turn_index = 0
+
     # Get current actor from turn order
     current_actor = get_current_actor(
         scenario,

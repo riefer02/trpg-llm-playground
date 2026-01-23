@@ -22,6 +22,7 @@ import type {
   RenderToken,
 } from "./canvas";
 import { buildHexGrid } from "./canvas";
+import { hex } from "./hex";
 import {
   hexCone,
   hexConeCentered,
@@ -144,7 +145,7 @@ export function adaptCombatScenario(
   }
 
   const grid = resolveGrid({
-    origin: input.gridOrigin ?? { q: 0, r: 0 },
+    origin: input.gridOrigin ?? hex(0, 0),
     radius: input.gridRadius,
     tokens,
     markers,
@@ -552,7 +553,19 @@ function labelFromName(name: string): string {
   if (!trimmed) {
     return "?";
   }
-  return trimmed[0]?.toUpperCase() ?? "?";
+  // Extract first word (before space or apostrophe) for better labels
+  // "VANGUARD's Everest" → "VA", "GMS Grunt (Grunt 1)" → "G1"
+  const firstWordMatch = trimmed.match(/^([A-Za-z]+)/);
+  const firstWord = firstWordMatch?.[1] ?? trimmed;
+
+  // Check for numbered suffix like "(Grunt 1)" → extract number
+  const numberMatch = trimmed.match(/\(.*?(\d+)\)/);
+  if (numberMatch) {
+    return `${firstWord[0]?.toUpperCase() ?? "?"}${numberMatch[1]}`;
+  }
+
+  // Use first 2 characters of first word
+  return firstWord.slice(0, 2).toUpperCase() || "?";
 }
 
 function dedupeCoords(coords: HexCoord[]): HexCoord[] {
