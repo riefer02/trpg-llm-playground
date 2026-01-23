@@ -742,12 +742,21 @@ function CampaignDetailPage() {
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <StatTile label="Members" value={readiness.total_members.toString()} />
-              <StatTile label="Ready" value={readiness.ready_members.toString()} />
+              <StatTile
+                label="Ready"
+                value={readiness.ready_members.toString()}
+                variant={readiness.ready_members === readiness.total_members ? "success" : "warning"}
+              />
               <StatTile
                 label="Ready Pilots"
                 value={`${readiness.ready_players}/${readiness.preferred_pilots}`}
+                variant={readiness.ready_players >= readiness.preferred_pilots ? "success" : "warning"}
               />
-              <StatTile label="Assigned" value={readiness.assigned_ready_players.toString()} />
+              <StatTile
+                label="Assigned"
+                value={readiness.assigned_ready_players.toString()}
+                variant={readiness.assigned_ready_players > 0 ? "success" : "default"}
+              />
             </div>
             {readiness.issues.length > 0 && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 space-y-1">
@@ -793,8 +802,15 @@ function CampaignDetailPage() {
               )}
             </div>
             {readiness.lobby_status && (
-              <p className="text-xs text-muted-foreground">
-                Lobby status: {readiness.lobby_status}
+              <p className={`text-xs flex items-center gap-2 ${
+                readiness.can_launch
+                  ? "text-green-600"
+                  : "text-amber-600"
+              }`}>
+                <span className={`inline-block w-2 h-2 rounded-full ${
+                  readiness.can_launch ? "bg-green-500" : "bg-amber-500"
+                }`} />
+                {readiness.lobby_status}
               </p>
             )}
           </CardContent>
@@ -1272,8 +1288,18 @@ function CampaignDetailPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-medium text-foreground">{member.user_id}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {member.role} • ready: {member.ready_state}
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      <span>{member.role}</span>
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                        member.ready_state === "ready"
+                          ? "bg-green-500/20 text-green-600 border border-green-500/30"
+                          : "bg-amber-500/20 text-amber-600 border border-amber-500/30"
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          member.ready_state === "ready" ? "bg-green-500" : "bg-amber-500"
+                        }`} />
+                        {member.ready_state === "ready" ? "Ready" : "Not Ready"}
+                      </span>
                     </div>
                   </div>
                   <Button
@@ -1647,11 +1673,29 @@ function CampaignDetailPage() {
   );
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
+function StatTile({
+  label,
+  value,
+  variant = "default",
+}: {
+  label: string;
+  value: string;
+  variant?: "default" | "success" | "warning";
+}) {
+  const borderColors = {
+    default: "border-border/60",
+    success: "border-green-500/40",
+    warning: "border-amber-500/40",
+  };
+  const valueColors = {
+    default: "text-foreground",
+    success: "text-green-600",
+    warning: "text-amber-600",
+  };
   return (
-    <div className="border border-border/60 rounded-lg px-3 py-2">
+    <div className={`border rounded-lg px-3 py-2 ${borderColors[variant]}`}>
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-lg font-semibold text-foreground">{value}</div>
+      <div className={`text-lg font-semibold ${valueColors[variant]}`}>{value}</div>
     </div>
   );
 }
