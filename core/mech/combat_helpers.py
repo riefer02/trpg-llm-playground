@@ -3143,6 +3143,75 @@ def _resolve_movement(
             pending_decisions=list(scenario.pending_decisions),
         )
 
+    # Linked grapple movement - smaller party moves with larger party (PR2 4168)
+    # "The smaller party is immobilized, but moves when the larger party moves."
+    from core.shared.grapple import SIZE_ORDER
+
+    for grapple in scenario.grapples:
+        # Check if actor is part of this grapple
+        if grapple.grappler_id != actor.id and grapple.target_id != actor.id:
+            continue
+
+        # Find the other party
+        other_id = grapple.target_id if grapple.grappler_id == actor.id else grapple.grappler_id
+        other_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == other_id), None)
+        if other_idx is None:
+            continue
+        other = scenario.combatants[other_idx]
+        if other.position is None:
+            continue
+
+        # Re-fetch the updated actor from scenario
+        updated_actor_for_grapple = next(
+            (c for c in scenario.combatants if c.id == actor.id), None
+        )
+        if updated_actor_for_grapple is None:
+            continue
+
+        # Check sizes - only drag if actor is LARGER
+        actor_size = updated_actor_for_grapple.stats.size if updated_actor_for_grapple.stats else "size_1"
+        other_size = other.stats.size if other.stats else "size_1"
+
+        actor_size_val = SIZE_ORDER.get(actor_size, 1)
+        other_size_val = SIZE_ORDER.get(other_size, 1)
+
+        if actor_size_val <= other_size_val:
+            continue  # Actor is same size or smaller, no linked movement
+
+        # Move smaller party to maintain adjacency
+        final_coord = final_position.coord
+        adjacent_hexes = final_coord.neighbors()
+
+        # Pick the adjacent hex closest to their original position
+        old_coord = other.position.coord
+        best_hex = min(adjacent_hexes, key=lambda h: h.distance_to(old_coord))
+
+        # Update smaller party's position
+        new_other_position = HexPosition(coord=best_hex, elevation=other.position.elevation)
+        updated_other = other.model_copy(update={"position": new_other_position})
+        updated_combatants = list(scenario.combatants)
+        updated_combatants[other_idx] = updated_other
+        scenario = MechCombatScenario(
+            combatants=updated_combatants,
+            grapples=list(scenario.grapples),
+            rounds=list(scenario.rounds),
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables=dict(scenario.deployables),
+            sitrep_resolution=scenario.sitrep_resolution,
+            pending_decisions=list(scenario.pending_decisions),
+        )
+
+        effects.append({
+            "type": "linked_grapple_movement",
+            "larger_id": actor.id,
+            "smaller_id": other_id,
+            "from_coord": {"q": old_coord.q, "r": old_coord.r},
+            "to_coord": {"q": best_hex.q, "r": best_hex.r},
+        })
+
+        break  # Only one linked movement per movement action
+
     # Check and break grapples if movement causes adjacency loss (PR2 4175)
     scenario, grapple_break_effects = _check_and_break_grapples_on_movement(
         scenario,

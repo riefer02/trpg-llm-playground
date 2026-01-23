@@ -235,7 +235,21 @@ function CombatSessionPage() {
         return;
       }
 
-      executeAction.mutate(request, {
+      // Check if any target is a deployable (Phase 60)
+      const deployableIds = new Set(Object.keys(scenario?.deployables ?? {}));
+      const deployableTargets = (request.target_ids ?? []).filter((id) => deployableIds.has(id));
+      const combatantTargets = (request.target_ids ?? []).filter((id) => !deployableIds.has(id));
+
+      // Build final request with deployable targeting if applicable
+      const finalRequest: ActionRequest = deployableTargets.length > 0
+        ? {
+            ...request,
+            target_ids: combatantTargets,
+            target_deployable_id: deployableTargets[0], // Only one deployable target supported
+          }
+        : request;
+
+      executeAction.mutate(finalRequest, {
         onSuccess: (result) => {
           if (result.success) {
             setEconomy(result.economy);
@@ -252,7 +266,7 @@ function CombatSessionPage() {
         onError: (err) => toast.error(err.message || "Action failed"),
       });
     },
-    [executeAction]
+    [executeAction, scenario?.deployables]
   );
 
   // Handle overcharge confirmation
@@ -383,18 +397,23 @@ function CombatSessionPage() {
     if (!targetMode?.requiresTarget) {
       return { active: false };
     }
-    // For now, all enemies are valid targets for attacks
-    // This could be refined based on action type, range, etc.
-    const validTargetIds = combatants
+    // All combatants except current actor are valid targets for attacks
+    const combatantTargets = combatants
       .filter((c) => c.id !== currentActor?.id)
       .map((c) => c.id);
+
+    // Include non-destroyed deployables as valid targets (Phase 60)
+    const deployableTargets = Object.entries(scenario?.deployables ?? {})
+      .filter(([_, d]) => !d.is_destroyed)
+      .map(([id, _]) => id);
+
     return {
       active: true,
-      validTargetIds,
+      validTargetIds: [...combatantTargets, ...deployableTargets],
       selectedTargetIds,
       maxTargets,
     };
-  }, [targetMode, combatants, currentActor, selectedTargetIds, maxTargets]);
+  }, [targetMode, combatants, currentActor, selectedTargetIds, maxTargets, scenario?.deployables]);
 
   // Derive active indices from selectedAction or fall back to current position
   const activeRoundIndex = selectedAction?.roundIdx ?? clampIndex(currentRound - 1, rounds);

@@ -859,6 +859,16 @@ class ActionRequest(BaseModel):
         default=False,
         description="Whether to treat a melee weapon attack as thrown",
     )
+    # Mount/Deployable targeting (Phase 60)
+    target_mount_id: int | None = Field(
+        default=None,
+        ge=0,
+        description="Mount index to target for called shot (adds +1 difficulty)",
+    )
+    target_deployable_id: str | None = Field(
+        default=None,
+        description="ID of deployable to target instead of combatant",
+    )
 
 
 class ActionResponse(BaseModel):
@@ -1222,6 +1232,8 @@ async def execute_combat_action(
         prompt_dangerous_terrain=body.prompt_dangerous_terrain,
         is_overcharge=body.is_overcharge,
         use_thrown=body.use_thrown,
+        target_mount_id=body.target_mount_id,
+        target_deployable_id=body.target_deployable_id,
     )
 
     # Execute action using core helper

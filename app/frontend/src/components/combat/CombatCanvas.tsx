@@ -199,6 +199,16 @@ export function CombatCanvas({
         );
         if (clickedToken) {
           onTokenClick(clickedToken.id);
+        } else {
+          // Check if we clicked a marker (deployable) - Phase 60
+          const clickedMarker = state.markers?.find(
+            (m) => m.coord.q === coord.q && m.coord.r === coord.r
+          );
+          if (clickedMarker && clickedMarker.id.startsWith("deployable:")) {
+            // Extract deployable ID and pass to token click handler
+            const deployableId = clickedMarker.id.replace("deployable:", "");
+            onTokenClick(deployableId);
+          }
         }
       }
       // Then call the original onSelect
@@ -217,7 +227,7 @@ export function CombatCanvas({
     return () => {
       cleanup.forEach((fn) => fn());
     };
-  }, [onHover, onSelect, onTarget, onTokenClick, onHexClick, isPathMode, resolvedLayout, state.grid, state.tokens]);
+  }, [onHover, onSelect, onTarget, onTokenClick, onHexClick, isPathMode, resolvedLayout, state.grid, state.tokens, state.markers]);
 
   // Apply targeting/path mode cursor
   const cursorClass = isPathMode

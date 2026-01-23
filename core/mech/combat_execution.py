@@ -377,6 +377,64 @@ def start_turn(
                 "falling_from_altitude": falling_from_altitude_value,
             })
 
+    # Check for same-size grapple contested HULL check at turn start (PR2 4164-4165)
+    # "If both parties are the same size, they can make a contested hull check at the
+    # start of their turn. The winner can choose to break the grapple."
+    same_size_grapple_check = False
+    grapple_broke_on_turn_start = False
+    grapple_contest_roll: int | None = None
+    grapple_contest_opponent_id: str | None = None
+
+    for grapple in scenario.grapples:
+        # Check if actor is part of this grapple
+        if grapple.grappler_id != actor_id and grapple.target_id != actor_id:
+            continue
+
+        # Get both parties
+        other_id = grapple.target_id if grapple.grappler_id == actor_id else grapple.grappler_id
+        other = next((c for c in scenario.combatants if c.id == other_id), None)
+        if other is None:
+            continue
+
+        # Check if same size using the size comparison utility
+        from core.shared.grapple import _compare_sizes
+
+        actor_size = updated_actor.stats.size if updated_actor.stats else "size_1"
+        other_size = other.stats.size if other.stats else "size_1"
+        size_comparison = _compare_sizes(actor_size, other_size)
+
+        if size_comparison != "tie":
+            continue  # Different sizes, no automatic contest
+
+        # Same-size grapple - run contested HULL check
+        same_size_grapple_check = True
+        grapple_contest_opponent_id = other_id
+
+        from core.shared.grapple import contest_grapple_check
+
+        # Get HULL bonuses (grit represents HULL skill)
+        actor_hull = updated_actor.stats.grit if updated_actor.stats else 0
+        other_hull = other.stats.grit if other.stats else 0
+
+        # Contested check: actor vs other
+        winner, roll = contest_grapple_check(actor_hull, other_hull)
+        grapple_contest_roll = roll
+
+        # Current actor wins if:
+        # - They're the grappler and winner is "attacker"
+        # - They're the target and winner is "target"
+        is_grappler = grapple.grappler_id == actor_id
+        actor_won = (is_grappler and winner == "attacker") or (not is_grappler and winner == "target")
+
+        if actor_won:
+            # Winner breaks grapple (per PR2: "winner can choose to break")
+            # Auto-break on win since it's advantageous to break
+            updated_grapples = [g for g in scenario.grapples if g != grapple]
+            scenario = scenario.model_copy(update={"grapples": updated_grapples})
+            grapple_broke_on_turn_start = True
+
+        break  # Only one grapple check per turn
+
     # Check for dangerous terrain at start of turn (PR2 3859-3860)
     # "A character only needs to make one check a round for dangerous terrain"
     dangerous_terrain_check_required = False
@@ -565,6 +623,10 @@ def start_turn(
         dangerous_terrain_damage=dangerous_terrain_damage,
         started_falling=started_falling,
         falling_from_altitude=falling_from_altitude_value,
+        same_size_grapple_check=same_size_grapple_check,
+        grapple_broke_on_turn_start=grapple_broke_on_turn_start,
+        grapple_contest_roll=grapple_contest_roll,
+        grapple_contest_opponent_id=grapple_contest_opponent_id,
     )
 
 
@@ -1201,9 +1263,175 @@ def execute_action(
             )
         thrown_coord = action_input.target_position.coord
 
-    # Check if this is an attack action with targets
+    # Check if this is an attack against a deployable (Phase 60)
+    if is_attack and action_input.target_deployable_id:
+        from core.shared.rolls import resolve_attack
+        from core.mech.combat_resolution import damage_deployable as damage_deployable_func
+
+        deployable_id = action_input.target_deployable_id
+        if deployable_id not in scenario.deployables:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error=f"Deployable {deployable_id} not found",
+            )
+        deployable = scenario.deployables[deployable_id]
+        if deployable.is_destroyed:
+            return scenario, current_turn, economy, ActionExecutionResult(
+                success=False,
+                error=f"Deployable {deployable_id} is already destroyed",
+            )
+
+        # Get attack bonus from actor's grit
+        attack_bonus = actor.stats.grit if actor.stats else 0
+
+        # Get attacker status modifiers
+        attacker_acc_mod, attacker_diff_mod = _get_attacker_status_modifiers(actor)
+
+        # Roll attack against deployable's evasion
+        attack_result = resolve_attack(
+            attack_bonus=attack_bonus,
+            target_defense=deployable.evasion,
+            accuracy_bonus=accuracy_bonus + attacker_acc_mod,
+            difficulty_bonus=difficulty_bonus + attacker_diff_mod,
+        )
+
+        effects_applied.append({
+            "type": "attack_deployable",
+            "deployable_id": deployable_id,
+            "roll": attack_result.roll,
+            "total": attack_result.total_accuracy,
+            "hit": attack_result.hit,
+            "critical": attack_result.is_critical,
+            "target_evasion": deployable.evasion,
+        })
+
+        if attack_result.hit:
+            # Roll damage
+            base_components, overkill_heat = _roll_weapon_damage_components_critical(
+                weapon_profile,
+                is_critical=attack_result.is_critical,
+                apply_overkill=any(tag.tag == "overkill" for tag in weapon_tags),
+            )
+            heat_generated += overkill_heat
+
+            # Sum damage (deployables take HP damage, not typed)
+            total_damage = sum(amount for _, amount in base_components if _ != "heat")
+
+            # Apply damage to deployable
+            scenario, damage_result = damage_deployable_func(
+                scenario=scenario,
+                deployable_id=deployable_id,
+                damage=total_damage,
+                armor_piercing=armor_piercing,
+            )
+
+            damage_dealt += damage_result.damage_dealt
+            effects_applied.append({
+                "type": "deployable_damaged",
+                "deployable_id": deployable_id,
+                "damage_dealt": damage_result.damage_dealt,
+                "hp_before": damage_result.hp_before,
+                "hp_after": damage_result.hp_after,
+                "destroyed": damage_result.is_destroyed,
+            })
+
+        # Update action use to record deployable target
+        deployable_action_use = action_use.model_copy(update={
+            "target_ids": [deployable_id],
+        })
+        deployable_actions = list(current_turn.actions) + [deployable_action_use]
+        # Attacking a deployable is a non-protocol action that blocks ordnance
+        deployable_has_moved_or_acted = current_turn.has_moved_or_acted or (
+            action_input.action_type in ("full", "quick")
+        )
+        deployable_turn = CombatTurn(
+            actor_id=current_turn.actor_id,
+            move_used=current_turn.move_used,
+            movement_mode=current_turn.movement_mode,
+            movement_path=current_turn.movement_path,
+            actions=deployable_actions,
+            has_moved_or_acted=deployable_has_moved_or_acted,
+        )
+
+        # Handle self heat from weapon
+        if heat_self > 0:
+            actor_idx = next(
+                (i for i, c in enumerate(scenario.combatants) if c.id == actor.id),
+                -1,
+            )
+            if actor_idx >= 0:
+                actor_state = scenario.combatants[actor_idx]
+                new_heat = min(
+                    actor_state.resources.heat_current + heat_self,
+                    actor_state.resources.heat_cap,
+                )
+                new_resources = actor_state.resources.model_copy(
+                    update={"heat_current": new_heat}
+                )
+                updated_actor = actor_state.model_copy(update={"resources": new_resources})
+                updated_combatants = list(scenario.combatants)
+                updated_combatants[actor_idx] = updated_actor
+                scenario = MechCombatScenario(
+                    combatants=updated_combatants,
+                    grapples=list(scenario.grapples),
+                    rounds=list(scenario.rounds),
+                    terrain=scenario.terrain,
+                    environment=scenario.environment,
+                    deployables=dict(scenario.deployables),
+                    sitrep_resolution=scenario.sitrep_resolution,
+                    pending_decisions=list(scenario.pending_decisions),
+                )
+                heat_generated += heat_self
+
+        return scenario, deployable_turn, updated_economy, ActionExecutionResult(
+            success=True,
+            action_use=deployable_action_use,
+            effects_applied=effects_applied,
+            damage_dealt=damage_dealt,
+            damage_breakdown=DamageBreakdown(
+                kinetic=damage_dealt,  # Simplify - all damage is counted as kinetic for deployables
+            ),
+            heat_generated=heat_generated,
+            resource_changes=[],
+            statuses_applied={},
+            structure_checks=[],
+            overheat_checks=[],
+            position_updates={},
+        )
+
+    # Check if this is an attack action with combatant targets
     if is_attack and attack_target_ids:
         from core.shared.rolls import resolve_attack
+
+        # Validate mount targeting (Phase 60: called shot to mount)
+        if action_input.target_mount_id is not None:
+            # Called shot to mount requires exactly one target
+            if len(attack_target_ids) != 1:
+                return scenario, current_turn, economy, ActionExecutionResult(
+                    success=False,
+                    error="Called shot to mount requires exactly one target",
+                )
+            mount_target = next(
+                (c for c in scenario.combatants if c.id == attack_target_ids[0]),
+                None,
+            )
+            if mount_target is None or mount_target.inventory is None:
+                return scenario, current_turn, economy, ActionExecutionResult(
+                    success=False,
+                    error="Target has no inventory for mount targeting",
+                )
+            mount_idx = action_input.target_mount_id
+            if mount_idx < 0 or mount_idx >= len(mount_target.inventory.mounts):
+                return scenario, current_turn, economy, ActionExecutionResult(
+                    success=False,
+                    error=f"Invalid mount index {mount_idx}",
+                )
+            target_mount = mount_target.inventory.mounts[mount_idx]
+            if target_mount.destroyed:
+                return scenario, current_turn, economy, ActionExecutionResult(
+                    success=False,
+                    error=f"Mount {mount_idx} is already destroyed",
+                )
 
         # Validate range and LOS for each target before resolving attacks
         # Skip for area attacks (already validated by area origin)
@@ -1297,6 +1525,16 @@ def execute_action(
             final_difficulty_bonus = (
                 difficulty_bonus + attacker_diff_mod + target_diff_mod + cover_difficulty + talent_diff_mod
             )
+
+            # Called shot to mount adds +1 difficulty (Phase 60 house rule)
+            if action_input.target_mount_id is not None:
+                final_difficulty_bonus += 1
+                effects_applied.append({
+                    "type": "called_shot_mount",
+                    "target_id": target_id,
+                    "mount_index": action_input.target_mount_id,
+                    "difficulty_modifier": 1,
+                })
 
             attack_result = resolve_attack(
                 attack_bonus=attack_bonus,
@@ -1423,6 +1661,56 @@ def execute_action(
                         "target_id": target_id,
                         "armor_bypassed": current_target.stats.armor if current_target.stats else 0,
                     })
+
+                # Called shot to mount: destroy mount instead of dealing HP damage (Phase 60)
+                if action_input.target_mount_id is not None:
+                    # Destroy the targeted mount
+                    mount_target_idx = next(
+                        (i for i, c in enumerate(scenario.combatants) if c.id == target_id),
+                        -1,
+                    )
+                    if mount_target_idx >= 0:
+                        mount_combatant = scenario.combatants[mount_target_idx]
+                        if mount_combatant.inventory:
+                            mount_idx = action_input.target_mount_id
+                            updated_mounts = list(mount_combatant.inventory.mounts)
+                            if mount_idx < len(updated_mounts):
+                                target_mount = updated_mounts[mount_idx]
+                                # Mark mount and all weapons as destroyed
+                                destroyed_weapons = [
+                                    w.model_copy(update={"destroyed": True})
+                                    for w in target_mount.weapons
+                                ]
+                                updated_mounts[mount_idx] = target_mount.model_copy(
+                                    update={"destroyed": True, "weapons": destroyed_weapons}
+                                )
+                                new_inventory = mount_combatant.inventory.model_copy(
+                                    update={"mounts": updated_mounts}
+                                )
+                                updated_combatant = mount_combatant.model_copy(
+                                    update={"inventory": new_inventory}
+                                )
+                                updated_combatants = list(scenario.combatants)
+                                updated_combatants[mount_target_idx] = updated_combatant
+                                scenario = MechCombatScenario(
+                                    combatants=updated_combatants,
+                                    grapples=list(scenario.grapples),
+                                    rounds=list(scenario.rounds),
+                                    terrain=scenario.terrain,
+                                    environment=scenario.environment,
+                                    deployables=dict(scenario.deployables),
+                                    sitrep_resolution=scenario.sitrep_resolution,
+                                    pending_decisions=list(scenario.pending_decisions),
+                                )
+                                effects_applied.append({
+                                    "type": "mount_destroyed",
+                                    "target_id": target_id,
+                                    "mount_index": mount_idx,
+                                    "slot_type": target_mount.slot_type,
+                                    "weapons_destroyed": [w.weapon_id for w in target_mount.weapons],
+                                })
+                    # Skip normal damage application for called shot
+                    continue
 
                 scenario, change, breakdown, structure_result, overheat_result = apply_typed_damage(
                     scenario,

@@ -87,6 +87,16 @@ class ActionExecutionInput(FrozenModel):
     mine_type: Literal["explosive", "shroud", "breaching", "cluster", "emp"] | None = Field(
         default=None, description="Type of mine being deployed"
     )
+    # Mount/Deployable targeting (Phase 60)
+    target_mount_id: int | None = Field(
+        default=None,
+        ge=0,
+        description="Mount index to target for called shot (adds +1 difficulty, destroys mount on hit)",
+    )
+    target_deployable_id: str | None = Field(
+        default=None,
+        description="ID of deployable to target (instead of combatant)",
+    )
 
 
 class ReactionInput(FrozenModel):
@@ -280,6 +290,24 @@ class TurnStartResult(FrozenModel):
     falling_from_altitude: int | None = Field(
         default=None,
         description="Altitude level the actor is falling from (if started_falling)"
+    )
+
+    # Same-size grapple contested check at turn start (PR2 4164-4165)
+    same_size_grapple_check: bool = Field(
+        default=False,
+        description="Whether a same-size grapple contested HULL check was triggered"
+    )
+    grapple_broke_on_turn_start: bool = Field(
+        default=False,
+        description="Whether the grapple was broken due to winning the contest"
+    )
+    grapple_contest_roll: int | None = Field(
+        default=None,
+        description="The d20 roll result for the grapple contest"
+    )
+    grapple_contest_opponent_id: str | None = Field(
+        default=None,
+        description="ID of the opponent in the grapple contest"
     )
 
 

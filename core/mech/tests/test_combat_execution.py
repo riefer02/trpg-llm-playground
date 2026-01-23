@@ -10510,3 +10510,1071 @@ class TestGrappleTurnSequencing:
             None,
         )
         assert grapple_broken is None
+
+
+# =============================================================================
+# Same-Size Grapple Turn Start Tests (Phase 61)
+# =============================================================================
+
+
+class TestSameSizeGrappleTurnStart:
+    """Tests for same-size grapple contested HULL check at turn start per PR2 4164-4165."""
+
+    def test_same_size_grapple_triggers_contest_at_turn_start(self):
+        """Test same-size grapple triggers contested check at turn start."""
+        from core.mech.combat_execution import start_turn
+
+        # Both size_1 mechs
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=0,
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            grit=0,
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="target_1")])
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+            rounds=[round1],
+        )
+
+        _, result = start_turn(scenario, "target_1")
+
+        # Should trigger same-size check
+        assert result.same_size_grapple_check is True
+        assert result.grapple_contest_opponent_id == "grappler_1"
+        assert result.grapple_contest_roll is not None
+
+    def test_different_size_grapple_no_contest_at_turn_start(self):
+        """Test different-size grapple does NOT trigger contested check at turn start."""
+        from core.mech.combat_execution import start_turn
+
+        # Size 2 grappler vs size 1 target
+        grappler = CombatantState(
+            id="grappler_1",
+            name="Big Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_2",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                tech_attack=0,
+                grit=0,
+                engineering_skill=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            grit=0,
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="target_1")])
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+            rounds=[round1],
+        )
+
+        _, result = start_turn(scenario, "target_1")
+
+        # Should NOT trigger same-size check
+        assert result.same_size_grapple_check is False
+        assert result.grapple_contest_roll is None
+
+    def test_contest_winner_breaks_grapple(self):
+        """Test contest winner breaks grapple."""
+        from unittest.mock import patch
+        from core.mech.combat_execution import start_turn
+
+        # Both size_1 mechs, target will win the contest
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=0,
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            grit=5,  # Higher hull bonus
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="target_1")])
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+            rounds=[round1],
+        )
+
+        # Mock contest so target wins
+        with patch("core.shared.grapple.contest_grapple_check") as mock_contest:
+            mock_contest.return_value = ("target", 15)  # target wins
+
+            updated_scenario, result = start_turn(scenario, "target_1")
+
+        assert result.same_size_grapple_check is True
+        assert result.grapple_broke_on_turn_start is True
+        assert len(updated_scenario.grapples) == 0
+
+    def test_contest_loser_remains_grappled(self):
+        """Test contest loser remains grappled."""
+        from unittest.mock import patch
+        from core.mech.combat_execution import start_turn
+
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=5,  # Higher hull bonus
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            grit=0,
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="target_1")])
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+            rounds=[round1],
+        )
+
+        # Mock contest so attacker wins (target loses)
+        with patch("core.shared.grapple.contest_grapple_check") as mock_contest:
+            mock_contest.return_value = ("attacker", 10)  # attacker wins
+
+            updated_scenario, result = start_turn(scenario, "target_1")
+
+        assert result.same_size_grapple_check is True
+        assert result.grapple_broke_on_turn_start is False
+        assert len(updated_scenario.grapples) == 1
+
+    def test_turn_start_result_includes_grapple_contest_info(self):
+        """Test TurnStartResult includes all grapple contest info."""
+        from core.mech.combat_execution import start_turn
+
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+            grit=2,
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            grit=3,
+        )
+
+        round1 = make_round(round_index=1, turns=[make_turn(actor_id="grappler_1")])
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+            rounds=[round1],
+        )
+
+        _, result = start_turn(scenario, "grappler_1")
+
+        # Result should have all grapple-related fields
+        assert hasattr(result, "same_size_grapple_check")
+        assert hasattr(result, "grapple_broke_on_turn_start")
+        assert hasattr(result, "grapple_contest_roll")
+        assert hasattr(result, "grapple_contest_opponent_id")
+        assert result.grapple_contest_opponent_id == "target_1"
+
+
+# =============================================================================
+# Linked Grapple Movement Tests (Phase 61)
+# =============================================================================
+
+
+class TestLinkedGrappleMovement:
+    """Tests for linked grapple movement per PR2 4168."""
+
+    def test_larger_mover_drags_smaller_party(self):
+        """Test larger party movement drags smaller party along."""
+        from core.mech.combat_helpers import _resolve_movement
+
+        # Size 2 grappler vs size 1 target
+        grappler = CombatantState(
+            id="grappler_1",
+            name="Big Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_2",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                tech_attack=0,
+                grit=0,
+                engineering_skill=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+
+        # Move grappler to (2, 0)
+        path = [HexPosition(coord=HexCoord(q=1, r=0)), HexPosition(coord=HexCoord(q=2, r=0))]
+
+        updated_scenario, effects = _resolve_movement(
+            scenario, grappler, path, is_boost=False
+        )
+
+        # Find linked movement effect
+        linked_effect = next(
+            (e for e in effects if e.get("type") == "linked_grapple_movement"),
+            None,
+        )
+        assert linked_effect is not None
+        assert linked_effect["larger_id"] == "grappler_1"
+        assert linked_effect["smaller_id"] == "target_1"
+
+        # Target should have moved to adjacent hex of (2, 0)
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert updated_target.position is not None
+        # Should be adjacent to grappler's new position
+        assert updated_target.position.coord.distance_to(HexCoord(q=2, r=0)) == 1
+
+    def test_same_size_no_linked_movement(self):
+        """Test same-size grapple does not trigger linked movement."""
+        from core.mech.combat_helpers import _resolve_movement
+
+        # Both size_1 mechs
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+
+        # Move grappler - but target shouldn't be dragged (same size)
+        path = [HexPosition(coord=HexCoord(q=0, r=1))]
+
+        updated_scenario, effects = _resolve_movement(
+            scenario, grappler, path, is_boost=False
+        )
+
+        # No linked movement effect
+        linked_effect = next(
+            (e for e in effects if e.get("type") == "linked_grapple_movement"),
+            None,
+        )
+        assert linked_effect is None
+
+        # Target should still be at original position
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert updated_target.position is not None
+        assert updated_target.position.coord == HexCoord(q=1, r=0)
+
+    def test_smaller_mover_no_linked_movement(self):
+        """Test smaller party movement does not drag larger party."""
+        from core.mech.combat_helpers import _resolve_movement
+
+        # Size 2 target vs size 1 grappler
+        grappler = make_combatant(
+            id="grappler_1",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = CombatantState(
+            id="target_1",
+            name="Big Mech",
+            side="hostiles",
+            kind="mech",
+            stats=CombatStats(
+                size="size_2",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                tech_attack=0,
+                grit=0,
+                engineering_skill=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+
+        # Move grappler (smaller party) - should not drag target
+        path = [HexPosition(coord=HexCoord(q=0, r=1))]
+
+        updated_scenario, effects = _resolve_movement(
+            scenario, grappler, path, is_boost=False
+        )
+
+        # No linked movement effect
+        linked_effect = next(
+            (e for e in effects if e.get("type") == "linked_grapple_movement"),
+            None,
+        )
+        assert linked_effect is None
+
+        # Target should still be at original position
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert updated_target.position is not None
+        assert updated_target.position.coord == HexCoord(q=1, r=0)
+
+    def test_linked_movement_picks_closest_adjacent_hex(self):
+        """Test linked movement places smaller party at closest adjacent hex."""
+        from core.mech.combat_helpers import _resolve_movement
+
+        # Size 2 grappler vs size 1 target
+        grappler = CombatantState(
+            id="grappler_1",
+            name="Big Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_2",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                tech_attack=0,
+                grit=0,
+                engineering_skill=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),  # Adjacent to grappler
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+
+        # Move grappler to (2, 0)
+        path = [HexPosition(coord=HexCoord(q=1, r=0)), HexPosition(coord=HexCoord(q=2, r=0))]
+
+        updated_scenario, effects = _resolve_movement(
+            scenario, grappler, path, is_boost=False
+        )
+
+        # Target should move to hex adjacent to (2, 0) that is closest to original (1, 0)
+        updated_target = next(c for c in updated_scenario.combatants if c.id == "target_1")
+        assert updated_target.position is not None
+
+        # Adjacent hexes to (2, 0): (3,0), (2,-1), (1,-1), (1,0), (2,1), (3,-1)
+        # Closest to original (1, 0) should be (1, 0) or (2, -1) or (2, 1)
+        # (1, 0) is distance 0 from (1, 0), so it's the closest
+        assert updated_target.position.coord == HexCoord(q=1, r=0)
+
+    def test_linked_movement_records_effect(self):
+        """Test linked movement records effect with correct info."""
+        from core.mech.combat_helpers import _resolve_movement
+
+        grappler = CombatantState(
+            id="grappler_1",
+            name="Big Mech",
+            side="players",
+            kind="mech",
+            stats=CombatStats(
+                size="size_2",
+                hp_max=10,
+                evasion=8,
+                e_defense=8,
+                armor=0,
+                speed=4,
+                sensor_range=10,
+                tech_attack=0,
+                grit=0,
+                engineering_skill=0,
+            ),
+            resources=CombatResources(
+                hp_current=10,
+                heat_current=0,
+                heat_cap=6,
+                structure_current=4,
+                stress_current=4,
+                repairs_remaining=4,
+            ),
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+        target = make_combatant(
+            id="target_1",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+        )
+
+        scenario = MechCombatScenario(
+            combatants=[grappler, target],
+            grapples=[GrappleLink(grappler_id="grappler_1", target_id="target_1")],
+        )
+
+        path = [HexPosition(coord=HexCoord(q=1, r=0)), HexPosition(coord=HexCoord(q=2, r=0))]
+
+        _, effects = _resolve_movement(scenario, grappler, path, is_boost=False)
+
+        linked_effect = next(
+            (e for e in effects if e.get("type") == "linked_grapple_movement"),
+            None,
+        )
+        assert linked_effect is not None
+        assert linked_effect["type"] == "linked_grapple_movement"
+        assert linked_effect["larger_id"] == "grappler_1"
+        assert linked_effect["smaller_id"] == "target_1"
+        assert "from_coord" in linked_effect
+        assert "to_coord" in linked_effect
+
+
+# =============================================================================
+# Phase 60: Mount & Deployable Targeting Tests
+# =============================================================================
+
+
+class TestMountTargeting:
+    """Tests for called shot mount targeting (Phase 60)."""
+
+    def test_called_shot_adds_difficulty(self):
+        """Called shot to mount adds +1 difficulty."""
+        from unittest.mock import patch
+
+        # Create attacker
+        attacker = make_combatant(
+            id="attacker",
+            name="Attacker",
+            side="players",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        # Create target with inventory containing a mount
+        weapon_state = WeaponState(weapon_id="rifle", tags=[], destroyed=False)
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=False,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+        target = make_combatant(
+            id="target",
+            name="Target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            inventory=inventory,
+        )
+
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target"],
+            weapon_id="assault_rifle",
+            target_mount_id=0,
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=10,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=10,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+            # Verify difficulty was modified (+1 for called shot)
+            call_args = mock_resolve.call_args
+            assert call_args is not None
+            assert call_args.kwargs.get("difficulty_bonus", 0) >= 1
+
+            # Check called shot effect was recorded
+            called_shot_effects = [
+                e for e in result.effects_applied if e.get("type") == "called_shot_mount"
+            ]
+            assert len(called_shot_effects) == 1
+            assert called_shot_effects[0]["mount_index"] == 0
+
+    def test_called_shot_hit_destroys_mount(self):
+        """Successful called shot destroys the targeted mount."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        weapon_state = WeaponState(weapon_id="rifle", tags=[], destroyed=False)
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=False,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+        target = make_combatant(
+            id="target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            inventory=inventory,
+        )
+
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target"],
+            weapon_id="assault_rifle",
+            target_mount_id=0,
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=18,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=18,
+                target_defense=10,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+
+        # Check mount was destroyed
+        target_after = next(c for c in updated_scenario.combatants if c.id == "target")
+        assert target_after.inventory is not None
+        assert target_after.inventory.mounts[0].destroyed is True
+
+        # Check mount_destroyed effect
+        mount_destroyed = next(
+            (e for e in result.effects_applied if e.get("type") == "mount_destroyed"),
+            None,
+        )
+        assert mount_destroyed is not None
+        assert mount_destroyed["mount_index"] == 0
+
+    def test_called_shot_miss_no_mount_damage(self):
+        """Missed called shot does not destroy mount."""
+        from unittest.mock import patch
+
+        attacker = make_combatant(
+            id="attacker",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        weapon_state = WeaponState(weapon_id="rifle", tags=[], destroyed=False)
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=False,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+        target = make_combatant(
+            id="target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            inventory=inventory,
+        )
+
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target"],
+            weapon_id="assault_rifle",
+            target_mount_id=0,
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=3,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=3,
+                target_defense=10,
+                hit=False,
+                is_critical=False,
+                miss_by=7,
+            )
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Mount should not be destroyed
+        target_after = next(c for c in updated_scenario.combatants if c.id == "target")
+        assert target_after.inventory is not None
+        assert target_after.inventory.mounts[0].destroyed is False
+
+        # No mount_destroyed effect
+        mount_destroyed = next(
+            (e for e in result.effects_applied if e.get("type") == "mount_destroyed"),
+            None,
+        )
+        assert mount_destroyed is None
+
+    def test_cannot_target_destroyed_mount(self):
+        """Cannot target an already-destroyed mount."""
+        attacker = make_combatant(
+            id="attacker",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        weapon_state = WeaponState(weapon_id="rifle", tags=[], destroyed=True)
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=True,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+        target = make_combatant(
+            id="target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            inventory=inventory,
+        )
+
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target"],
+            weapon_id="assault_rifle",
+            target_mount_id=0,
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert result.error is not None
+        assert "destroyed" in result.error.lower()
+
+    def test_invalid_mount_index_rejected(self):
+        """Invalid mount index is rejected."""
+        attacker = make_combatant(
+            id="attacker",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        weapon_state = WeaponState(weapon_id="rifle", tags=[], destroyed=False)
+        mount = WeaponMountState(
+            mount_index=0,
+            slot_type="main",
+            weapons=[weapon_state],
+            destroyed=False,
+        )
+        inventory = MechInventory(mounts=[mount], systems=[])
+        target = make_combatant(
+            id="target",
+            side="hostiles",
+            position=HexPosition(coord=HexCoord(q=1, r=0)),
+            inventory=inventory,
+        )
+
+        scenario = make_scenario(combatants=[attacker, target])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            target_ids=["target"],
+            weapon_id="assault_rifle",
+            target_mount_id=5,  # Invalid - only mount 0 exists
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert result.error is not None
+        assert "invalid mount index" in result.error.lower()
+
+
+class TestDeployableTargeting:
+    """Tests for deployable targeting (Phase 60)."""
+
+    def test_attack_deployable_hit(self):
+        """Attack against deployable that hits deals damage."""
+        from unittest.mock import patch
+        from core.mech.combat_state import DeployableState
+
+        attacker = make_combatant(
+            id="attacker",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        deployable = DeployableState(
+            id="deployable_1",
+            name="Test Turret",
+            kind="deployable",
+            owner_id=None,
+            position=HexPosition(coord=HexCoord(q=2, r=0)),
+            size=1,
+            hp=10,
+            max_hp=10,
+            armor=0,
+            evasion=5,
+        )
+
+        scenario = make_scenario(combatants=[attacker])
+        scenario = MechCombatScenario(
+            combatants=scenario.combatants,
+            grapples=[],
+            rounds=scenario.rounds,
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables={"deployable_1": deployable},
+        )
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="assault_rifle",
+            target_deployable_id="deployable_1",
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=15,
+                target_defense=5,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+
+        # Check deployable took damage
+        deployable_after = updated_scenario.deployables["deployable_1"]
+        assert deployable_after.hp < 10
+
+        # Check attack effect was recorded
+        attack_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "attack_deployable"),
+            None,
+        )
+        assert attack_effect is not None
+        assert attack_effect["hit"] is True
+
+    def test_attack_deployable_miss(self):
+        """Attack against deployable that misses deals no damage."""
+        from unittest.mock import patch
+        from core.mech.combat_state import DeployableState
+
+        attacker = make_combatant(
+            id="attacker",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        deployable = DeployableState(
+            id="deployable_1",
+            name="Test Turret",
+            kind="deployable",
+            owner_id=None,
+            position=HexPosition(coord=HexCoord(q=2, r=0)),
+            size=1,
+            hp=10,
+            max_hp=10,
+            armor=0,
+            evasion=10,  # Higher evasion
+        )
+
+        scenario = make_scenario(combatants=[attacker])
+        scenario = MechCombatScenario(
+            combatants=scenario.combatants,
+            grapples=[],
+            rounds=scenario.rounds,
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables={"deployable_1": deployable},
+        )
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="assault_rifle",
+            target_deployable_id="deployable_1",
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=5,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=5,
+                target_defense=10,
+                hit=False,
+                is_critical=False,
+                miss_by=5,
+            )
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        assert result.success
+
+        # Deployable should have full HP
+        deployable_after = updated_scenario.deployables["deployable_1"]
+        assert deployable_after.hp == 10
+
+        # Attack effect shows miss
+        attack_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "attack_deployable"),
+            None,
+        )
+        assert attack_effect is not None
+        assert attack_effect["hit"] is False
+
+    def test_deployable_destroyed_at_zero_hp(self):
+        """Deployable is marked as destroyed when HP reaches zero."""
+        from unittest.mock import patch
+        from core.mech.combat_state import DeployableState
+
+        attacker = make_combatant(
+            id="attacker",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        deployable = DeployableState(
+            id="deployable_1",
+            name="Weak Turret",
+            kind="deployable",
+            owner_id=None,
+            position=HexPosition(coord=HexCoord(q=2, r=0)),
+            size=1,
+            hp=1,  # Very low HP
+            max_hp=1,
+            armor=0,
+            evasion=5,
+        )
+
+        scenario = make_scenario(combatants=[attacker])
+        scenario = MechCombatScenario(
+            combatants=scenario.combatants,
+            grapples=[],
+            rounds=scenario.rounds,
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables={"deployable_1": deployable},
+        )
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="assault_rifle",
+            target_deployable_id="deployable_1",
+        )
+
+        with patch("core.shared.rolls.resolve_attack") as mock_resolve:
+            mock_resolve.return_value = AttackResolutionResult(
+                roll=15,
+                attack_bonus=0,
+                accuracy_dice_rolls=[],
+                difficulty_dice_rolls=[],
+                net_accuracy=0,
+                total_accuracy=15,
+                target_defense=5,
+                hit=True,
+                is_critical=False,
+                miss_by=0,
+            )
+            updated_scenario, _, _, result = execute_action(
+                scenario, turn, economy, action_input
+            )
+
+        # Deployable should be destroyed
+        deployable_after = updated_scenario.deployables["deployable_1"]
+        assert deployable_after.hp == 0
+        assert deployable_after.is_destroyed is True
+
+        # Check destroyed effect
+        damage_effect = next(
+            (e for e in result.effects_applied if e.get("type") == "deployable_damaged"),
+            None,
+        )
+        assert damage_effect is not None
+        assert damage_effect["destroyed"] is True
+
+    def test_cannot_target_destroyed_deployable(self):
+        """Cannot target an already-destroyed deployable."""
+        from core.mech.combat_state import DeployableState
+
+        attacker = make_combatant(
+            id="attacker",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        deployable = DeployableState(
+            id="deployable_1",
+            name="Destroyed Turret",
+            kind="deployable",
+            owner_id=None,
+            position=HexPosition(coord=HexCoord(q=2, r=0)),
+            size=1,
+            hp=0,
+            max_hp=10,
+            armor=0,
+            evasion=5,
+            is_destroyed=True,
+        )
+
+        scenario = make_scenario(combatants=[attacker])
+        scenario = MechCombatScenario(
+            combatants=scenario.combatants,
+            grapples=[],
+            rounds=scenario.rounds,
+            terrain=scenario.terrain,
+            environment=scenario.environment,
+            deployables={"deployable_1": deployable},
+        )
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="assault_rifle",
+            target_deployable_id="deployable_1",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert result.error is not None
+        assert "destroyed" in result.error.lower()
+
+    def test_deployable_not_found_error(self):
+        """Error when targeting a non-existent deployable."""
+        attacker = make_combatant(
+            id="attacker",
+            position=HexPosition(coord=HexCoord(q=0, r=0)),
+        )
+
+        scenario = make_scenario(combatants=[attacker])
+        turn = make_turn(actor_id="attacker")
+        economy = ActionEconomyState()
+
+        action_input = ActionExecutionInput(
+            actor_id="attacker",
+            action_id="skirmish",
+            action_type="quick",
+            weapon_id="assault_rifle",
+            target_deployable_id="nonexistent_deployable",
+        )
+
+        _, _, _, result = execute_action(scenario, turn, economy, action_input)
+
+        assert result.success is False
+        assert result.error is not None
+        assert "not found" in result.error.lower()

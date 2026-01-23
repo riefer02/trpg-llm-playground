@@ -31,6 +31,9 @@ export interface ActionRequest {
   prompt_dangerous_terrain?: boolean;
   is_overcharge?: boolean;
   use_thrown?: boolean;
+  // Phase 60: Mount & Deployable targeting
+  target_mount_id?: number;
+  target_deployable_id?: string;
 }
 
 export interface ActionResponse {
