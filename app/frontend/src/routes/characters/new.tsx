@@ -510,19 +510,27 @@ function NewCharacterPage() {
           <div className="text-xs uppercase tracking-wide text-muted-foreground">
             Mission Steps
           </div>
-          {STEP_ORDER.map((stepId) => {
+          {STEP_ORDER.map((stepId, index) => {
             const meta = STEP_META[stepId];
             const isActive = step === stepId;
             const isComplete = stepStatus[stepId];
+            // A step is reachable if all previous steps are complete, or it's the current step
+            const previousStepsComplete = STEP_ORDER.slice(0, index).every(
+              (prevStep) => stepStatus[prevStep]
+            );
+            const isReachable = previousStepsComplete || isActive;
             return (
               <button
                 key={stepId}
                 type="button"
-                onClick={() => setStep(stepId)}
+                onClick={() => isReachable && setStep(stepId)}
+                disabled={!isReachable}
                 aria-current={isActive ? "step" : undefined}
                 className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
                   isActive
                     ? "border-primary/50 bg-primary/10"
+                    : !isReachable
+                    ? "border-border/50 opacity-50 cursor-not-allowed"
                     : "border-border hover:bg-muted/60"
                 }`}
               >
@@ -530,13 +538,17 @@ function NewCharacterPage() {
                   <span className="text-sm font-medium">{meta.title}</span>
                   <span
                     className={`text-xs ${
-                      isComplete ? "text-primary" : "text-muted-foreground"
+                      isComplete
+                        ? "text-primary"
+                        : !isReachable
+                        ? "text-muted-foreground/50"
+                        : "text-muted-foreground"
                     }`}
                   >
-                    {isComplete ? "Ready" : "Pending"}
+                    {isComplete ? "Ready" : !isReachable ? "Locked" : "Pending"}
                   </span>
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className={`text-xs ${!isReachable ? "text-muted-foreground/50" : "text-muted-foreground"}`}>
                   {meta.summary}
                 </div>
               </button>
