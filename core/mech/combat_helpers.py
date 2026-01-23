@@ -2218,13 +2218,14 @@ def _resolve_ram(
 
     # Apply knockback position change if applicable
     if apply_knockback and ram_result.knockback_spaces > 0 and target.position and actor.position:
-        from core.shared.grapple import get_knockback_direction
-        direction = get_knockback_direction(actor.position.coord, target.position.coord)
-        new_coord = HexCoord(
-            q=target.position.coord.q + (direction.q * ram_result.knockback_spaces),
-            r=target.position.coord.r + (direction.r * ram_result.knockback_spaces),
+        from core.shared.involuntary_movement import resolve_knockback
+        knockback_result = resolve_knockback(
+            source=actor.position.coord,
+            target=target.position.coord,
+            spaces=ram_result.knockback_spaces,
+            terrain=scenario.terrain,
         )
-        new_position = target.position.model_copy(update={"coord": new_coord})
+        new_position = target.position.model_copy(update={"coord": knockback_result.end_position})
 
         target_idx = next((i for i, c in enumerate(scenario.combatants) if c.id == target.id), -1)
         if target_idx >= 0:

@@ -3,7 +3,7 @@ import type { ActionLogEffect, HexCoord } from "../types/lancer";
 import { getMarkerIconConfig } from "../combat-effects";
 
 import type { HexLayout, PixelPoint } from "./hex";
-import { axialToPixel, hexCorners, pixelToAxial } from "./hex";
+import { axialToPixel, hex, hexCorners, pixelToAxial } from "./hex";
 
 export type HexGrid = {
   coords: HexCoord[];
@@ -27,6 +27,8 @@ export type RenderToken = {
   color?: string;
   label?: string;
   radius?: number;
+  /** When true, renders with a distinctive glow to indicate current actor */
+  isActive?: boolean;
 };
 
 export type DeployableKind = "mine" | "drone" | "deployable" | "other";
@@ -165,14 +167,14 @@ export type ClickCallbacks = {
 
 export function buildHexGrid(
   radius: number,
-  origin: HexCoord = { q: 0, r: 0 },
+  origin: HexCoord = hex(0, 0),
 ): HexGrid {
   const coords: HexCoord[] = [];
   for (let q = -radius; q <= radius; q += 1) {
     const rMin = Math.max(-radius, -q - radius);
     const rMax = Math.min(radius, -q + radius);
     for (let r = rMin; r <= rMax; r += 1) {
-      coords.push({ q: q + origin.q, r: r + origin.r });
+      coords.push(hex(q + origin.q, r + origin.r));
     }
   }
   const coordSet = new Set(coords.map(hexKey));
@@ -241,6 +243,23 @@ export function drawTokens(
   for (const token of tokens) {
     const center = axialToPixel(token.coord, layout);
     const radius = token.radius ?? style.radius ?? layout.size * 0.45;
+
+    // Draw active indicator glow/ring behind the token
+    if (token.isActive) {
+      // Outer glow
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius + 6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(250, 204, 21, 0.3)";
+      ctx.fill();
+
+      // Pulsing ring
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
     ctx.beginPath();
     ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
     ctx.fillStyle = token.color ?? style.fillStyle ?? "#334155";

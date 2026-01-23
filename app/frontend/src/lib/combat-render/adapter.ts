@@ -117,9 +117,11 @@ export function adaptCombatScenario(
     combatants.map((combatant) => [combatant.id, combatant]),
   );
 
+  const activeActorId = input.actorId ?? input.turn?.actor_id ?? null;
   const { tokens, tokenMetadata } = buildTokens(
     combatants,
     input.tokenColors,
+    activeActorId,
   );
   const terrainTiles = buildTerrainTiles(input.scenario.terrain ?? null);
   const markers = buildMarkers(combatants, input.scenario.deployables);
@@ -189,6 +191,7 @@ type PatternOverlayInput = {
 function buildTokens(
   combatants: CombatantState[],
   tokenColors?: Partial<Record<Side, string>>,
+  activeActorId?: string | null,
 ): {
   tokens: RenderToken[];
   tokenMetadata: Record<string, RenderTokenMetadata>;
@@ -220,6 +223,7 @@ function buildTokens(
       coord: position.coord,
       color: colors[combatant.side],
       label: labelFromName(combatant.name),
+      isActive: combatant.id === activeActorId,
     });
   }
 
