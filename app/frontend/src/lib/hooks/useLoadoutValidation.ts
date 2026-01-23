@@ -35,7 +35,9 @@ export function useLoadoutValidation(
     const weaponMap = new Map(weapons?.map((w) => [w.id, w]) ?? []);
     const systemMap = new Map(systems?.map((s) => [s.id, s]) ?? []);
     const licenseMap = new Map(
-      character.licenses.map((l) => [l.license_id, l.rank])
+      character.licenses
+        .filter((l): l is typeof l & { rank: number } => l.rank != null)
+        .map((l) => [l.license_id, l.rank])
     );
 
     return validateLoadout({

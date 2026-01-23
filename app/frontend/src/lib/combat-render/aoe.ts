@@ -1,12 +1,13 @@
 import type { HexCoord } from "../types/lancer";
+import { hex } from "./hex";
 
 export const HEX_DIRECTIONS: HexCoord[] = [
-  { q: 1, r: 0 },
-  { q: 1, r: -1 },
-  { q: 0, r: -1 },
-  { q: -1, r: 0 },
-  { q: -1, r: 1 },
-  { q: 0, r: 1 },
+  hex(1, 0),
+  hex(1, -1),
+  hex(0, -1),
+  hex(-1, 0),
+  hex(-1, 1),
+  hex(0, 1),
 ];
 
 export function normalizeHexDirection(direction: HexCoord): HexCoord | null {
@@ -45,11 +46,11 @@ export function normalizeHexDirection(direction: HexCoord): HexCoord | null {
 }
 
 export function hexAdd(a: HexCoord, b: HexCoord): HexCoord {
-  return { q: a.q + b.q, r: a.r + b.r };
+  return hex(a.q + b.q, a.r + b.r);
 }
 
 export function hexScale(coord: HexCoord, scale: number): HexCoord {
-  return { q: coord.q * scale, r: coord.r * scale };
+  return hex(coord.q * scale, coord.r * scale);
 }
 
 export function hexDistance(a: HexCoord, b: HexCoord): number {
@@ -66,7 +67,7 @@ export function hexesInRadius(center: HexCoord, radius: number): HexCoord[] {
   const results: HexCoord[] = [];
   for (let dq = -radius; dq <= radius; dq += 1) {
     for (let dr = -radius; dr <= radius; dr += 1) {
-      const coord = { q: center.q + dq, r: center.r + dr };
+      const coord = hex(center.q + dq, center.r + dr);
       if (hexDistance(center, coord) <= radius) {
         results.push(coord);
       }
@@ -86,10 +87,10 @@ export function hexLineFromDirection(
   }
   const results: HexCoord[] = [];
   for (let distance = 1; distance <= length; distance += 1) {
-    results.push({
-      q: origin.q + step.q * distance,
-      r: origin.r + step.r * distance,
-    });
+    results.push(hex(
+      origin.q + step.q * distance,
+      origin.r + step.r * distance,
+    ));
   }
   return results;
 }
@@ -165,5 +166,5 @@ function axialToCube(coord: HexCoord): [number, number, number] {
 }
 
 function cubeToAxial(cube: [number, number, number]): HexCoord {
-  return { q: cube[0], r: cube[1] };
+  return hex(cube[0], cube[1]);
 }

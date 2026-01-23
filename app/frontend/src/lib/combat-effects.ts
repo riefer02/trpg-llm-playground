@@ -1,4 +1,4 @@
-import type { ActionLogEffect, StatusType } from "./types/lancer";
+import type { ActionLogEffect, Status } from "./types/lancer";
 
 export type IconName =
   | "send"
@@ -55,7 +55,7 @@ export const EFFECT_ICON_BY_TYPE: Record<ActionLogEffect["type"], EffectIconConf
     },
   };
 
-export const STATUS_ICON_BY_ID: Partial<Record<StatusType, EffectIconConfig>> = {
+export const STATUS_ICON_BY_ID: Partial<Record<Status, EffectIconConfig>> = {
   lock_on: {
     key: "status_lock_on",
     label: "Lock On",

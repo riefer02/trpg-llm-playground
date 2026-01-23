@@ -27,6 +27,7 @@ import {
 } from "../../components/ui";
 import type { PilotLoadout, MechBuild } from "../../lib/types/lancer";
 import { useLoadoutValidation } from "../../lib/hooks/useLoadoutValidation";
+import type { BuildDraft } from "../../lib/validation/loadout";
 import { ValidationSummary } from "../../components/character/ValidationSummary";
 import { LicenseBadge } from "../../components/ui/LicenseBadge";
 import { formatLicenseRequirement } from "../../lib/utils/license";
@@ -433,22 +434,30 @@ function LoadoutSection({ character }: { character: CharacterResponse }) {
   );
 }
 
+// Local draft type with mutable arrays (vs. tuple types in PilotLoadout)
+type PilotLoadoutDraft = {
+  clothing: string | null;
+  armor: string | null;
+  weapons: string[];
+  gear: string[];
+};
+
 function PilotGearSection({ character }: { character: CharacterResponse }) {
   const { data: pilotGear } = usePilotGear();
   const updatePilotGear = useUpdatePilotGear();
   const [isEditing, setIsEditing] = useState(false);
 
-  const currentLoadout = useMemo<PilotLoadout>(
+  const currentLoadout = useMemo<PilotLoadoutDraft>(
     () => ({
       clothing: character.pilot_gear?.clothing ?? null,
       armor: character.pilot_gear?.armor ?? null,
-      weapons: character.pilot_gear?.weapons ?? [],
-      gear: character.pilot_gear?.gear ?? [],
+      weapons: [...(character.pilot_gear?.weapons ?? [])],
+      gear: [...(character.pilot_gear?.gear ?? [])],
     }),
     [character.pilot_gear]
   );
 
-  const [draft, setDraft] = useState<PilotLoadout>(currentLoadout);
+  const [draft, setDraft] = useState<PilotLoadoutDraft>(currentLoadout);
 
   useEffect(() => {
     if (!isEditing) {
@@ -472,10 +481,10 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
 
   const toggleList = (key: "weapons" | "gear", id: string, max: number) => {
     setDraft((prev) => {
-      const current = prev[key];
+      const current = prev[key] ?? [];
       const isSelected = current.includes(id);
       if (isSelected) {
-        return { ...prev, [key]: current.filter((itemId) => itemId !== id) };
+        return { ...prev, [key]: current.filter((itemId: string) => itemId !== id) };
       }
       if (current.length >= max) {
         return prev;
@@ -523,7 +532,7 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
                 onClick={() =>
                   updatePilotGear.mutate({
                     id: character.id,
-                    data: { pilot_gear: draft },
+                    data: { pilot_gear: draft as PilotLoadout },
                   }, {
                     onSuccess: () => setIsEditing(false),
                   })
@@ -571,8 +580,8 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
             <div>
               <div className="text-xs text-muted-foreground uppercase">Weapons</div>
               <div className="font-medium">
-                {draft.weapons.length
-                  ? draft.weapons
+                {(draft.weapons?.length ?? 0) > 0
+                  ? draft.weapons!
                       .map((id) => pilotGearMap.get(id)?.name ?? id)
                       .join(", ")
                   : "None"}
@@ -581,8 +590,8 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
             <div>
               <div className="text-xs text-muted-foreground uppercase">Gear</div>
               <div className="font-medium">
-                {draft.gear.length
-                  ? draft.gear
+                {(draft.gear?.length ?? 0) > 0
+                  ? draft.gear!
                       .map((id) => pilotGearMap.get(id)?.name ?? id)
                       .join(", ")
                   : "None"}
@@ -654,13 +663,13 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
                   Weapons (Up to 2)
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {draft.weapons.length} / 2 selected
+                  {draft.weapons?.length ?? 0} / 2 selected
                 </div>
               </div>
               <div className="grid gap-2">
                 {weaponOptions.map((item) => {
-                  const isSelected = draft.weapons.includes(item.id);
-                  const isFull = draft.weapons.length >= 2 && !isSelected;
+                  const isSelected = draft.weapons?.includes(item.id) ?? false;
+                  const isFull = (draft.weapons?.length ?? 0) >= 2 && !isSelected;
                   return (
                     <button
                       key={item.id}
@@ -688,13 +697,13 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
                   Gear (Up to 3)
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {draft.gear.length} / 3 selected
+                  {draft.gear?.length ?? 0} / 3 selected
                 </div>
               </div>
               <div className="grid gap-2">
                 {gearOptions.map((item) => {
-                  const isSelected = draft.gear.includes(item.id);
-                  const isFull = draft.gear.length >= 3 && !isSelected;
+                  const isSelected = draft.gear?.includes(item.id) ?? false;
+                  const isFull = (draft.gear?.length ?? 0) >= 3 && !isSelected;
                   return (
                     <button
                       key={item.id}
@@ -726,7 +735,6 @@ function PilotGearSection({ character }: { character: CharacterResponse }) {
   );
 }
 
-type BuildDraft = Omit<MechBuild, "frame_id">;
 
 function MechBuildSection({ character }: { character: CharacterResponse }) {
   const { data: frames } = useFrames();
@@ -764,8 +772,15 @@ function MechBuildSection({ character }: { character: CharacterResponse }) {
 
   const currentDraft = useMemo<BuildDraft>(
     () => ({
-      weapons: activeMech?.build?.weapons ?? [],
-      systems: activeMech?.build?.systems ?? [],
+      weapons: (activeMech?.build?.weapons ?? []).map((w) => ({
+        mount_index: w.mount_index,
+        weapon_id: w.weapon_id,
+        weapon_size: w.weapon_size,
+      })),
+      systems: (activeMech?.build?.systems ?? []).map((s) => ({
+        system_id: s.system_id,
+        sp_cost: s.sp_cost ?? undefined,
+      })),
     }),
     [activeMech?.build?.systems, activeMech?.build?.weapons]
   );
@@ -942,7 +957,7 @@ function MechBuildSection({ character }: { character: CharacterResponse }) {
                     {
                       characterId: character.id,
                       mechId: activeMech.id,
-                      data: { build: draft },
+                      data: { build: draft as unknown as Omit<MechBuild, "frame_id"> },
                     },
                     {
                       onSuccess: () => setIsEditing(false),

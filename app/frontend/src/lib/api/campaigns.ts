@@ -3,12 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import type {
   Campaign as LancerCampaign,
-  EncounterDifficulty as LancerEncounterDifficulty,
+  Difficulty1 as LancerEncounterDifficulty,
   MissionObjectiveBrief,
   MissionStakesBrief,
   ReservePlanEntry,
   SitrepType as LancerSitrepType,
-  TileSetType as LancerTileSetType,
+  TileSet as LancerTileSetType,
 } from "../types/lancer";
 
 export interface CampaignMember {

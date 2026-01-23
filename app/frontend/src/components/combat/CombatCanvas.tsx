@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   CanvasSize,
@@ -14,7 +14,9 @@ import {
   drawMovementPath,
 } from "../../lib/combat-render/canvas";
 import type { HexLayout } from "../../lib/combat-render/hex";
+import { createHexLayout, pixelToAxial } from "../../lib/combat-render/hex";
 import type { HexCoord } from "../../lib/types/lancer";
+import type { ViewportState } from "../../lib/hooks/useCanvasViewport";
 
 type LayoutResolver = HexLayout | ((size: CanvasSize) => HexLayout);
 
@@ -23,6 +25,13 @@ export type TargetingMode = {
   validTargetIds?: string[];
   selectedTargetIds?: string[];
   maxTargets?: number;
+};
+
+export type ContextMenuInfo = {
+  coord: HexCoord;
+  tokenId?: string;
+  markerId?: string;
+  screenPosition: { x: number; y: number };
 };
 
 export type CombatCanvasProps = {
@@ -37,11 +46,27 @@ export type CombatCanvasProps = {
   movementPath?: HexCoord[];
   movementPathStyle?: MovementPathStyle;
   isPathMode?: boolean;
+  /** Viewport state for pan/zoom */
+  viewport?: ViewportState;
+  /** Callback to update zoom at a specific point (for scroll wheel zoom) */
+  onZoomAtPoint?: (
+    delta: number,
+    cursorPoint: { x: number; y: number },
+    currentLayout: HexLayout
+  ) => void;
+  /** Callback to update pan offset */
+  onPan?: (x: number, y: number) => void;
+  /** Callback to zoom by delta (for keyboard zoom) */
+  onZoomDelta?: (delta: number) => void;
+  /** Callback to center viewport on current actor */
+  onCenterOnActor?: () => void;
   onHover?: ClickCallbacks["onSelect"];
   onSelect?: ClickCallbacks["onSelect"];
   onTarget?: ClickCallbacks["onTarget"];
   onTokenClick?: (tokenId: string) => void;
   onHexClick?: (coord: HexCoord) => void;
+  /** Callback for right-click context menu */
+  onContextMenu?: (info: ContextMenuInfo) => void;
 };
 
 export function CombatCanvas({
@@ -56,20 +81,41 @@ export function CombatCanvas({
   movementPath,
   movementPathStyle,
   isPathMode = false,
+  viewport,
+  onZoomAtPoint,
+  onPan,
+  onZoomDelta,
+  onCenterOnActor,
   onHover,
   onSelect,
   onTarget,
   onTokenClick,
   onHexClick,
+  onContextMenu,
 }: CombatCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width, height });
   const [devicePixelRatio, setDevicePixelRatio] = useState(1);
 
-  const resolvedLayout = useMemo(
-    () => (typeof layout === "function" ? layout(canvasSize) : layout),
-    [layout, canvasSize],
-  );
+  // Pan drag state
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+
+  // Compute resolved layout with viewport transforms applied
+  const resolvedLayout = useMemo(() => {
+    const baseLayout = typeof layout === "function" ? layout(canvasSize) : layout;
+
+    // If no viewport, return base layout
+    if (!viewport) {
+      return baseLayout;
+    }
+
+    // Apply zoom to size and pan to origin
+    return createHexLayout(baseLayout.size * viewport.zoom, {
+      x: baseLayout.origin.x + viewport.pan.x,
+      y: baseLayout.origin.y + viewport.pan.y,
+    });
+  }, [layout, canvasSize, viewport]);
 
   // Modify render state to highlight valid/selected targets when in targeting mode
   const renderState = useMemo(() => {
@@ -173,6 +219,130 @@ export function CombatCanvas({
     }
   }, [canvasSize, devicePixelRatio, resolvedLayout, renderState, styles, movementPath, movementPathStyle]);
 
+  // Wheel zoom handler
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !onZoomAtPoint) {
+      return;
+    }
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const cursorPoint = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+      // Normalize delta: scroll up zooms in (positive delta), scroll down zooms out
+      const delta = -e.deltaY * 0.001;
+      onZoomAtPoint(delta, cursorPoint, resolvedLayout);
+    };
+
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener("wheel", handleWheel);
+    };
+  }, [onZoomAtPoint, resolvedLayout]);
+
+  // Pan handlers (middle mouse button drag)
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      // Middle mouse button (button === 1)
+      if (e.button === 1 && onPan && viewport) {
+        e.preventDefault();
+        setIsPanning(true);
+        panStartRef.current = {
+          x: e.clientX,
+          y: e.clientY,
+          panX: viewport.pan.x,
+          panY: viewport.pan.y,
+        };
+        (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+      }
+    },
+    [onPan, viewport]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (!isPanning || !panStartRef.current || !onPan) {
+        return;
+      }
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      onPan(panStartRef.current.panX + dx, panStartRef.current.panY + dy);
+    },
+    [isPanning, onPan]
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (isPanning) {
+        setIsPanning(false);
+        panStartRef.current = null;
+        (e.target as HTMLCanvasElement).releasePointerCapture(e.pointerId);
+      }
+    },
+    [isPanning]
+  );
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLCanvasElement>) => {
+      const PAN_STEP = 40; // pixels per keypress
+      const ZOOM_STEP = 0.2;
+
+      switch (e.key) {
+        case "ArrowUp":
+        case "w":
+        case "W":
+          e.preventDefault();
+          onPan?.(viewport?.pan.x ?? 0, (viewport?.pan.y ?? 0) + PAN_STEP);
+          break;
+        case "ArrowDown":
+        case "s":
+        case "S":
+          e.preventDefault();
+          onPan?.(viewport?.pan.x ?? 0, (viewport?.pan.y ?? 0) - PAN_STEP);
+          break;
+        case "ArrowLeft":
+        case "a":
+        case "A":
+          e.preventDefault();
+          onPan?.((viewport?.pan.x ?? 0) + PAN_STEP, viewport?.pan.y ?? 0);
+          break;
+        case "ArrowRight":
+        case "d":
+        case "D":
+          e.preventDefault();
+          onPan?.((viewport?.pan.x ?? 0) - PAN_STEP, viewport?.pan.y ?? 0);
+          break;
+        case "+":
+        case "=":
+          e.preventDefault();
+          onZoomDelta?.(ZOOM_STEP);
+          break;
+        case "-":
+        case "_":
+          e.preventDefault();
+          onZoomDelta?.(-ZOOM_STEP);
+          break;
+        case "c":
+        case "C":
+          e.preventDefault();
+          onCenterOnActor?.();
+          break;
+        case "Home":
+          e.preventDefault();
+          // Reset viewport
+          onPan?.(0, 0);
+          onZoomDelta?.(1 - (viewport?.zoom ?? 1)); // Reset to 1.0
+          break;
+      }
+    },
+    [viewport, onPan, onZoomDelta, onCenterOnActor]
+  );
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) {
@@ -224,17 +394,69 @@ export function CombatCanvas({
       );
     }
 
+    // Right-click context menu handler
+    if (onContextMenu) {
+      const handleContextMenu = (e: MouseEvent) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Convert pixel to hex coordinate using the layout
+        const hexCoord = pixelToAxial({ x, y }, resolvedLayout);
+
+        // Check if this hex is in the grid
+        const coordKey = `${hexCoord.q},${hexCoord.r}`;
+        if (!state.grid.coordSet.has(coordKey)) {
+          return;
+        }
+
+        // Check if we right-clicked on a token
+        const clickedToken = state.tokens.find(
+          (t) => t.coord.q === hexCoord.q && t.coord.r === hexCoord.r
+        );
+
+        // Check if we right-clicked on a marker (deployable)
+        const clickedMarker = state.markers?.find(
+          (m) => m.coord.q === hexCoord.q && m.coord.r === hexCoord.r
+        );
+
+        onContextMenu({
+          coord: hexCoord,
+          tokenId: clickedToken?.id,
+          markerId: clickedMarker?.id,
+          screenPosition: { x: e.clientX, y: e.clientY },
+        });
+      };
+
+      canvas.addEventListener("contextmenu", handleContextMenu);
+      cleanup.push(() => canvas.removeEventListener("contextmenu", handleContextMenu));
+    }
+
     return () => {
       cleanup.forEach((fn) => fn());
     };
-  }, [onHover, onSelect, onTarget, onTokenClick, onHexClick, isPathMode, resolvedLayout, state.grid, state.tokens, state.markers]);
+  }, [onHover, onSelect, onTarget, onTokenClick, onHexClick, isPathMode, resolvedLayout, state.grid, state.tokens, state.markers, onContextMenu]);
 
-  // Apply targeting/path mode cursor
-  const cursorClass = isPathMode
-    ? "cursor-pointer"
-    : targetingMode?.active
-      ? "cursor-crosshair"
-      : "";
+  // Apply targeting/path mode/panning cursor
+  const cursorClass = isPanning
+    ? "cursor-grabbing"
+    : isPathMode
+      ? "cursor-pointer"
+      : targetingMode?.active
+        ? "cursor-crosshair"
+        : "";
 
-  return <canvas ref={canvasRef} className={`${className ?? ""} ${cursorClass}`} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      tabIndex={0}
+      className={`${className ?? ""} ${cursorClass} outline-none focus:ring-2 focus:ring-primary/50`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onKeyDown={handleKeyDown}
+    />
+  );
 }

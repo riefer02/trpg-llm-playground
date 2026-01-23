@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { axialToPixel, createHexLayout } from "./hex";
+import { axialToPixel, createHexLayout, hex } from "./hex";
 
 import {
   attachClickHandlers,
@@ -9,6 +9,7 @@ import {
   getRenderPassOrder,
   gridContains,
 } from "./canvas";
+import type { CombatRenderState } from "./canvas";
 
 describe("combat-render canvas helpers", () => {
   it("builds a hex range with the expected tile count", () => {
@@ -23,23 +24,23 @@ describe("combat-render canvas helpers", () => {
 
   it("tracks grid membership by axial coordinate", () => {
     const grid = buildHexGrid(1);
-    expect(gridContains(grid, { q: 0, r: 0 })).toBe(true);
-    expect(gridContains(grid, { q: 2, r: 0 })).toBe(false);
+    expect(gridContains(grid, hex(0, 0))).toBe(true);
+    expect(gridContains(grid, hex(2, 0))).toBe(false);
   });
 
   it("applies the grid origin offset", () => {
-    const grid = buildHexGrid(0, { q: 2, r: -1 });
-    expect(grid.coords).toEqual([{ q: 2, r: -1 }]);
-    expect(gridContains(grid, { q: 2, r: -1 })).toBe(true);
+    const grid = buildHexGrid(0, hex(2, -1));
+    expect(grid.coords).toEqual([hex(2, -1)]);
+    expect(gridContains(grid, hex(2, -1))).toBe(true);
   });
 
   it("detects hoverable hexes within the grid bounds", () => {
     const grid = buildHexGrid(1);
     const layout = createHexLayout(10);
-    const center = axialToPixel({ q: 0, r: 0 }, layout);
+    const center = axialToPixel(hex(0, 0), layout);
 
     const hover = getHoveredHex({ x: center.x + 1, y: center.y + 1 }, layout, grid);
-    expect(hover).toEqual({ q: 0, r: 0 });
+    expect(hover).toEqual(hex(0, 0));
 
     const outside = getHoveredHex({ x: 500, y: 500 }, layout, grid);
     expect(outside).toBeNull();
@@ -48,15 +49,15 @@ describe("combat-render canvas helpers", () => {
   it("handles hover detection with a shifted layout origin", () => {
     const grid = buildHexGrid(1);
     const layout = createHexLayout(10, { x: 80, y: 40 });
-    const center = axialToPixel({ q: 1, r: -1 }, layout);
+    const center = axialToPixel(hex(1, -1), layout);
     const hover = getHoveredHex({ x: center.x + 2, y: center.y - 1 }, layout, grid);
-    expect(hover).toEqual({ q: 1, r: -1 });
+    expect(hover).toEqual(hex(1, -1));
   });
 
   it("routes click and contextmenu events to select/target callbacks", () => {
     const grid = buildHexGrid(1);
     const layout = createHexLayout(10);
-    const center = axialToPixel({ q: 0, r: 0 }, layout);
+    const center = axialToPixel(hex(0, 0), layout);
 
     const handlers: Record<string, Array<(event: MouseEvent) => void>> = {};
     const canvas = {
@@ -96,7 +97,7 @@ describe("combat-render canvas helpers", () => {
       preventDefault: () => {},
     } as MouseEvent;
     handlers.click?.forEach((handler) => handler(clickEvent));
-    expect(selected).toEqual({ q: 0, r: 0 });
+    expect(selected).toEqual(hex(0, 0));
 
     const targetEvent = {
       clientX: center.x + 1,
@@ -104,19 +105,19 @@ describe("combat-render canvas helpers", () => {
       preventDefault: () => {},
     } as MouseEvent;
     handlers.contextmenu?.forEach((handler) => handler(targetEvent));
-    expect(targeted).toEqual({ q: 0, r: 0 });
+    expect(targeted).toEqual(hex(0, 0));
 
     detach();
   });
 
   it("builds render passes in terrain-first order", () => {
-    const state = {
+    const state: CombatRenderState = {
       grid: buildHexGrid(0),
-      tokens: [{ id: "alpha", coord: { q: 0, r: 0 } }],
-      terrain: [{ coord: { q: 0, r: 0 }, difficult: true }],
-      overlays: [{ coords: [{ q: 0, r: 0 }] }],
-      markers: [{ id: "marker:1", coord: { q: 0, r: 0 }, kind: "mine" }],
-      hover: { q: 0, r: 0 },
+      tokens: [{ id: "alpha", coord: hex(0, 0) }],
+      terrain: [{ coord: hex(0, 0), difficult: true }],
+      overlays: [{ coords: [hex(0, 0)] }],
+      markers: [{ id: "marker:1", coord: hex(0, 0), kind: "mine" }],
+      hover: hex(0, 0),
     };
 
     expect(getRenderPassOrder(state)).toEqual([

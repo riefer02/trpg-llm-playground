@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { HexCoord } from "../types/lancer";
-
 import {
   axialToPixel,
   createHexLayout,
+  hex,
   hexCorners,
   pixelToAxial,
 } from "./hex";
@@ -14,12 +13,12 @@ const EPSILON = 1e-6;
 describe("combat-render hex helpers", () => {
   it("round-trips axial coords through pixel space", () => {
     const layout = createHexLayout(10, { x: 3, y: -7 });
-    const samples: HexCoord[] = [
-      { q: 0, r: 0 },
-      { q: 1, r: 0 },
-      { q: 0, r: 1 },
-      { q: -2, r: 3 },
-      { q: 4, r: -1 },
+    const samples = [
+      hex(0, 0),
+      hex(1, 0),
+      hex(0, 1),
+      hex(-2, 3),
+      hex(4, -1),
     ];
 
     for (const coord of samples) {
@@ -45,14 +44,14 @@ describe("combat-render hex helpers", () => {
 
   it("matches known flat-top axial-to-pixel values", () => {
     const layout = createHexLayout(10);
-    const origin = axialToPixel({ q: 0, r: 0 }, layout);
+    const origin = axialToPixel(hex(0, 0), layout);
     expect(origin).toEqual({ x: 0, y: 0 });
 
-    const q1 = axialToPixel({ q: 1, r: 0 }, layout);
+    const q1 = axialToPixel(hex(1, 0), layout);
     expect(q1.x).toBeCloseTo(15);
     expect(q1.y).toBeCloseTo(Math.sqrt(3) * 5);
 
-    const r1 = axialToPixel({ q: 0, r: 1 }, layout);
+    const r1 = axialToPixel(hex(0, 1), layout);
     expect(r1.x).toBeCloseTo(0);
     expect(r1.y).toBeCloseTo(Math.sqrt(3) * 10);
   });

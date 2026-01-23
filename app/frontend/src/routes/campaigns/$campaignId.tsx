@@ -35,6 +35,7 @@ import {
 } from "../../components/ui";
 import { CampaignDetailSkeleton } from "../../components/skeletons";
 import { MissionBriefingModal } from "../../components/campaign/MissionBriefingModal";
+import type { EnemyRosterPreviewProps } from "../../components/campaign/EnemyRosterPreview";
 
 export const Route = createFileRoute("/campaigns/$campaignId")({
   component: CampaignDetailPage,
@@ -1545,10 +1546,10 @@ function CampaignDetailPage() {
           <CardDescription>Downtime → Brief → Prep → Mission → Debrief checkpoints.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {campaignModel.sessions.length === 0 && (
+          {(campaignModel.sessions?.length ?? 0) === 0 && (
             <p className="text-sm text-muted-foreground">No sessions yet.</p>
           )}
-          {campaignModel.sessions.map((sessionRecord) => (
+          {campaignModel.sessions?.map((sessionRecord) => (
             <div key={sessionRecord.id} className="border border-border/50 rounded-lg px-3 py-2 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1667,7 +1668,7 @@ function CampaignDetailPage() {
         objectives={lobbyState?.mission_plan?.objectives}
         supportAssets={lobbyState?.mission_plan?.support_assets}
         reserves={lobbyState?.mission_plan?.reserves}
-        enemyForcePreview={lobbyState?.enemy_force_preview}
+        enemyForcePreview={lobbyState?.enemy_force_preview as EnemyRosterPreviewProps["preview"] | undefined}
       />
     </div>
   );

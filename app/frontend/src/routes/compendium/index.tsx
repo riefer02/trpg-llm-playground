@@ -96,7 +96,9 @@ function CompendiumPage() {
 
   const systemTypeOptions = useMemo(() => {
     const types = new Set<string>();
-    systems.forEach((system) => types.add(system.system_type));
+    systems.forEach((system) => {
+      if (system.system_type) types.add(system.system_type);
+    });
     return ["all", ...Array.from(types).sort()];
   }, [systems]);
 
@@ -526,7 +528,7 @@ function FrameGrid({ frames }: { frames: MechFrameDefinition[] }) {
               <span>Save: {frame.base_stats.save_target}</span>
             </div>
             <div className="text-muted-foreground">
-              Mounts: {formatMounts(frame.mounts)}
+              Mounts: {formatMounts(frame.mounts ?? [])}
             </div>
             {frame.core_system?.name && (
               <div className="text-muted-foreground">
@@ -587,7 +589,7 @@ function SystemGrid({ systems }: { systems: MechSystemDefinition[] }) {
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="flex flex-wrap gap-2 text-muted-foreground">
-              <span>{formatEnum(system.system_type)}</span>
+              {system.system_type && <span>{formatEnum(system.system_type)}</span>}
               <span>SP {system.sp_cost}</span>
               {system.unique && <span>Unique</span>}
             </div>
@@ -627,8 +629,8 @@ function PilotGearGrid({ items }: { items: PilotGearItemDefinition[] }) {
   );
 }
 
-function TagRow({ tags }: { tags: Array<{ tag: string; value?: number | null }> }) {
-  if (!tags.length) {
+function TagRow({ tags }: { tags: Array<{ tag: string; value?: number | null }> | undefined }) {
+  if (!tags?.length) {
     return (
       <div className="text-muted-foreground">No tags</div>
     );

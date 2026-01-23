@@ -4,10 +4,13 @@ import {
   Anchor,
   ArrowDown,
   Ban,
+  Bomb,
+  Bot,
   CircleDot,
   Crosshair,
   EyeOff,
   Ghost,
+  Package,
   Power,
   Scissors,
   Send,
@@ -43,6 +46,9 @@ const EFFECT_ICON_COMPONENTS: Record<IconName, LucideIcon> = {
   swords: Swords,
   power: Power,
   circleDot: CircleDot,
+  bomb: Bomb,
+  bot: Bot,
+  package: Package,
 };
 
 export interface SelectedAction {

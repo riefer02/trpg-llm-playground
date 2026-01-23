@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
 
 import {
   useCombatSession,
@@ -24,13 +25,18 @@ import {
   type DecisionSubmitRequest,
   type CombatCompleteRequest,
 } from "../../lib/api";
-import { CombatCanvas, type TargetingMode } from "../../components/combat/CombatCanvas";
+import { CombatCanvas, type TargetingMode, type ContextMenuInfo } from "../../components/combat/CombatCanvas";
+import { ViewportControls } from "../../components/combat/ViewportControls";
+import { ContextMenu, type ContextMenuTarget, type ContextMenuOption } from "../../components/combat/ContextMenu";
+import { MapTooltip, type HoverTarget } from "../../components/combat/MapTooltip";
 import {
   ActionLog,
   type SelectedAction,
 } from "../../components/combat/ActionLog";
 import { TurnControls, type TurnState } from "../../components/combat/TurnControls";
+import { TurnIndicator } from "../../components/combat/TurnIndicator";
 import { ActionPanel, type TargetMode } from "../../components/combat/ActionPanel";
+import { ActionBar } from "../../components/combat/ActionBar";
 import { OverchargeConfirm } from "../../components/combat/OverchargeConfirm";
 import { ReactionPrompt } from "../../components/combat/ReactionPrompt";
 import { SaveCheckPrompt } from "../../components/combat/SaveCheckPrompt";
@@ -41,6 +47,7 @@ import { ObjectiveTracker } from "../../components/combat/ObjectiveTracker";
 import { ReservesPanel } from "../../components/combat/ReservesPanel";
 import {
   adaptCombatScenario,
+  buildMovementRangeOverlays,
   type CombatRenderAdapterOutput,
 } from "../../lib/combat-render/adapter";
 import { createHexLayout } from "../../lib/combat-render/hex";
@@ -117,6 +124,37 @@ function CombatSessionPage() {
   const [isPathMode, setIsPathMode] = useState(false);
   const [movementPath, setMovementPath] = useState<HexCoord[]>([]);
   const [pathHexClick, setPathHexClick] = useState<HexCoord | null>(null);
+
+  // Movement range preview state
+  const [showMovementRange, setShowMovementRange] = useState(false);
+  const [movementRangeSpeed, setMovementRangeSpeed] = useState(0);
+
+  // Viewport pan/zoom state
+  const {
+    viewport,
+    setPan,
+    setZoom,
+    resetViewport,
+    centerOnCoord,
+    zoomAtPoint,
+    MIN_ZOOM,
+    MAX_ZOOM,
+  } = useCanvasViewport();
+
+  // Canvas size ref for centering calculations
+  const canvasSizeRef = useRef<{ width: number; height: number }>({ width: 720, height: 520 });
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    position: { x: number; y: number };
+    target: ContextMenuTarget;
+  } | null>(null);
+
+  // Hover tooltip state
+  const [hoverTooltip, setHoverTooltip] = useState<{
+    target: HoverTarget;
+    position: { x: number; y: number };
+  } | null>(null);
 
   const scenario = data?.scenario;
   const rounds = scenario?.rounds ?? [];
@@ -220,11 +258,16 @@ function CombatSessionPage() {
     });
   }, [autoNpcTurn]);
 
-  // Handle action selection from ActionPanel
+  // Action triggered from ActionBar (to pass to ActionPanel)
+  const [triggeredAction, setTriggeredAction] = useState<AvailableActionItem | null>(null);
+
+  // Handle action selection from ActionPanel or ActionBar
   const handleActionSelect = useCallback((action: AvailableActionItem) => {
     // Reset targets when selecting new action and set max targets from action
     setSelectedTargetIds([]);
     setMaxTargets(action.max_targets);
+    // Set triggered action for ActionPanel to process
+    setTriggeredAction(action);
   }, []);
 
   // Handle action execution
@@ -254,7 +297,8 @@ function CombatSessionPage() {
       executeAction.mutate(finalRequest, {
         onSuccess: (result) => {
           if (result.success) {
-            setEconomy(result.economy);
+            const newEconomy = result.economy;
+            setEconomy(newEconomy);
             setTargetMode(null);
             setSelectedTargetIds([]);
             setMaxTargets(1);
@@ -263,6 +307,21 @@ function CombatSessionPage() {
             setPreviewOrigin(null);
             setActionError(null);
             toast.success("Action executed");
+
+            // Auto-end turn if all actions exhausted
+            if (newEconomy) {
+              const fullExhausted = newEconomy.full_actions_used >= 1;
+              const quickTotal = 2 + (newEconomy.overcharge_used ? 1 : 0);
+              const quickExhausted = newEconomy.quick_actions_used >= quickTotal;
+
+              if (fullExhausted && quickExhausted) {
+                // Brief delay before auto-ending to let user see the result
+                setTimeout(() => {
+                  toast.info("All actions used - ending turn automatically");
+                  handleEndTurn();
+                }, 1000);
+              }
+            }
           } else {
             const errorMsg = result.error || "Action failed";
             setActionError(errorMsg);
@@ -276,7 +335,7 @@ function CombatSessionPage() {
         },
       });
     },
-    [executeAction, scenario?.deployables]
+    [executeAction, scenario?.deployables, handleEndTurn]
   );
 
   // Handle overcharge confirmation
@@ -391,6 +450,40 @@ function CombatSessionPage() {
     }
   }, [isPathMode]);
 
+  // Handle movement range preview changes from ActionPanel
+  const handleMovementRangeChange = useCallback((show: boolean, speed: number) => {
+    setShowMovementRange(show);
+    setMovementRangeSpeed(speed);
+  }, []);
+
+  // Viewport control handlers
+  const handleZoomIn = useCallback(() => {
+    setZoom(viewport.zoom + 0.2);
+  }, [setZoom, viewport.zoom]);
+
+  const handleZoomOut = useCallback(() => {
+    setZoom(viewport.zoom - 0.2);
+  }, [setZoom, viewport.zoom]);
+
+  const handleZoomDelta = useCallback(
+    (delta: number) => {
+      setZoom(viewport.zoom + delta);
+    },
+    [setZoom, viewport.zoom]
+  );
+
+  const handleCenterOnActor = useCallback(() => {
+    const actorCoord = currentActor?.position?.coord;
+    if (!actorCoord) return;
+
+    // Use stored canvas size for centering
+    const baseLayout = createHexLayout(30 * viewport.zoom, {
+      x: canvasSizeRef.current.width / 2,
+      y: canvasSizeRef.current.height / 2,
+    });
+    centerOnCoord(actorCoord, baseLayout, canvasSizeRef.current);
+  }, [currentActor?.position?.coord, viewport.zoom, centerOnCoord]);
+
   // Handle token click for targeting - toggle targets in array up to maxTargets
   const handleTokenClick = useCallback(
     (tokenId: string) => {
@@ -410,6 +503,83 @@ function CombatSessionPage() {
       });
     },
     [targetMode, maxTargets]
+  );
+
+  // Handle right-click context menu on canvas
+  const handleContextMenu = useCallback(
+    (info: ContextMenuInfo) => {
+      // Don't show context menu during path mode or certain states
+      if (isPathMode) return;
+
+      // Determine what was clicked
+      let target: ContextMenuTarget;
+
+      if (info.tokenId) {
+        // Clicked on a combatant token
+        const combatant = combatants.find((c) => c.id === info.tokenId);
+        if (combatant) {
+          const isEnemy = combatant.side !== "players";
+          target = isEnemy
+            ? { type: "enemy", combatantId: combatant.id, combatantName: combatant.name, coord: info.coord }
+            : { type: "friendly", combatantId: combatant.id, combatantName: combatant.name, coord: info.coord };
+        } else {
+          // Token not found in combatants, treat as empty hex
+          target = { type: "empty", coord: info.coord };
+        }
+      } else if (info.markerId?.startsWith("deployable:")) {
+        // Clicked on a deployable
+        const deployableId = info.markerId.replace("deployable:", "");
+        const deployable = scenario?.deployables?.[deployableId];
+        target = {
+          type: "deployable",
+          deployableId,
+          deployableName: deployable?.name ?? "Deployable",
+          coord: info.coord,
+        };
+      } else {
+        // Clicked on empty hex
+        target = { type: "empty", coord: info.coord };
+      }
+
+      setContextMenu({
+        position: info.screenPosition,
+        target,
+      });
+    },
+    [combatants, scenario?.deployables, isPathMode]
+  );
+
+  // Handle context menu option selection
+  const handleContextMenuSelect = useCallback(
+    (option: ContextMenuOption) => {
+      // Close the menu
+      setContextMenu(null);
+
+      // Handle info/view options (non-action)
+      if (option.id.startsWith("view_")) {
+        // TODO: Show info panel/tooltip for the target
+        toast.info(`View info: ${option.label}`);
+        return;
+      }
+
+      // Handle action options
+      if (option.action) {
+        // Trigger the action through the action bar flow
+        handleActionSelect(option.action);
+
+        // If the action targets the right-clicked entity, pre-select it
+        if (contextMenu?.target.type === "enemy" || contextMenu?.target.type === "friendly") {
+          const targetId =
+            contextMenu.target.type === "enemy"
+              ? contextMenu.target.combatantId
+              : contextMenu.target.combatantId;
+          setSelectedTargetIds([targetId]);
+        } else if (contextMenu?.target.type === "deployable") {
+          setSelectedTargetIds([contextMenu.target.deployableId]);
+        }
+      }
+    },
+    [handleActionSelect, contextMenu]
   );
 
   // Build targeting mode for canvas
@@ -454,6 +624,62 @@ function CombatSessionPage() {
     [weaponsQuery.data],
   );
 
+  // Build movement range overlays when in path mode
+  const movementRangeOverlays = useMemo(() => {
+    if (!showMovementRange || !currentActor?.position?.coord || !scenario) {
+      return [];
+    }
+
+    const origin = currentActor.position.coord;
+    const speed = movementRangeSpeed;
+
+    if (speed <= 0) return [];
+
+    // Build valid hex set from grid (we need to compute the grid first)
+    // Use a temporary grid calculation matching what adaptCombatScenario would use
+    const combatants = scenario.combatants ?? [];
+    let maxDistance = 0;
+    for (const combatant of combatants) {
+      if (combatant.position?.coord) {
+        const dist = Math.abs(combatant.position.coord.q) + Math.abs(combatant.position.coord.r);
+        maxDistance = Math.max(maxDistance, dist);
+      }
+    }
+    for (const tile of scenario.terrain?.tiles ?? []) {
+      const dist = Math.abs(tile.coord.q) + Math.abs(tile.coord.r);
+      maxDistance = Math.max(maxDistance, dist);
+    }
+    const gridRadius = Math.max(4, maxDistance + 1);
+
+    // Build valid hex set
+    const validHexes = new Set<string>();
+    for (let q = -gridRadius; q <= gridRadius; q++) {
+      const rMin = Math.max(-gridRadius, -q - gridRadius);
+      const rMax = Math.min(gridRadius, -q + gridRadius);
+      for (let r = rMin; r <= rMax; r++) {
+        validHexes.add(`${q},${r}`);
+      }
+    }
+
+    // Build blocked hex set (other combatants' positions)
+    const blockedHexes = new Set<string>();
+    for (const combatant of combatants) {
+      if (combatant.id !== currentActor.id && combatant.position?.coord) {
+        blockedHexes.add(`${combatant.position.coord.q},${combatant.position.coord.r}`);
+      }
+    }
+
+    // Build difficult terrain set from scenario
+    const difficultHexes = new Set<string>();
+    for (const tile of scenario.terrain?.tiles ?? []) {
+      if (tile.difficult) {
+        difficultHexes.add(`${tile.coord.q},${tile.coord.r}`);
+      }
+    }
+
+    return buildMovementRangeOverlays(origin, speed, validHexes, blockedHexes, difficultHexes);
+  }, [showMovementRange, currentActor, scenario, movementRangeSpeed]);
+
   const renderOutput: CombatRenderAdapterOutput | null = useMemo(() => {
     if (!scenario) {
       return null;
@@ -463,7 +689,7 @@ function CombatSessionPage() {
       ? { coord: previewOrigin }
       : currentActor?.position;
 
-    return adaptCombatScenario({
+    const result = adaptCombatScenario({
       scenario,
       round,
       turn,
@@ -475,7 +701,17 @@ function CombatSessionPage() {
       patternDirection: areaDirection ?? undefined,
       actorId: currentActor?.id,
     });
-  }, [action, hovered, round, scenario, turn, areaPattern, areaDirection, currentActor, previewOrigin]);
+
+    // Add movement range overlays (before other overlays so they appear underneath)
+    if (movementRangeOverlays.length > 0) {
+      result.state.overlays = [
+        ...movementRangeOverlays,
+        ...(result.state.overlays ?? []),
+      ];
+    }
+
+    return result;
+  }, [action, hovered, round, scenario, turn, areaPattern, areaDirection, currentActor, previewOrigin, movementRangeOverlays]);
 
   if (isLoading) {
     return <CombatSessionSkeleton />;
@@ -558,20 +794,22 @@ function CombatSessionPage() {
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        {/* Canvas area */}
-        <div className="rounded-md border border-border bg-muted/30 p-2">
-          <div className="h-[calc(100vh-180px)] min-h-[400px] w-full">
+        {/* Canvas area - reduced height when action bar visible */}
+        <div className="relative rounded-md border border-border bg-muted/30 p-2">
+          <div className={`min-h-[400px] w-full ${turnActive ? "h-[calc(100vh-280px)]" : "h-[calc(100vh-180px)]"}`}>
                 {renderOutput ? (
                   <CombatCanvas
                     width={720}
                     height={520}
                     resizeToParent
-                    layout={(size) =>
-                      createHexLayout(30, {
+                    layout={(size) => {
+                      // Store canvas size for centering calculations
+                      canvasSizeRef.current = size;
+                      return createHexLayout(30, {
                         x: size.width / 2,
                         y: size.height / 2,
-                      })
-                    }
+                      });
+                    }}
                     state={renderOutput.state}
                     styles={{
                       grid: { strokeStyle: "rgba(148, 163, 184, 0.5)" },
@@ -586,15 +824,64 @@ function CombatSessionPage() {
                     targetingMode={canvasTargetingMode}
                     movementPath={isPathMode ? movementPath : undefined}
                     isPathMode={isPathMode}
-                    onHover={(coord) => {
+                    viewport={viewport}
+                    onZoomAtPoint={zoomAtPoint}
+                    onPan={setPan}
+                    onZoomDelta={handleZoomDelta}
+                    onCenterOnActor={handleCenterOnActor}
+                    onHover={(coord, point) => {
                       setHovered(coord);
                       // Update blast preview origin when hovering (blast follows cursor)
                       if (areaPattern?.pattern === "blast" && targetMode?.requiresTarget) {
                         setPreviewOrigin(coord);
                       }
+
+                      // Update hover tooltip
+                      if (!coord) {
+                        setHoverTooltip(null);
+                        return;
+                      }
+
+                      // Determine what's at this hex
+                      const combatant = combatants.find(
+                        (c) => c.position?.coord?.q === coord.q && c.position?.coord?.r === coord.r
+                      );
+                      const deployableEntry = Object.entries(scenario?.deployables ?? {}).find(
+                        ([_, d]) => d.position?.coord?.q === coord.q && d.position?.coord?.r === coord.r
+                      );
+
+                      let target: HoverTarget;
+                      if (combatant) {
+                        target = {
+                          type: "combatant",
+                          combatant,
+                          isEnemy: combatant.side !== "players",
+                          coord,
+                        };
+                      } else if (deployableEntry) {
+                        target = {
+                          type: "deployable",
+                          deployable: deployableEntry[1],
+                          deployableId: deployableEntry[0],
+                          coord,
+                        };
+                      } else {
+                        target = { type: "empty", coord };
+                      }
+
+                      // Get screen position from canvas bounding rect + point offset
+                      const canvasEl = document.querySelector("canvas");
+                      if (canvasEl && point) {
+                        const rect = canvasEl.getBoundingClientRect();
+                        setHoverTooltip({
+                          target,
+                          position: { x: rect.left + point.x, y: rect.top + point.y },
+                        });
+                      }
                     }}
                     onTokenClick={handleTokenClick}
                     onHexClick={handlePathHexClick}
+                    onContextMenu={handleContextMenu}
                     className="h-full w-full"
                   />
                 ) : (
@@ -603,11 +890,33 @@ function CombatSessionPage() {
                   </div>
                 )}
               </div>
+          {/* Viewport Controls (pan/zoom) */}
+          <ViewportControls
+            zoom={viewport.zoom}
+            minZoom={MIN_ZOOM}
+            maxZoom={MAX_ZOOM}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onReset={resetViewport}
+            onCenterOnActor={handleCenterOnActor}
+            hasActorPosition={!!currentActor?.position?.coord}
+          />
         </div>
 
         <div className="flex flex-col h-full max-h-[calc(100vh-100px)]">
           {/* Sticky Turn Controls with integrated Economy */}
-          <div className="sticky top-0 z-10 bg-background pb-2">
+          <div className="sticky top-0 z-10 bg-background pb-2 space-y-2">
+            {/* Turn Indicator with initiative order */}
+            <TurnIndicator
+              currentActor={currentActor}
+              combatants={combatants}
+              roundNumber={currentRound}
+              turnIndex={currentTurnIndex}
+              isTurnActive={turnActive}
+              isPlayerTurn={currentActor?.side === "players"}
+            />
+
+            {/* Turn Controls (Start/End Turn buttons) */}
             <TurnControls
               currentActorName={currentActor?.name ?? null}
               roundNumber={currentRound}
@@ -658,6 +967,7 @@ function CombatSessionPage() {
                 onTargetModeChange={handleTargetModeChange}
                 onPathModeChange={handlePathModeChange}
                 onAreaPreviewChange={handleAreaPreviewChange}
+                onMovementRangeChange={handleMovementRangeChange}
                 isExecuting={executeAction.isPending}
                 selectedTargetIds={selectedTargetIds}
                 actorInventory={currentActor?.inventory}
@@ -665,6 +975,8 @@ function CombatSessionPage() {
                 actorSpeed={currentActor?.stats?.speed ?? 4}
                 actorPosition={currentActor?.position?.coord ?? null}
                 hexClickCoord={pathHexClick}
+                triggeredAction={triggeredAction}
+                onTriggeredActionProcessed={() => setTriggeredAction(null)}
               />
             )}
 
@@ -814,6 +1126,38 @@ function CombatSessionPage() {
                 </Modal>
               );
             })}
+
+        {/* Hover Tooltip */}
+        <MapTooltip
+          target={hoverTooltip?.target ?? null}
+          position={hoverTooltip?.position ?? null}
+          delay={300}
+        />
+
+        {/* Context Menu (right-click on canvas) */}
+        {contextMenu && (
+          <ContextMenu
+            position={contextMenu.position}
+            target={contextMenu.target}
+            availableActions={availableActions ?? null}
+            actorPosition={currentActor?.position?.coord}
+            onSelect={handleContextMenuSelect}
+            onClose={() => setContextMenu(null)}
+            isTurnActive={turnActive}
+          />
+        )}
+
+        {/* Bottom Action Bar (WoW-style) */}
+        <ActionBar
+          availableActions={availableActions ?? null}
+          economy={economy}
+          onActionSelect={handleActionSelect}
+          onOvercharge={() => setShowOverchargeConfirm(true)}
+          canOvercharge={availableActions?.can_overcharge ?? false}
+          overchargeLevel={availableActions?.overcharge_level ?? 0}
+          isExecuting={executeAction.isPending}
+          visible={turnActive}
+        />
       </div>
     </div>
   );

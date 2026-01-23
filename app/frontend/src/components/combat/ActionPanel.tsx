@@ -107,6 +107,8 @@ export interface ActionPanelProps {
     origin: HexCoord | null,
     direction: HexCoord | null
   ) => void;
+  /** Callback to show/hide movement range preview */
+  onMovementRangeChange?: (show: boolean, speed: number) => void;
   isExecuting?: boolean;
   selectedTargetIds?: string[];
   actorInventory?: MechInventory | null;
@@ -115,6 +117,10 @@ export interface ActionPanelProps {
   actorPosition?: HexCoord | null;
   /** Incoming hex click from canvas when in path mode */
   hexClickCoord?: HexCoord | null;
+  /** Action triggered externally (e.g., from ActionBar) */
+  triggeredAction?: AvailableActionItem | null;
+  /** Callback when triggered action is processed */
+  onTriggeredActionProcessed?: () => void;
 }
 
 export function ActionPanel({
@@ -125,6 +131,7 @@ export function ActionPanel({
   onTargetModeChange,
   onPathModeChange,
   onAreaPreviewChange,
+  onMovementRangeChange,
   isExecuting = false,
   selectedTargetIds = [],
   actorInventory,
@@ -132,6 +139,8 @@ export function ActionPanel({
   actorSpeed = 4,
   actorPosition,
   hexClickCoord,
+  triggeredAction,
+  onTriggeredActionProcessed,
 }: ActionPanelProps) {
   const [panelState, setPanelState] = useState<ActionPanelState>("idle");
   const [selectedAction, setSelectedAction] = useState<AvailableActionItem | null>(null);
@@ -203,6 +212,94 @@ export function ActionPanel({
     }
   }, [canUseThrown, useThrown]);
 
+  // Track last processed triggered action to avoid re-processing
+  const [lastTriggeredActionId, setLastTriggeredActionId] = useState<string | null>(null);
+
+  // Process externally triggered actions (from ActionBar)
+  useEffect(() => {
+    if (!triggeredAction) return;
+    if (triggeredAction.action_id === lastTriggeredActionId) return;
+    if (!triggeredAction.is_available) return;
+
+    // Mark as processed
+    setLastTriggeredActionId(triggeredAction.action_id);
+
+    // Reset state for new action
+    setSelectedAction(triggeredAction);
+    setSelectedWeaponId(null);
+    setSelectedWeaponProfileId(null);
+    setSelectedSystemId(null);
+    setUseThrown(false);
+    setMovementPath([]);
+    setFullTechStep(1);
+    setFullTechSelections({});
+    onActionSelect(triggeredAction);
+    onAreaPreviewChange?.(null, null, null);
+
+    // Determine initial state based on requirements
+    if (triggeredAction.action_id === "full_tech") {
+      setPanelState("selecting_full_tech_option");
+      onTargetModeChange(null);
+      onPathModeChange(false, []);
+      onMovementRangeChange?.(false, 0);
+    } else if (triggeredAction.requires_weapon) {
+      setPanelState("selecting_weapon");
+      onTargetModeChange(null);
+      onPathModeChange(false, []);
+      onMovementRangeChange?.(false, 0);
+    } else if (triggeredAction.requires_system) {
+      setPanelState("selecting_system");
+      onTargetModeChange(null);
+      onPathModeChange(false, []);
+      onMovementRangeChange?.(false, 0);
+    } else if (triggeredAction.requires_path) {
+      const initialPath = actorPosition ? [actorPosition] : [];
+      setMovementPath(initialPath);
+      setPanelState("selecting_path");
+      onTargetModeChange(null);
+      onPathModeChange(true, initialPath);
+      // Show movement range preview - boost doubles speed
+      const effectiveSpeed = triggeredAction.action_id === "boost" ? actorSpeed * 2 : actorSpeed;
+      onMovementRangeChange?.(true, effectiveSpeed);
+    } else if (triggeredAction.requires_target) {
+      setPanelState("selecting_target");
+      onTargetModeChange({
+        actionId: triggeredAction.action_id,
+        actionType: triggeredAction.action_type as ActionRequest["action_type"],
+        requiresTarget: triggeredAction.requires_target,
+        requiresWeapon: triggeredAction.requires_weapon,
+      });
+      onPathModeChange(false, []);
+      onMovementRangeChange?.(false, 0);
+    } else {
+      setPanelState("confirming");
+      onTargetModeChange(null);
+      onPathModeChange(false, []);
+      onMovementRangeChange?.(false, 0);
+    }
+
+    // Notify parent that we processed the action
+    onTriggeredActionProcessed?.();
+  }, [
+    triggeredAction,
+    lastTriggeredActionId,
+    actorPosition,
+    actorSpeed,
+    onActionSelect,
+    onAreaPreviewChange,
+    onMovementRangeChange,
+    onPathModeChange,
+    onTargetModeChange,
+    onTriggeredActionProcessed,
+  ]);
+
+  // Reset tracked action when panel returns to idle
+  useEffect(() => {
+    if (panelState === "idle") {
+      setLastTriggeredActionId(null);
+    }
+  }, [panelState]);
+
   // Early return AFTER all hooks are called
   if (!availableActions || !economy) {
     return (
@@ -249,11 +346,13 @@ export function ActionPanel({
       setPanelState("selecting_weapon");
       onTargetModeChange(null);
       onPathModeChange(false, []);
+      onMovementRangeChange?.(false, 0);
     } else if (action.requires_system) {
       // System selection
       setPanelState("selecting_system");
       onTargetModeChange(null);
       onPathModeChange(false, []);
+      onMovementRangeChange?.(false, 0);
     } else if (action.requires_path) {
       // Path selection (for Move, Boost)
       const initialPath = actorPosition ? [actorPosition] : [];
@@ -261,6 +360,9 @@ export function ActionPanel({
       setPanelState("selecting_path");
       onTargetModeChange(null);
       onPathModeChange(true, initialPath);
+      // Show movement range preview - boost doubles speed
+      const effectiveSpeed = action.action_id === "boost" ? actorSpeed * 2 : actorSpeed;
+      onMovementRangeChange?.(true, effectiveSpeed);
     } else if (action.requires_target) {
       setPanelState("selecting_target");
       onTargetModeChange({
@@ -270,10 +372,12 @@ export function ActionPanel({
         requiresWeapon: action.requires_weapon,
       });
       onPathModeChange(false, []);
+      onMovementRangeChange?.(false, 0);
     } else {
       setPanelState("confirming");
       onTargetModeChange(null);
       onPathModeChange(false, []);
+      onMovementRangeChange?.(false, 0);
     }
   };
 
@@ -464,6 +568,7 @@ export function ActionPanel({
     onTargetModeChange(null);
     onPathModeChange(false, []);
     onAreaPreviewChange?.(null, null, null);
+    onMovementRangeChange?.(false, 0);
   };
 
   // Reset state when action completes
@@ -480,6 +585,7 @@ export function ActionPanel({
     onTargetModeChange(null);
     onPathModeChange(false, []);
     onAreaPreviewChange?.(null, null, null);
+    onMovementRangeChange?.(false, 0);
   };
 
   // Handle confirm path for movement actions
@@ -488,6 +594,7 @@ export function ActionPanel({
 
     setPanelState("executing");
     onPathModeChange(false, []);
+    onMovementRangeChange?.(false, 0);
 
     onExecuteAction({
       action_id: selectedAction.action_id,

@@ -104,7 +104,7 @@ export function Breadcrumbs() {
             Home
           </Link>
         </li>
-        {breadcrumbs.map((crumb, index) => (
+        {breadcrumbs.map((crumb) => (
           <li key={crumb.href} className="flex items-center gap-1">
             <span className="text-muted-foreground/60 mx-1">/</span>
             {crumb.isCurrent ? (

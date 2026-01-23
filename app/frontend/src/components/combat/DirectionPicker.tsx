@@ -1,5 +1,6 @@
 import type { HexCoord } from "../../lib/types/lancer";
 import { HEX_DIRECTIONS } from "../../lib/combat-render/aoe";
+import { hex } from "../../lib/combat-render/hex";
 import { Button } from "../ui";
 
 export interface DirectionPickerProps {
@@ -209,10 +210,10 @@ export function getPatternPreviewCoords(
 function lineCoords(origin: HexCoord, direction: HexCoord, length: number): HexCoord[] {
   const results: HexCoord[] = [];
   for (let distance = 1; distance <= length; distance += 1) {
-    results.push({
-      q: origin.q + direction.q * distance,
-      r: origin.r + direction.r * distance,
-    });
+    results.push(hex(
+      origin.q + direction.q * distance,
+      origin.r + direction.r * distance,
+    ));
   }
   return results;
 }
@@ -231,10 +232,10 @@ function coneCoords(origin: HexCoord, direction: HexCoord, length: number): HexC
 
   for (let distance = 1; distance <= length; distance += 1) {
     for (let offset = 0; offset < distance; offset += 1) {
-      results.push({
-        q: origin.q + direction.q * distance + left.q * offset,
-        r: origin.r + direction.r * distance + left.r * offset,
-      });
+      results.push(hex(
+        origin.q + direction.q * distance + left.q * offset,
+        origin.r + direction.r * distance + left.r * offset,
+      ));
     }
   }
 

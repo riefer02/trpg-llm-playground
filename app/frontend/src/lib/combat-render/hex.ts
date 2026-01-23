@@ -1,5 +1,12 @@
 import type { HexCoord } from "../types/lancer";
 
+/**
+ * Create a HexCoord with computed s value (cube coordinate invariant: q + r + s = 0)
+ */
+export function hex(q: number, r: number): HexCoord {
+  return { q, r, s: -q - r };
+}
+
 export type PixelPoint = {
   x: number;
   y: number;
@@ -60,7 +67,7 @@ function axialToCube(coord: { q: number; r: number }): CubeCoord {
 }
 
 function cubeToAxial(cube: CubeCoord): HexCoord {
-  return { q: cube.x, r: cube.z };
+  return hex(cube.x, cube.z);
 }
 
 function cubeRound(cube: CubeCoord): CubeCoord {

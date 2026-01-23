@@ -31,6 +31,7 @@ import {
   hexLineFromDirection,
   normalizeHexDirection,
 } from "./aoe";
+import { calculateReachableHexes } from "./movement";
 
 export type CombatRenderAdapterInput = {
   scenario: MechCombatScenario;
@@ -108,6 +109,19 @@ const PATTERN_OVERLAY_STYLES: Record<string, HoverStyle> = {
     lineWidth: 1.5,
   },
 };
+
+export const MOVEMENT_OVERLAY_STYLES = {
+  easy: {
+    fillStyle: "rgba(34, 197, 94, 0.2)", // green-500
+    strokeStyle: "rgba(34, 197, 94, 0.5)",
+    lineWidth: 1,
+  },
+  atMax: {
+    fillStyle: "rgba(234, 179, 8, 0.2)", // yellow-500
+    strokeStyle: "rgba(234, 179, 8, 0.5)",
+    lineWidth: 1,
+  },
+} as const;
 
 export function adaptCombatScenario(
   input: CombatRenderAdapterInput,
@@ -584,4 +598,49 @@ function dedupeCoords(coords: HexCoord[]): HexCoord[] {
     result.push(coord);
   }
   return result;
+}
+
+/**
+ * Build movement range overlays showing reachable hexes with color coding:
+ * - Green (easy): cost <= 50% of speed
+ * - Yellow (atMax): cost > 50% but <= 100% of speed
+ */
+export function buildMovementRangeOverlays(
+  origin: HexCoord,
+  speed: number,
+  validHexes: Set<string>,
+  blockedHexes?: Set<string>,
+  difficultHexes?: Set<string>,
+): AreaOverlay[] {
+  const reachable = calculateReachableHexes(
+    origin,
+    speed,
+    validHexes,
+    blockedHexes,
+    difficultHexes,
+  );
+
+  const easyThreshold = Math.floor(speed / 2);
+
+  const easy: HexCoord[] = [];
+  const atMax: HexCoord[] = [];
+
+  for (const { coord, cost } of reachable) {
+    if (cost <= easyThreshold) {
+      easy.push(coord);
+    } else {
+      atMax.push(coord);
+    }
+  }
+
+  const overlays: AreaOverlay[] = [];
+
+  if (easy.length > 0) {
+    overlays.push({ coords: easy, style: MOVEMENT_OVERLAY_STYLES.easy });
+  }
+  if (atMax.length > 0) {
+    overlays.push({ coords: atMax, style: MOVEMENT_OVERLAY_STYLES.atMax });
+  }
+
+  return overlays;
 }
