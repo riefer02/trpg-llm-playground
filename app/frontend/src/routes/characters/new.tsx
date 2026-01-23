@@ -847,6 +847,7 @@ function NewCharacterPage() {
                     label="HULL"
                     description="+2 HP per point"
                     value={formData.skills.hull}
+                    impact={`+${formData.skills.hull * 2} HP`}
                     onChange={(v) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -858,6 +859,7 @@ function NewCharacterPage() {
                     label="AGILITY"
                     description="+1 Evasion per point"
                     value={formData.skills.agility}
+                    impact={`+${formData.skills.agility} Evasion`}
                     onChange={(v) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -872,6 +874,7 @@ function NewCharacterPage() {
                     label="SYSTEMS"
                     description="+1 Tech Attack & E-Def"
                     value={formData.skills.systems}
+                    impact={`+${formData.skills.systems} Tech/E-Def`}
                     onChange={(v) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -886,6 +889,7 @@ function NewCharacterPage() {
                     label="ENGINEERING"
                     description="+1 Heat Cap per point"
                     value={formData.skills.engineering}
+                    impact={`+${formData.skills.engineering} Heat Cap`}
                     onChange={(v) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -1521,16 +1525,26 @@ function SkillInput({
   description,
   value,
   onChange,
+  impact,
 }: {
   label: string;
   description: string;
   value: number;
   onChange: (value: number) => void;
+  /** Live computed impact text, e.g., "+4 HP" */
+  impact?: string;
 }) {
   return (
     <div className="p-3 bg-muted/50 border border-border rounded-md">
       <div className="flex items-center justify-between mb-1">
-        <span className="font-medium">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{label}</span>
+          {impact && value > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
+              {impact}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
