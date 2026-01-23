@@ -29,7 +29,6 @@ import {
   ActionLog,
   type SelectedAction,
 } from "../../components/combat/ActionLog";
-import { EconomyDisplay } from "../../components/combat/EconomyDisplay";
 import { TerrainLegend } from "../../components/combat/TerrainLegend";
 import { TurnControls, type TurnState } from "../../components/combat/TurnControls";
 import { ActionPanel, type TargetMode } from "../../components/combat/ActionPanel";
@@ -92,6 +91,7 @@ function CombatSessionPage() {
   // Turn state tracking
   const [turnActive, setTurnActive] = useState(false);
   const [economy, setEconomy] = useState<ActionEconomyState | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Available actions query (only when turn is active)
   const { data: availableActions } = useAvailableActions(combatId, {
@@ -116,6 +116,8 @@ function CombatSessionPage() {
   // Area targeting state for line/cone attacks
   const [areaPattern, setAreaPattern] = useState<AttackPatternDefinition | null>(null);
   const [areaDirection, setAreaDirection] = useState<HexCoord | null>(null);
+  // Preview origin for blast patterns (follows cursor)
+  const [previewOrigin, setPreviewOrigin] = useState<HexCoord | null>(null);
 
   // Movement path state
   const [isPathMode, setIsPathMode] = useState(false);
@@ -179,13 +181,17 @@ function CombatSessionPage() {
 
   // Handle start turn
   const handleStartTurn = useCallback(() => {
+    setActionError(null);
     startTurn.mutate(undefined, {
       onSuccess: (result) => {
         setTurnActive(true);
         setEconomy(result.economy);
         toast.success("Turn started");
       },
-      onError: (err) => toast.error(err.message || "Failed to start turn"),
+      onError: (err) => {
+        setActionError(err.message || "Failed to start turn");
+        toast.error(err.message || "Failed to start turn");
+      },
     });
   }, [startTurn]);
 
@@ -250,6 +256,7 @@ function CombatSessionPage() {
           }
         : request;
 
+      setActionError(null);
       executeAction.mutate(finalRequest, {
         onSuccess: (result) => {
           if (result.success) {
@@ -259,12 +266,20 @@ function CombatSessionPage() {
             setMaxTargets(1);
             setAreaPattern(null);
             setAreaDirection(null);
+            setPreviewOrigin(null);
+            setActionError(null);
             toast.success("Action executed");
           } else {
-            toast.error("Action failed");
+            const errorMsg = result.error || "Action failed";
+            setActionError(errorMsg);
+            toast.error(errorMsg);
           }
         },
-        onError: (err) => toast.error(err.message || "Action failed"),
+        onError: (err) => {
+          const errorMsg = err.message || "Action failed";
+          setActionError(errorMsg);
+          toast.error(errorMsg);
+        },
       });
     },
     [executeAction, scenario?.deployables]
@@ -365,6 +380,16 @@ function CombatSessionPage() {
     }
   }, []);
 
+  // Handle AoE preview changes from ActionPanel (weapon selection)
+  const handleAreaPreviewChange = useCallback(
+    (pattern: AttackPatternDefinition | null, origin: HexCoord | null, direction: HexCoord | null) => {
+      setAreaPattern(pattern);
+      setPreviewOrigin(origin);
+      setAreaDirection(direction);
+    },
+    []
+  );
+
   // Handle hex click for path building (from CombatCanvas)
   const handlePathHexClick = useCallback((coord: HexCoord) => {
     if (isPathMode) {
@@ -439,6 +464,11 @@ function CombatSessionPage() {
     if (!scenario) {
       return null;
     }
+    // For blast patterns, use preview origin (follows cursor) instead of actor position
+    const effectivePatternOrigin = areaPattern?.pattern === "blast" && previewOrigin
+      ? { coord: previewOrigin }
+      : currentActor?.position;
+
     return adaptCombatScenario({
       scenario,
       round,
@@ -447,11 +477,11 @@ function CombatSessionPage() {
       hover: hovered,
       // Include area targeting preview
       attackPattern: areaPattern ?? undefined,
-      patternOrigin: currentActor?.position,
+      patternOrigin: effectivePatternOrigin,
       patternDirection: areaDirection ?? undefined,
       actorId: currentActor?.id,
     });
-  }, [action, hovered, round, scenario, turn, areaPattern, areaDirection, currentActor]);
+  }, [action, hovered, round, scenario, turn, areaPattern, areaDirection, currentActor, previewOrigin]);
 
   if (isLoading) {
     return <CombatSessionSkeleton />;
@@ -588,7 +618,13 @@ function CombatSessionPage() {
                     targetingMode={canvasTargetingMode}
                     movementPath={isPathMode ? movementPath : undefined}
                     isPathMode={isPathMode}
-                    onHover={(coord) => setHovered(coord)}
+                    onHover={(coord) => {
+                      setHovered(coord);
+                      // Update blast preview origin when hovering (blast follows cursor)
+                      if (areaPattern?.pattern === "blast" && targetMode?.requiresTarget) {
+                        setPreviewOrigin(coord);
+                      }
+                    }}
                     onSelect={(coord) => setSelected(coord)}
                     onTarget={(coord) => setTargeted(coord)}
                     onTokenClick={handleTokenClick}
@@ -611,78 +647,136 @@ function CombatSessionPage() {
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
-          {/* Turn Controls */}
-          <TurnControls
-            currentActorName={currentActor?.name ?? null}
-            roundNumber={currentRound}
-            turnIndex={currentTurnIndex}
-            turnState={turnState}
-            onStartTurn={handleStartTurn}
-            onEndTurn={handleEndTurn}
-            onAutoNpcTurn={handleAutoNpcTurn}
-            isStarting={startTurn.isPending}
-            isEnding={endTurn.isPending}
-            isAutoNpc={autoNpcTurn.isPending}
-            isCurrentActorAI={currentActor?.ai_controlled ?? false}
-          />
-
-          {/* Victory Conditions (if SITREP active) */}
-          <VictoryConditionPanel sitrepResolution={scenario?.sitrep_resolution} />
-
-          {/* Mission Objectives (if available) */}
-          <ObjectiveTracker objectives={scenario?.objectives} />
-
-          {/* Mission Reserves (if available) */}
-          <ReservesPanel
-            reserves={scenario?.mission_reserves}
-            onSpendReserve={handleSpendReserve}
-            isSpending={spendReserve.isPending}
-          />
-
-          {/* Economy Display (always visible, greyed when not your turn) */}
-          {economy && (
-            <EconomyDisplay
+        <div className="flex flex-col h-full max-h-[calc(100vh-220px)]">
+          {/* Sticky Turn Controls with integrated Economy */}
+          <div className="sticky top-0 z-10 bg-background pb-3">
+            <TurnControls
+              currentActorName={currentActor?.name ?? null}
+              roundNumber={currentRound}
+              turnIndex={currentTurnIndex}
+              turnState={turnState}
+              onStartTurn={handleStartTurn}
+              onEndTurn={handleEndTurn}
+              onAutoNpcTurn={handleAutoNpcTurn}
+              isStarting={startTurn.isPending}
+              isEnding={endTurn.isPending}
+              isAutoNpc={autoNpcTurn.isPending}
+              isCurrentActorAI={currentActor?.ai_controlled ?? false}
               economy={economy}
               canOvercharge={availableActions?.can_overcharge ?? false}
               overchargeLevel={availableActions?.overcharge_level ?? 0}
-              disabled={!turnActive}
+              error={actionError}
             />
-          )}
+          </div>
 
-          {/* Overcharge Confirmation Modal */}
-          {showOverchargeConfirm && currentActor && (
-            <OverchargeConfirm
-              currentLevel={availableActions?.overcharge_level ?? 0}
-              heatCurrent={currentActor.resources?.heat_current ?? 0}
-              heatCap={currentActor.resources?.heat_cap ?? 6}
-              onConfirm={handleOverchargeConfirm}
-              onCancel={() => setShowOverchargeConfirm(false)}
-              isOpen={showOverchargeConfirm}
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            {/* Action Panel (only when turn is active) - prioritized at top */}
+            {turnActive && (
+              <ActionPanel
+                availableActions={availableActions ?? null}
+                economy={economy}
+                onActionSelect={handleActionSelect}
+                onExecuteAction={handleExecuteAction}
+                onTargetModeChange={handleTargetModeChange}
+                onPathModeChange={handlePathModeChange}
+                onAreaPreviewChange={handleAreaPreviewChange}
+                isExecuting={executeAction.isPending}
+                selectedTargetIds={selectedTargetIds}
+                actorInventory={currentActor?.inventory}
+                weaponDefinitions={weaponDefinitions}
+                actorSpeed={currentActor?.stats?.speed ?? 4}
+                actorPosition={currentActor?.position?.coord ?? null}
+                hexClickCoord={pathHexClick}
+              />
+            )}
+
+            {/* Victory Conditions (if SITREP active) */}
+            <VictoryConditionPanel sitrepResolution={scenario?.sitrep_resolution} />
+
+            {/* Mission Objectives (if available) */}
+            <ObjectiveTracker objectives={scenario?.objectives} />
+
+            {/* Mission Reserves (if available) */}
+            <ReservesPanel
+              reserves={scenario?.mission_reserves}
+              onSpendReserve={handleSpendReserve}
+              isSpending={spendReserve.isPending}
             />
-          )}
 
-          {/* Action Panel (only when turn is active) */}
-          {turnActive && (
-            <ActionPanel
-              availableActions={availableActions ?? null}
-              economy={economy}
-              onActionSelect={handleActionSelect}
-              onExecuteAction={handleExecuteAction}
-              onTargetModeChange={handleTargetModeChange}
-              onPathModeChange={handlePathModeChange}
-              isExecuting={executeAction.isPending}
-              selectedTargetIds={selectedTargetIds}
-              actorInventory={currentActor?.inventory}
-              weaponDefinitions={weaponDefinitions}
-              actorSpeed={currentActor?.stats?.speed ?? 4}
-              actorPosition={currentActor?.position?.coord ?? null}
-              hexClickCoord={pathHexClick}
-            />
-          )}
+            {/* Combatants List - compact */}
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Combatants
+              </div>
+              <div className="space-y-1">
+                {combatants.map((combatant) => (
+                  <div
+                    key={combatant.id}
+                    className={`flex items-center justify-between rounded px-2 py-1.5 text-sm ${
+                      combatant.id === currentActor?.id
+                        ? "bg-primary/10 border-l-2 border-primary"
+                        : "bg-muted/40"
+                    } ${
+                      selectedTargetIds.includes(combatant.id)
+                        ? "ring-1 ring-green-500"
+                        : ""
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate">
+                        {combatant.name}
+                        {combatant.id === currentActor?.id && (
+                          <span className="ml-1 text-[10px] text-primary font-normal">(turn)</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground ml-2">
+                      {combatant.position?.coord
+                        ? `${combatant.position.coord.q},${combatant.position.coord.r}`
+                        : "--"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          {/* Reaction Prompt (when not our turn and reaction opportunity exists) */}
-          <Modal
+            {/* Action Log - compact */}
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Action Log
+              </div>
+              <div className="max-h-32 overflow-y-auto">
+                <ActionLog
+                  rounds={rounds}
+                  currentRound={currentRound}
+                  currentTurnIndex={currentTurnIndex}
+                  combatantNames={combatantNameById}
+                  selectedAction={selectedAction}
+                  onSelectAction={(roundIdx, turnIdx, actionIdx) =>
+                    setSelectedAction({ roundIdx, turnIdx, actionIdx })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Modals - outside sidebar */}
+        {/* Overcharge Confirmation Modal */}
+        {showOverchargeConfirm && currentActor && (
+          <OverchargeConfirm
+            currentLevel={availableActions?.overcharge_level ?? 0}
+            heatCurrent={currentActor.resources?.heat_current ?? 0}
+            heatCap={currentActor.resources?.heat_cap ?? 6}
+            onConfirm={handleOverchargeConfirm}
+            onCancel={() => setShowOverchargeConfirm(false)}
+            isOpen={showOverchargeConfirm}
+          />
+        )}
+
+        {/* Reaction Prompt (when not our turn and reaction opportunity exists) */}
+        <Modal
             isOpen={
               !turnActive &&
               reactionOpportunity?.pending_triggers?.length !== undefined &&
@@ -764,95 +858,6 @@ function CombatSessionPage() {
                 </Modal>
               );
             })}
-
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-base">Action Log</CardTitle>
-              <CardDescription className="text-xs">
-                Click an action to preview area overlays on the canvas.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-              <div className="max-h-48 overflow-y-auto pr-1">
-                <ActionLog
-                  rounds={rounds}
-                  currentRound={currentRound}
-                  currentTurnIndex={currentTurnIndex}
-                  combatantNames={combatantNameById}
-                  selectedAction={selectedAction}
-                  onSelectAction={(roundIdx, turnIdx, actionIdx) =>
-                    setSelectedAction({ roundIdx, turnIdx, actionIdx })
-                  }
-                />
-              </div>
-              {renderOutput?.overlayMetadata.length ? (
-                <div className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground space-y-2">
-                  {renderOutput.overlayMetadata.map((meta) => (
-                    <div key={meta.id}>
-                      <div className="font-medium text-foreground">
-                        {meta.pattern.toUpperCase()} size {meta.size}
-                      </div>
-                      <div>Origin: {formatPosition(meta.origin)}</div>
-                      <div>
-                        Direction:{" "}
-                        {meta.direction
-                          ? `${meta.direction.q},${meta.direction.r}`
-                          : "--"}
-                      </div>
-                      <div>Coords: {meta.coordCount}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  No area overlays available for this action.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-base">Combatants</CardTitle>
-              <CardDescription className="text-xs">
-                Positions mapped from the current scenario snapshot.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm pt-0">
-              {combatants.map((combatant) => (
-                <div
-                  key={combatant.id}
-                  className={`flex items-center justify-between rounded-md border px-3 py-2 ${
-                    combatant.id === currentActor?.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-muted/40"
-                  } ${
-                    selectedTargetIds.includes(combatant.id)
-                      ? "ring-2 ring-green-500"
-                      : ""
-                  }`}
-                >
-                  <div>
-                    <div className="font-medium">
-                      {combatant.name}
-                      {combatant.id === currentActor?.id && (
-                        <span className="ml-2 text-xs text-primary">(active)</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {combatant.side} · {combatant.kind}
-                    </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {combatant.position?.coord
-                      ? `${combatant.position.coord.q},${combatant.position.coord.r}`
-                      : "--"}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );
@@ -876,11 +881,4 @@ function formatCoord(coord: HexCoord | null): string {
     return "--";
   }
   return `${coord.q},${coord.r}`;
-}
-
-function formatPosition(position?: { coord?: HexCoord | null } | null): string {
-  if (!position?.coord) {
-    return "--";
-  }
-  return `${position.coord.q},${position.coord.r}`;
 }
