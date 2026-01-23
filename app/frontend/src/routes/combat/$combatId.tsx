@@ -627,12 +627,13 @@ function CombatSessionPage() {
             isSpending={spendReserve.isPending}
           />
 
-          {/* Economy Display (only when turn is active) */}
-          {turnActive && economy && (
+          {/* Economy Display (always visible, greyed when not your turn) */}
+          {economy && (
             <EconomyDisplay
               economy={economy}
               canOvercharge={availableActions?.can_overcharge ?? false}
               overchargeLevel={availableActions?.overcharge_level ?? 0}
+              disabled={!turnActive}
             />
           )}
 

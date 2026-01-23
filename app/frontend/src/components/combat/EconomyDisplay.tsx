@@ -5,16 +5,32 @@ export interface EconomyDisplayProps {
   economy: ActionEconomyState;
   canOvercharge: boolean;
   overchargeLevel?: number;
+  /** When true, shows greyed-out state (not your turn) */
+  disabled?: boolean;
 }
 
-export function EconomyDisplay({ economy, canOvercharge, overchargeLevel = 0 }: EconomyDisplayProps) {
+export function EconomyDisplay({
+  economy,
+  canOvercharge,
+  overchargeLevel = 0,
+  disabled = false,
+}: EconomyDisplayProps) {
   const quickSlotsTotal = economy.quick_actions_available + economy.quick_actions_used;
   const quickSlotsRemaining = economy.quick_actions_available;
 
   return (
-    <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
-      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        Action Economy
+    <div className={`rounded-md border p-3 space-y-2 transition-opacity ${
+      disabled
+        ? "border-border/50 bg-muted/10 opacity-50"
+        : "border-border bg-muted/30"
+    }`}>
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Action Economy
+        </div>
+        {disabled && (
+          <span className="text-[10px] text-muted-foreground/60">Not your turn</span>
+        )}
       </div>
 
       <div className="flex items-center gap-3">
