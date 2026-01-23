@@ -9,7 +9,7 @@
  * 5. Mech - name + GMS Everest (LL0)
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -190,6 +190,47 @@ const defaultTouched: TouchedFields = {
   licenses: false,
 };
 
+// Local storage key for auto-save
+const DRAFT_STORAGE_KEY = "lancer_character_draft";
+
+/** Load draft from localStorage if available */
+function loadDraft(): { formData: FormData; step: Step } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Validate it has required shape
+      if (parsed.formData && parsed.step) {
+        return parsed;
+      }
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+/** Save draft to localStorage */
+function saveDraft(formData: FormData, step: Step): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ formData, step }));
+  } catch {
+    // Ignore storage errors (quota exceeded, etc.)
+  }
+}
+
+/** Clear draft from localStorage */
+function clearDraft(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+  } catch {
+    // Ignore errors
+  }
+}
+
 function NewCharacterPage() {
   const navigate = useNavigate();
   const createMutation = useCreateCharacter();
@@ -203,10 +244,37 @@ function NewCharacterPage() {
   const { data: licenses, isLoading: loadingLicenses } = useLicenses();
   const { data: frames, isLoading: loadingFrames } = useFrames();
 
-  const [step, setStep] = useState<Step>("background");
-  const [formData, setFormData] = useState<FormData>(defaultFormData);
+  // Load draft from localStorage on mount
+  const [step, setStep] = useState<Step>(() => {
+    const draft = loadDraft();
+    return draft?.step ?? "background";
+  });
+  const [formData, setFormData] = useState<FormData>(() => {
+    const draft = loadDraft();
+    return draft?.formData ?? defaultFormData;
+  });
   const [touched, setTouched] = useState<TouchedFields>(defaultTouched);
   const [error, setError] = useState<string | null>(null);
+  const [hasDraft, setHasDraft] = useState(() => !!loadDraft());
+
+  // Auto-save to localStorage when form data or step changes
+  useEffect(() => {
+    // Only save if there's meaningful data (callsign entered)
+    if (formData.callsign.trim()) {
+      saveDraft(formData, step);
+      setHasDraft(true);
+    }
+  }, [formData, step]);
+
+  // Clear draft handler
+  const handleClearDraft = useCallback(() => {
+    clearDraft();
+    setFormData(defaultFormData);
+    setStep("background");
+    setTouched(defaultTouched);
+    setHasDraft(false);
+    toast.info("Draft cleared");
+  }, []);
 
   // Mark a field as touched for validation feedback
   const markTouched = (field: keyof TouchedFields) => {
@@ -356,6 +424,8 @@ function NewCharacterPage() {
         }
       }
 
+      // Clear draft on successful submission
+      clearDraft();
       toast.success(`Character "${formData.callsign}" created`);
       navigate({
         to: "/characters/$characterId",
@@ -466,8 +536,23 @@ function NewCharacterPage() {
               LL{formData.level} build with guided validation and live readiness checks
             </p>
           </div>
-          <div className="rounded-full border border-border px-4 py-1 text-xs text-muted-foreground">
-            {completedSteps} / {STEP_ORDER.length} steps ready
+          <div className="flex items-center gap-3">
+            {hasDraft && (
+              <button
+                type="button"
+                onClick={handleClearDraft}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              >
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                Draft saved
+                <span className="text-muted-foreground/60 hover:text-destructive">
+                  (clear)
+                </span>
+              </button>
+            )}
+            <div className="rounded-full border border-border px-4 py-1 text-xs text-muted-foreground">
+              {completedSteps} / {STEP_ORDER.length} steps ready
+            </div>
           </div>
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
