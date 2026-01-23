@@ -167,6 +167,29 @@ const defaultFormData: FormData = {
   notes: "",
 };
 
+// Track which fields have been interacted with for validation feedback
+interface TouchedFields {
+  callsign: boolean;
+  background: boolean;
+  triggers: boolean;
+  skills: boolean;
+  talents: boolean;
+  clothing: boolean;
+  mech: boolean;
+  licenses: boolean;
+}
+
+const defaultTouched: TouchedFields = {
+  callsign: false,
+  background: false,
+  triggers: false,
+  skills: false,
+  talents: false,
+  clothing: false,
+  mech: false,
+  licenses: false,
+};
+
 function NewCharacterPage() {
   const navigate = useNavigate();
   const createMutation = useCreateCharacter();
@@ -182,7 +205,13 @@ function NewCharacterPage() {
 
   const [step, setStep] = useState<Step>("background");
   const [formData, setFormData] = useState<FormData>(defaultFormData);
+  const [touched, setTouched] = useState<TouchedFields>(defaultTouched);
   const [error, setError] = useState<string | null>(null);
+
+  // Mark a field as touched for validation feedback
+  const markTouched = (field: keyof TouchedFields) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
 
   // Dynamic step order based on level
   const STEP_ORDER = useMemo(() => {
@@ -524,11 +553,6 @@ function NewCharacterPage() {
                 <CardDescription>{STEP_META.background.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                {!formData.callsign.trim() && (
-                  <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                    Callsign is required before you can select a background.
-                  </div>
-                )}
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">
@@ -543,9 +567,17 @@ function NewCharacterPage() {
                           callsign: e.target.value,
                         }))
                       }
+                      onBlur={() => markTouched("callsign")}
                       placeholder="NOVA"
-                      className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                      className={`w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
+                        touched.callsign && !formData.callsign.trim()
+                          ? "border-destructive"
+                          : "border-border"
+                      }`}
                     />
+                    {touched.callsign && !formData.callsign.trim() && (
+                      <p className="mt-1 text-xs text-destructive">Callsign is required</p>
+                    )}
                   </div>
 
                   <div>
@@ -565,35 +597,46 @@ function NewCharacterPage() {
 
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Select Background
+                      Select Background <span className="text-destructive">*</span>
                     </label>
-                    <div className="grid gap-2 max-h-80 overflow-y-auto">
-                      {backgrounds?.map((bg) => (
-                        <button
-                          key={bg.id}
-                          type="button"
-                          onClick={() => handleBackgroundSelect(bg)}
-                          disabled={!formData.callsign.trim()}
-                          className={`p-3 text-left border rounded-md transition-colors ${
-                            !formData.callsign.trim()
-                              ? "opacity-50 cursor-not-allowed"
-                              : "hover:bg-primary/10 hover:border-primary"
-                          }`}
-                        >
-                          <div className="font-medium">{bg.name}</div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Triggers:{" "}
-                            {bg.triggers
-                              .map((id) => triggerMap.get(id)?.name ?? id)
-                              .join(", ")}
-                          </div>
-                        </button>
-                      ))}
+                    <div
+                      className="grid gap-2 max-h-80 overflow-y-auto"
+                      onMouseLeave={() => formData.callsign.trim() && markTouched("background")}
+                    >
+                      {backgrounds?.map((bg) => {
+                        const isSelected = formData.backgroundId === bg.id;
+                        return (
+                          <button
+                            key={bg.id}
+                            type="button"
+                            onClick={() => handleBackgroundSelect(bg)}
+                            disabled={!formData.callsign.trim()}
+                            className={`p-3 text-left border rounded-md transition-colors ${
+                              isSelected
+                                ? "bg-primary/20 border-primary"
+                                : !formData.callsign.trim()
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:bg-primary/10 hover:border-primary"
+                            }`}
+                          >
+                            <div className="font-medium">{bg.name}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Triggers:{" "}
+                              {bg.triggers
+                                .map((id) => triggerMap.get(id)?.name ?? id)
+                                .join(", ")}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                     {!formData.callsign.trim() && (
                       <p className="text-xs text-muted-foreground mt-2">
                         Enter a callsign first to select a background.
                       </p>
+                    )}
+                    {touched.background && formData.callsign.trim() && !formData.backgroundId && (
+                      <p className="mt-2 text-xs text-destructive">Background selection is required</p>
                     )}
                   </div>
                 </div>
@@ -647,17 +690,25 @@ function NewCharacterPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <LicenseSelector
-                  licenses={licenses}
-                  allocations={formData.licenseAllocations}
-                  availablePoints={progression.licensePoints}
-                  onChange={(allocations) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      licenseAllocations: allocations,
-                    }))
-                  }
-                />
+                {touched.licenses && !canProceedFromLicenses && (
+                  <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    Allocate exactly {progression.licensePoints} license point{progression.licensePoints > 1 ? "s" : ""} to continue.
+                  </div>
+                )}
+
+                <div onMouseLeave={() => markTouched("licenses")}>
+                  <LicenseSelector
+                    licenses={licenses}
+                    allocations={formData.licenseAllocations}
+                    availablePoints={progression.licensePoints}
+                    onChange={(allocations) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        licenseAllocations: allocations,
+                      }))
+                    }
+                  />
+                </div>
 
                 <div className="flex gap-3 mt-6">
                   <Button
@@ -695,13 +746,16 @@ function NewCharacterPage() {
                     Selected: {formData.triggers.length} / 4 triggers
                   </div>
                 </div>
-                {!canProceedFromTriggers && (
+                {touched.triggers && !canProceedFromTriggers && (
                   <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                     Select exactly 4 triggers to continue.
                   </div>
                 )}
 
-                <div className="grid gap-2 max-h-96 overflow-y-auto">
+                <div
+                  className="grid gap-2 max-h-96 overflow-y-auto"
+                  onMouseLeave={() => markTouched("triggers")}
+                >
                   {allTriggers?.map((trigger) => {
                     const isSelected = formData.triggers.includes(trigger.id);
                     const isFull = formData.triggers.length >= 4;
@@ -832,15 +886,22 @@ function NewCharacterPage() {
                   />
                 </div>
 
-                <div className="mt-4 text-sm">
+                <div
+                  className="mt-4 text-sm"
+                  onMouseLeave={() => markTouched("skills")}
+                >
                   <span
                     className={
-                      canProceedFromSkills ? "text-primary" : "text-destructive"
+                      canProceedFromSkills
+                        ? "text-primary"
+                        : touched.skills
+                        ? "text-destructive"
+                        : "text-muted-foreground"
                     }
                   >
                     Total: {totalSkillPoints} / {progression.skillPoints} points
                   </span>
-                  {!canProceedFromSkills && (
+                  {touched.skills && !canProceedFromSkills && (
                     <span className="text-destructive ml-2">
                       (Must be exactly {progression.skillPoints} for LL
                       {formData.level})
@@ -882,13 +943,16 @@ function NewCharacterPage() {
                     talents
                   </div>
                 </div>
-                {!canProceedFromTalents && (
+                {touched.talents && !canProceedFromTalents && (
                   <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                     Select exactly {progression.talentPoints} talents to continue.
                   </div>
                 )}
 
-                <div className="grid gap-2 max-h-96 overflow-y-auto">
+                <div
+                  className="grid gap-2 max-h-96 overflow-y-auto"
+                  onMouseLeave={() => markTouched("talents")}
+                >
                   {allTalents?.map((talent) => {
                     const isSelected = formData.talents.includes(talent.id);
                     const isFull =
@@ -960,7 +1024,7 @@ function NewCharacterPage() {
                 <CardDescription>{STEP_META.gear.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                {!canProceedFromGear && (
+                {touched.clothing && !canProceedFromGear && (
                   <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                     Clothing is required before moving on.
                   </div>
@@ -968,9 +1032,12 @@ function NewCharacterPage() {
                 <div className="space-y-6">
                   <div>
                     <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                      Clothing (Required)
+                      Clothing (Required) <span className="text-destructive">*</span>
                     </div>
-                    <div className="grid gap-2">
+                    <div
+                      className="grid gap-2"
+                      onMouseLeave={() => markTouched("clothing")}
+                    >
                       {clothingOptions.map((item) => {
                         const isSelected = formData.pilotGear.clothing === item.id;
                         return (
@@ -1149,12 +1216,13 @@ function NewCharacterPage() {
                 <CardDescription>{STEP_META.mech.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                {!canProceedFromMech && (
+                {touched.mech && !canProceedFromMech && (
                   <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                     Select at least one mech to continue.
                   </div>
                 )}
 
+                <div onMouseLeave={() => markTouched("mech")}>
                 <FrameBrowser
                   frames={frames}
                   licenses={licenses}
@@ -1182,6 +1250,7 @@ function NewCharacterPage() {
                     }))
                   }
                 />
+                </div>
 
                 <div className="mt-6">
                   <label className="block text-sm font-medium mb-1">Notes</label>
