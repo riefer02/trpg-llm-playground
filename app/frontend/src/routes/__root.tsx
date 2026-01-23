@@ -16,6 +16,7 @@ import { Toaster } from 'sonner'
 import { useState } from 'react'
 
 import appCss from '../styles.css?url'
+import { Breadcrumbs } from '../components/Breadcrumbs'
 
 // Create QueryClient with sensible defaults
 function makeQueryClient() {
@@ -79,6 +80,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <div className="app-shell flex flex-col">
             <Header />
+            <Breadcrumbs />
             <main className="flex-1">
               {children}
             </main>
