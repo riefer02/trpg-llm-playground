@@ -69,10 +69,14 @@ hp = character.active_mech_stats.hp  # Computed from pilot + frame + bonuses
 
 ## Project Context
 
-This project is a **monorepo** for Lancer TTRPG tooling with three domains:
-1. **`/core`**: Type-driven game schemas using Pydantic v2 (3277+ tests)
-2. **`/llm`**: Synthetic data generation and LLM fine-tuning pipeline
-3. **`/app`**: Full-stack web application (FastAPI + TanStack Start)
+**Lancer Tactics AI** - Single-player tactical mech combat with an AI opponent that thinks.
+
+**Tagline**: "Your mech. Your voice. An AI that fights back."
+
+This project is a **monorepo** with three domains:
+1. **`/core`**: Complete Lancer mechanical system (4000+ tests) - the engine
+2. **`/llm`**: AI tactician and narrative generation - the brain
+3. **`/app`**: Game interface (combat visualization, voice input)
 
 ## Monorepo Structure
 
@@ -568,27 +572,86 @@ core/ change → make test-core → add to export.py → make generate-types →
 - ✅ **Evaluation Benchmark**: Accuracy/grounding/citation metrics
 - ✅ **Local Chat**: Ollama + RAG with Gradio UI
 
+## Autonomous Development (Ralph)
+
+The project uses the Ralph loop pattern for autonomous AI development. Ralph repeatedly runs an AI agent until all user stories pass.
+
+### Architecture
+
+```
+scripts/ralph/
+├── ralph.sh       # Bash loop: spawns AI, checks completion, iterates
+├── PROMPT.md      # Agent instructions (read each iteration)
+├── prd.json       # User stories with passes: true/false
+├── progress.txt   # Append-only learnings (memory between iterations)
+└── archive/       # Previous PRD runs
+```
+
+### Supported Tools
+
+| Tool | Install | Use Case |
+|------|---------|----------|
+| Claude Code | `npm i -g @anthropic-ai/claude-code` | Default, best quality |
+| OpenCode | `curl -fsSL https://opencode.ai/install \| bash` | Open-source, multi-provider |
+
+### Usage
+
+```bash
+./scripts/ralph/ralph.sh                           # Claude Code
+./scripts/ralph/ralph.sh --tool opencode           # OpenCode
+./scripts/ralph/ralph.sh --tool opencode --model ollama/llama3  # Local
+```
+
+### PRD Format
+
+```json
+{
+  "project": "feature-name",
+  "branchName": "ralph/feature-name",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Story title",
+      "acceptanceCriteria": ["Criterion 1", "Criterion 2"],
+      "priority": 1,
+      "passes": false
+    }
+  ]
+}
+```
+
+### Key Concepts
+
+- **Fresh context**: Each iteration starts clean; use `progress.txt` for continuity
+- **Quality gates**: `make test-core` and `make lint` must pass before commits
+- **Completion signal**: Output `<promise>COMPLETE</promise>` when all stories pass
+- **Right-sized tasks**: Stories should complete in one iteration
+
 ## Roadmap
 
-### Current: Multi-player + Real-time (Phase 11)
-- 🔲 WebSocket for real-time combat updates
-- 🔲 Movement path drawing on canvas
-- 🔲 Multi-target selection (Barrage attacks)
-- 🔲 System activation UI
+### Current: AI Tactician
+Build an LLM-powered opponent that reasons about tactics.
 
-### Completed
-- ✅ Phase 1: Core type system (3286 tests)
-- ✅ Phase 2: Code cleanliness (HexCoord, effects splitting)
-- ✅ Phase 3: App foundation (FastAPI, TanStack Start, type generation)
-- ✅ Phase 4: Pilot & Combat session CRUD APIs
-- ✅ Phase 5: Character system (core model + API + frontend)
-- ✅ Phase 6: Compendium + loadout builder + PDF export
-- ✅ Phase 7: Campaign system (lobby, lifecycle, invites, outcomes)
-- ✅ Phase 8: Combat turn execution (action/reaction execution, economy, API)
-- ✅ Phase 9: Combat UI action panel (turn controls, economy display, target selection)
-- ✅ Phase 10: Combat UI polish (weapon picker, area targeting, overcharge confirm, reaction prompts)
+The AI Tactician PRD is at `scripts/ralph/prd.json` with these stories:
+- US-001: Combat state serializer (state → LLM-readable JSON)
+- US-002: Tactical system prompt (combat reasoning instructions)
+- US-003: Action parser (LLM output → validated action)
+- US-004: Tactician class (orchestrates the loop)
+- US-005: Wire into NPC turn flow
+- US-006: UI displays AI reasoning
+
+### Completed (Foundation)
+- ✅ Core type system (4000+ tests)
+- ✅ Combat state machine (actions, reactions, conditions)
+- ✅ Quick Battle (instant scenario generation)
+- ✅ Combat UI (canvas, action bar, tooltips, pan/zoom)
 
 ### Future
-- LLM integration for rules assistance
-- Mobile-responsive UI
-- NPC/AI decision automation
+- Voice interface (speech-to-action, TTS narration)
+- Mission generator (procedural objectives + narrative)
+- Progression loop (pilot advancement, unlocks)
+
+### Out of Scope
+- ~~Multiplayer/co-op~~
+- ~~GM tools~~
+- ~~Campaign management for groups~~

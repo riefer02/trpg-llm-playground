@@ -1,0 +1,16 @@
+# Ralph Progress Log
+# Project: Lancer AI Tactician
+Started: Initial setup
+---
+
+## Setup Notes
+
+Key files to understand before starting:
+- `core/shared/combat/mech_combat_scenario.py` - Main combat state machine
+- `core/shared/combat/actions/` - Action definitions and execution
+- `core/npc/` - Existing NPC system (templates, behaviors)
+- `AGENTS.md` - Architecture patterns and conventions
+
+The tactician will live in `llm/src/tactician/` and interface with core's combat system.
+
+---

@@ -1,0 +1,144 @@
+# Ralph Agent - Lancer Tactics AI
+
+You are an autonomous coding agent implementing features for the Lancer Tactics AI project. Follow these instructions precisely.
+
+## Your Task
+
+1. Read `scripts/ralph/prd.json` to find the highest-priority incomplete user story (lowest `priority` number where `passes` is `false`)
+2. Read `scripts/ralph/progress.txt` to understand prior context and learnings
+3. Implement that ONE story completely
+4. Run quality checks
+5. Commit your changes
+6. Update tracking files
+7. Signal completion status
+
+## Project Context
+
+This is a single-player tactical mech combat game with an AI opponent. Key architecture:
+
+- **`/core`**: Complete Lancer mechanical system (4000+ tests) - source of truth
+- **`/llm`**: AI tactician and narrative generation
+- **`/app`**: Game interface (combat visualization)
+
+**Golden Rule**: Core is the source of truth. Never duplicate what core provides.
+
+The combat state machine lives in `core/shared/combat/`. The AI tactician will interface at:
+```python
+actions = scenario.get_available_actions(actor_id)  # What can I do?
+result = scenario.execute_action(action)            # Do it
+```
+
+## Implementation Process
+
+### Step 1: Read Current State
+```bash
+cat scripts/ralph/prd.json
+cat scripts/ralph/progress.txt
+```
+
+Identify the highest-priority incomplete story.
+
+### Step 2: Verify Git Branch
+```bash
+git branch --show-current
+```
+
+If not on the correct branch (from `prd.json.branchName`), create/checkout it:
+```bash
+git checkout -b <branchName> || git checkout <branchName>
+```
+
+### Step 3: Implement the Story
+
+- Read relevant existing code first - understand before changing
+- Follow existing patterns in the codebase
+- Write tests for new functionality
+- Keep changes minimal and focused
+
+### Step 4: Run Quality Checks
+
+ALL changes must pass before committing:
+```bash
+make test-core    # Core tests (required)
+make lint         # Linting (required)
+```
+
+If implementing app features:
+```bash
+make test-app     # App tests
+```
+
+### Step 5: Commit Changes
+
+Only if ALL quality checks pass:
+```bash
+git add <specific-files>
+git commit -m "feat(<scope>): <description>
+
+Implements <story-id>: <story-title>
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+### Step 6: Update PRD
+
+Mark the story as passing in `scripts/ralph/prd.json`:
+```json
+{
+  "id": "US-XXX",
+  "passes": true,
+  "notes": "Brief implementation notes"
+}
+```
+
+### Step 7: Update Progress Log
+
+APPEND to `scripts/ralph/progress.txt` (never replace):
+```
+## Iteration - <timestamp>
+Story: <story-id> - <title>
+Status: PASSED / FAILED
+
+### Changes Made
+- file1.py: Added X
+- file2.py: Modified Y
+
+### Learnings
+- Key insight or gotcha discovered
+- Pattern that worked well
+
+### Next Steps
+- What the next iteration should know
+---
+```
+
+### Step 8: Signal Completion
+
+After updating both files:
+
+- If ALL stories now have `passes: true`:
+  Output: `<promise>COMPLETE</promise>`
+
+- If there are remaining stories:
+  Output: `Iteration complete. Story <id> implemented.`
+
+## Quality Standards
+
+- **Tests required**: New functionality needs tests
+- **Type safety**: Use typed IDs from `core/shared/ids.py`
+- **Core-first**: Validation belongs in core, not API layer
+- **Minimal changes**: Don't refactor unrelated code
+
+## Key Files Reference
+
+- Combat state: `core/shared/combat/mech_combat_scenario.py`
+- Actions: `core/shared/combat/actions/`
+- NPC behavior: `core/npc/`
+- Combat UI: `app/frontend/src/routes/combat/`
+
+## Important Notes
+
+- Each iteration gets fresh context - rely on `progress.txt` for continuity
+- If you discover reusable patterns, add them to `AGENTS.md`
+- If quality checks fail, fix the issue and try again within this iteration
+- Do NOT skip tests or force commits
