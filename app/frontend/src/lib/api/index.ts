@@ -183,6 +183,9 @@ export type {
   UseCombatWebSocketOptions,
 } from './combat-ws'
 
+// Quarters hooks (pilot quarters hub)
+export { useActiveCharacter, useMissionCount } from './quarters'
+
 // Re-export generated core types for convenience
 // These are the source of truth - use these for domain data
 export type {

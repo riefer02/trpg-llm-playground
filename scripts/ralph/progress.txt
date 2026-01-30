@@ -37,3 +37,27 @@ Key files to understand before starting:
 The tactician will live in `llm/src/tactician/` and interface with core's combat system.
 
 ---
+
+## Iteration - Fri Jan 30 2026 18:59 UTC
+Story: E1-US-002 - Pilot Quarters Hub
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/routes/quarters/index.tsx: Created hub screen with pilot/mech summary, navigation buttons, mission count badge, deploy button
+- app/frontend/src/lib/api/quarters.ts: Added useActiveCharacter and useMissionCount hooks
+- app/frontend/src/lib/api/index.ts: Exported quarters hooks
+- app/frontend/src/routes/quarters/pilot.tsx: Placeholder pilot detail route
+- app/frontend/src/routes/quarters/mech.tsx: Placeholder mech loadout route
+- app/frontend/src/routes/index.tsx: Updated continue button to navigate to quarters
+- app/frontend/src/routes/quarters/index.tsx: Added keyboard arrow navigation between buttons
+
+### Learnings
+- Arrow key navigation can be implemented with refs and useEffect, cycling through button refs
+- Active character determined as first character in list for MVP
+- Use existing character API to get pilot and mech data
+- TanStack Router file-based routing automatically picks up new route files
+
+### Next Steps
+- Next story: E1-US-003 (Mission Select) should create mission list screen
+- Need mission generation API (placeholder for MVP)
+---

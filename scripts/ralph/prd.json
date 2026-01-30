@@ -77,8 +77,8 @@
         "`make test-app` passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented quarters hub at /quarters with pilot/mech summary using active character (first character). Navigation buttons with keyboard arrow key support. Mission count badge placeholder (3). Deploy button disabled pending mission selection. Redirects to title if no saved pilot. All acceptance criteria satisfied."
     },
     {
       "id": "E1-US-003",

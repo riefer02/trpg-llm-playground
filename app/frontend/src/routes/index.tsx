@@ -22,9 +22,7 @@ function TitleScreen() {
   };
 
   const handleContinue = () => {
-    // TODO: navigate to quarters hub (E1-US-002 not yet implemented)
-    // For now, redirect to characters list
-    navigate({ to: "/characters" });
+    navigate({ to: "/quarters" });
   };
 
   const handleQuickBattle = async () => {

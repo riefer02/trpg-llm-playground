@@ -10,10 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as QuartersIndexRouteImport } from './routes/quarters/index'
 import { Route as PilotsIndexRouteImport } from './routes/pilots/index'
 import { Route as CompendiumIndexRouteImport } from './routes/compendium/index'
 import { Route as CharactersIndexRouteImport } from './routes/characters/index'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns/index'
+import { Route as QuartersPilotRouteImport } from './routes/quarters/pilot'
+import { Route as QuartersMechRouteImport } from './routes/quarters/mech'
 import { Route as PilotsNewRouteImport } from './routes/pilots/new'
 import { Route as PilotsPilotIdRouteImport } from './routes/pilots/$pilotId'
 import { Route as InvitesTokenRouteImport } from './routes/invites/$token'
@@ -26,6 +29,11 @@ import { Route as CharactersCharacterIdExportRouteImport } from './routes/charac
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuartersIndexRoute = QuartersIndexRouteImport.update({
+  id: '/quarters/',
+  path: '/quarters/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PilotsIndexRoute = PilotsIndexRouteImport.update({
@@ -46,6 +54,16 @@ const CharactersIndexRoute = CharactersIndexRouteImport.update({
 const CampaignsIndexRoute = CampaignsIndexRouteImport.update({
   id: '/campaigns/',
   path: '/campaigns/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuartersPilotRoute = QuartersPilotRouteImport.update({
+  id: '/quarters/pilot',
+  path: '/quarters/pilot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuartersMechRoute = QuartersMechRouteImport.update({
+  id: '/quarters/mech',
+  path: '/quarters/mech',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PilotsNewRoute = PilotsNewRouteImport.update({
@@ -99,10 +117,13 @@ export interface FileRoutesByFullPath {
   '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/quarters/mech': typeof QuartersMechRoute
+  '/quarters/pilot': typeof QuartersPilotRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
   '/compendium': typeof CompendiumIndexRoute
   '/pilots': typeof PilotsIndexRoute
+  '/quarters': typeof QuartersIndexRoute
   '/characters/$characterId/export': typeof CharactersCharacterIdExportRoute
 }
 export interface FileRoutesByTo {
@@ -114,10 +135,13 @@ export interface FileRoutesByTo {
   '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/quarters/mech': typeof QuartersMechRoute
+  '/quarters/pilot': typeof QuartersPilotRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
   '/compendium': typeof CompendiumIndexRoute
   '/pilots': typeof PilotsIndexRoute
+  '/quarters': typeof QuartersIndexRoute
   '/characters/$characterId/export': typeof CharactersCharacterIdExportRoute
 }
 export interface FileRoutesById {
@@ -130,10 +154,13 @@ export interface FileRoutesById {
   '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/quarters/mech': typeof QuartersMechRoute
+  '/quarters/pilot': typeof QuartersPilotRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
   '/compendium/': typeof CompendiumIndexRoute
   '/pilots/': typeof PilotsIndexRoute
+  '/quarters/': typeof QuartersIndexRoute
   '/characters/$characterId/export': typeof CharactersCharacterIdExportRoute
 }
 export interface FileRouteTypes {
@@ -147,10 +174,13 @@ export interface FileRouteTypes {
     | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
+    | '/quarters/mech'
+    | '/quarters/pilot'
     | '/campaigns'
     | '/characters'
     | '/compendium'
     | '/pilots'
+    | '/quarters'
     | '/characters/$characterId/export'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -162,10 +192,13 @@ export interface FileRouteTypes {
     | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
+    | '/quarters/mech'
+    | '/quarters/pilot'
     | '/campaigns'
     | '/characters'
     | '/compendium'
     | '/pilots'
+    | '/quarters'
     | '/characters/$characterId/export'
   id:
     | '__root__'
@@ -177,10 +210,13 @@ export interface FileRouteTypes {
     | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
+    | '/quarters/mech'
+    | '/quarters/pilot'
     | '/campaigns/'
     | '/characters/'
     | '/compendium/'
     | '/pilots/'
+    | '/quarters/'
     | '/characters/$characterId/export'
   fileRoutesById: FileRoutesById
 }
@@ -193,10 +229,13 @@ export interface RootRouteChildren {
   InvitesTokenRoute: typeof InvitesTokenRoute
   PilotsPilotIdRoute: typeof PilotsPilotIdRoute
   PilotsNewRoute: typeof PilotsNewRoute
+  QuartersMechRoute: typeof QuartersMechRoute
+  QuartersPilotRoute: typeof QuartersPilotRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
   CompendiumIndexRoute: typeof CompendiumIndexRoute
   PilotsIndexRoute: typeof PilotsIndexRoute
+  QuartersIndexRoute: typeof QuartersIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -206,6 +245,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quarters/': {
+      id: '/quarters/'
+      path: '/quarters'
+      fullPath: '/quarters'
+      preLoaderRoute: typeof QuartersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pilots/': {
@@ -234,6 +280,20 @@ declare module '@tanstack/react-router' {
       path: '/campaigns'
       fullPath: '/campaigns'
       preLoaderRoute: typeof CampaignsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quarters/pilot': {
+      id: '/quarters/pilot'
+      path: '/quarters/pilot'
+      fullPath: '/quarters/pilot'
+      preLoaderRoute: typeof QuartersPilotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quarters/mech': {
+      id: '/quarters/mech'
+      path: '/quarters/mech'
+      fullPath: '/quarters/mech'
+      preLoaderRoute: typeof QuartersMechRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pilots/new': {
@@ -317,10 +377,13 @@ const rootRouteChildren: RootRouteChildren = {
   InvitesTokenRoute: InvitesTokenRoute,
   PilotsPilotIdRoute: PilotsPilotIdRoute,
   PilotsNewRoute: PilotsNewRoute,
+  QuartersMechRoute: QuartersMechRoute,
+  QuartersPilotRoute: QuartersPilotRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,
   CompendiumIndexRoute: CompendiumIndexRoute,
   PilotsIndexRoute: PilotsIndexRoute,
+  QuartersIndexRoute: QuartersIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
