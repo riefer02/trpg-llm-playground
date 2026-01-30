@@ -48,16 +48,18 @@ help:
 # Testing
 # =============================================================================
 
+PYTHON := .venv/bin/python
+
 test: test-core test-llm test-app
 
 test-core:
-	python -m pytest core -v
+	$(PYTHON) -m pytest core -v
 
 test-llm:
-	cd llm && python -m pytest tests -v
+	PYTHONPATH=$(CURDIR) $(PYTHON) -m pytest llm/tests/tactician -v
 
 test-app:
-	PYTHONPATH=$(CURDIR) python -m pytest app/backend/tests -v
+	PYTHONPATH=$(CURDIR) $(PYTHON) -m pytest app/backend/tests -v
 	cd app/frontend && npm test 2>/dev/null || echo "No frontend tests configured"
 
 # =============================================================================

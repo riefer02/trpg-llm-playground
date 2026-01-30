@@ -118,3 +118,35 @@ prompt = build_tactical_prompt_with_role(state, "artillery")
 response = llm_complete(prompt)
 action_choice = json.loads(response)
 ```
+
+## Testing the Tactician
+
+### Unit Tests
+
+Tests live in `llm/tests/tactician/`. Run with:
+```bash
+make test-llm
+```
+
+### Testing Action Parser
+
+The `parse_llm_action` function handles malformed LLM output gracefully:
+
+```python
+from llm.src.tactician import parse_llm_action
+
+# Test with mock LLM output
+mock_output = '''
+I'll attack the striker.
+{"action_id": "attack", "target_id": "striker_1", "reasoning": "...", "confidence": 0.8}
+'''
+available = [AvailableAction(id="attack", name="Attack", ...)]
+result = parse_llm_action(mock_output, available)
+```
+
+### Integration Testing (Future)
+
+When testing the full tactician flow without hitting real LLM APIs:
+1. Mock the LLM client to return predetermined JSON
+2. Use deterministic combat scenarios with `ResolutionSettings`
+3. Verify the action parser correctly routes to core execution

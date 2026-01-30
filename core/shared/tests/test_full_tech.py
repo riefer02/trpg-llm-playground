@@ -227,6 +227,10 @@ class TestResolveFullTech:
 
     def test_full_tech_invade_miss(self):
         """Test Full Tech invade that misses."""
+        # Force a low roll (5) so the attack misses against e_defense=100
+        # Total will be 5 + 5 = 10, which is less than 100
+        from core.mech.combat_resolution import ResolutionSettings
+
         input = FullTechInput(
             actor_id="test_mech",
             first_option=FullTechFirstOption(
@@ -241,6 +245,7 @@ class TestResolveFullTech:
                 option="scan",
                 scan_params=ScanTechParams(target_id="target_mech"),
             ),
+            settings=ResolutionSettings(forced_roll=5),
         )
         result = resolve_full_tech(input)
 

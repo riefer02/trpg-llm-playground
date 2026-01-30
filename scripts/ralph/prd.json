@@ -39,6 +39,18 @@
       "name": "Accessibility Polish",
       "priority": "P3",
       "description": "Canvas accessibility, screen reader support, reduced motion, keyboard shortcuts"
+    },
+    {
+      "id": "E7",
+      "name": "Combat Polish",
+      "priority": "P4 - QoL",
+      "description": "Combat UX improvements: action previews, confirmations, AI feedback, undo support"
+    },
+    {
+      "id": "E8",
+      "name": "Game Flow Safety",
+      "priority": "P4 - QoL",
+      "description": "Mid-mission controls, pause functionality, auto-save, progress protection"
     }
   ],
   "userStories": [
@@ -617,6 +629,225 @@
       "priority": 31,
       "passes": false,
       "notes": ""
+    },
+    {
+      "id": "E7-US-001",
+      "epic": "E7",
+      "title": "Action Preview",
+      "description": "Show predicted damage, hit chance, and effects before committing to an action. Reduces 'oops I didn't mean that' frustration.",
+      "acceptanceCriteria": [
+        "Hovering over attack action shows damage preview panel",
+        "Preview displays: min/max/average damage, hit chance percentage",
+        "Shows target's current HP and predicted HP after attack",
+        "Preview updates when changing targets",
+        "Works for all action types (attacks, tech actions, etc)",
+        "Preview panel positioned to not obscure target",
+        "Keyboard accessible: preview shown when action focused",
+        "`make test-app` passes"
+      ],
+      "priority": 32,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E7-US-002",
+      "epic": "E7",
+      "title": "End Turn Confirmation",
+      "description": "Prompt player before ending turn if they have unused actions, preventing accidental turn waste.",
+      "acceptanceCriteria": [
+        "End Turn button shows confirmation if actions remain",
+        "Confirmation lists: remaining quick actions, full actions, reactions",
+        "Can dismiss with 'End Anyway' or 'Cancel'",
+        "Setting to disable confirmation in settings",
+        "No confirmation if all actions used",
+        "Keyboard: Enter confirms, Escape cancels",
+        "`make test-app` passes"
+      ],
+      "priority": 33,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E7-US-003",
+      "epic": "E7",
+      "title": "AI Thinking Indicator",
+      "description": "Visual feedback while AI tactician processes its turn, so dead air doesn't feel broken.",
+      "acceptanceCriteria": [
+        "Spinner/animation displays during AI turn processing",
+        "Shows 'Enemy is thinking...' or similar message",
+        "Animation is subtle, not distracting",
+        "Respects reduced motion setting (static indicator instead)",
+        "Timeout message if AI takes too long (>10s)",
+        "Indicator clears when AI action begins",
+        "`make test-app` passes"
+      ],
+      "priority": 34,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E7-US-004",
+      "epic": "E7",
+      "title": "Undo Targeting",
+      "description": "Allow canceling target selection before confirming action, enabling exploration without commitment.",
+      "acceptanceCriteria": [
+        "Escape key cancels current targeting mode",
+        "Cancel button visible during target selection",
+        "Right-click cancels targeting (mouse users)",
+        "Returns to action selection state",
+        "No state changes until action confirmed",
+        "Works for movement path selection too",
+        "Clear visual indication of 'targeting mode' vs 'confirmed'",
+        "`make test-app` passes"
+      ],
+      "priority": 35,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E7-US-005",
+      "epic": "E7",
+      "title": "Invalid Action Feedback",
+      "description": "Explain why an action can't be taken instead of silently disabling it.",
+      "acceptanceCriteria": [
+        "Disabled actions show tooltip explaining why",
+        "Common reasons: out of range, out of ammo, on cooldown, insufficient heat capacity",
+        "Tooltip appears on hover/focus of disabled action",
+        "Screen reader announces reason when focusing disabled action",
+        "Visual distinction between 'available' and 'unavailable but visible'",
+        "`make test-app` passes"
+      ],
+      "priority": 36,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E7-US-006",
+      "epic": "E7",
+      "title": "Victory Celebration",
+      "description": "Clear, satisfying victory moment when combat ends - the payoff needs to land.",
+      "acceptanceCriteria": [
+        "Victory triggers distinct visual celebration (animation, color change)",
+        "Clear 'VICTORY' text displayed prominently",
+        "Brief pause before auto-navigation to debrief",
+        "Audio cue for victory (if audio enabled)",
+        "Defeat has distinct but less celebratory treatment",
+        "Respects reduced motion setting",
+        "`make test-app` passes"
+      ],
+      "priority": 37,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E7-US-007",
+      "epic": "E7",
+      "title": "Low HP Warning",
+      "description": "Audio/visual cue when player mech is critically damaged to raise tension.",
+      "acceptanceCriteria": [
+        "Warning triggers at 25% HP or less",
+        "Visual: HP bar pulses or changes color (red)",
+        "Audio: warning tone or alarm (if audio enabled)",
+        "Warning persists until HP recovered or combat ends",
+        "Structure damage (armor break) also triggers warning",
+        "Not annoying - subtle but noticeable",
+        "Can be disabled in settings",
+        "`make test-app` passes"
+      ],
+      "priority": 38,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E8-US-001",
+      "epic": "E8",
+      "title": "Mid-Mission Forfeit",
+      "description": "Allow player to quit combat early with confirmation, treating it as a defeat.",
+      "acceptanceCriteria": [
+        "Forfeit option in pause menu or combat UI",
+        "Confirmation dialog: 'Forfeit mission? This counts as defeat.'",
+        "Forfeit navigates to debrief with DEFEAT outcome",
+        "Partial rewards possible (enemies defeated before forfeit)",
+        "No forfeit during enemy turn (wait for your turn)",
+        "Keyboard shortcut: Ctrl+Q or similar",
+        "`make test-app` passes"
+      ],
+      "priority": 39,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E8-US-002",
+      "epic": "E8",
+      "title": "Pause Functionality",
+      "description": "Pause combat with Escape or spacebar, showing pause menu with options.",
+      "acceptanceCriteria": [
+        "Escape key opens pause menu during combat",
+        "Pause menu options: Resume, Settings, Forfeit, Help",
+        "Game state frozen while paused (no AI processing)",
+        "Pause overlay dims combat view",
+        "Resume with Escape or Resume button",
+        "Settings opens in-game settings (not full settings screen)",
+        "Help shows combat-specific keyboard shortcuts",
+        "`make test-app` passes"
+      ],
+      "priority": 40,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E8-US-003",
+      "epic": "E8",
+      "title": "Auto-Save on Mission Launch",
+      "description": "Save game state when starting a mission so crashes don't lose progress.",
+      "acceptanceCriteria": [
+        "Auto-save triggers when 'Launch Mission' clicked",
+        "Save includes: pilot state, selected mission, pre-combat loadout",
+        "On crash recovery: option to resume mission or return to quarters",
+        "Save indicator briefly visible ('Saving...')",
+        "Does not overwrite manual saves",
+        "Works with existing save/load system (E5-US-004)",
+        "`make test-app` passes"
+      ],
+      "priority": 41,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E8-US-004",
+      "epic": "E8",
+      "title": "Prevent Accidental Navigation",
+      "description": "Confirm before navigating away from combat to prevent losing progress.",
+      "acceptanceCriteria": [
+        "Browser back button during combat shows confirmation",
+        "Confirmation: 'Leave combat? Progress will be lost.'",
+        "Closing browser tab shows native 'unsaved changes' warning",
+        "No confirmation needed after combat ends",
+        "Forfeit flow bypasses this (already confirmed)",
+        "Works on all browsers (beforeunload event)",
+        "`make test-app` passes"
+      ],
+      "priority": 42,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E8-US-005",
+      "epic": "E8",
+      "title": "Combat Statistics Tracking",
+      "description": "Track meaningful stats during combat for debrief and dopamine moments.",
+      "acceptanceCriteria": [
+        "Track: damage dealt, damage received, enemies destroyed, turns taken",
+        "Track: closest call (lowest HP reached), overkill damage",
+        "Track: actions taken by type (attacks, moves, techs)",
+        "Stats passed to debrief screen",
+        "Debrief highlights interesting stats ('Closest Call: 2 HP!')",
+        "Stats stored with mission completion record",
+        "`make test-app` passes"
+      ],
+      "priority": 43,
+      "passes": false,
+      "notes": ""
     }
   ],
   "implementationOrder": [
@@ -656,6 +887,28 @@
         "E6-US-001",
         "E6-US-004"
       ]
+    },
+    {
+      "phase": "Phase 4 - Combat QoL",
+      "stories": [
+        "E7-US-001",
+        "E7-US-002",
+        "E7-US-003",
+        "E7-US-004",
+        "E7-US-005",
+        "E7-US-006",
+        "E7-US-007",
+        "E8-US-002"
+      ]
+    },
+    {
+      "phase": "Phase 5 - Game Flow Safety",
+      "stories": [
+        "E8-US-001",
+        "E8-US-003",
+        "E8-US-004",
+        "E8-US-005"
+      ]
     }
   ],
   "verification": [
@@ -663,6 +916,12 @@
     "Voice combat: Enable voice, speak 'attack striker', confirm action executes",
     "AI reasoning: Watch NPC turn, see reasoning displayed before action",
     "Accessibility: Navigate entire flow with keyboard only, verify screen reader announces turns",
-    "Tests: `make test` passes after each story"
+    "Tests: `make test` passes after each story",
+    "Combat QoL: Hover attack to see damage preview, try to end turn with actions remaining, see AI thinking indicator",
+    "Undo flow: Start targeting, press Escape, verify returns to action selection without executing",
+    "Pause flow: Press Escape during combat, verify game pauses, resume works",
+    "Forfeit flow: Open pause, click forfeit, confirm, verify debrief shows defeat",
+    "Victory moment: Win combat, verify celebration animation and clear victory text before debrief",
+    "Low HP warning: Take damage to <25% HP, verify visual/audio warning"
   ]
 }

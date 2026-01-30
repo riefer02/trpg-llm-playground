@@ -129,6 +129,28 @@ After updating both files:
 - **Core-first**: Validation belongs in core, not API layer
 - **Minimal changes**: Don't refactor unrelated code
 
+## Common Gotchas
+
+### Testing with Dice Rolls
+Combat tests that check hit/miss outcomes MUST use `ResolutionSettings(forced_roll=X)` to be deterministic. Without this, tests randomly fail when dice roll nat 20 (critical hit always succeeds).
+
+```python
+# WRONG - flaky test
+result = resolve_attack(attack_bonus=5, target_defense=100)
+assert result.hit is False  # Fails ~5% of time (nat 20)
+
+# RIGHT - deterministic
+settings = ResolutionSettings(forced_roll=5)
+result = resolve_attack(..., settings=settings)
+assert result.hit is False  # Always passes
+```
+
+### Running Tests
+Always use `make test-core`, `make test-llm`, or `make test-app`. These handle PYTHONPATH and venv correctly. Raw `pytest` commands may fail with import errors.
+
+### Check Existing Patterns First
+Before writing new tests, look at existing tests in the same module for patterns. The codebase has 4000+ tests with established conventions.
+
 ## Key Files Reference
 
 - Combat state: `core/shared/combat/mech_combat_scenario.py`

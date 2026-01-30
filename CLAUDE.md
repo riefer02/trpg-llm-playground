@@ -120,6 +120,33 @@ The AI tactician will interface at the action level:
 # Core validates: action is legal, resolves effects
 ```
 
+### Testing Patterns
+
+**Deterministic Combat Tests**
+Combat resolution uses dice rolls. To make tests deterministic, always use `ResolutionSettings`:
+
+```python
+from core.mech.combat_resolution import ResolutionSettings
+
+# Force a specific d20 roll (e.g., to guarantee a miss)
+settings = ResolutionSettings(forced_roll=5)
+result = resolve_attack(..., settings=settings)
+
+# Force accuracy/difficulty dice
+settings = ResolutionSettings(
+    forced_roll=10,
+    forced_accuracy_rolls=[6, 4],
+    forced_difficulty_rolls=[1, 2],
+)
+```
+
+**Critical Hit Rule**: Natural 20 always hits regardless of defense. If testing a "miss" scenario, force a low roll (1-19) to avoid flaky tests.
+
+**Environment**: Always use `make test` commands. They handle PYTHONPATH and venv activation. If running pytest manually:
+```bash
+PYTHONPATH=$(pwd) .venv/bin/python -m pytest <path> -v
+```
+
 ## Project-Specific Notes
 
 - PostgreSQL runs on port **5433** (not 5432)
