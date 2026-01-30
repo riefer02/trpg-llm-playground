@@ -3,6 +3,29 @@
 Started: Initial setup
 ---
 
+## Iteration - Fri Jan 30 2026 12:46 UTC
+Story: E1-US-001 - Title Screen
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/routes/__root.tsx: Hide header and breadcrumbs on home route
+- app/frontend/src/routes/index.tsx: Replace dashboard with title screen component
+- app/frontend/src/lib/api/title.ts: New hook to check for saved pilots
+- Updated PRD.json to mark story as passing
+
+### Learnings
+- TanStack Router's shellComponent can conditionally render based on route
+- Use existing API hooks (useCharacters) for checking saved data
+- Continue button disabled state includes loading indicator while checking
+- Quick Battle button reuses existing demo combat mutation
+
+### Next Steps
+- Next story: E1-US-002 (Pilot Quarters Hub) should build on character API
+- Need to create `/quarters` route and hub screen
+- Continue button should navigate to quarters when implemented
+
+---
+
 ## Setup Notes
 
 Key files to understand before starting:

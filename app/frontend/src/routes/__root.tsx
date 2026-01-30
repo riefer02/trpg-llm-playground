@@ -8,7 +8,7 @@
  * - Dev tools (in development)
  */
 
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+import { HeadContent, Scripts, createRootRoute, useLocation } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -70,6 +70,8 @@ export const Route = createRootRoute({
 function RootDocument({ children }: { children: React.ReactNode }) {
   // Create query client once per component lifecycle
   const [queryClient] = useState(() => getQueryClient())
+  const location = useLocation()
+  const isTitleScreen = location.pathname === '/'
 
   return (
     <html lang="en">
@@ -79,8 +81,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         <QueryClientProvider client={queryClient}>
           <div className="app-shell flex flex-col">
-            <Header />
-            <Breadcrumbs />
+            {!isTitleScreen && <Header />}
+            {!isTitleScreen && <Breadcrumbs />}
             <main className="flex-1">
               {children}
             </main>

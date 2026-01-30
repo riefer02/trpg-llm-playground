@@ -58,8 +58,8 @@
         "`make test-app` passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented title screen with game title, tagline, four buttons. Continue button disabled when no saved pilot exists (checks via API). Quick Battle uses existing demo combat. All buttons have ARIA labels and keyboard navigation. Header hidden on title screen."
     },
     {
       "id": "E1-US-002",
