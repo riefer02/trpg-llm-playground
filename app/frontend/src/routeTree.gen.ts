@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as QuartersIndexRouteImport } from './routes/quarters/index'
 import { Route as PilotsIndexRouteImport } from './routes/pilots/index'
+import { Route as MissionsIndexRouteImport } from './routes/missions/index'
 import { Route as CompendiumIndexRouteImport } from './routes/compendium/index'
 import { Route as CharactersIndexRouteImport } from './routes/characters/index'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns/index'
@@ -24,6 +25,8 @@ import { Route as CombatCombatIdRouteImport } from './routes/combat/$combatId'
 import { Route as CharactersNewRouteImport } from './routes/characters/new'
 import { Route as CharactersCharacterIdRouteImport } from './routes/characters/$characterId'
 import { Route as CampaignsCampaignIdRouteImport } from './routes/campaigns/$campaignId'
+import { Route as MissionsMissionIdDebriefRouteImport } from './routes/missions/$missionId/debrief'
+import { Route as MissionsMissionIdBriefingRouteImport } from './routes/missions/$missionId/briefing'
 import { Route as CharactersCharacterIdExportRouteImport } from './routes/characters/$characterId.export'
 
 const IndexRoute = IndexRouteImport.update({
@@ -39,6 +42,11 @@ const QuartersIndexRoute = QuartersIndexRouteImport.update({
 const PilotsIndexRoute = PilotsIndexRouteImport.update({
   id: '/pilots/',
   path: '/pilots/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MissionsIndexRoute = MissionsIndexRouteImport.update({
+  id: '/missions/',
+  path: '/missions/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompendiumIndexRoute = CompendiumIndexRouteImport.update({
@@ -101,6 +109,18 @@ const CampaignsCampaignIdRoute = CampaignsCampaignIdRouteImport.update({
   path: '/campaigns/$campaignId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MissionsMissionIdDebriefRoute =
+  MissionsMissionIdDebriefRouteImport.update({
+    id: '/missions/$missionId/debrief',
+    path: '/missions/$missionId/debrief',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const MissionsMissionIdBriefingRoute =
+  MissionsMissionIdBriefingRouteImport.update({
+    id: '/missions/$missionId/briefing',
+    path: '/missions/$missionId/briefing',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const CharactersCharacterIdExportRoute =
   CharactersCharacterIdExportRouteImport.update({
     id: '/export',
@@ -122,9 +142,12 @@ export interface FileRoutesByFullPath {
   '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
   '/compendium': typeof CompendiumIndexRoute
+  '/missions': typeof MissionsIndexRoute
   '/pilots': typeof PilotsIndexRoute
   '/quarters': typeof QuartersIndexRoute
   '/characters/$characterId/export': typeof CharactersCharacterIdExportRoute
+  '/missions/$missionId/briefing': typeof MissionsMissionIdBriefingRoute
+  '/missions/$missionId/debrief': typeof MissionsMissionIdDebriefRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -140,9 +163,12 @@ export interface FileRoutesByTo {
   '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
   '/compendium': typeof CompendiumIndexRoute
+  '/missions': typeof MissionsIndexRoute
   '/pilots': typeof PilotsIndexRoute
   '/quarters': typeof QuartersIndexRoute
   '/characters/$characterId/export': typeof CharactersCharacterIdExportRoute
+  '/missions/$missionId/briefing': typeof MissionsMissionIdBriefingRoute
+  '/missions/$missionId/debrief': typeof MissionsMissionIdDebriefRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -159,9 +185,12 @@ export interface FileRoutesById {
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
   '/compendium/': typeof CompendiumIndexRoute
+  '/missions/': typeof MissionsIndexRoute
   '/pilots/': typeof PilotsIndexRoute
   '/quarters/': typeof QuartersIndexRoute
   '/characters/$characterId/export': typeof CharactersCharacterIdExportRoute
+  '/missions/$missionId/briefing': typeof MissionsMissionIdBriefingRoute
+  '/missions/$missionId/debrief': typeof MissionsMissionIdDebriefRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -179,9 +208,12 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/characters'
     | '/compendium'
+    | '/missions'
     | '/pilots'
     | '/quarters'
     | '/characters/$characterId/export'
+    | '/missions/$missionId/briefing'
+    | '/missions/$missionId/debrief'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -197,9 +229,12 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/characters'
     | '/compendium'
+    | '/missions'
     | '/pilots'
     | '/quarters'
     | '/characters/$characterId/export'
+    | '/missions/$missionId/briefing'
+    | '/missions/$missionId/debrief'
   id:
     | '__root__'
     | '/'
@@ -215,9 +250,12 @@ export interface FileRouteTypes {
     | '/campaigns/'
     | '/characters/'
     | '/compendium/'
+    | '/missions/'
     | '/pilots/'
     | '/quarters/'
     | '/characters/$characterId/export'
+    | '/missions/$missionId/briefing'
+    | '/missions/$missionId/debrief'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -234,8 +272,11 @@ export interface RootRouteChildren {
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
   CompendiumIndexRoute: typeof CompendiumIndexRoute
+  MissionsIndexRoute: typeof MissionsIndexRoute
   PilotsIndexRoute: typeof PilotsIndexRoute
   QuartersIndexRoute: typeof QuartersIndexRoute
+  MissionsMissionIdBriefingRoute: typeof MissionsMissionIdBriefingRoute
+  MissionsMissionIdDebriefRoute: typeof MissionsMissionIdDebriefRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -259,6 +300,13 @@ declare module '@tanstack/react-router' {
       path: '/pilots'
       fullPath: '/pilots'
       preLoaderRoute: typeof PilotsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/missions/': {
+      id: '/missions/'
+      path: '/missions'
+      fullPath: '/missions'
+      preLoaderRoute: typeof MissionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/compendium/': {
@@ -345,6 +393,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CampaignsCampaignIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/missions/$missionId/debrief': {
+      id: '/missions/$missionId/debrief'
+      path: '/missions/$missionId/debrief'
+      fullPath: '/missions/$missionId/debrief'
+      preLoaderRoute: typeof MissionsMissionIdDebriefRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/missions/$missionId/briefing': {
+      id: '/missions/$missionId/briefing'
+      path: '/missions/$missionId/briefing'
+      fullPath: '/missions/$missionId/briefing'
+      preLoaderRoute: typeof MissionsMissionIdBriefingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/characters/$characterId/export': {
       id: '/characters/$characterId/export'
       path: '/export'
@@ -382,8 +444,11 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,
   CompendiumIndexRoute: CompendiumIndexRoute,
+  MissionsIndexRoute: MissionsIndexRoute,
   PilotsIndexRoute: PilotsIndexRoute,
   QuartersIndexRoute: QuartersIndexRoute,
+  MissionsMissionIdBriefingRoute: MissionsMissionIdBriefingRoute,
+  MissionsMissionIdDebriefRoute: MissionsMissionIdDebriefRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

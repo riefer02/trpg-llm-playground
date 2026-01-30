@@ -135,8 +135,8 @@
         "`make test-app` passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented debrief route at /missions/:id/debrief with outcome banner, epilogue, rewards, statistics, and continue button. Victory/defeat tone changes narrative. Navigation from combat completion to debrief with mission ID and placeholder statistics."
     },
     {
       "id": "E1-US-006",

@@ -186,6 +186,10 @@ export type {
 // Quarters hooks (pilot quarters hub)
 export { useActiveCharacter, useMissionCount } from './quarters'
 
+// Missions hooks
+export { useMissions, useMission } from './missions'
+export type { Mission } from './missions'
+
 // Re-export generated core types for convenience
 // These are the source of truth - use these for domain data
 export type {

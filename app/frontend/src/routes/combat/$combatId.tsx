@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
 
@@ -60,8 +60,15 @@ import {
 } from "../../components/ui";
 import { CombatSessionSkeleton } from "../../components/skeletons";
 
+interface CombatSearch {
+  missionId?: string;
+}
+
 export const Route = createFileRoute("/combat/$combatId")({
   component: CombatSessionPage,
+  validateSearch: (search: Record<string, unknown>): CombatSearch => ({
+    missionId: typeof search.missionId === "string" ? search.missionId : undefined,
+  }),
 });
 
 /** Polling interval when WebSocket is disconnected (5 seconds) */
@@ -69,6 +76,7 @@ const FALLBACK_POLLING_INTERVAL = 5000;
 
 function CombatSessionPage() {
   const { combatId } = Route.useParams();
+  const search = useSearch({ from: Route.fullPath });
 
   // WebSocket connection for real-time updates
   const { isConnected: wsConnected } = useCombatWebSocket(combatId);
@@ -388,8 +396,26 @@ function CombatSessionPage() {
         onSuccess: (result) => {
           setShowMissionCompleteModal(false);
           toast.success("Mission completed");
-          // Redirect to campaign if linked, otherwise to dashboard
-          if (result.campaign_id) {
+          
+          // Redirect to debrief if missionId is known, otherwise to campaign/dashboard
+          if (search.missionId) {
+            // Compute statistics
+            const turnsTaken = scenario?.rounds?.reduce((acc, round) => acc + (round.turns?.length || 0), 0) || 0;
+            const enemyCount = scenario?.combatants?.filter(c => c.side !== "players").length || 0;
+            const damageDealt = enemyCount * 300; // placeholder
+            const damageReceived = 1200; // placeholder
+            
+            navigate({
+              to: "/missions/$missionId/debrief",
+              params: { missionId: search.missionId },
+              search: {
+                outcome: request.outcome === "success" || request.outcome === "partial" ? "victory" : "defeat",
+                turns: turnsTaken,
+                damageDealt,
+                damageReceived,
+              },
+            });
+          } else if (result.campaign_id) {
             navigate({ to: "/campaigns/$campaignId", params: { campaignId: result.campaign_id } });
           } else {
             navigate({ to: "/" });
@@ -398,7 +424,7 @@ function CombatSessionPage() {
         onError: (err) => toast.error(err.message || "Failed to complete mission"),
       });
     },
-    [completeCombat, navigate]
+    [completeCombat, navigate, search, scenario]
   );
 
   // Handle reserve spending

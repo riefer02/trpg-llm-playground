@@ -105,3 +105,23 @@ Status: PASSED
 - Next story: E1-US-005 (Mission Debrief) should implement post-mission screen
 - Need to connect combat outcome to debrief narrative
 ---
+
+## Iteration - Fri Jan 30 2026 20:30 UTC
+Story: E1-US-005 - Mission Debrief
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/routes/missions/$missionId/debrief.tsx: Created debrief screen with outcome banner, epilogue, rewards, statistics, and continue button
+- app/frontend/src/routes/missions/$missionId/briefing.tsx: Updated launch button to pass missionId as query param to combat route
+- app/frontend/src/routes/combat/$combatId.tsx: Added search param missionId, updated handleMissionComplete to navigate to debrief with outcome and statistics
+- Implemented victory/defeat narrative tone based on mission outcome
+
+### Learnings
+- TanStack Router search params require validateSearch in route definition
+- Combat scenario data can be used to compute simple statistics (turns taken)
+- Mission ID can be passed via query param from briefing to combat to debrief
+- Frontend build passes and tests remain green
+
+### Next Steps
+- Next story: E1-US-006 (Adapt Character Detail Views) should create pilot/mech detail screens
+- Need to reuse existing character detail components

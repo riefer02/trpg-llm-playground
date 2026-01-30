@@ -40,7 +40,7 @@ function MissionBriefing() {
     
     try {
       const session = await createDemo.mutateAsync(scenarioType);
-      navigate({ to: `/combat/${session.id}` });
+      navigate({ to: `/combat/${session.id}`, search: { missionId: mission.id } });
     } catch (error) {
       console.error("Failed to launch mission:", error);
       alert(`Failed to launch mission: ${error instanceof Error ? error.message : "Unknown error"}`);
