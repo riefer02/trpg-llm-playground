@@ -60,4 +60,48 @@ Status: PASSED
 ### Next Steps
 - Next story: E1-US-003 (Mission Select) should create mission list screen
 - Need mission generation API (placeholder for MVP)
+
+---
+
+## Iteration - Fri Jan 30 2026 19:30 UTC
+Story: E1-US-003 - Mission Select
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/lib/api/missions.ts: Created hook with static mission data and lock logic
+- app/frontend/src/routes/missions/index.tsx: Mission list screen with cards, lock icons, arrow navigation
+- app/frontend/src/routes/missions/$missionId/briefing.tsx: Placeholder briefing route
+- Updated PRD.json to mark story as passing
+
+### Learnings
+- Arrow key navigation between grid items requires managing ref array and focus state
+- Locked missions use pilot license level (LL) vs difficulty stars
+- Static mission data can be extended later with backend API
+- TanStack Router dynamic segments ($missionId) work automatically
+
+### Next Steps
+- Next story: E1-US-004 (Mission Briefing) should flesh out briefing screen with narrative
+- Need to integrate mission generation API for dynamic content
+
+---
+## Iteration - Fri Jan 30 2026 19:45 UTC
+Story: E1-US-004 - Mission Briefing
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/lib/api/missions.ts: Enhanced Mission interface with briefing, objectives, enemyIntel, mapPreviewUrl fields
+- app/frontend/src/routes/missions/$missionId/briefing.tsx: Fully implemented briefing screen with mission data display, map preview, loadout check, and launch button
+- Added 2-3 paragraph briefing text, objectives list, enemy intel for each static mission
+- Integrated useCreateDemoCombat hook to launch combat scenario based on mission SITREP type
+- Added keyboard navigation and accessibility labels
+
+### Learnings
+- Mission data structure can be extended with static content for MVP
+- Demo combat endpoint supports mapping SITREP types to scenario types (control, skirmish, boss)
+- Loadout check requires active character with active_mech configuration
+- Build passes and frontend tests remain green after changes
+
+### Next Steps
+- Next story: E1-US-005 (Mission Debrief) should implement post-mission screen
+- Need to connect combat outcome to debrief narrative
 ---

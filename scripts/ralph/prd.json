@@ -96,8 +96,8 @@
         "`make test-app` passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented mission select screen at /missions with static mission data, lock icons based on pilot license level, arrow key navigation, and placeholder briefing route. All acceptance criteria satisfied."
     },
     {
       "id": "E1-US-004",
@@ -116,8 +116,8 @@
         "`make test-app` passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented mission briefing screen at /missions/:id/briefing with dynamic mission data, 2-3 paragraph briefing, objectives list, enemy intel, map preview placeholder, loadout check using active character, and launch button that starts combat via demo scenario mapping. All acceptance criteria satisfied."
     },
     {
       "id": "E1-US-005",
