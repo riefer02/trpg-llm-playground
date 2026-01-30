@@ -1,0 +1,643 @@
+{
+  "project": "lancer-tactics-ai",
+  "branchName": "ralph/lancer-tactics-full",
+  "description": "Complete single-player tactical mech combat game with voice-first accessibility, AI tactician, mission generator, and progression system",
+  "gameFlow": "TITLE SCREEN -> NEW PILOT or CONTINUE -> PILOT QUARTERS (hub) -> MISSION SELECT -> MISSION BRIEFING -> COMBAT -> MISSION DEBRIEF -> PROGRESSION -> back to PILOT QUARTERS",
+  "epics": [
+    {
+      "id": "E1",
+      "name": "Core Game Flow",
+      "priority": "P1 - MVP",
+      "description": "Title screen, hub navigation, mission flow screens"
+    },
+    {
+      "id": "E2",
+      "name": "AI Tactician",
+      "priority": "P1 - MVP",
+      "description": "LLM-powered opponent that reasons about tactics and executes valid combat actions"
+    },
+    {
+      "id": "E3",
+      "name": "Voice Interface",
+      "priority": "P2",
+      "description": "Speech-to-text input, voice intent parsing, text-to-speech feedback"
+    },
+    {
+      "id": "E4",
+      "name": "Mission Generator",
+      "priority": "P2",
+      "description": "Procedural mission creation with LLM-generated narrative"
+    },
+    {
+      "id": "E5",
+      "name": "Progression System",
+      "priority": "P3",
+      "description": "XP, leveling, license unlocks, save/load"
+    },
+    {
+      "id": "E6",
+      "name": "Accessibility Polish",
+      "priority": "P3",
+      "description": "Canvas accessibility, screen reader support, reduced motion, keyboard shortcuts"
+    }
+  ],
+  "userStories": [
+    {
+      "id": "E1-US-001",
+      "epic": "E1",
+      "title": "Title Screen",
+      "description": "Replace current dashboard with game title screen featuring New Pilot/Continue/Quick Battle/Settings buttons. This is the entry point for the entire game.",
+      "acceptanceCriteria": [
+        "Route `/` renders title screen instead of current dashboard",
+        "Displays game title 'LANCER TACTICS AI' and tagline",
+        "Four buttons: New Pilot, Continue, Quick Battle, Settings",
+        "Continue button disabled if no saved pilot exists",
+        "Quick Battle launches combat with preset pilot/mech (for testing)",
+        "All buttons keyboard accessible (Tab navigation, Enter to activate)",
+        "ARIA labels on all interactive elements",
+        "`make test-app` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E1-US-002",
+      "epic": "E1",
+      "title": "Pilot Quarters Hub",
+      "description": "Central hub screen showing pilot/mech summary with navigation to missions, loadout, and compendium. This is the main menu after completing pilot creation.",
+      "acceptanceCriteria": [
+        "Route `/quarters` renders hub screen",
+        "Displays current pilot name, license level, and mech frame",
+        "Navigation buttons: Pilot, Mech, Missions, Compendium",
+        "Shows mission count badge on Missions button",
+        "Prominent 'Deploy to Mission' button (disabled if no mission selected)",
+        "Keyboard navigation between all buttons",
+        "Redirects to title if no active pilot",
+        "`make test-app` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E1-US-003",
+      "epic": "E1",
+      "title": "Mission Select",
+      "description": "Display 3 available missions with difficulty rating, SITREP type, terrain, and enemy count. Player selects one to view briefing.",
+      "acceptanceCriteria": [
+        "Route `/missions` renders mission list",
+        "Shows 3 missions with: name, difficulty stars (1-3), SITREP type, terrain, enemy count",
+        "Missions generated statically for MVP (hardcoded 3 missions)",
+        "Locked missions (difficulty > pilot level) show lock icon and are non-selectable",
+        "Selecting a mission navigates to `/missions/:id/briefing`",
+        "Arrow key navigation between mission cards",
+        "Back button returns to quarters",
+        "`make test-app` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E1-US-004",
+      "epic": "E1",
+      "title": "Mission Briefing",
+      "description": "Pre-mission screen with narrative briefing, map preview, enemy intel, objectives, and launch button. Static content for MVP.",
+      "acceptanceCriteria": [
+        "Route `/missions/:id/briefing` renders briefing screen",
+        "Displays mission name, SITREP type, objectives",
+        "Shows 2-3 paragraph briefing text (static for MVP)",
+        "Enemy intel section: frame types, count, threat assessment",
+        "Map preview thumbnail (can be placeholder image)",
+        "Loadout check section showing pilot's current mech",
+        "Launch Mission button starts combat",
+        "Back button returns to mission select",
+        "`make test-app` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E1-US-005",
+      "epic": "E1",
+      "title": "Mission Debrief",
+      "description": "Post-mission screen showing outcome, narrative epilogue, and rewards earned. Static content for MVP.",
+      "acceptanceCriteria": [
+        "Route `/missions/:id/debrief` renders debrief screen",
+        "Displays mission outcome: VICTORY or DEFEAT",
+        "Shows 2-3 paragraph epilogue text (static for MVP)",
+        "Rewards section: XP earned, salvage (placeholder values)",
+        "Statistics: turns taken, damage dealt, damage received",
+        "Continue button returns to quarters",
+        "Victory/defeat affects displayed narrative tone",
+        "`make test-app` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E1-US-006",
+      "epic": "E1",
+      "title": "Adapt Character Detail Views",
+      "description": "Create pilot detail and mech loadout views from existing character page components.",
+      "acceptanceCriteria": [
+        "Route `/quarters/pilot` shows pilot stats, skills, talents",
+        "Route `/quarters/mech` shows mech frame, systems, weapons",
+        "Reuses existing character detail components where possible",
+        "Read-only for MVP (no editing)",
+        "Back button returns to quarters hub",
+        "Keyboard accessible",
+        "`make test-app` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E1-US-007",
+      "epic": "E1",
+      "title": "Settings Screen",
+      "description": "Settings screen for audio, voice, display, and accessibility preferences.",
+      "acceptanceCriteria": [
+        "Route `/settings` renders settings screen",
+        "Audio section: master volume, SFX volume, music volume sliders",
+        "Voice section: enable voice input toggle, TTS toggle, voice speed",
+        "Display section: theme toggle (light/dark)",
+        "Accessibility section: reduced motion toggle, high contrast toggle",
+        "Settings persist to localStorage",
+        "Back button returns to previous screen",
+        "`make test-app` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E2-US-001",
+      "epic": "E2",
+      "title": "Combat State Serializer",
+      "description": "Create a serializer that converts MechCombatScenario state into a structured, LLM-readable format with all information needed for tactical decisions.",
+      "acceptanceCriteria": [
+        "Function `serialize_combat_state(scenario: MechCombatScenario) -> dict` in `llm/src/tactician/state_serializer.py`",
+        "Output includes: current actor, all combatants (position, HP, heat, conditions), available actions for current actor",
+        "Output includes: terrain/hazards on the map, turn order, round number",
+        "Positions use hex coordinates matching the combat grid",
+        "Actions include their parameters (targets, ranges, damage predictions)",
+        "Unit tests in `llm/tests/tactician/test_state_serializer.py` covering various combat states",
+        "`make test-llm` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E2-US-002",
+      "epic": "E2",
+      "title": "Tactical System Prompt",
+      "description": "Design the system prompt that instructs the LLM how to reason about Lancer tactics by NPC role (striker, defender, artillery, etc).",
+      "acceptanceCriteria": [
+        "System prompt template in `llm/src/tactician/prompts/tactical_system.md`",
+        "Prompt explains Lancer combat basics (heat, structure, conditions)",
+        "Prompt defines output format: JSON with action type, target, reasoning",
+        "Includes few-shot examples of good tactical reasoning",
+        "Role-specific tactics: striker (aggressive), defender (protect allies), artillery (range)",
+        "Prompt template function in `llm/src/tactician/prompts.py` that fills in combat state",
+        "Documentation of prompt design decisions in `llm/src/tactician/README.md`"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E2-US-003",
+      "epic": "E2",
+      "title": "Action Parser and Validator",
+      "description": "Parse LLM output into validated combat actions that can be executed by the combat system.",
+      "acceptanceCriteria": [
+        "Function `parse_llm_action(llm_output: str, available_actions: list) -> Action` in `llm/src/tactician/action_parser.py`",
+        "Handles JSON parsing with fallback for malformed output",
+        "Validates parsed action against available_actions list",
+        "Returns closest valid action if exact match fails (fuzzy matching)",
+        "Raises clear error if no valid action can be determined",
+        "Unit tests covering: valid JSON, malformed JSON, invalid action, fuzzy matching",
+        "`make test-llm` passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E2-US-004",
+      "epic": "E2",
+      "title": "Tactician Integration",
+      "description": "Wire the Tactician class into NPC turn flow with configurable LLM backend and fallback behavior.",
+      "acceptanceCriteria": [
+        "Class `Tactician` in `llm/src/tactician/tactician.py`",
+        "Method `decide_action(scenario: MechCombatScenario, actor_id: str) -> Action`",
+        "Configurable LLM backend (supports Claude API, local Ollama)",
+        "Includes retry logic for failed parses (max 3 attempts)",
+        "Combat scenario detects when current actor is NPC-controlled",
+        "NPC turns call `tactician.decide_action()` instead of waiting for input",
+        "Graceful fallback if tactician fails (random valid action)",
+        "Can be toggled on/off via combat scenario config",
+        "Logs reasoning chain for debugging/display",
+        "`make test-llm` passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E2-US-005",
+      "epic": "E2",
+      "title": "AI Reasoning Display",
+      "description": "Show the AI's tactical reasoning in the combat interface so players understand why the AI made its choice.",
+      "acceptanceCriteria": [
+        "API endpoint returns AI reasoning with action result",
+        "Combat UI shows reasoning panel/tooltip when AI acts",
+        "Reasoning is displayed BEFORE action animation plays",
+        "Panel shows: situation assessment, considered options, chosen action, rationale",
+        "Can be collapsed/hidden via user preference in settings",
+        "Works with existing combat log component",
+        "`make test-app` passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E2-US-006",
+      "epic": "E2",
+      "title": "Multi-Action Turn Planning",
+      "description": "AI plans full turns with multiple actions (move + attack, overcharge + attack, etc) rather than single actions.",
+      "acceptanceCriteria": [
+        "Tactician can plan sequences of actions for a full turn",
+        "Respects action economy (quick vs full actions)",
+        "Considers overcharge trade-offs (heat vs extra action)",
+        "Returns ordered list of actions to execute",
+        "Combat system executes action sequence atomically",
+        "Reasoning includes full turn plan explanation",
+        "`make test-llm` passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E3-US-001",
+      "epic": "E3",
+      "title": "Speech-to-Text Input",
+      "description": "Implement speech recognition using Web Speech API with push-to-talk activation and visual feedback.",
+      "acceptanceCriteria": [
+        "Voice module in `app/frontend/src/lib/voice/speech-to-text.ts`",
+        "Uses Web Speech API (SpeechRecognition)",
+        "Push-to-talk activation via keyboard (default: spacebar when not in input)",
+        "Visual indicator showing listening state",
+        "Transcription displayed in real-time",
+        "Configurable language (default: en-US)",
+        "Graceful degradation if API unavailable",
+        "`make test-app` passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E3-US-002",
+      "epic": "E3",
+      "title": "Voice Intent Parser",
+      "description": "LLM converts natural voice commands into ActionExecutionInput that the combat system can process.",
+      "acceptanceCriteria": [
+        "Module `llm/src/voice/intent_parser.py`",
+        "Function `parse_voice_intent(transcript: str, available_actions: list) -> ActionExecutionInput`",
+        "Handles natural phrasings: 'attack the striker with my rifle', 'move to 3,2', 'boost forward'",
+        "Context-aware: uses current combat state to resolve ambiguous targets",
+        "Returns confidence score with parsed intent",
+        "Fallback prompt if intent unclear: 'Did you mean attack with Main Rifle?'",
+        "Unit tests with diverse voice command examples",
+        "`make test-llm` passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E3-US-003",
+      "epic": "E3",
+      "title": "Text-to-Speech Narration",
+      "description": "Narrate action results, AI turns, and important status changes using browser TTS.",
+      "acceptanceCriteria": [
+        "Voice module in `app/frontend/src/lib/voice/text-to-speech.ts`",
+        "Uses Web Speech API (SpeechSynthesis)",
+        "Narrates: action results, AI turn announcements, damage/status effects",
+        "Configurable voice, speed, and volume",
+        "Queue system to prevent overlapping speech",
+        "Can be enabled/disabled in settings",
+        "Interruption support (new high-priority message cancels queue)",
+        "`make test-app` passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E3-US-004",
+      "epic": "E3",
+      "title": "Voice Combat UI",
+      "description": "Combat UI components for voice control: toggle button, listening indicator, transcript display, confirmation dialog.",
+      "acceptanceCriteria": [
+        "Voice toggle button in combat action bar",
+        "Listening indicator (pulsing icon) when active",
+        "Transcript display showing recognized speech",
+        "Confirmation dialog for parsed action: 'Attack Striker with Assault Rifle?'",
+        "Accept/reject buttons and voice commands ('yes'/'no')",
+        "Error state for unrecognized commands with retry prompt",
+        "Keyboard accessible (Tab to toggle, Enter to confirm)",
+        "`make test-app` passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E3-US-005",
+      "epic": "E3",
+      "title": "Voice Navigation",
+      "description": "Voice commands for navigating game screens outside of combat.",
+      "acceptanceCriteria": [
+        "Voice commands work on all screens: 'go to missions', 'open settings', 'launch mission'",
+        "Parser handles navigation intents separately from combat intents",
+        "Commands: 'go to [screen]', 'back', 'select [item]', 'launch', 'read briefing'",
+        "'Read briefing' triggers TTS to read mission briefing text",
+        "Visual feedback shows recognized navigation command",
+        "Works with existing router navigation",
+        "`make test-app` passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E4-US-001",
+      "epic": "E4",
+      "title": "Mission Generator Orchestrator",
+      "description": "Procedurally generate mission configurations: SITREP type, enemy composition, terrain, and difficulty.",
+      "acceptanceCriteria": [
+        "Module `llm/src/mission/generator.py`",
+        "Function `generate_missions(pilot_level: int, count: int = 3) -> list[MissionConfig]`",
+        "Selects SITREP type from: Control, Extraction, Gauntlet, Holdout, Recon",
+        "Configures enemy composition based on SITREP and difficulty",
+        "Sets terrain type matching narrative theme",
+        "Ensures variety (no duplicate SITREPs in one batch)",
+        "Returns structured MissionConfig with all combat setup data",
+        "Unit tests for mission generation",
+        "`make test-llm` passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E4-US-002",
+      "epic": "E4",
+      "title": "Narrative Briefing Generation",
+      "description": "LLM generates 2-3 paragraph mission briefing based on SITREP type, terrain, and enemy composition.",
+      "acceptanceCriteria": [
+        "Module `llm/src/mission/narrative.py`",
+        "Function `generate_briefing(mission: MissionConfig) -> str`",
+        "Prompt template in `llm/src/mission/prompts/briefing.md`",
+        "Briefing includes: situation, mission objective, known threats, extraction plan",
+        "Tone matches military sci-fi genre",
+        "Consistent with Lancer setting (Union, corporations, etc)",
+        "Caches generated briefings to avoid regeneration",
+        "`make test-llm` passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E4-US-003",
+      "epic": "E4",
+      "title": "Narrative Debrief Generation",
+      "description": "LLM generates mission epilogue based on outcome, statistics, and events that occurred during combat.",
+      "acceptanceCriteria": [
+        "Function `generate_debrief(mission: MissionConfig, outcome: Outcome, stats: CombatStats) -> str`",
+        "Prompt template in `llm/src/mission/prompts/debrief.md`",
+        "Epilogue reflects victory/defeat outcome",
+        "Incorporates notable events: kills, near-deaths, objective completion",
+        "Tone shifts based on outcome (triumphant vs somber)",
+        "2-3 paragraphs in length",
+        "`make test-llm` passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E4-US-004",
+      "epic": "E4",
+      "title": "Difficulty Scaling",
+      "description": "Scale enemy count, frame quality, and AI aggression based on pilot license level.",
+      "acceptanceCriteria": [
+        "Difficulty function considers pilot license level (LL0-LL12)",
+        "Higher difficulty: more enemies, better frames, smarter tactics",
+        "Tactician receives difficulty parameter affecting aggression",
+        "Mission generator uses scaling curves for enemy composition",
+        "Documentation of scaling formulas",
+        "`make test-llm` passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E4-US-005",
+      "epic": "E4",
+      "title": "Terrain Generation",
+      "description": "Procedurally generate terrain layouts matching mission narrative theme.",
+      "acceptanceCriteria": [
+        "Function `generate_terrain(sitrep: str, theme: str) -> TerrainConfig`",
+        "Terrain types: urban, forest, desert, facility, space station",
+        "Places cover, hazards, objectives based on SITREP",
+        "Control missions have central control zone",
+        "Extraction missions have evac point",
+        "Returns hex grid with terrain features",
+        "`make test-llm` passes"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E5-US-001",
+      "epic": "E5",
+      "title": "XP and Leveling",
+      "description": "Award XP for mission completion, track level thresholds, calculate license points earned.",
+      "acceptanceCriteria": [
+        "XP awarded based on mission difficulty and outcome",
+        "Level thresholds following Lancer rules (LL0 -> LL12)",
+        "LP (License Points) earned at each level up",
+        "XP/level displayed in pilot quarters",
+        "Level up notification/celebration on quarters screen",
+        "Persists to pilot save data",
+        "`make test-app` passes"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E5-US-002",
+      "epic": "E5",
+      "title": "License Unlocks",
+      "description": "Spend LP to unlock manufacturer frames and gear following Lancer license system.",
+      "acceptanceCriteria": [
+        "License unlock screen accessible from quarters",
+        "Shows all manufacturers with their license trees",
+        "Can spend LP to unlock license ranks (1-3)",
+        "Unlocking grants access to frames, weapons, systems",
+        "Visual indication of owned vs locked licenses",
+        "Integrates with core license/manufacturer data",
+        "`make test-app` passes"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E5-US-003",
+      "epic": "E5",
+      "title": "Salvage System",
+      "description": "Earn salvage currency from victories, spend on upgrades or repairs.",
+      "acceptanceCriteria": [
+        "Salvage awarded based on enemies defeated",
+        "Bonus salvage for completing optional objectives",
+        "Salvage display in quarters and debrief",
+        "Can spend salvage on repairs (if mech damaged)",
+        "Future: spend on cosmetics or consumables",
+        "Persists to pilot save data",
+        "`make test-app` passes"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E5-US-004",
+      "epic": "E5",
+      "title": "Save/Load System",
+      "description": "Auto-save after each mission, manual save option, continue from title screen.",
+      "acceptanceCriteria": [
+        "Auto-save triggers after mission completion",
+        "Manual save option in settings/pause menu",
+        "Save data stored in localStorage (with export option)",
+        "Continue button on title loads most recent save",
+        "Save includes: pilot, mech loadout, XP/level, licenses, salvage",
+        "Multiple save slots (3 slots)",
+        "Delete save option with confirmation",
+        "`make test-app` passes"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E6-US-001",
+      "epic": "E6",
+      "title": "Canvas Accessibility",
+      "description": "Provide text-based alternative to hex grid canvas for screen reader users.",
+      "acceptanceCriteria": [
+        "Toggle for text grid mode in accessibility settings",
+        "Text grid shows unit positions in table format",
+        "Keyboard targeting: arrow keys to select hex, Enter to confirm",
+        "Current selection announced to screen reader",
+        "Action available at selected hex displayed",
+        "Equivalent functionality to canvas interaction",
+        "`make test-app` passes"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E6-US-002",
+      "epic": "E6",
+      "title": "Screen Reader Combat",
+      "description": "Announce turn changes, action results, and status updates to screen readers.",
+      "acceptanceCriteria": [
+        "ARIA live region for combat announcements",
+        "Turn start: 'Your turn' or 'Enemy Striker's turn'",
+        "Actions: 'Striker attacks you with rifle, 8 damage'",
+        "Status: 'You are now IMMOBILIZED'",
+        "Round changes announced",
+        "Victory/defeat announced",
+        "Works with NVDA and VoiceOver",
+        "`make test-app` passes"
+      ],
+      "priority": 29,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E6-US-003",
+      "epic": "E6",
+      "title": "Reduced Motion Mode",
+      "description": "Disable animations and transitions for users sensitive to motion.",
+      "acceptanceCriteria": [
+        "Reduced motion toggle in accessibility settings",
+        "Respects prefers-reduced-motion media query",
+        "When enabled: instant transitions, no projectile animations",
+        "Static backgrounds (no parallax or ambient motion)",
+        "Combat still clearly indicates actions taken",
+        "Setting persists across sessions",
+        "`make test-app` passes"
+      ],
+      "priority": 30,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E6-US-004",
+      "epic": "E6",
+      "title": "Keyboard Shortcuts Reference",
+      "description": "Modal showing all keyboard shortcuts, accessible via ? key.",
+      "acceptanceCriteria": [
+        "Pressing ? opens keyboard shortcuts modal",
+        "Modal lists all available shortcuts by category",
+        "Categories: Navigation, Combat, Voice, General",
+        "Escape closes modal",
+        "Modal is screen reader accessible",
+        "Shows context-specific shortcuts (different in combat vs hub)",
+        "`make test-app` passes"
+      ],
+      "priority": 31,
+      "passes": false,
+      "notes": ""
+    }
+  ],
+  "implementationOrder": [
+    {
+      "phase": "Phase 1 - MVP Core Loop",
+      "stories": ["E1-US-001", "E1-US-002", "E1-US-003", "E1-US-004", "E2-US-001", "E2-US-002", "E2-US-003", "E2-US-004", "E1-US-005"]
+    },
+    {
+      "phase": "Phase 2 - Voice and Narrative",
+      "stories": ["E3-US-001", "E3-US-002", "E3-US-003", "E3-US-004", "E4-US-001", "E4-US-002", "E4-US-003", "E2-US-005"]
+    },
+    {
+      "phase": "Phase 3 - Progression and Polish",
+      "stories": ["E5-US-001", "E5-US-002", "E5-US-004", "E6-US-001", "E6-US-004"]
+    }
+  ],
+  "verification": [
+    "Title to Combat flow: Start app, click New Pilot, complete creation, go to Missions, select one, launch, play combat, see debrief",
+    "Voice combat: Enable voice, speak 'attack striker', confirm action executes",
+    "AI reasoning: Watch NPC turn, see reasoning displayed before action",
+    "Accessibility: Navigate entire flow with keyboard only, verify screen reader announces turns",
+    "Tests: `make test` passes after each story"
+  ]
+}
