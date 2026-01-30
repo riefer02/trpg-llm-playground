@@ -24,3 +24,9 @@ export type { ModalProps } from './modal'
 
 export { StatBlock, SkillBlock } from './stat-blocks'
 export type { StatBlockProps, SkillBlockProps } from './stat-blocks'
+
+export { Slider } from './slider'
+export type { SliderProps } from './slider'
+
+export { Toggle } from './toggle'
+export type { ToggleProps } from './toggle'

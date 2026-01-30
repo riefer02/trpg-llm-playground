@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as QuartersIndexRouteImport } from './routes/quarters/index'
 import { Route as PilotsIndexRouteImport } from './routes/pilots/index'
@@ -29,6 +30,11 @@ import { Route as MissionsMissionIdDebriefRouteImport } from './routes/missions/
 import { Route as MissionsMissionIdBriefingRouteImport } from './routes/missions/$missionId/briefing'
 import { Route as CharactersCharacterIdExportRouteImport } from './routes/characters/$characterId.export'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -130,6 +136,7 @@ const CharactersCharacterIdExportRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
@@ -173,6 +181,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
   '/characters/$characterId': typeof CharactersCharacterIdRouteWithChildren
   '/characters/new': typeof CharactersNewRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/settings'
     | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/settings'
     | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/settings'
     | '/campaigns/$campaignId'
     | '/characters/$characterId'
     | '/characters/new'
@@ -260,6 +272,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SettingsRoute: typeof SettingsRoute
   CampaignsCampaignIdRoute: typeof CampaignsCampaignIdRoute
   CharactersCharacterIdRoute: typeof CharactersCharacterIdRouteWithChildren
   CharactersNewRoute: typeof CharactersNewRoute
@@ -281,6 +294,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -432,6 +452,7 @@ const CharactersCharacterIdRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SettingsRoute: SettingsRoute,
   CampaignsCampaignIdRoute: CampaignsCampaignIdRoute,
   CharactersCharacterIdRoute: CharactersCharacterIdRouteWithChildren,
   CharactersNewRoute: CharactersNewRoute,
