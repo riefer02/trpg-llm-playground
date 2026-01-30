@@ -169,3 +169,49 @@ Status: PASSED
 ### Next Steps
 - Next story: E2-US-001 (Combat State Serializer) - start AI tactician implementation
 ---
+
+## Iteration - Fri Jan 30 2026 21:30 UTC
+Story: E2-US-001 - Combat State Serializer
+Status: PASSED
+
+### Changes Made
+- Created `llm/src/tactician/state_serializer.py` with `serialize_combat_state()` function
+- Imports core models and uses `get_current_actor`, `get_available_actions`
+- Serializes combatants with hex positions, stats, resources, conditions
+- Serializes terrain tiles with properties (dangerous, cover, difficult, etc.) and hazards list
+- Computes turn order with side and acted status based on current round
+- Enriches actions with parameters: potential targets (enemies within sensor range) with distances, damage predictions for weapon actions (min/max/average damage)
+- Added unit tests in `llm/tests/tactician/test_state_serializer.py` covering empty scenario, single combatant, rounds/turns
+- Updated PRD.json to mark story as passing
+
+### Learnings
+- Core provides `get_current_actor` and `get_available_actions` for current actor detection and action listing
+- Hex coordinates serialized via `model_dump(mode="json")` produce q/r/s fields
+- Terrain map tiles contain elevation, cover, line-of-sight blocking, dangerous flags
+- Weapon damage predictions require resolving weapon definition and computing dice statistics
+- Unit tests must be run with PYTHONPATH set to include core module
+
+### Next Steps
+- Next story: E2-US-002 (Tactical System Prompt) - design LLM prompt for tactical reasoning
+---
+
+
+## Iteration - Fri Jan 30 14:48:25 CST 2026
+Story: E2-US-002 - Tactical System Prompt
+Status: PASSED
+
+### Changes Made
+- llm/src/tactician/prompts/tactical_system.md: Created comprehensive system prompt with Lancer combat basics, role-specific tactics, few-shot examples, and output format specification
+- llm/src/tactician/prompts.py: Implemented prompt template functions (load_system_prompt, build_tactical_prompt, build_tactical_prompt_with_role)
+- llm/src/tactician/README.md: Added documentation of prompt design decisions
+- Updated PRD.json to mark story as passing
+
+### Learnings
+- System prompt should balance completeness with conciseness to avoid overwhelming LLM context
+- Role-specific tactics help guide AI decision-making toward intended behavior
+- Few-shot examples demonstrate both reasoning structure and proper JSON output format
+- Markdown files are easy to maintain and version control for prompt engineering
+
+### Next Steps
+- Next story: E2-US-003 (Action Parser and Validator) - parse LLM output into validated combat actions
+---

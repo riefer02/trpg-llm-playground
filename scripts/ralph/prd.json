@@ -190,8 +190,8 @@
         "`make test-llm` passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented serialize_combat_state() with: current actor detection via get_current_actor; combatant serialization with hex positions, stats, resources; terrain serialization extracting tiles with properties (dangerous, cover, etc.); turn order with side and acted status; action parameters including potential targets (enemies within sensor range) with distances, damage predictions based on actor's first usable weapon (min/max/average). All acceptance criteria satisfied. Unit tests pass."
     },
     {
       "id": "E2-US-002",
@@ -208,8 +208,8 @@
         "Documentation of prompt design decisions in `llm/src/tactician/README.md`"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created tactical system prompt with Lancer combat basics, role-specific tactics, few-shot examples, and prompt template functions. All files placed in llm/src/tactician/ with proper documentation."
     },
     {
       "id": "E2-US-003",
@@ -622,15 +622,40 @@
   "implementationOrder": [
     {
       "phase": "Phase 1 - MVP Core Loop",
-      "stories": ["E1-US-001", "E1-US-002", "E1-US-003", "E1-US-004", "E2-US-001", "E2-US-002", "E2-US-003", "E2-US-004", "E1-US-005"]
+      "stories": [
+        "E1-US-001",
+        "E1-US-002",
+        "E1-US-003",
+        "E1-US-004",
+        "E2-US-001",
+        "E2-US-002",
+        "E2-US-003",
+        "E2-US-004",
+        "E1-US-005"
+      ]
     },
     {
       "phase": "Phase 2 - Voice and Narrative",
-      "stories": ["E3-US-001", "E3-US-002", "E3-US-003", "E3-US-004", "E4-US-001", "E4-US-002", "E4-US-003", "E2-US-005"]
+      "stories": [
+        "E3-US-001",
+        "E3-US-002",
+        "E3-US-003",
+        "E3-US-004",
+        "E4-US-001",
+        "E4-US-002",
+        "E4-US-003",
+        "E2-US-005"
+      ]
     },
     {
       "phase": "Phase 3 - Progression and Polish",
-      "stories": ["E5-US-001", "E5-US-002", "E5-US-004", "E6-US-001", "E6-US-004"]
+      "stories": [
+        "E5-US-001",
+        "E5-US-002",
+        "E5-US-004",
+        "E6-US-001",
+        "E6-US-004"
+      ]
     }
   ],
   "verification": [
