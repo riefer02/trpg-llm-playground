@@ -215,3 +215,22 @@ Status: PASSED
 ### Next Steps
 - Next story: E2-US-003 (Action Parser and Validator) - parse LLM output into validated combat actions
 ---
+
+## Iteration - Fri Jan 30 2026 15:04:00 CST
+Story: E2-US-003 - Action Parser and Validator
+Status: PASSED
+
+### Changes Made
+- llm/src/tactician/action_parser.py: Implemented parse_llm_action with JSON extraction, validation, fuzzy matching
+- llm/src/tactician/__init__.py: Added export
+- llm/tests/tactician/test_action_parser.py: Added unit tests covering all acceptance criteria
+
+### Learnings
+- ActionType is a Literal type, not an enum; need to use string literals in tests
+- Fuzzy matching using difflib.get_close_matches works well for action_id and action_name
+- JSON extraction regex handles malformed output with surrounding text
+
+### Next Steps
+- Next story: E2-US-004 (Tactician Integration) - wire AI into NPC turn flow
+---
+
