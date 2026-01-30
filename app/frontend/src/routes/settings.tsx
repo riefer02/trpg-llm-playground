@@ -113,6 +113,43 @@ function SettingsScreen() {
                 step={0.1}
                 unit="x"
               />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Voice Language
+                </label>
+                <select
+                  value={settings.voiceLanguage}
+                  onChange={(e) => updateSettings({ voiceLanguage: e.target.value })}
+                  className="w-full p-2 rounded border border-input bg-background text-foreground"
+                >
+                  <option value="en-US">English (US)</option>
+                  <option value="en-GB">English (UK)</option>
+                  <option value="es-ES">Spanish (Spain)</option>
+                  <option value="fr-FR">French (France)</option>
+                  <option value="de-DE">German (Germany)</option>
+                  <option value="ja-JP">Japanese</option>
+                  <option value="ko-KR">Korean</option>
+                  <option value="zh-CN">Chinese (Simplified)</option>
+                </select>
+                <p className="text-sm text-muted-foreground">
+                  Language for speech recognition and text-to-speech
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* AI Section */}
+          <Card className="dashboard-surface">
+            <CardHeader>
+              <CardTitle>AI</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Toggle
+                label="Show AI Reasoning"
+                checked={settings.showAIReasoning}
+                onChange={(checked) => updateSettings({ showAIReasoning: checked })}
+                description="Display AI tactical reasoning panel during NPC turns"
+              />
             </CardContent>
           </Card>
 

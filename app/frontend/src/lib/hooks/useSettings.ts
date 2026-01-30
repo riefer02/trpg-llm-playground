@@ -18,6 +18,7 @@ export interface Settings {
   enableVoiceInput: boolean
   enableTTS: boolean
   voiceSpeed: number  // 0.5-2.0
+  voiceLanguage: string  // BCP 47 language tag
   
   // Display
   theme: 'light' | 'dark'
@@ -25,6 +26,9 @@ export interface Settings {
   // Accessibility
   reducedMotion: boolean
   highContrast: boolean
+  
+  // AI
+  showAIReasoning: boolean
 }
 
 const STORAGE_KEY = 'lancer_tactics_settings'
@@ -36,9 +40,11 @@ const defaultSettings: Settings = {
   enableVoiceInput: false,
   enableTTS: false,
   voiceSpeed: 1.0,
+  voiceLanguage: 'en-US',
   theme: 'light',
   reducedMotion: false,
   highContrast: false,
+  showAIReasoning: true,
 }
 
 function loadSettings(): Settings {

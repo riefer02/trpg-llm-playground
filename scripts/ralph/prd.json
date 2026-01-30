@@ -259,8 +259,8 @@
         "`make test-llm` passes"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented Tactician class with LLMBackend enum (Ollama, Claude, Mock), TacticianConfig for flexible configuration, decide_action() method with retry logic and graceful fallback. Extended core/mech/combat_state.py to add 'llm' as valid ai_type. Created integration module execute_llm_npc_turn() that mimics existing NPC turn execution API. Updated app/backend/api/combat.py to use LLM tactician when ai_type == 'llm', otherwise uses rule-based AI. All unit tests pass (llm/tests/tactician/test_tactician.py). Acceptance criteria satisfied."
     },
     {
       "id": "E2-US-005",
@@ -277,8 +277,8 @@
         "`make test-app` passes"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented AI reasoning display with settings toggle. The API endpoint already returns detailed reasoning fields (situation_assessment, considered_options, rationale, confidence). Combat UI shows reasoning panel when AI acts, respecting user preference in settings (new 'Show AI Reasoning' toggle in Settings). Panel displays all reasoning fields and can be collapsed via close button. Works alongside existing combat log component. All tests pass."
     },
     {
       "id": "E2-US-006",
@@ -295,8 +295,8 @@
         "`make test-llm` passes"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Updated tactical system prompt with Turn Planning section explaining multi-action sequences and optional sequence array in JSON output. Enhanced action parser to extract sequences via parse_llm_action_sequence() returning list of ActionExecutionInput. Modified Tactician.decide_action() to return list of actions and updated fallback method. Updated integration.py execute_llm_npc_turn() to loop through action sequences, respecting action economy limits (using core's execute_action iteratively). Added sequence info to reasoning text. All unit tests pass and linting passes."
     },
     {
       "id": "E3-US-001",
@@ -314,8 +314,8 @@
         "`make test-app` passes"
       ],
       "priority": 14,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created speech-to-text module with Web Speech API, push-to-talk spacebar activation, visual indicator component, configurable language via settings, graceful degradation for unsupported browsers. All acceptance criteria satisfied."
     },
     {
       "id": "E3-US-002",

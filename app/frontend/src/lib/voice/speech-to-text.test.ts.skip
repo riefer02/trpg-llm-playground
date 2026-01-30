@@ -1,0 +1,97 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { renderHook, act } from '@testing-library/react'
+
+// Mock SpeechRecognition globally
+const mockStart = vi.fn()
+const mockStop = vi.fn()
+const mockAbort = vi.fn()
+
+class MockSpeechRecognition {
+  lang = 'en-US'
+  continuous = false
+  interimResults = true
+  onstart: (() => void) | null = null
+  onend: (() => void) | null = null
+  onerror: ((event: any) => void) | null = null
+  onresult: ((event: any) => void) | null = null
+  
+  start = mockStart
+  stop = mockStop
+  abort = mockAbort
+}
+
+describe('useSpeechRecognition', () => {
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    
+    // Setup global SpeechRecognition mock
+    global.SpeechRecognition = MockSpeechRecognition as any
+    global.webkitSpeechRecognition = MockSpeechRecognition as any
+    
+    // Mock useSettings hook
+    vi.doMock('../../hooks/useSettings', () => ({
+      useSettings: () => ({
+        settings: {
+          enableVoiceInput: true,
+          voiceLanguage: 'en-US',
+        },
+      }),
+    }))
+  })
+  
+  afterEach(() => {
+    delete (global as any).SpeechRecognition
+    delete (global as any).webkitSpeechRecognition
+  })
+  
+  it('should return correct initial state when SpeechRecognition is supported', async () => {
+    const { useSpeechRecognition } = await import('./speech-to-text')
+    const { result } = renderHook(() => useSpeechRecognition())
+    
+    expect(result.current.recognitionSupported).toBe(true)
+    expect(result.current.isListening).toBe(false)
+    expect(result.current.transcript).toBe('')
+    expect(result.current.error).toBeNull()
+  })
+  
+  it('should return recognitionSupported false when SpeechRecognition is not supported', async () => {
+    delete (global as any).SpeechRecognition
+    delete (global as any).webkitSpeechRecognition
+    
+    const { useSpeechRecognition } = await import('./speech-to-text')
+    const { result } = renderHook(() => useSpeechRecognition())
+    
+    expect(result.current.recognitionSupported).toBe(false)
+    expect(result.current.error).toBe('Speech recognition is not supported in this browser.')
+  })
+  
+  it('should call start and stop methods', async () => {
+    const { useSpeechRecognition } = await import('./speech-to-text')
+    const { result } = renderHook(() => useSpeechRecognition())
+    
+    act(() => {
+      result.current.startListening()
+    })
+    
+    expect(mockStart).toHaveBeenCalledTimes(1)
+    
+    act(() => {
+      result.current.stopListening()
+    })
+    
+    expect(mockStop).toHaveBeenCalledTimes(1)
+  })
+  
+  it('should reset transcript', async () => {
+    const { useSpeechRecognition } = await import('./speech-to-text')
+    const { result } = renderHook(() => useSpeechRecognition())
+    
+    act(() => {
+      result.current.resetTranscript()
+    })
+    
+    expect(result.current.transcript).toBe('')
+  })
+})

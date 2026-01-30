@@ -3,9 +3,30 @@
 Started: Initial setup
 ---
 
-## Iteration - Fri Jan 30 2026 12:46 UTC
-Story: E1-US-001 - Title Screen
+## Iteration - Fri Jan 30 2026 23:30 UTC
+Story: E2-US-006 - Multi-Action Turn Planning
 Status: PASSED
+
+### Changes Made
+- Updated llm/src/tactician/prompts/tactical_system.md: Added Turn Planning section explaining multi-action sequences, optional sequence array in JSON output, and new example (move+attack)
+- Updated llm/src/tactician/action_parser.py: Created parse_llm_action_sequence() returning list of ActionExecutionInput, deprecated parse_llm_action() with warning
+- Updated llm/src/tactician/tactician.py: Modified decide_action() to return list[ActionExecutionInput] and use parse_llm_action_sequence(); updated fallback random action to return list
+- Updated llm/src/tactician/integration.py: Modified execute_llm_npc_turn() to loop through action sequences, respecting action economy limits, execute each action iteratively, track successful actions count, and update scenario/turn/economy state between actions
+- Updated llm/src/tactician/__init__.py: Added export of parse_llm_action_sequence
+- Updated llm/tests/tactician/test_tactician.py: Fixed tests to expect list of actions instead of single action; all tests pass
+- Ran `make test-llm` and `make lint` - all pass
+
+### Learnings
+- Core's execute_action handles action economy consumption; iterating actions automatically respects limits
+- The LLM can optionally include a "sequence" field in JSON output; if missing, single action assumed
+- Backward compatibility maintained: parse_llm_action still works but deprecated
+- Integration must handle empty action list (should not happen) and multiple action results
+- NPCActionDecision expects single action; we store first action and note sequence length in reasoning
+
+### Next Steps
+- Next story: E3-US-001 (Speech-to-Text Input) - implement voice interface for player commands
+---
+
 
 ### Changes Made
 - app/frontend/src/routes/__root.tsx: Hide header and breadcrumbs on home route
@@ -234,3 +255,68 @@ Status: PASSED
 - Next story: E2-US-004 (Tactician Integration) - wire AI into NPC turn flow
 ---
 
+## Iteration - Fri Jan 30 2026 15:41:19 CST
+Story: E2-US-004 - Tactician Integration
+Status: PASSED
+
+### Changes Made
+- llm/src/tactician/tactician.py: Created Tactician class with LLMBackend enum (Ollama, Claude, Mock), TacticianConfig, decide_action() method with retry logic (max 3 attempts)
+- llm/src/tactician/integration.py: Created execute_llm_npc_turn() function that mimics existing NPC turn execution API
+- core/mech/combat_state.py: Extended ai_type Literal to include "llm" as valid value for AI-controlled actors
+- app/backend/api/combat.py: Updated auto-NPC endpoint to use LLM tactician when ai_type == "llm", otherwise uses rule-based AI
+- llm/tests/tactician/test_tactician.py: Added unit tests for Tactician class covering initialization, mock backend, retry logic, fallback behavior, and role-based prompting
+- Updated PRD.json to mark story as passing
+
+### Learnings
+- LLMBackend enum abstraction allows switching between different LLM providers with shared interface
+- Exponential backoff retry pattern (1s, 2s, 4s) handles transient failures gracefully
+- Fallback to random valid action ensures game continuity even when LLM completely fails
+- ai_type field on CombatantState controls which AI system is used ("rulebased", "llm", etc.)
+- Integration pattern maintains same API as existing execute_npc_turn() for drop-in replacement
+- Core-first philosophy: extended core model (combat_state) rather than adding external flags
+
+### Next Steps
+- Next story: E2-US-005 (AI Reasoning Display) - show AI's tactical reasoning in combat UI
+---
+
+
+## Iteration - Fri Jan 30 2026 22:59 UTC
+Story: E2-US-005 - AI Reasoning Display
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/lib/hooks/useSettings.ts: Added showAIReasoning setting to Settings interface and defaultSettings
+- app/frontend/src/routes/settings.tsx: Added AI section with toggle for Show AI Reasoning
+- app/frontend/src/routes/combat/$combatId.tsx: Imported useSettings, conditionally show reasoning panel based on settings.showAIReasoning
+- Updated PRD.json to mark story as passing
+
+### Learnings
+- Settings system is extensible; adding new toggles requires updating interface, defaultSettings, and UI
+- AI reasoning panel already existed; needed to integrate with user preferences
+- Conditional display ensures reasoning is shown only when user wants it, respecting accessibility
+
+### Next Steps
+- Next story: E2-US-006 (Multi-Action Turn Planning) - enhance tactician to plan full turns with multiple actions
+---
+
+## Iteration - $(date)
+Story: E3-US-001 - Speech-to-Text Input
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/lib/voice/speech-to-text.ts: Created speech recognition hook with Web Speech API, push-to-talk spacebar activation, configurable language, error handling
+- app/frontend/src/lib/voice/speech.d.ts: Added TypeScript definitions for Web Speech API
+- app/frontend/src/lib/voice/VoiceIndicator.tsx: Visual indicator component showing listening state and real-time transcription
+- app/frontend/src/lib/hooks/useSettings.ts: Added voiceLanguage setting with default 'en-US'
+- app/frontend/src/routes/settings.tsx: Added language selector dropdown to Voice section
+- Updated PRD.json to mark story as passing
+
+### Learnings
+- Web Speech API requires vendor prefixes (webkitSpeechRecognition)
+- Speech recognition language can be changed on the fly via recognition.lang property
+- Push-to-talk spacebar must be disabled when user is typing in input fields
+- Settings persistence via localStorage works seamlessly with new fields
+
+### Next Steps
+- Next story: E3-US-002 (Voice Intent Parser) - parse natural language commands into combat actions
+---
