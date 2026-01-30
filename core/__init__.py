@@ -392,7 +392,9 @@ __all__ = [
     # Effect primitives
     "MechanicalEffect",
     "StatModifier",
+    "StatOverrideEffect",
     "DamageModifier",
+    "DirectDamage",
     "AccuracyModifier",
     "ActionGrant",
     "Immunity",

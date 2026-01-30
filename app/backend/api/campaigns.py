@@ -40,7 +40,6 @@ from core.mech.combat_state import (
     CombatResources,
     CombatStats,
     MechCombatScenario,
-    create_npc_combatant,
 )
 from core.mech.grid import HexPosition, HexCoord
 from core.mech.terrain import TerrainMap
@@ -57,7 +56,6 @@ from core.shared.campaign.campaign import (
     MissionStakesBrief,
     ReservePlanEntry,
     Session,
-    SessionLifecycleCheckpoint,
 )
 from core.shared.campaign.serialization import get_campaign_summary
 from core.shared.scenario import SitrepType, SITREP_TEMPLATES, MissionObjective
@@ -65,7 +63,6 @@ from core.shared.terrain_generation import (
     TileSetType,
     TerrainGeneratorParams,
     generate_terrain_from_sitrep,
-    generate_zone_coords,
 )
 from core.shared.sitrep_resolution import (
     SitrepResolution,
@@ -344,7 +341,6 @@ def _generate_mission_terrain(
     Returns:
         Tuple of (TerrainMap, SitrepResolution, zones dict)
     """
-    from core.shared.terrain_primitives import GeneratedTerrain
 
     template = SITREP_TEMPLATES.get(sitrep_type)
     if template is None:

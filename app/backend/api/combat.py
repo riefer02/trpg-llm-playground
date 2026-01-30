@@ -46,9 +46,7 @@ from core.mech.combat_execution import (
 from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
 from core.shared.overwatch import check_overwatch_triggers_for_movement
 from core.shared.full_tech import FullTechOptionSelection
-from core.shared.enums import ActionType
 from core.shared.decisions import (
-    PendingDecision,
     DecisionResolution,
     resolve_save_decision,
     resolve_trauma_decision,

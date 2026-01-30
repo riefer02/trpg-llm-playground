@@ -125,3 +125,26 @@ Status: PASSED
 ### Next Steps
 - Next story: E1-US-006 (Adapt Character Detail Views) should create pilot/mech detail screens
 - Need to reuse existing character detail components
+
+## Iteration - Fri Jan 30 2026 19:55 UTC
+Story: E1-US-006 - Adapt Character Detail Views
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/components/ui/stat-blocks.tsx: Created shared StatBlock and SkillBlock UI components
+- app/frontend/src/components/quarters/PilotDisplay.tsx: Read-only pilot display component showing stats, skills, talents, triggers, licenses, core bonuses
+- app/frontend/src/components/quarters/MechDisplay.tsx: Read-only mech display component showing frame, stats, weapons, systems
+- app/frontend/src/routes/quarters/pilot.tsx: Updated to use PilotDisplay with active character data, loading/error states, back button
+- app/frontend/src/routes/quarters/mech.tsx: Updated to use MechDisplay with active character data, loading/error states, back button
+- Updated PRD.json to mark story as passing
+
+### Learnings
+- Extracting reusable UI components (StatBlock, SkillBlock) reduces duplication across detail pages
+- Character detail components can be adapted for read-only quarters views with minimal changes
+- UseActiveCharacter hook provides consistent data across quarters screens
+- Frontend tests pass with new components and routes
+
+### Next Steps
+- Next story: E1-US-007 (Settings Screen) should implement settings UI with persistence
+- Need to create settings screen with audio, voice, display, accessibility sections
+---

@@ -1,52 +1,98 @@
 /**
- * Pilot detail view (placeholder).
- * Will be implemented in E1-US-006.
+ * Pilot detail view for quarters.
+ * Shows pilot stats, skills, talents, triggers, licenses, and core bonuses.
  */
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui";
+import { PilotDisplay } from "../../components/quarters/PilotDisplay";
+import { useActiveCharacter } from "../../lib/api/quarters";
 
 export const Route = createFileRoute("/quarters/pilot" as const)({
-  component: PilotDetailPlaceholder,
+  component: PilotDetailPage,
 });
 
-function PilotDetailPlaceholder() {
+function PilotDetailPage() {
   const navigate = useNavigate();
+  const { character, isLoading, error } = useActiveCharacter();
 
   const handleBack = () => navigate({ to: "/quarters" });
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 p-6">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div className="text-center space-y-4">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground">
+              Pilot Details
+            </h1>
+            <p className="text-xl text-muted-foreground">Loading pilot...</p>
+          </div>
+          <div className="text-center">
+            <Button variant="outline" onClick={handleBack}>
+              Back to Quarters
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !character) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 p-6">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div className="text-center space-y-4">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground">
+              Pilot Details
+            </h1>
+            <p className="text-xl text-muted-foreground">
+              {error?.message || "No active pilot found."}
+            </p>
+          </div>
+          <Card className="dashboard-surface">
+            <CardHeader>
+              <CardTitle>Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Please create a pilot first from the title screen.
+              </p>
+            </CardContent>
+          </Card>
+          <div className="text-center">
+            <Button variant="outline" onClick={handleBack}>
+              Back to Quarters
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold tracking-tight text-foreground">
             Pilot Details
           </h1>
           <p className="text-xl text-muted-foreground">
-            Coming soon in E1-US-006
+            {character.callsign} - License Level {character.level}
           </p>
         </div>
 
-        {/* Placeholder content */}
-        <Card className="dashboard-surface">
-          <CardHeader>
-            <CardTitle>Pilot Stats</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              This screen will show pilot skills, talents, triggers, and background.
-            </p>
-          </CardContent>
-        </Card>
-
         {/* Back button */}
-        <div className="text-center">
+        <div className="flex justify-start">
           <Button variant="outline" onClick={handleBack}>
-            Back to Quarters
+            ← Back to Quarters
           </Button>
         </div>
+
+        {/* Pilot Display */}
+        <PilotDisplay character={character} />
       </div>
     </div>
   );

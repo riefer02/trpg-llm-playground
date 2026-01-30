@@ -4,7 +4,7 @@ These are the building blocks for consistent API responses across all endpoints.
 """
 
 from datetime import datetime
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
 

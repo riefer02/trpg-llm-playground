@@ -21,3 +21,6 @@ export { Skeleton } from './skeleton'
 
 export { Modal } from './modal'
 export type { ModalProps } from './modal'
+
+export { StatBlock, SkillBlock } from './stat-blocks'
+export type { StatBlockProps, SkillBlockProps } from './stat-blocks'

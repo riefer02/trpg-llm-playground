@@ -153,8 +153,8 @@
         "`make test-app` passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created PilotDisplay and MechDisplay read-only components reusing character detail patterns. Updated /quarters/pilot and /quarters/mech routes to show pilot stats, skills, talents, triggers, licenses, core bonuses and mech frame, stats, weapons, systems. Includes back button and keyboard accessibility. Frontend tests pass."
     },
     {
       "id": "E1-US-007",
