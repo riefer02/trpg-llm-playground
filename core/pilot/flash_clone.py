@@ -7,10 +7,9 @@ Implements flash cloning mechanics per PR2 4789-4820:
 - Can only rejoin after mission completion
 """
 
-from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.pilot.clone_state import CloneState, CloneStatus, Quirk, QuirkSource
+from core.pilot.clone_state import CloneState, CloneStatus, Quirk
 
 
 class PilotSnapshot(FrozenModel):
@@ -144,8 +143,8 @@ def create_flash_clone(input_data: FlashCloneInput, quirk: Quirk) -> FlashCloneR
     gm_notes: list[str] = []
 
     narrative_effects.append(
-        f"Pilot has been flash cloned. The clone remembers suffering a major injury "
-        f"but will have to rebuild relationships from the start of this session."
+        "Pilot has been flash cloned. The clone remembers suffering a major injury "
+        "but will have to rebuild relationships from the start of this session."
     )
     narrative_effects.append(
         f"Despite the trauma, the clone retains all License Level {input_data.current_level} advancement."

@@ -3,12 +3,10 @@
 Tests automatic condition application on failed saves per Lancer rules.
 """
 
-import pytest
-from core.shared.enums import SaveType, StatusType
+from core.shared.enums import StatusType
 from core.shared.saves import SaveRequest
 from core.shared.integration.save_conditions import (
     SaveConditionMapping,
-    SaveConditionResult,
     HULL_SAVE_MAPPINGS,
     AGILITY_SAVE_MAPPINGS,
     SYSTEMS_SAVE_MAPPINGS,

@@ -15,7 +15,6 @@ This module provides type-safe helpers for:
 
 from __future__ import annotations
 
-from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import SizeClass
@@ -266,7 +265,6 @@ def get_cover_difficulty_with_flanking(
         CoverDifficultyResult with cover type and modifier
     """
     from core.shared.terrain import (
-        get_cover_difficulty,
         check_soft_cover,
         CoverDifficultyResult,
     )
@@ -337,7 +335,6 @@ def check_hard_cover_available_with_size(
     """
     from core.shared.terrain import (
         check_hard_cover_available,
-        HardCoverAvailabilityResult,
     )
 
     return check_hard_cover_available(

@@ -1,10 +1,8 @@
 """Tests for damage resolution primitives."""
 
-import pytest
 from core.shared.damage import (
     DamageInput,
     DamageResolutionContext,
-    DamageResolutionResult,
     resolve_damage_on_target,
     apply_damage_to_combatant,
     compute_damage_before_reductions,
@@ -12,7 +10,7 @@ from core.shared.damage import (
     compute_resistance_reduction,
 )
 from core.mech.grid import HexCoord
-from core.shared.enums import DamageType, StatusType
+from core.shared.enums import StatusType
 from core.mech.combat_state import (
     CombatantState,
     CombatResources,
@@ -602,7 +600,6 @@ class TestDamageResolutionIntegration:
 
     def test_pilot_damage_not_capped_at_4(self):
         """Pilots don't have the 4 armor cap."""
-        from core.shared.enums import StatusType
 
         stats = CombatStats(
             size="size_1",

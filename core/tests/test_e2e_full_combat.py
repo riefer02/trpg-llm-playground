@@ -4,8 +4,6 @@ Tests realistic combat scenarios with multiple combatants, rounds,
 and integrated systems (talents, core powers, terrain, status effects).
 """
 
-import pytest
-from unittest.mock import patch
 
 from core.tests.e2e_helpers import (
     make_pilot_with_talents,
@@ -18,9 +16,6 @@ from core.tests.e2e_helpers import (
     make_scenario,
     execute_attack,
     execute_full_round,
-    assert_combatant_alive,
-    assert_combatant_destroyed,
-    assert_attack_hit,
     assert_attack_crit,
     count_alive_on_side,
     get_total_damage_dealt,

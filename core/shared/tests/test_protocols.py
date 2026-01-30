@@ -2,18 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal
-import pytest
-from pydantic import Field
-from core.shared.models import FrozenModel
 from core.shared.protocols import (
     ProtocolActivationInput,
     ProtocolDeactivationInput,
-    ProtocolResult,
     ProtocolState,
     ProtocolDuration,
-    ProtocolEffectType,
-    ProtocolDurationType,
     resolve_protocol_activation,
     resolve_protocol_deactivation,
     apply_protocol_state,
@@ -23,9 +16,7 @@ from core.shared.protocols import (
     get_active_protocol_ids,
     validate_protocol_count,
     ProtocolValidationSettings,
-    DEFAULT_PROTOCOL_VALIDATION,
 )
-from core.mech.timing import TurnPhase
 
 
 class TestResolveProtocolActivation:

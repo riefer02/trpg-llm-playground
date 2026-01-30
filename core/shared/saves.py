@@ -26,7 +26,6 @@ from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import SaveType, StatusType
-from core.shared.rolls import SaveRoll, RollModifiers, AccuracyDifficulty
 from core.shared.dice import roll_dice
 from core.shared.effects import CheckModifierEffect
 
@@ -175,9 +174,9 @@ def resolve_save(request: SaveRequest) -> SaveResult:
     net_value = abs(total_difficulty)
 
     if roll == 20:
-        reason = f"Natural 20: automatic success"
+        reason = "Natural 20: automatic success"
     elif roll == 1:
-        reason = f"Natural 1: automatic failure"
+        reason = "Natural 1: automatic failure"
     elif success:
         reason = f"{request.save_type.upper()} save succeeds: {total} vs {request.save_target}"
     else:

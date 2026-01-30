@@ -4,7 +4,6 @@ This module provides helpers for filtering NPC templates by role,
 creating template variants, and working with NPC special classes.
 """
 
-from typing import Literal
 from core.shared.models import FrozenModel
 from core.shared.id_helpers import TemplateIdField
 from core.npc.models import NPCTemplate, NPCStats, NPCStatsBase, NPCRole

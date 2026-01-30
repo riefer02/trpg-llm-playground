@@ -444,6 +444,11 @@ export interface AutoNPCTurnResponse {
   decision_action?: string;
   decision_target?: string;
   decision_reasoning?: string;
+  // Detailed reasoning fields for AI reasoning display
+  situation_assessment?: string;
+  considered_options?: string;
+  rationale?: string;
+  confidence?: number;
   actions_taken: number;
   skipped: boolean;
   skip_reason?: string;

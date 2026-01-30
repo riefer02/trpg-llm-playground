@@ -28,8 +28,8 @@ from typing import TYPE_CHECKING
 from core.character import Character, MechConfiguration
 from core.pilot.background import Background
 from core.pilot.pilot import Pilot
-from core.pilot.skill import SkillSet, PilotTrigger, TRIGGER_DEFINITIONS
-from core.pilot.talent import Talent, EXAMPLE_TALENTS
+from core.pilot.skill import SkillSet, PilotTrigger
+from core.pilot.talent import Talent
 from core.pilot.gear import PilotLoadout
 from core.mech.frame import MechFrameDefinition
 from core.mech.build import MechBuild, build_mech_from_compendium
@@ -42,11 +42,8 @@ from core.shared.campaign.campaign import (
 )
 from core.shared.scenario import (
     SitrepTemplate,
-    MissionObjective,
-    SitrepZone,
     ESCORT_TEMPLATE,
     CONTROL_TEMPLATE,
-    EXTRACT_TEMPLATE,
 )
 from core.shared.narrative import (
     NarrativeGoal,
@@ -55,7 +52,7 @@ from core.shared.narrative import (
 )
 
 if TYPE_CHECKING:
-    from core.pilot.talent import TalentDefinition
+    pass
 
 
 def _fixed_id(prefix: str) -> str:

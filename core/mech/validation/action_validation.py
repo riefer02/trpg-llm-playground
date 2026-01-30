@@ -16,7 +16,6 @@ from core.mech.timing import (
 from core.shared.effects import CooldownState, PerTargetCounter
 
 if TYPE_CHECKING:
-    from core.mech.combat_actions import ActionRule
     from core.mech.combat_state import ActionUse, CombatantState, OverchargeState
     from core.mech.combat_rules import OverchargeRules
     from core.mech.timing import TurnPhase

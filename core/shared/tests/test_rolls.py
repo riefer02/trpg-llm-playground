@@ -1,6 +1,5 @@
 """Tests for roll mechanics and attack resolution."""
 
-import pytest
 from core.shared.rolls import (
     resolve_attack,
     AttackResolutionResult,

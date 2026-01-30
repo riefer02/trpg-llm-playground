@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
 
 from core.mech.combat_state import (
     CombatantState,
@@ -17,7 +15,6 @@ from core.mech.combat_state import (
 )
 from core.mech.combat_rules import (
     TagDefaultRules,
-    MechCombatRules,
 )
 from core.mech.combat_resolution import (
     deploy_object,
@@ -27,14 +24,12 @@ from core.mech.combat_resolution import (
     DeploymentResult,
     DeployableDamageResult,
     MineTriggerResult,
-    DangerZoneStatus,
 )
 from core.mech.validation.combat_validation import (
     validate_deployment,
     validate_mine_detection,
     validate_mine_disarm,
 )
-from core.mech.terrain import TerrainMap
 
 
 class TestDeployableKind:

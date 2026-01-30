@@ -6,7 +6,6 @@ Tests role-based NPC behavior patterns and decision-making.
 import pytest
 from core.shared.enums import ActionType
 from core.shared.integration.npc_ai import (
-    NPCBehaviorPattern,
     TargetInfo,
     ActionScore,
     NPCActionDecision,
@@ -14,7 +13,6 @@ from core.shared.integration.npc_ai import (
     DEFENDER_PATTERN,
     CONTROLLER_PATTERN,
     SUPPORTER_PATTERN,
-    NPC_BEHAVIOR_PATTERNS,
     get_behavior_pattern,
     compute_target_score,
     score_available_actions,
@@ -28,7 +26,6 @@ from core.npc.state import NPCState, NPCCombatStats
 @pytest.fixture
 def sample_npc():
     """Create a sample NPC state for testing."""
-    from core.npc.state import NPCCombatStats
 
     return NPCState(
         id="npc_striker_1",

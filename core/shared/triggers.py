@@ -8,12 +8,11 @@ Triggers are defined in TriggerType (core.shared.effects) and this module
 provides resolution logic for all trigger types.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from core.shared.effects import TriggerType, MechanicalEffect
 
 if TYPE_CHECKING:
-    from core.shared.id_helpers import CombatantIdField
-    from core.npc.models import NPCState
+    pass
 
 
 class TriggerContext:

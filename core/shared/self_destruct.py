@@ -24,13 +24,13 @@ from core.shared.enums import DamageType, SizeClass
 from core.shared.id_helpers import MechIdField
 from core.shared.dice import DiceExpression
 from core.shared.saves import SaveRequest, SaveResult, resolve_save
-from core.shared.heat import MeltdownState, trigger_meltdown
+from core.shared.heat import MeltdownState
 from core.shared.battlefield_objects import WreckageState
-from core.mech.grid import HexPosition, HexCoord, hex_add, hexes_in_radius
+from core.mech.grid import HexPosition, hexes_in_radius
 from core.mech.combat_state import CombatantState
 
 if TYPE_CHECKING:
-    from core.mech.combat_state import CombatStats, CombatResources
+    pass
 
 
 class SelfDestructRule(FrozenModel):
@@ -357,7 +357,6 @@ def apply_self_destruct_explosion(
     Returns:
         Updated combatant states with explosion effects
     """
-    from core.shared.enums import SizeClass
 
     updated_mech = mech
     updated_pilot = pilot

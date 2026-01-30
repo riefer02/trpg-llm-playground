@@ -13,15 +13,12 @@ validation functions (validate_protocol_timing, validate_action_while_prepared, 
 
 from __future__ import annotations
 
-from typing import Literal
 from pydantic import Field
 
 from core.shared.models import FrozenModel
 
 from core.shared.combat.tactical_initiative import (
-    TacticalInitiativeTracker,
     CombatSide,
-    start_tactical_combat,
 )
 from core.mech.combat_rules import TurnOrderRules
 from core.mech.timing import (
@@ -43,7 +40,6 @@ from core.mech.action_economy import (
     use_overcharge as use_overcharge_economy,
     use_reaction as use_reaction_economy,
     validate_action_economy,
-    reset_economy_for_new_turn,
     get_action_economy_summary,
 )
 from core.shared.enums import ActionType
@@ -300,7 +296,7 @@ def advance_phase(
         new_phase = "end"
     else:
         raise ValueError(
-            f"Cannot advance from end phase. Use end_actor_turn() to complete turn."
+            "Cannot advance from end phase. Use end_actor_turn() to complete turn."
         )
 
     return tracker.model_copy(

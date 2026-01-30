@@ -18,7 +18,7 @@ from pydantic import Field
 from pydantic.functional_validators import model_validator
 from core.shared.models import FrozenModel
 
-from core.mech.combat_actions import ACTION_RULES_BY_ID, ActionRule
+from core.mech.combat_actions import ACTION_RULES_BY_ID
 from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
 from core.mech.combat_state import (
     MechCombatScenario,

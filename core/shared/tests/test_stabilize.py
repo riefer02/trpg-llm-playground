@@ -15,7 +15,6 @@ from core.mech.combat_state import (
     WeaponMountState,
     WeaponState,
 )
-from core.mech.weapon import WeaponTagType
 
 
 @pytest.fixture

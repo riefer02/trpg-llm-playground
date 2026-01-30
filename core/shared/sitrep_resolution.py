@@ -11,7 +11,7 @@ Provides mechanical tracking for SITREP victory conditions including:
 from __future__ import annotations
 
 from typing import Literal, TYPE_CHECKING, Any
-from pydantic import Field, model_validator
+from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.scenario import (
     SitrepZone,
@@ -21,7 +21,7 @@ from core.shared.scenario import (
 )
 
 if TYPE_CHECKING:
-    from core.shared.combat_loop import CombatLoopState
+    pass
 
 
 SitrepVictoryOutcome = Literal["players_win", "enemies_win", "draw", "ongoing"]

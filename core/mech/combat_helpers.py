@@ -10,7 +10,7 @@ import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
-from core.shared.enums import StatusType, DamageType, AttackType
+from core.shared.enums import StatusType, DamageType
 from core.shared.dice import roll_dice, round_up
 from core.shared.damage import DamageBreakdown
 from core.shared.state_helpers import add_statuses
@@ -56,8 +56,6 @@ from core.mech.combat_state import (
 )
 from core.shared.effects import (
     MechanicalEffect,
-    AccuracyModifier,
-    CheckModifierEffect,
     EffectCondition,
     SpatialCondition,
     AttackContextCondition,
@@ -3892,7 +3890,7 @@ def resolve_single_attack(
         Tuple of (updated scenario, AttackOutcome with hit/miss/damage info)
     """
     from core.shared.rolls import resolve_attack
-    from core.mech.combat_models import AttackOutcome, ResourceChange
+    from core.mech.combat_models import AttackOutcome
 
     # Lazy import to avoid circular dependency
     if apply_typed_damage_func is None:

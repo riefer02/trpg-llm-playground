@@ -13,7 +13,6 @@ from core.shared.terrain_generation import (
     generate_zone_coords,
 )
 from core.shared.sitrep_resolution import (
-    SitrepResolution,
     create_sitrep_resolution,
     advance_sitrep_round,
     update_zone_control,

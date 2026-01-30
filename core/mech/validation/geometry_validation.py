@@ -12,7 +12,6 @@ from core.mech.grid import HexCoord, hexes_between
 from core.mech.terrain import TerrainHex
 
 if TYPE_CHECKING:
-    from typing import Any
 
     from core.mech.combat_state import ActionUse
     from core.mech.combat_actions import ActionRule

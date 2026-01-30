@@ -4,8 +4,6 @@ These tests recreate specific scenarios from the Player's Resource 2 (PR2)
 rulebook to verify mechanical accuracy.
 """
 
-import pytest
-from unittest.mock import patch
 
 from core.tests.e2e_helpers import (
     make_pilot_with_talents,
@@ -14,7 +12,6 @@ from core.tests.e2e_helpers import (
     make_enemy_combatant,
     make_duel_scenario,
     execute_attack,
-    assert_attack_hit,
     assert_attack_crit,
 )
 from core.mech.combat_execution import (
@@ -25,7 +22,6 @@ from core.mech.combat_execution import (
 from core.mech.combat_state import CombatTurn
 from core.mech.combat_helpers import (
     _get_talent_accuracy_modifiers,
-    _get_talent_check_modifiers,
 )
 from core.pilot import collect_pilot_talent_effects
 from core.shared.effects import MechanicalEffect, AccuracyModifier

@@ -3,7 +3,6 @@
 import pytest
 from core.pilot.gear import (
     PilotGearTag,
-    PilotGearItemDefinition,
     PilotDamageSpec,
     PilotAreaEffect,
     PilotWeaponProfile,
@@ -16,7 +15,6 @@ from core.pilot.gear import (
     get_pilot_weapon_action_type,
     get_pilot_weapon_difficulty_modifier,
     can_pilot_weapon_damage_target,
-    PILOT_GEAR_DEFINITIONS_BY_ID,
 )
 
 

@@ -4,29 +4,22 @@ Tests that pilot talents properly modify attack accuracy, damage, and other
 combat mechanics in realistic multi-turn scenarios.
 """
 
-import pytest
-from unittest.mock import patch
 
 from core.tests.e2e_helpers import (
     make_pilot_with_talents,
     make_combatant_from_pilot,
-    make_combatant,
     make_enemy_combatant,
     make_duel_scenario,
     make_skirmish_scenario,
     execute_attack,
     execute_full_round,
-    assert_attack_hit,
-    assert_attack_missed,
-    assert_attack_crit,
     get_total_damage_dealt,
 )
-from core.pilot import Pilot, Talent, collect_pilot_talent_effects
+from core.pilot import collect_pilot_talent_effects
 from core.mech.combat_helpers import (
     _evaluate_condition,
     _get_talent_accuracy_modifiers,
 )
-from core.shared.effects import MechanicalEffect, AccuracyModifier
 
 
 class TestCrackShotTalent:

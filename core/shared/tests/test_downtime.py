@@ -1,6 +1,5 @@
 """Tests for downtime actions and reserves system."""
 
-import pytest
 from core.shared.downtime import (
     ReserveType,
     NarrativeReserveType,

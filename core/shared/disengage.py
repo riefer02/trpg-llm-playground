@@ -19,10 +19,7 @@ Engagement Rules (per PR2 ~3818-3819, 3953-3954):
 
 from __future__ import annotations
 
-from typing import Literal
-from pydantic import Field
 from core.shared.models import FrozenModel
-from core.shared.enums import StatusType
 
 
 class DisengageStatus(FrozenModel):

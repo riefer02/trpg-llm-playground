@@ -17,7 +17,6 @@ Invisibility Rules (per PR2 4073-4076):
 from __future__ import annotations
 
 from typing import Literal
-from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.dice import roll_dice
 

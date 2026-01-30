@@ -9,10 +9,8 @@ import pytest
 from core.tests.e2e_helpers import (
     make_pilot_with_talents,
     make_combatant_from_pilot,
-    make_combatant,
     make_enemy_combatant,
     make_sitrep_scenario,
-    make_scenario,
     update_sitrep_zone_for_side,
     advance_scenario_round,
     check_scenario_victory,

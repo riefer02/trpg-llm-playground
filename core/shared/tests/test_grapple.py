@@ -1,15 +1,9 @@
 """Tests for Grapple and Ram resolution helpers."""
 
-import pytest
 from core.shared.grapple import (
     GrappleAttempt,
     GrappleResult,
-    GrappleStatus,
-    GrappleEndResult,
     RamAttempt,
-    RamResult,
-    GroupGrappleSize,
-    DisarmResult,
     can_grapple,
     attempt_grapple,
     resolve_grapple_status,

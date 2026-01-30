@@ -12,16 +12,10 @@ from core.mech.combat_resolution import (
     use_overcharge,
     reset_overcharge,
     increment_overcharge_on_turn_start,
-    OverchargeEscalationResult,
-    OverchargeUsageResult,
-    OverchargeResetResult,
 )
 from core.mech.validation.combat_validation import (
     _validate_overcharge_escalation,
-    CombatValidationIssue,
 )
-from core.shared.enums import StatusType
-from core.mech.rules import DEFAULT_OVERCHARGE_RULES
 
 
 class TestOverchargeState:

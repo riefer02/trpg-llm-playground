@@ -9,7 +9,7 @@ at different cognitive complexity levels:
 """
 
 import hashlib
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 
 # Difficulty level definitions with prompt instructions

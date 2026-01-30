@@ -307,19 +307,16 @@ class TestImprovisedRuleDefaults:
 
     def test_default_damage(self):
         """Test default damage is 1d6."""
-        from core.shared.improvised import DEFAULT_IMPROVISED_RULES
 
         assert DEFAULT_IMPROVISED_RULES.damage.count == 1
         assert DEFAULT_IMPROVISED_RULES.damage_type == "kinetic"
 
     def test_default_requires_unarmed(self):
         """Test default requires_unarmed is True."""
-        from core.shared.improvised import DEFAULT_IMPROVISED_RULES
 
         assert DEFAULT_IMPROVISED_RULES.requires_unarmed is True
 
     def test_default_attack_type(self):
         """Test default attack type is melee."""
-        from core.shared.improvised import DEFAULT_IMPROVISED_RULES
 
         assert DEFAULT_IMPROVISED_RULES.attack_type == "melee"

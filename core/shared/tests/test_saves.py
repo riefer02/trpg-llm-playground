@@ -1,6 +1,5 @@
 """Tests for save resolution module."""
 
-import pytest
 from core.shared.saves import (
     SaveRequest,
     SaveResult,
@@ -9,7 +8,6 @@ from core.shared.saves import (
     compute_save_target,
     resolve_save_against_damage,
 )
-from core.shared.enums import SaveType
 
 
 class TestSaveRequest:

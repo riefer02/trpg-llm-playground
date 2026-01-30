@@ -36,12 +36,9 @@ Each class has a victory_count field for SITREP resolution:
 """
 
 from core.npc.models import (
-    NPCTemplate,
     NPCStats,
     NPCStatsBase,
     NPCTierScaling,
-    NPCAbility,
-    NPCGear,
     SpecialNPCTemplate,
     UltraTrait,
     VeteranTrait,
@@ -50,20 +47,11 @@ from core.npc.models import (
     InfantrySquadStats,
 )
 from core.npc.enums import (
-    NPCTier,
-    NPCClass,
     NPCSpecialClass,
-    UltraTraitType,
-    VeteranTraitType,
-    ExoticModuleType,
-    CommanderTraitType,
-    VehicleType,
 )
 from core.shared.effects import (
     MechanicalEffect,
     Resistance,
-    DirectDamage,
-    AccuracyModifier,
 )
 
 

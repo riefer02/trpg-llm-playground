@@ -4,7 +4,6 @@ This module provides NPC-specific combat state including stat scaling
 by tier and integration with the broader combat system.
 """
 
-from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import SizeClass
@@ -12,8 +11,6 @@ from core.npc.enums import NPCTier, NPCClass
 from core.npc.models import (
     NPCTemplate,
     NPCStats,
-    NPCStatsBase,
-    NPCTierScaling,
 )
 
 

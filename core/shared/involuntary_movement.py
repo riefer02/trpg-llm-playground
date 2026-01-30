@@ -32,7 +32,7 @@ from core.shared.models import FrozenModel
 from core.shared.enums import SizeClass, StatusType
 from core.shared.conditions import apply_condition, ConditionApplicationResult
 from core.mech.grid import HexCoord
-from core.mech.terrain import TerrainMap, terrain_index
+from core.mech.terrain import TerrainMap
 
 
 SIZE_ORDER: dict[SizeClass, int] = {

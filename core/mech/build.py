@@ -2,7 +2,6 @@
 
 import re
 
-from typing import Union
 from pydantic import Field
 from core.shared.models import FrozenModel
 

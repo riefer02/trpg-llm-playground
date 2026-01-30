@@ -1,7 +1,7 @@
 import argparse
 import json
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Any, List
 
 import yaml
 from openai import OpenAI

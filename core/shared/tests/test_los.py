@@ -1,6 +1,5 @@
 """Line of sight resolution tests for Lancer combat."""
 
-import pytest
 from core.mech.grid import HexCoord, HexPosition
 from core.mech.terrain import TerrainHex, TerrainMap
 from core.shared.los import (

@@ -3,7 +3,6 @@
 from core.shared.effects import PerTargetCounter
 from core.mech.combat_resolution import (
     resolve_per_target_counter,
-    PerTargetCounterResolution,
 )
 
 

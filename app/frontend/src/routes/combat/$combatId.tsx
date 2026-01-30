@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
+import { useSettings } from "../../lib/hooks/useSettings";
 
 import {
   useCombatSession,
@@ -18,6 +19,7 @@ import {
   useSpendReserve,
   useWeapons,
   useAutoNpcTurn,
+  type AutoNPCTurnResponse,
   type ActionRequest,
   type ActionEconomyState,
   type AvailableActionItem,
@@ -94,6 +96,7 @@ function CombatSessionPage() {
   const completeCombat = useCompleteCombat(combatId);
   const spendReserve = useSpendReserve(combatId);
   const autoNpcTurn = useAutoNpcTurn(combatId);
+  const { settings } = useSettings();
   const navigate = useNavigate();
 
   // Mission completion state
@@ -103,6 +106,9 @@ function CombatSessionPage() {
   const [turnActive, setTurnActive] = useState(false);
   const [economy, setEconomy] = useState<ActionEconomyState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // AI reasoning display
+  const [aiReasoning, setAiReasoning] = useState<AutoNPCTurnResponse | null>(null);
+  const [showReasoningPanel, setShowReasoningPanel] = useState(false);
 
   // Available actions query (only when turn is active)
   const { data: availableActions } = useAvailableActions(combatId, {
@@ -252,19 +258,26 @@ function CombatSessionPage() {
 
   // Handle auto NPC turn
   const handleAutoNpcTurn = useCallback(() => {
+    // Clear previous reasoning
+    setAiReasoning(null);
     autoNpcTurn.mutate(undefined, {
-      onSuccess: () => {
+      onSuccess: (response) => {
         // Turn state remains inactive since the full turn cycle completed
         setTurnActive(false);
         setEconomy(null);
         setTargetMode(null);
         setSelectedTargetIds([]);
         setMaxTargets(1);
+        // Store AI reasoning for display
+        setAiReasoning(response);
+        if (settings.showAIReasoning) {
+          setShowReasoningPanel(true);
+        }
         toast.success("NPC turn completed");
       },
       onError: (err) => toast.error(err.message || "NPC turn failed"),
     });
-  }, [autoNpcTurn]);
+  }, [autoNpcTurn, settings]);
 
   // Action triggered from ActionBar (to pass to ActionPanel)
   const [triggeredAction, setTriggeredAction] = useState<AvailableActionItem | null>(null);
@@ -982,6 +995,56 @@ function CombatSessionPage() {
                 />
               </div>
             </div>
+
+            {/* AI Reasoning Panel */}
+            {showReasoningPanel && aiReasoning && (
+              <div className="rounded-md border border-border bg-muted/30 p-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                    AI Reasoning
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowReasoningPanel(false)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="space-y-2 text-xs max-h-32 overflow-y-auto">
+                  {aiReasoning.situation_assessment && (
+                    <div>
+                      <div className="font-medium">Situation Assessment</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">{aiReasoning.situation_assessment}</div>
+                    </div>
+                  )}
+                  {aiReasoning.considered_options && (
+                    <div>
+                      <div className="font-medium">Considered Options</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">{aiReasoning.considered_options}</div>
+                    </div>
+                  )}
+                  {aiReasoning.rationale && (
+                    <div>
+                      <div className="font-medium">Rationale</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">{aiReasoning.rationale}</div>
+                    </div>
+                  )}
+                  {aiReasoning.confidence !== undefined && (
+                    <div>
+                      <div className="font-medium">Confidence</div>
+                      <div className="text-muted-foreground">{aiReasoning.confidence.toFixed(2)}</div>
+                    </div>
+                  )}
+                  {aiReasoning.decision_reasoning && (
+                    <div>
+                      <div className="font-medium">Decision Reasoning</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">{aiReasoning.decision_reasoning}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Action Panel (only when turn is active) */}
             {turnActive && (

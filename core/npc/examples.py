@@ -4,7 +4,6 @@ from core.npc.state import NPCState
 from core.npc.compendium import (
     get_npc_template,
     NPC_TEMPLATES,
-    NPC_TEMPLATES_BY_ID,
 )
 from core.npc.validation import validate_npc_in_combat, validate_npc_template
 

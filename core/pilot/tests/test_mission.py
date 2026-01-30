@@ -1,15 +1,12 @@
 """Tests for mission cadence, downtime actions, and reserves."""
 
-import pytest
 
 from core.pilot.mission import (
     validate_downtime_plan,
     DowntimePlan,
     DowntimeActionUse,
-    DowntimeActionDefinition,
     ReserveEntry,
     MissionCadenceRules,
-    DEFAULT_MISSION_CADENCE_RULES,
     DOWNTIME_ACTIONS_BY_ID,
     DOWNTIME_ACTION_DEFINITIONS,
     roll_for_reserve,
@@ -17,7 +14,6 @@ from core.pilot.mission import (
     MECH_RESERVES,
     TACTICAL_RESERVES,
     OrganizationState,
-    RollTierOutcome,
     _get_roll_tier,
 )
 

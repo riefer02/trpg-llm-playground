@@ -918,7 +918,7 @@ def main() -> None:
     if negatives_enabled:
         total_examples = positive_count + negative_count
         actual_ratio = negative_count / total_examples if total_examples > 0 else 0
-        print(f"\n--- Negative Examples ---")
+        print("\n--- Negative Examples ---")
         print(f"Positive examples: {positive_count}")
         print(f"Negative examples: {negative_count}")
         print(f"Negative ratio: {actual_ratio:.1%} (target: {negatives_ratio:.1%})")
@@ -937,7 +937,7 @@ def main() -> None:
         difficulty_stats.print_summary(target_distribution=difficulty_distribution)
 
     if walkthrough_written > 0:
-        print(f"\n--- Walkthrough Summary ---")
+        print("\n--- Walkthrough Summary ---")
         print(f"Walkthrough conversations: {walkthrough_written}")
 
     print(f"\nSuccessfully generated {total_samples} pairs. Saved to {output_path}")

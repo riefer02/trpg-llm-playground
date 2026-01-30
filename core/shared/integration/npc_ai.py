@@ -15,7 +15,7 @@ Target awareness: Can read target stats for smarter decisions.
 
 from __future__ import annotations
 
-from typing import Literal, NamedTuple
+from typing import Literal, Optional
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import ActionType, SizeClass
@@ -70,6 +70,7 @@ class NPCActionDecision(FrozenModel):
     action: ActionType
     target_id: CombatantIdField | None
     reasoning: str
+    detailed_reasoning: Optional[str] = None
     fallback_used: bool = False
 
 

@@ -36,7 +36,6 @@ from core.shared.dice import roll_dice
 from core.mech.grid import HexCoord
 from core.mech.terrain import TerrainMap
 from core.shared.terrain import get_terrain_at
-from core.mech.statuses import get_status_definition
 
 
 # =============================================================================

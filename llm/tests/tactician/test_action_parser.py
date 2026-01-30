@@ -125,10 +125,22 @@ def test_validate_parsed_json_valid():
         "confidence": 0.9,
         "reasoning": "Some reason",
     }
-    action_id, target_id, confidence = validate_parsed_json(parsed)
+    (
+        action_id,
+        target_id,
+        confidence,
+        reasoning,
+        situation_assessment,
+        considered_options,
+        rationale,
+    ) = validate_parsed_json(parsed)
     assert action_id == "skirmish"
     assert target_id == "enemy1"
     assert confidence == 0.9
+    assert reasoning == "Some reason"
+    assert situation_assessment == ""
+    assert considered_options == ""
+    assert rationale == ""
 
 
 def test_validate_parsed_json_missing_action_id():
@@ -212,14 +224,16 @@ def test_parse_llm_action_valid():
         "confidence": 0.85
     }"""
     actions = create_mock_actions()
-    result = parse_llm_action(llm_output, "actor_1", actions)
+    action_input, reasoning_fields = parse_llm_action(llm_output, "actor_1", actions)
 
-    assert result.actor_id == "actor_1"
-    assert result.action_id == "skirmish"
-    assert result.action_type == "quick"
-    assert result.target_ids == ["enemy_striker"]
-    assert result.weapon_id is None  # Not provided by LLM
-    assert result.system_id is None
+    assert action_input.actor_id == "actor_1"
+    assert action_input.action_id == "skirmish"
+    assert action_input.action_type == "quick"
+    assert action_input.target_ids == ["enemy_striker"]
+    assert action_input.weapon_id is None  # Not provided by LLM
+    assert action_input.system_id is None
+    assert reasoning_fields["reasoning"] == "Target is low HP"
+    assert reasoning_fields["confidence"] == 0.85
 
 
 def test_parse_llm_action_no_target():
@@ -231,11 +245,13 @@ def test_parse_llm_action_no_target():
         "confidence": 0.7
     }"""
     actions = create_mock_actions()
-    result = parse_llm_action(llm_output, "actor_1", actions)
+    action_input, reasoning_fields = parse_llm_action(llm_output, "actor_1", actions)
 
-    assert result.action_id == "move"
-    assert result.target_ids == []
-    assert result.action_type == "quick"
+    assert action_input.action_id == "move"
+    assert action_input.target_ids == []
+    assert action_input.action_type == "quick"
+    assert reasoning_fields["reasoning"] == "Reposition"
+    assert reasoning_fields["confidence"] == 0.7
 
 
 def test_parse_llm_action_missing_required_target():
@@ -258,17 +274,18 @@ def test_parse_llm_action_extra_target_ignored():
         "confidence": 0.5
     }"""
     actions = create_mock_actions()
-    result = parse_llm_action(llm_output, "actor_1", actions)
+    action_input, reasoning_fields = parse_llm_action(llm_output, "actor_1", actions)
     # target_id should be ignored, not in target_ids
-    assert result.target_ids == []
+    assert action_input.target_ids == []
+    assert reasoning_fields["confidence"] == 0.5
 
 
 def test_parse_llm_action_fuzzy_match():
     """Test parsing with fuzzy matching of action_id."""
     llm_output = """{"action_id": "skirmis", "target_id": "enemy1"}"""
     actions = create_mock_actions()
-    result = parse_llm_action(llm_output, "actor_1", actions)
-    assert result.action_id == "skirmish"
+    action_input, _ = parse_llm_action(llm_output, "actor_1", actions)
+    assert action_input.action_id == "skirmish"
 
 
 def test_parse_llm_action_malformed_json():
@@ -281,8 +298,8 @@ def test_parse_llm_action_malformed_json():
     }
     ```"""
     actions = create_mock_actions()
-    result = parse_llm_action(llm_output, "actor_1", actions)
-    assert result.action_id == "barrage"
+    action_input, _ = parse_llm_action(llm_output, "actor_1", actions)
+    assert action_input.action_id == "barrage"
 
 
 def test_parse_llm_action_no_json():
@@ -302,8 +319,9 @@ def test_parse_llm_action_confidence_passthrough():
     }"""
     actions = create_mock_actions()
     # Should not raise
-    result = parse_llm_action(llm_output, "actor_1", actions)
-    assert result.action_id == "skirmish"
+    action_input, reasoning_fields = parse_llm_action(llm_output, "actor_1", actions)
+    assert action_input.action_id == "skirmish"
+    assert reasoning_fields["confidence"] == 0.42
 
 
 if __name__ == "__main__":

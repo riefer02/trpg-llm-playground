@@ -30,7 +30,6 @@ from core.shared.terrain_primitives import (
     MaterialType,
     MaterialProperties,
     MATERIAL_ORGANIC,
-    MATERIAL_TOUGH,
     MATERIAL_HARDY,
     MATERIAL_FORTIFIED,
     MATERIAL_ARMORED,

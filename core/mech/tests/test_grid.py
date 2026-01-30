@@ -5,7 +5,6 @@ Tests the size-aware adjacency helpers per PR2 rules:
 - Larger units engage/interact at extended range
 """
 
-import pytest
 from core.mech.grid import (
     HexCoord,
     adjacency_distance,

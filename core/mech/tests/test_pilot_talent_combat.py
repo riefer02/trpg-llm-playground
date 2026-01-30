@@ -6,7 +6,6 @@ Tests that pilot talents are properly:
 3. Evaluated during combat for accuracy/difficulty modifiers
 """
 
-import pytest
 from core.mech.combat_state import (
     MechCombatScenario,
     CombatantState,
@@ -32,8 +31,6 @@ from core.shared.effects import (
 from core.pilot import (
     Pilot,
     Talent,
-    TalentDefinition,
-    TalentRank,
     collect_pilot_talent_effects,
     get_talent_definition,
 )

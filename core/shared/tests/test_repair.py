@@ -10,16 +10,11 @@ from core.shared.repair import (
     RestInput,
     RestRule,
     RepairSpec,
-    RestResolutionResult,
 )
 from core.mech.combat_state import (
     CombatantState,
     CombatStats,
     CombatResources,
-    MechInventory,
-    MechSystemState,
-    WeaponMountState,
-    WeaponState,
 )
 
 

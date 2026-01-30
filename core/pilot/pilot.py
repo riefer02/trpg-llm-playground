@@ -6,8 +6,7 @@ that define their capabilities both in and out of the mech.
 """
 
 from pydantic import BaseModel, Field, computed_field, model_validator
-from uuid import uuid4
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from core.pilot.skill import SkillSet, PilotTrigger
 from core.pilot.background import Background
@@ -291,7 +290,7 @@ class Pilot(BaseModel):
         Returns:
             New Pilot with clone state updated
         """
-        from core.pilot.clone_state import CloneState, CloneStatus, QuirkSource
+        from core.pilot.clone_state import CloneState, CloneStatus
 
         new_clone_state = CloneState(
             status=CloneStatus(times_cloned=1, is_dead=False),

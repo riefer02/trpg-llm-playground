@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from core.shared.enums import ActionType, StatusType, DamageType
+from core.shared.enums import StatusType, DamageType
 from core.shared.dice import roll_dice, round_up
 
 if TYPE_CHECKING:
@@ -95,13 +95,9 @@ from core.mech.combat_helpers import (
 from core.mech.combat_state import (
     MechCombatScenario,
     CombatantState,
-    CombatResources,
     CombatTurn,
-    CombatRound,
     ActionLogEffect,
     ActionUse,
-    OverchargeState,
-    GrappleLink,
 )
 from core.mech.action_economy import (
     ActionEconomyState,
@@ -110,7 +106,6 @@ from core.mech.action_economy import (
     use_quick_action,
     use_overcharge as mark_overcharge_used,
     use_reaction,
-    reset_economy_for_new_turn,
 )
 from core.mech.combat_resolution import (
     decrement_cooldowns_on_turn_start,
@@ -122,17 +117,15 @@ from core.mech.combat_resolution import (
 from core.mech.grid import HexPosition
 from core.mech.grid import (
     HexCoord,
-    hex_add,
     hex_cone,
     hex_cone_centered,
     hex_line_from_direction,
-    hex_scale,
     hexes_in_radius,
     normalize_hex_direction,
 )
 from core.mech.compendium import get_weapon_definition
 from core.mech.combat_rules import AttackPatternDefinition
-from core.mech.weapon import WeaponProfile, WeaponTag, resolve_weapon_profile
+from core.mech.weapon import WeaponTag, resolve_weapon_profile
 from core.mech.tech_actions import (
     ScanResult,
     BolsterResult,
@@ -144,14 +137,9 @@ from core.mech.tech_actions import (
     resolve_invade,
 )
 from core.shared.full_tech import (
-    FullTechOptionSelection,
     FullTechInput,
     FullTechFirstOption,
     FullTechSecondOption,
-    ScanTechParams,
-    BolsterTechParams,
-    LockOnTechParams,
-    InvadeTechParams,
     resolve_full_tech,
 )
 from core.shared.heat import decrement_meltdown_countdown, trigger_meltdown

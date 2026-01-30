@@ -30,10 +30,9 @@ from core.shared.id_helpers import CombatantIdField
 if TYPE_CHECKING:
     from core.mech.combat_state import (
         CombatantState,
-        MechInventory,
         MechCombatScenario,
     )
-    from core.shared.structure import StructureResolutionResult, SystemTraumaSelection
+    from core.shared.structure import StructureResolutionResult
     from core.shared.heat import OverheatResolutionResult
 
 

@@ -27,7 +27,6 @@ from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
 
 from core.mech.combat_state import CombatantState
-from core.mech.statuses import get_status_definition
 
 
 class ShutDownInput(FrozenModel):

@@ -5,9 +5,7 @@ from core.shared.structure import (
     resolve_structure_damage,
     apply_structure_result,
     StructureInput,
-    SystemTraumaSelection,
 )
-from core.shared.heat import MeltdownState
 from core.mech.combat_state import (
     CombatantState,
     CombatStats,
@@ -17,7 +15,6 @@ from core.mech.combat_state import (
     WeaponState,
     MechSystemState,
 )
-from core.shared.enums import SizeClass, StatusType
 
 
 @pytest.fixture

@@ -11,10 +11,6 @@ Tests cover:
 
 import pytest
 from core.gm_toolkit.world_generation import (
-    WorldType,
-    NaturalFeature,
-    AnthropocentricFeature,
-    EnvironmentalHazard,
     WorldDetails,
     WORLD_TYPE_NAMES,
     NATURAL_FEATURE_NAMES,

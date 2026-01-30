@@ -16,12 +16,9 @@ The prone status auto-grants the slowed condition (per status definition).
 from __future__ import annotations
 
 from typing import Literal
-from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
 from core.mech.statuses import (
-    StatusDefinition,
-    STATUS_DEFINITIONS_BY_ID,
     get_status_definition,
 )
 

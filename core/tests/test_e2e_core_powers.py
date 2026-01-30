@@ -4,7 +4,6 @@ Tests that frame core powers can be activated, apply effects correctly,
 and respect the once-per-mission limitation.
 """
 
-import pytest
 
 from core.tests.e2e_helpers import (
     make_pilot_with_talents,
@@ -12,7 +11,6 @@ from core.tests.e2e_helpers import (
     make_combatant,
     make_enemy_combatant,
     make_duel_scenario,
-    execute_attack,
 )
 from core.mech.combat_state import (
     MechCombatScenario,

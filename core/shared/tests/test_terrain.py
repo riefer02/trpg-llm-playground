@@ -1,6 +1,5 @@
 """Terrain resolution tests for Lancer combat."""
 
-import pytest
 from core.shared.terrain import (
     get_terrain_at,
     get_terrain_effects_at,
@@ -12,14 +11,9 @@ from core.shared.terrain import (
     resolve_dangerous_terrain,
     get_elevation_bonus,
     calculate_climb_cost,
-    TerrainEffectResult,
-    CoverDifficultyResult,
-    HardCoverAvailabilityResult,
-    DangerousTerrainResult,
 )
 from core.mech.terrain import TerrainHex, TerrainMap
 from core.mech.grid import HexCoord
-from core.shared.enums import SizeClass
 
 
 class TestGetTerrainAt:

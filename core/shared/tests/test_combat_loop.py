@@ -1,16 +1,10 @@
 """Tests for narrative combat loop primitives."""
 
-import pytest
 from core.shared.combat_loop import (
     CombatLoopState,
     InitiativeTracker,
     SceneTimer,
-    SceneMetrics,
-    ScenePhase,
-    SceneScenarioType,
-    TimePressureLevel,
     VictoryCondition,
-    MissionCompletionResult,
     VictoryCheckResult,
     advance_phase,
     transfer_initiative,
@@ -412,11 +406,9 @@ class TestNarrativeScenarioIntegration:
     def test_start_narrative_scenario(self):
         """Test initializing a complete narrative scenario."""
         from core.shared.combat_loop import (
-            start_narrative_scenario,
-            InitiativeTracker,
             SceneTimer,
         )
-        from core.shared.narrative import NarrativeCombatState, NarrativeGoalTracker
+        from core.shared.narrative import NarrativeCombatState
 
         loop_state, combat_state, init_tracker, timer = start_narrative_scenario(
             scene_id="test_scene",
@@ -438,7 +430,6 @@ class TestNarrativeScenarioIntegration:
     def test_advance_narrative_turn(self):
         """Test advancing narrative turn with phase transition."""
         from core.shared.combat_loop import (
-            advance_narrative_turn,
             CombatLoopState,
         )
 
@@ -456,11 +447,9 @@ class TestNarrativeScenarioIntegration:
     def test_check_narrative_victory_conditions_met(self):
         """Test victory detection when all conditions are met."""
         from core.shared.combat_loop import (
-            check_narrative_victory,
             VictoryCondition,
             CombatLoopState,
         )
-        from core.shared.narrative import NarrativeCombatState
 
         loop_state = CombatLoopState(
             scene_id="scene_1",
@@ -504,12 +493,10 @@ class TestNarrativeScenarioIntegration:
     def test_check_narrative_victory_not_met(self):
         """Test victory detection when conditions are not met."""
         from core.shared.combat_loop import (
-            check_narrative_victory,
             VictoryCondition,
             CombatLoopState,
         )
         from core.shared.narrative import (
-            NarrativeCombatState,
             NarrativeGoalTracker,
             NarrativeGoal,
             NarrativeGoalState,

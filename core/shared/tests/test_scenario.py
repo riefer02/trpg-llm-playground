@@ -1,12 +1,9 @@
 """Tests for scenario/objective system."""
 
 import pytest
-from pydantic import ValidationError
 from core.shared.scenario import (
     MissionObjectiveType,
     ObjectiveStatus,
-    ObjectiveCriterionType,
-    MissionOutcomeType,
     ObjectiveCriterion,
     MissionObjective,
     MissionObjectiveState,

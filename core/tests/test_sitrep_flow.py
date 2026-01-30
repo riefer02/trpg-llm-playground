@@ -4,12 +4,9 @@ Tests mission templates, objectives, zone control, and victory condition resolut
 following the structure defined in PR2 888-1000 and 2812-2815.
 """
 
-import pytest
 from core.shared.scenario import (
     SitrepTemplate,
     MissionObjective,
-    SitrepZone,
-    VictoryCondition,
     MissionOutcomeType,
     ObjectiveCriterion,
     ESCORT_TEMPLATE,
@@ -18,12 +15,9 @@ from core.shared.scenario import (
 )
 from core.shared.sitrep_resolution import (
     ZoneControlStateTracker,
-    SitrepResolution,
     create_sitrep_resolution,
     spawn_reserves,
-    update_zone_control,
     check_extraction_progress,
-    check_victory_conditions,
     advance_sitrep_round,
 )
 from core.shared.integration.narrative_combat import CombatEvent
@@ -294,8 +288,6 @@ class TestReserveManagement:
         """All reserve types are available."""
         from core.shared.downtime import (
             ReserveType,
-            NarrativeReserveType,
-            MechReserveType,
         )
 
         assert "narrative" in ReserveType.__args__

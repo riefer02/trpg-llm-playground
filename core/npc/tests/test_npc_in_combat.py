@@ -7,13 +7,9 @@ from core.npc.compendium import (
 )
 from core.npc.state import (
     NPCState,
-    NPCCombatStats,
-    scale_npc_stats,
 )
 from core.npc.models import NPCTemplate, NPCStats, NPCStatsBase, NPCTierScaling
 from core.npc.validation import validate_npc_template, validate_npc_in_combat
-from core.npc.enums import NPCTier, NPCClass
-from core.shared.enums import SizeClass
 
 
 def _assert_no_errors(validation) -> None:

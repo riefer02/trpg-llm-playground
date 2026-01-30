@@ -14,15 +14,12 @@ from core.shared.heat import (
     decrement_meltdown_countdown,
     trigger_meltdown,
     OverheatInput,
-    OverheatResolutionResult,
     MeltdownState,
     resolve_stress_check,
     apply_stress_check_result,
     StressCheckInput,
-    StressCheckResult,
     resolve_meltdown_countdown,
     MeltdownCountdownInput,
-    MeltdownCountdownResult,
 )
 from core.mech.combat_state import (
     CombatantState,
@@ -33,7 +30,6 @@ from core.mech.combat_state import (
     WeaponState,
     MechSystemState,
 )
-from core.shared.enums import StatusType
 
 
 @pytest.fixture

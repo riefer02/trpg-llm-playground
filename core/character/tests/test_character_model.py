@@ -6,7 +6,6 @@ from core.character import Character, MechConfiguration
 from core.pilot.pilot import Pilot
 from core.pilot.skill import SkillSet, PilotTrigger
 from core.pilot.talent import Talent
-from core.pilot.background import Background
 from core.mech.build import MechBuild
 
 

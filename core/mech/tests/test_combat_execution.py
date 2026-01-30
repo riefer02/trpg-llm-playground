@@ -1,16 +1,8 @@
 """Tests for combat turn execution and action resolution."""
 
-import pytest
 from core.mech.combat_execution import (
     ActionExecutionInput,
-    ActionExecutionResult,
-    TurnStartResult,
-    TurnEndResult,
     ReactionInput,
-    ReactionResult,
-    AvailableAction,
-    AvailableActionsResult,
-    ResourceChange,
     start_turn,
     end_turn,
     execute_action,
@@ -21,13 +13,9 @@ from core.mech.combat_execution import (
     apply_heat,
     clear_heat,
     lookup_weapon_damage_and_ap,
-    check_structure_cascade,
-    check_overheat_cascade,
 )
 from core.mech.action_economy import (
     ActionEconomyState,
-    use_full_action,
-    use_quick_action,
 )
 from core.mech.combat_state import (
     MechCombatScenario,
@@ -6658,7 +6646,6 @@ class TestRangeAndLOS:
 
     def test_tech_attack_within_sensor_range_succeeds(self):
         """Target within sensor range should allow tech attack."""
-        from unittest.mock import patch
 
         attacker = make_combatant(
             id="attacker",

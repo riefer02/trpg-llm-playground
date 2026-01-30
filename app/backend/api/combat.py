@@ -4,8 +4,9 @@ This module provides API endpoints for managing combat sessions.
 It directly uses core.mech.combat_state models - no duplicate schemas.
 """
 
+import json
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect
@@ -28,6 +29,7 @@ from core.mech.combat_state import (
     CombatResources,
     CombatTurn,
     CombatRound,
+    CombatEnvironment,
 )
 from core.mech.grid import HexPosition, HexCoord
 from core.shared.campaign.campaign import MissionOutcomeReport
@@ -56,6 +58,7 @@ from core.shared.decisions import (
     apply_failed_hull_save,
 )
 from core.mech.npc_turn_execution import execute_npc_turn
+from llm.src.tactician.integration import execute_llm_npc_turn
 
 router = APIRouter(prefix="/combat", tags=["combat"])
 
@@ -200,7 +203,7 @@ def _validate_combatant(data: dict[str, Any]) -> CombatantState:
 
 def _validate_scenario(
     combatants: list[dict[str, Any]],
-    environment: str,
+    environment: CombatEnvironment,
 ) -> MechCombatScenario:
     """Build and validate scenario using core models."""
     validated_combatants = [_validate_combatant(c) for c in combatants]
@@ -230,7 +233,7 @@ def _session_to_response(session_db: CombatSessionDB) -> CombatSessionResponse:
         created_at=session_db.created_at,
         updated_at=session_db.updated_at,
         name=session_db.name,
-        status=session_db.status,
+        status=cast(SessionStatus, session_db.status),
         current_round=session_db.current_round,
         current_turn_index=session_db.current_turn_index,
         notes=session_db.notes,
@@ -244,7 +247,7 @@ def _session_to_list_item(session_db: CombatSessionDB) -> CombatSessionListItem:
     return CombatSessionListItem(
         id=session_db.id,
         name=session_db.name,
-        status=session_db.status,
+        status=cast(SessionStatus, session_db.status),
         current_round=session_db.current_round,
         combatant_count=len(scenario.get("combatants", [])),
         environment=scenario.get("environment", "standard"),
@@ -831,11 +834,15 @@ class ActionRequest(BaseModel):
     """Request body for executing a combat action."""
 
     action_id: str = Field(..., description="Action identifier")
-    action_type: Literal["full", "quick", "free", "reaction", "protocol", "move"] = Field(
-        ..., description="Type of action"
+    action_type: Literal["full", "quick", "free", "reaction", "protocol", "move"] = (
+        Field(..., description="Type of action")
     )
-    target_ids: list[str] = Field(default_factory=list, description="Target combatant IDs")
-    target_position: dict[str, Any] | None = Field(default=None, description="Target position")
+    target_ids: list[str] = Field(
+        default_factory=list, description="Target combatant IDs"
+    )
+    target_position: dict[str, Any] | None = Field(
+        default=None, description="Target position"
+    )
     weapon_id: str | None = Field(default=None, description="Weapon to use")
     weapon_profile_id: str | None = Field(
         default=None, description="Weapon profile for weapons with multiple profiles"
@@ -847,12 +854,16 @@ class ActionRequest(BaseModel):
     full_tech_second: FullTechOptionSelection | None = Field(
         default=None, description="Second Full Tech option"
     )
-    movement_path: list[dict[str, Any]] = Field(default_factory=list, description="Movement path")
+    movement_path: list[dict[str, Any]] = Field(
+        default_factory=list, description="Movement path"
+    )
     prompt_dangerous_terrain: bool = Field(
         default=False,
         description="Whether to prompt for dangerous terrain checks (players only)",
     )
-    is_overcharge: bool = Field(default=False, description="Whether this uses overcharge")
+    is_overcharge: bool = Field(
+        default=False, description="Whether this uses overcharge"
+    )
     use_thrown: bool = Field(
         default=False,
         description="Whether to treat a melee weapon attack as thrown",
@@ -898,9 +909,15 @@ class ReactionRequest(BaseModel):
     """Request body for declaring a reaction."""
 
     reactor_id: str = Field(..., description="ID of the reacting combatant")
-    reaction_type: Literal["brace", "overwatch"] = Field(..., description="Type of reaction")
-    trigger_action_id: str | None = Field(default=None, description="Action that triggered this")
-    target_ids: list[str] = Field(default_factory=list, description="Targets for the reaction")
+    reaction_type: Literal["brace", "overwatch"] = Field(
+        ..., description="Type of reaction"
+    )
+    trigger_action_id: str | None = Field(
+        default=None, description="Action that triggered this"
+    )
+    target_ids: list[str] = Field(
+        default_factory=list, description="Targets for the reaction"
+    )
     weapon_id: str | None = Field(default=None, description="Weapon for overwatch")
 
 
@@ -972,7 +989,9 @@ class PendingDecisionItem(BaseModel):
     """A pending decision for a combatant."""
 
     decision_id: str
-    decision_type: Literal["hull_save", "engineering_save", "engineering_check", "system_trauma"]
+    decision_type: Literal[
+        "hull_save", "engineering_save", "engineering_check", "system_trauma"
+    ]
     trigger_source: str
     trigger_round: int
 
@@ -1004,7 +1023,9 @@ class DecisionSubmitRequest(BaseModel):
     """Request body for submitting a decision."""
 
     decision_id: str = Field(..., description="ID of the decision to resolve")
-    combatant_id: str = Field(..., description="ID of the combatant making the decision")
+    combatant_id: str = Field(
+        ..., description="ID of the combatant making the decision"
+    )
     choice: Literal["roll", "voluntary_fail", "use_reroll"] = Field(
         ..., description="Player's chosen action"
     )
@@ -1082,7 +1103,13 @@ async def start_combat_turn(
     if combat_session.status != "active":
         raise ValidationError(
             f"Cannot start turn: session status is '{combat_session.status}'",
-            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["status"],
+                    "msg": "Session must be active",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Hydrate scenario
@@ -1116,7 +1143,13 @@ async def start_combat_turn(
     if current_actor is None:
         raise ValidationError(
             "No current actor found",
-            errors=[{"loc": ["turn"], "msg": "Turn order not initialized", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["turn"],
+                    "msg": "Turn order not initialized",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Start the turn using core helper
@@ -1177,7 +1210,13 @@ async def execute_combat_action(
     if combat_session.status != "active":
         raise ValidationError(
             f"Cannot execute action: session status is '{combat_session.status}'",
-            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["status"],
+                    "msg": "Session must be active",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Hydrate scenario
@@ -1193,7 +1232,9 @@ async def execute_combat_action(
     if current_actor is None:
         raise ValidationError(
             "No current actor found",
-            errors=[{"loc": ["turn"], "msg": "Turn not started", "type": "value_error"}],
+            errors=[
+                {"loc": ["turn"], "msg": "Turn not started", "type": "value_error"}
+            ],
         )
 
     # Get or create current turn
@@ -1201,7 +1242,9 @@ async def execute_combat_action(
     turn_idx = combat_session.current_turn_index
     current_turn: CombatTurn
 
-    if round_idx < len(scenario.rounds) and turn_idx < len(scenario.rounds[round_idx].turns):
+    if round_idx < len(scenario.rounds) and turn_idx < len(
+        scenario.rounds[round_idx].turns
+    ):
         current_turn = scenario.rounds[round_idx].turns[turn_idx]
     else:
         current_turn = CombatTurn(actor_id=current_actor.id)
@@ -1279,7 +1322,9 @@ async def execute_combat_action(
         updated_rounds[round_idx] = CombatRound(
             round_index=updated_rounds[round_idx].round_index,
             turns=round_turns,
-            reaction_counts_by_actor=dict(updated_rounds[round_idx].reaction_counts_by_actor),
+            reaction_counts_by_actor=dict(
+                updated_rounds[round_idx].reaction_counts_by_actor
+            ),
         )
 
     final_scenario = MechCombatScenario(
@@ -1311,7 +1356,9 @@ async def execute_combat_action(
 
     return ActionResponse(
         success=True,
-        action_use=action_result.action_use.model_dump() if action_result.action_use else None,
+        action_use=action_result.action_use.model_dump()
+        if action_result.action_use
+        else None,
         effects_applied=action_result.effects_applied,
         damage_dealt=action_result.damage_dealt,
         heat_generated=action_result.heat_generated,
@@ -1345,7 +1392,13 @@ async def end_combat_turn(
     if combat_session.status != "active":
         raise ValidationError(
             f"Cannot end turn: session status is '{combat_session.status}'",
-            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["status"],
+                    "msg": "Session must be active",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Hydrate scenario
@@ -1358,7 +1411,9 @@ async def end_combat_turn(
     if round_idx >= len(scenario.rounds):
         raise ValidationError(
             "Invalid round",
-            errors=[{"loc": ["round"], "msg": "Round not found", "type": "value_error"}],
+            errors=[
+                {"loc": ["round"], "msg": "Round not found", "type": "value_error"}
+            ],
         )
 
     current_round_data = scenario.rounds[round_idx]
@@ -1435,7 +1490,13 @@ async def submit_reaction(
     if combat_session.status != "active":
         raise ValidationError(
             f"Cannot react: session status is '{combat_session.status}'",
-            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["status"],
+                    "msg": "Session must be active",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Hydrate scenario
@@ -1451,7 +1512,9 @@ async def submit_reaction(
     )
 
     # Get economy for the reactor (may be different from current actor)
-    reactor_economy = ActionEconomyState()  # Reactions have their own per-round tracking
+    reactor_economy = (
+        ActionEconomyState()
+    )  # Reactions have their own per-round tracking
 
     # Execute reaction using core helper
     updated_scenario, updated_economy, reaction_result = execute_reaction(
@@ -1526,7 +1589,9 @@ async def get_combat_available_actions(
     if current_actor is None:
         raise ValidationError(
             "No current actor found",
-            errors=[{"loc": ["turn"], "msg": "Turn not started", "type": "value_error"}],
+            errors=[
+                {"loc": ["turn"], "msg": "Turn not started", "type": "value_error"}
+            ],
         )
 
     # Get current economy
@@ -1552,7 +1617,7 @@ async def get_combat_available_actions(
     # Get overcharge level from combatant state
     overcharge_level = 0
     if current_actor.overcharge_state:
-        overcharge_level = current_actor.overcharge_state.level
+        overcharge_level = current_actor.overcharge_state.current_level
 
     return AvailableActionsResponse(
         actor_id=available.actor_id,
@@ -1719,10 +1784,12 @@ async def combat_websocket(
     try:
         # Send initial state
         response = _session_to_response(combat_session)
-        await websocket.send_json({
-            "type": "state",
-            "data": response.model_dump(mode="json"),
-        })
+        await websocket.send_json(
+            {
+                "type": "state",
+                "data": response.model_dump(mode="json"),
+            }
+        )
 
         # Keep connection alive and handle client messages
         while True:
@@ -1833,7 +1900,13 @@ async def submit_decision(
     if combat_session.status != "active":
         raise ValidationError(
             f"Cannot submit decision: session status is '{combat_session.status}'",
-            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["status"],
+                    "msg": "Session must be active",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Hydrate scenario
@@ -1851,7 +1924,13 @@ async def submit_decision(
     if decision.combatant_id != body.combatant_id:
         raise ValidationError(
             f"Decision belongs to combatant '{decision.combatant_id}', not '{body.combatant_id}'",
-            errors=[{"loc": ["combatant_id"], "msg": "Combatant mismatch", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["combatant_id"],
+                    "msg": "Combatant mismatch",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Find the combatant
@@ -1890,42 +1969,54 @@ async def submit_decision(
         save_result = resolve_save_decision(
             decision,
             resolution,
-            target_conditions=list(combatant.conditions) if combatant.conditions else [],
+            target_conditions=list(combatant.conditions)
+            if combatant.conditions
+            else [],
         )
         roll_result = save_result.save_result.roll if save_result.save_result else None
         save_succeeded = save_result.success
 
         if save_result.voluntarily_failed:
-            effects_applied.append({
-                "type": "voluntary_fail",
-                "decision_type": decision.decision_type,
-            })
+            effects_applied.append(
+                {
+                    "type": "voluntary_fail",
+                    "decision_type": decision.decision_type,
+                }
+            )
         elif save_result.save_result:
-            effects_applied.append({
-                "type": "save_roll",
-                "roll": save_result.save_result.roll,
-                "total": save_result.save_result.total,
-                "target": save_result.save_result.target,
-                "success": save_result.success,
-                "degree": save_result.save_result.degree,
-            })
+            effects_applied.append(
+                {
+                    "type": "save_roll",
+                    "roll": save_result.save_result.roll,
+                    "total": save_result.save_result.total,
+                    "target": save_result.save_result.target,
+                    "success": save_result.success,
+                    "degree": save_result.save_result.degree,
+                }
+            )
 
         # Apply failure effects based on decision type
         if not save_result.success:
             if decision.decision_type == "hull_save":
                 # Hull save failure at 2 structure = mech destroyed
                 updated_combatant = apply_failed_hull_save(combatant)
-                updated_scenario = _replace_combatant(updated_scenario, updated_combatant)
-                effects_applied.append({
-                    "type": "mech_destroyed",
-                    "reason": "hull_save_failed",
-                })
+                updated_scenario = _replace_combatant(
+                    updated_scenario, updated_combatant
+                )
+                effects_applied.append(
+                    {
+                        "type": "mech_destroyed",
+                        "reason": "hull_save_failed",
+                    }
+                )
             elif decision.decision_type == "engineering_save":
                 # Engineering save failure = meltdown countdown starts
-                effects_applied.append({
-                    "type": "meltdown_countdown",
-                    "reason": "engineering_save_failed",
-                })
+                effects_applied.append(
+                    {
+                        "type": "meltdown_countdown",
+                        "reason": "engineering_save_failed",
+                    }
+                )
             elif decision.decision_type == "engineering_check":
                 # Engineering check failure (dangerous terrain) = take damage
                 terrain_rules = DEFAULT_MECH_COMBAT_RULES.terrain
@@ -1936,19 +2027,23 @@ async def submit_decision(
                     damage_amount,
                     armor_piercing=0,
                 )
-                effects_applied.append({
-                    "type": "damage",
-                    "target_id": combatant.id,
-                    "amount": damage_amount,
-                    "source": "dangerous_terrain",
-                })
-                effects_applied.append({
-                    "type": "terrain_damage",
-                    "reason": "engineering_check_failed",
-                    "trigger_source": decision.trigger_source,
-                    "damage": damage_amount,
-                    "damage_type": str(terrain_rules.dangerous_terrain_damage_type),
-                })
+                effects_applied.append(
+                    {
+                        "type": "damage",
+                        "target_id": combatant.id,
+                        "amount": damage_amount,
+                        "source": "dangerous_terrain",
+                    }
+                )
+                effects_applied.append(
+                    {
+                        "type": "terrain_damage",
+                        "reason": "engineering_check_failed",
+                        "trigger_source": decision.trigger_source,
+                        "damage": damage_amount,
+                        "damage_type": str(terrain_rules.dangerous_terrain_damage_type),
+                    }
+                )
 
         if decision.decision_type == "engineering_check":
             refreshed = next(
@@ -1975,17 +2070,21 @@ async def submit_decision(
         if trauma_result.selected_target == "mount":
             updated_combatant = apply_system_trauma_selection(combatant, trauma_result)
             updated_scenario = _replace_combatant(updated_scenario, updated_combatant)
-            effects_applied.append({
-                "type": "mount_destroyed",
-                "mount_index": trauma_result.mount_index,
-            })
+            effects_applied.append(
+                {
+                    "type": "mount_destroyed",
+                    "mount_index": trauma_result.mount_index,
+                }
+            )
         else:
             updated_combatant = apply_system_trauma_selection(combatant, trauma_result)
             updated_scenario = _replace_combatant(updated_scenario, updated_combatant)
-            effects_applied.append({
-                "type": "system_destroyed",
-                "system_id": trauma_result.system_id,
-            })
+            effects_applied.append(
+                {
+                    "type": "system_destroyed",
+                    "system_id": trauma_result.system_id,
+                }
+            )
 
     # Remove the resolved decision from scenario
     updated_scenario = remove_decision_from_scenario(updated_scenario, body.decision_id)
@@ -2045,7 +2144,13 @@ async def spend_reserve(
     if combat_session.status != "active":
         raise ValidationError(
             f"Cannot spend reserve: session status is '{combat_session.status}'",
-            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["status"],
+                    "msg": "Session must be active",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Hydrate scenario
@@ -2066,7 +2171,13 @@ async def spend_reserve(
     if reserve.status != "planned":
         raise ValidationError(
             f"Reserve '{body.reserve_id}' has already been spent or earned",
-            errors=[{"loc": ["reserve_id"], "msg": f"Reserve status is '{reserve.status}'", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["reserve_id"],
+                    "msg": f"Reserve status is '{reserve.status}'",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Update reserve status to 'spent'
@@ -2075,7 +2186,9 @@ async def spend_reserve(
     updated_reserves[reserve_idx] = updated_reserve
 
     # Create updated scenario with spent reserve
-    updated_scenario = scenario.model_copy(update={"mission_reserves": updated_reserves})
+    updated_scenario = scenario.model_copy(
+        update={"mission_reserves": updated_reserves}
+    )
 
     # Persist
     combat_session.scenario = updated_scenario.model_dump(mode="json")
@@ -2109,6 +2222,11 @@ class AutoNPCTurnResponse(BaseModel):
     decision_action: str | None = None
     decision_target: str | None = None
     decision_reasoning: str | None = None
+    # Detailed reasoning fields for AI reasoning display
+    situation_assessment: str | None = None
+    considered_options: str | None = None
+    rationale: str | None = None
+    confidence: float | None = None
     actions_taken: int
     skipped: bool
     skip_reason: str | None = None
@@ -2145,7 +2263,13 @@ async def execute_auto_npc_turn(
     if combat_session.status != "active":
         raise ValidationError(
             f"Cannot execute NPC turn: session status is '{combat_session.status}'",
-            errors=[{"loc": ["status"], "msg": "Session must be active", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["status"],
+                    "msg": "Session must be active",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Hydrate scenario
@@ -2161,23 +2285,45 @@ async def execute_auto_npc_turn(
     if current_actor is None:
         raise ValidationError(
             "No current actor found",
-            errors=[{"loc": ["turn"], "msg": "Turn order not initialized", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["turn"],
+                    "msg": "Turn order not initialized",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # Validate current actor is AI-controlled
     if not current_actor.ai_controlled:
         raise ValidationError(
             f"Current actor '{current_actor.name}' is not AI-controlled",
-            errors=[{"loc": ["actor"], "msg": "Actor must be ai_controlled=True", "type": "value_error"}],
+            errors=[
+                {
+                    "loc": ["actor"],
+                    "msg": "Actor must be ai_controlled=True",
+                    "type": "value_error",
+                }
+            ],
         )
 
-    # Execute the NPC turn
-    updated_scenario, npc_result = execute_npc_turn(
-        scenario,
-        current_actor.id,
-        combat_session.current_round,
-        combat_session.current_turn_index,
-    )
+    # Choose AI implementation based on ai_type
+    if current_actor.ai_type == "llm":
+        # Use LLM-powered tactician
+        updated_scenario, npc_result = execute_llm_npc_turn(
+            scenario,
+            current_actor.id,
+            combat_session.current_round,
+            combat_session.current_turn_index,
+        )
+    else:
+        # Use rule-based NPC AI (default)
+        updated_scenario, npc_result = execute_npc_turn(
+            scenario,
+            current_actor.id,
+            combat_session.current_round,
+            combat_session.current_turn_index,
+        )
 
     # Update round/turn index based on turn end result
     new_round = combat_session.current_round
@@ -2217,13 +2363,36 @@ async def execute_auto_npc_turn(
         {"type": "state", "data": ws_response.model_dump(mode="json")},
     )
 
+    # Extract detailed reasoning if available
+    situation_assessment = None
+    considered_options = None
+    rationale = None
+    confidence = None
+
+    if npc_result.decision and npc_result.decision.detailed_reasoning:
+        try:
+            detailed = json.loads(npc_result.decision.detailed_reasoning)
+            situation_assessment = detailed.get("situation_assessment")
+            considered_options = detailed.get("considered_options")
+            rationale = detailed.get("rationale")
+            confidence = detailed.get("confidence")
+        except (json.JSONDecodeError, AttributeError):
+            # If parsing fails, fall back to basic reasoning
+            pass
+
     return AutoNPCTurnResponse(
         success=not npc_result.skipped,
         actor_id=npc_result.actor_id,
         actor_name=npc_result.actor_name,
         decision_action=npc_result.decision.action if npc_result.decision else None,
         decision_target=npc_result.decision.target_id if npc_result.decision else None,
-        decision_reasoning=npc_result.decision.reasoning if npc_result.decision else None,
+        decision_reasoning=npc_result.decision.reasoning
+        if npc_result.decision
+        else None,
+        situation_assessment=situation_assessment,
+        considered_options=considered_options,
+        rationale=rationale,
+        confidence=confidence,
         actions_taken=npc_result.actions_taken,
         skipped=npc_result.skipped,
         skip_reason=npc_result.skip_reason,

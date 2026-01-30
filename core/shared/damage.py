@@ -8,14 +8,13 @@ Provides centralized, composable damage resolution per PR2 4538-4558 rules:
 - Integration with existing MechanicalEffect system
 """
 
-from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.shared.enums import DamageType, StatusType
+from core.shared.enums import DamageType
 from core.shared.dice import round_up
 from core.shared.id_helpers import CombatantIdField
 from core.mech.combat_rules import DamageResolutionRules
-from core.mech.combat_state import CombatantState, CombatStats
+from core.mech.combat_state import CombatantState
 from core.mech.grid import HexCoord
 
 

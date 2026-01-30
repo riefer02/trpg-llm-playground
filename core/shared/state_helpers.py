@@ -14,7 +14,7 @@ Per PR2 rules:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
@@ -23,11 +23,8 @@ from core.shared.id_helpers import SystemIdField, ActionIdField
 if TYPE_CHECKING:
     from core.mech.combat_state import (
         CombatantState,
-        CombatResources,
         MechInventory,
         WeaponMountState,
-        MechSystemState,
-        WeaponState,
     )
     from core.shared.heat import MeltdownState
     from core.shared.turn_end import TurnEndEffectState

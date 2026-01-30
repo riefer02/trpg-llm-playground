@@ -9,7 +9,6 @@ Provides type-safe models for battlefield objects per PR2 rules:
 from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.shared.enums import SizeClass, StatusType
 from core.mech.grid import HexPosition
 
 

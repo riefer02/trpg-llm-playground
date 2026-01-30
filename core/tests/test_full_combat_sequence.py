@@ -4,14 +4,11 @@ Tests multi-round combat scenarios with attacks, damage, and turn progression.
 Uses the combat execution layer to simulate realistic combat encounters.
 """
 
-import pytest
 from core.mech.combat_execution import (
     ActionExecutionInput,
     start_turn,
-    end_turn,
     execute_action,
 )
-from core.mech.action_economy import ActionEconomyState
 from core.mech.combat_state import (
     MechCombatScenario,
     CombatantState,

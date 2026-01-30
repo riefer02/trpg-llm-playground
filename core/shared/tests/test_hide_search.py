@@ -10,7 +10,6 @@ Tests cover:
 - resolve_disengage() engagement state
 """
 
-import pytest
 from core.shared.hide_search import (
     HideAttempt,
     HideResult,
@@ -28,7 +27,6 @@ from core.shared.hide_search import (
 )
 from core.mech.grid import HexCoord
 from core.mech.terrain import TerrainMap, TerrainHex
-from core.shared.enums import StatusType
 
 
 class TestCanHide:

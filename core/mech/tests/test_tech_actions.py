@@ -1,6 +1,5 @@
 """Tests for tech action resolution helpers."""
 
-import pytest
 from core.mech.tech_actions import (
     resolve_scan,
     resolve_bolster,

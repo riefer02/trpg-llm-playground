@@ -3,7 +3,6 @@
 import pytest
 from core.shared.combat.tactical_initiative import (
     ActorPriority,
-    TacticalInitiativeTracker,
     complete_turn,
     get_eligible_nominees,
     get_remaining_actors_on_side,

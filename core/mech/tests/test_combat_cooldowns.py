@@ -1,12 +1,7 @@
 """Tests for cooldown trigger integration."""
 
-import pytest
 from core.shared.effects import (
     CooldownState,
-    CooldownEffect,
-    CooldownResetTrigger,
-    TriggerType,
-    MechanicalEffect,
 )
 from core.mech.combat_resolution import (
     check_action_on_cooldown,
@@ -16,9 +11,6 @@ from core.mech.combat_resolution import (
     decrement_cooldowns_on_round_end,
     reset_cooldowns_on_scene_end,
     get_cooldown_state,
-    CooldownCheckResult,
-    CooldownApplicationResult,
-    CooldownDecrementResult,
 )
 from core.mech.combat_state import (
     CombatStats,

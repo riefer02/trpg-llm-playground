@@ -194,7 +194,6 @@ class TestApplySelfDestructInitiation:
 
     def test_apply_self_destruct_initiation_success(self, test_mech):
         """Test applying successful self destruct initiation."""
-        from core.shared.self_destruct import SelfDestructResolutionResult
 
         result = SelfDestructResolutionResult(
             actor_id="test_pilot",
@@ -216,7 +215,6 @@ class TestApplySelfDestructInitiation:
 
     def test_apply_self_destruct_initiation_failure(self, test_mech):
         """Test applying failed self destruct initiation."""
-        from core.shared.self_destruct import SelfDestructResolutionResult
 
         result = SelfDestructResolutionResult(
             actor_id="test_pilot",
@@ -340,32 +338,27 @@ class TestSelfDestructRuleDefaults:
 
     def test_default_burst_radius(self):
         """Test default burst radius is 2."""
-        from core.shared.self_destruct import DEFAULT_SELF_DESTRUCT_RULES
 
         assert DEFAULT_SELF_DESTRUCT_RULES.burst_radius == 2
 
     def test_default_damage(self):
         """Test default damage is 4d6."""
-        from core.shared.self_destruct import DEFAULT_SELF_DESTRUCT_RULES
 
         assert DEFAULT_SELF_DESTRUCT_RULES.damage.count == 4
         assert DEFAULT_SELF_DESTRUCT_RULES.damage.size == 6
 
     def test_default_damage_type(self):
         """Test default damage type is explosive."""
-        from core.shared.self_destruct import DEFAULT_SELF_DESTRUCT_RULES
 
         assert DEFAULT_SELF_DESTRUCT_RULES.damage_type == "explosive"
 
     def test_default_delay_range(self):
         """Test default delay is 1-2 turns."""
-        from core.shared.self_destruct import DEFAULT_SELF_DESTRUCT_RULES
 
         assert DEFAULT_SELF_DESTRUCT_RULES.min_delay_turns == 1
         assert DEFAULT_SELF_DESTRUCT_RULES.max_delay_turns == 2
 
     def test_default_save_skill(self):
         """Test default save skill is agility."""
-        from core.shared.self_destruct import DEFAULT_SELF_DESTRUCT_RULES
 
         assert DEFAULT_SELF_DESTRUCT_RULES.save_skill == "agility"

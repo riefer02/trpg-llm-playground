@@ -1,7 +1,7 @@
 """Mission cadence, downtime actions, and reserve handling models for Lancer TTRPG."""
 
 from typing import Literal
-from pydantic import Field, model_validator
+from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.effects import MechanicalEffect
 

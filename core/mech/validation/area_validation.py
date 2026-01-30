@@ -4,10 +4,9 @@ Covers area pattern geometry, origin resolution, and target identification."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from core.mech.grid import (
-    HexCoord,
     hex_cone,
     hex_cone_centered,
     hex_line_from_direction,

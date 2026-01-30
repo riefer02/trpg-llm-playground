@@ -28,7 +28,6 @@ from core.mech.grid import HexCoord, is_adjacent_by_size
 from core.shared.effects import (
     PerTargetCounter,
     CooldownState,
-    CooldownEffect,
     CooldownResetTrigger,
     TriggerType,
 )
@@ -2019,8 +2018,7 @@ import warnings
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.shared.structure import StructureInput, StructureResolutionResult
-    from core.shared.heat import OverheatInput, OverheatResolutionResult, MeltdownState
+    pass
 
 
 def resolve_structure_damage_deprecated(

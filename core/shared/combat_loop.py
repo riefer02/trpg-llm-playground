@@ -15,11 +15,11 @@ Per PR2 rules (3064-3071):
 from __future__ import annotations
 
 from typing import Literal, Any, TYPE_CHECKING
-from pydantic import Field, model_validator, field_validator
+from pydantic import Field, model_validator
 from core.shared.models import FrozenModel
 
 if TYPE_CHECKING:
-    from core.shared.narrative import NarrativeCombatState, NarrativeGoalTracker
+    from core.shared.narrative import NarrativeCombatState
     from core.shared.turn_end import TurnEndTrigger, TurnEndEffectState, TurnEndResult
     from core.shared.scenario import MissionState
 
@@ -618,7 +618,7 @@ def check_narrative_victory(
     Returns:
         Tuple of (is_victory, completion_result)
     """
-    from core.shared.scenario import check_mission_completion, resolve_mission_outcome
+    from core.shared.scenario import resolve_mission_outcome
 
     completed_goal_ids = [
         g.goal.id for g in combat_state.goal_tracker.goals if g.status == "completed"
@@ -703,8 +703,6 @@ def end_combatant_turn(
     """
     from core.shared.turn_end import (
         TurnEndInput,
-        TurnEndTrigger,
-        TurnEndEffectState,
         resolve_turn_end,
     )
 

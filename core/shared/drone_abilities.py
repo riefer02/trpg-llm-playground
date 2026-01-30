@@ -30,11 +30,10 @@ from __future__ import annotations
 from typing import Literal, Any, Union
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.shared.enums import DamageType, SizeClass
+from core.shared.enums import SizeClass
 from core.shared.id_helpers import CombatantIdField
 from core.shared.dice import roll_dice
-from core.mech.grid import HexPosition, HexCoord, hexes_in_radius, adjacency_distance
-from core.mech.combat_state import MechCombatScenario
+from core.mech.grid import HexPosition, adjacency_distance
 
 
 DroneAbilityType = Literal["turret", "restock", "latch", "iceout", "tracking", "hive"]

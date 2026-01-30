@@ -19,13 +19,13 @@ from core.mech.build import (
 )
 from core.mech.frame import MechFrameDefinition
 from core.mech.mounts import MountSlot, allowed_weapon_sizes
-from core.mech.weapon import MechWeaponDefinition, WeaponSize
+from core.mech.weapon import MechWeaponDefinition
 from core.mech.system import MechSystemDefinition
 from core.pilot.skill import SkillSet
 from core.pilot.license import License
 
 if TYPE_CHECKING:
-    from typing import Literal
+    pass
 
 MechBuildIssue = ValidationIssue
 

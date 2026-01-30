@@ -23,11 +23,11 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType, SizeClass
-from core.shared.dice import roll_dice, round_up
+from core.shared.dice import roll_dice
 from core.mech.grid import HexCoord
 
 if TYPE_CHECKING:
-    from core.mech.grid import HexPosition
+    pass
 
 
 __all__ = [

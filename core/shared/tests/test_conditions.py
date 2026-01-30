@@ -1,12 +1,8 @@
 """Tests for condition resolution helpers."""
 
-import pytest
 from core.shared.enums import StatusType
 from core.shared.conditions import (
     CONDITIONS,
-    ConditionApplicationResult,
-    ConditionRemovalResult,
-    ConditionEffectResult,
     resolve_condition_effects,
     can_apply_condition,
     apply_condition,

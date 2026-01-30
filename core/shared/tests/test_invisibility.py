@@ -17,7 +17,6 @@ from core.shared.invisibility import (
     get_invisibility_miss_chance_description,
     INVISIBILITY_BREAK_CONDITIONS,
     InvisibilityDetectionAttempt,
-    InvisibilityBreakCondition,
 )
 
 

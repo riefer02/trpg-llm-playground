@@ -10,9 +10,7 @@ Tests cover:
 
 import unittest
 from core.gm_toolkit import (
-    EncounterDifficulty,
     PlayerPartyPower,
-    EnemyForceRecommendation,
     estimate_party_power,
     calculate_enemy_force,
     calculate_total_victory_points,
@@ -23,9 +21,7 @@ from core.npc.compendium import (
     GMS_GRUNT_T2,
     GMS_ELITE_T2,
     IPSN_BOSS_T3,
-    SSC_SPECIALIST_T2,
     PR2_ACE_T1,
-    PR2_AEGIS_T1,
 )
 from core.npc.special_classes import (
     SPECIAL_ULTRA_T1,

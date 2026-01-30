@@ -4,7 +4,6 @@ import pytest
 from core.mech.grid import HexCoord, HexPosition
 from core.shared.terrain_primitives import (
     # Materials
-    MaterialType,
     MaterialProperties,
     MATERIAL_ORGANIC,
     MATERIAL_TOUGH,
@@ -24,7 +23,6 @@ from core.shared.terrain_primitives import (
     damage_destructible_terrain,
     create_destructible_state,
     # Composition
-    GeneratedTerrain,
     compose_terrain_map,
 )
 

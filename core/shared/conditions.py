@@ -24,8 +24,6 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
 from core.mech.statuses import (
-    StatusDefinition,
-    STATUS_DEFINITIONS_BY_ID,
     get_status_definition,
 )
 

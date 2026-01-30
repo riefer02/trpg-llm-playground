@@ -22,7 +22,7 @@ from core.shared.models import FrozenModel
 from core.shared.id_helpers import CombatantIdField
 
 if TYPE_CHECKING:
-    from core.shared.combat_loop import CombatLoopState
+    pass
 
 
 MissionObjectiveType = Literal[

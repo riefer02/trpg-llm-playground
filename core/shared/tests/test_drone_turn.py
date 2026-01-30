@@ -11,9 +11,6 @@ Tests all turn-phase integration functions per PR2 rules:
 
 import unittest
 from core.shared.drone_turn import (
-    DroneTurnPhase,
-    DroneType,
-    DroneReactionTrigger,
     DroneTurnStartInput,
     DroneTurnStartResult,
     resolve_drone_turn_start,
@@ -33,12 +30,9 @@ from core.shared.drone_turn import (
     DroneZoneManagementResult,
     resolve_drone_zone_management,
 )
-from core.shared.models import FrozenModel
-from core.shared.heat import MeltdownState
 from core.mech.grid import HexCoord, HexPosition
 from core.mech.combat_state import (
     DeployableState,
-    DeployableKind,
     MechCombatScenario,
 )
 

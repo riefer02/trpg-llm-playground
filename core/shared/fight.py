@@ -189,7 +189,6 @@ def resolve_fight(
     from core.pilot.gear import (
         get_pilot_gear_definition,
         is_sidearm_weapon,
-        is_archaic_weapon,
         can_pilot_weapon_damage_target,
         get_pilot_weapon_difficulty_modifier,
     )

@@ -1,10 +1,8 @@
 """Tests for core/shared/id_helpers.py"""
 
-import pytest
 from pydantic import BaseModel, Field
 
 from core.shared.id_helpers import (
-    IdField,
     PilotIdField,
     MechIdField,
     WeaponIdField,
@@ -15,18 +13,6 @@ from core.shared.id_helpers import (
     DeployableIdField,
     DroneIdField,
     TemplateIdField,
-)
-from core.shared.ids import (
-    PilotId,
-    MechId,
-    WeaponId,
-    SystemId,
-    CombatantId,
-    ActionId,
-    EffectId,
-    DeployableId,
-    DroneId,
-    TemplateId,
 )
 
 

@@ -100,7 +100,9 @@ class CombatStats(FrozenModel):
     sensor_range: int = Field(default=0, ge=0)
     tech_attack: int = Field(default=0)
     grit: int = Field(default=0, ge=0)
-    engineering_skill: int = Field(default=0, ge=0, le=6, description="Engineering skill for saves")
+    engineering_skill: int = Field(
+        default=0, ge=0, le=6, description="Engineering skill for saves"
+    )
 
 
 class CombatResources(FrozenModel):
@@ -202,8 +204,8 @@ class CombatantState(FrozenModel):
     )
     inventory: MechInventory | None = None
     ai_controlled: bool = False
-    ai_type: Literal["compcon", "nhp"] | None = Field(
-        default=None, description="Type of AI installed (compcon or nhp)"
+    ai_type: Literal["compcon", "nhp", "llm"] | None = Field(
+        default=None, description="Type of AI installed (compcon, nhp, or llm)"
     )
     ai_control_state: Literal["pilot", "cede", "cede_remote", "unshackled"] = Field(
         default="pilot", description="Current control state of the mech"
@@ -260,7 +262,8 @@ class CombatantState(FrozenModel):
         description="Passive mechanical effects from frame traits",
     )
     core_power_available: bool = Field(
-        default=True, description="Whether core power can be activated (once per mission)"
+        default=True,
+        description="Whether core power can be activated (once per mission)",
     )
     core_power_active: bool = Field(
         default=False, description="Whether core power is currently active"
@@ -486,7 +489,6 @@ def create_npc_combatant(
     Returns:
         A new CombatantState suitable for use in combat
     """
-    from core.shared.enums import SizeClass
 
     return CombatantState(
         id=npc_id,

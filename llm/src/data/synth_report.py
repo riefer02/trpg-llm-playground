@@ -9,7 +9,7 @@ import json
 import os
 from collections import Counter, defaultdict
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 
 def load_synthetic_data(path: str) -> List[Dict]:
@@ -158,7 +158,7 @@ def format_sample_markdown(record: Dict) -> str:
     lines.append("")
     lines.append(f"**Question**: {record.get('instruction', '')}")
     lines.append("")
-    lines.append(f"**Answer**:")
+    lines.append("**Answer**:")
     lines.append("```")
     lines.append(record.get("output", "")[:500])
     if len(record.get("output", "")) > 500:

@@ -7,7 +7,7 @@ clarifications, and deeper exploration of topics.
 """
 
 import json
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from ..utils.llm_client import call_llm
 from .synth_io import log_invalid_response

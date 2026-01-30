@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated, Any, TypeVar
 
-from pydantic import BeforeValidator, Field
+from pydantic import BeforeValidator
 
 
 if TYPE_CHECKING:

@@ -1,10 +1,8 @@
 """Tests for campaign persistence layer."""
 
-import json
 import tempfile
 import os
-from datetime import date, datetime
-from uuid import uuid4
+from datetime import date
 
 import pytest
 from pydantic import ValidationError
@@ -38,7 +36,6 @@ from core.shared.campaign.serialization import (
     validate_campaign_synchronous,
     is_campaign_valid,
     get_campaign_summary,
-    CampaignValidationError,
 )
 
 

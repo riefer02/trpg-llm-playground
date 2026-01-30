@@ -11,9 +11,6 @@ import pytest
 from core.pilot.clone_state import (
     CloneStatus,
     CloneState,
-    Quirk,
-    QuirkType,
-    QuirkSource,
 )
 from core.pilot.down_and_out import (
     resolve_down_and_out,
@@ -41,7 +38,6 @@ from core.pilot.quirks import (
     generate_narrative_prompts,
     get_all_quirks,
     count_quirks,
-    QUIRK_TABLE,
 )
 
 

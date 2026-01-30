@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 import statistics
 from collections import Counter

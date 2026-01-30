@@ -12,7 +12,6 @@ Tests all drone ability resolvers per PR2 5070-5088:
 
 import unittest
 from core.shared.drone_abilities import (
-    DroneAbilityType,
     TurretDroneInput,
     TurretDroneResult,
     resolve_turret_drone,

@@ -16,7 +16,6 @@ from core.shared.integration.narrative_combat import (
     CombatToNarrativeMapper,
     CombatSetup,
     CombatResult,
-    NarrativeCombatBridge,
     get_goal_ids,
     get_active_goals,
     DEFAULT_BRIDGE,

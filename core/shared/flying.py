@@ -22,12 +22,7 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.shared.enums import StatusType
 from core.mech.combat_rules import FlightRules, DEFAULT_MECH_COMBAT_RULES
-from core.mech.statuses import (
-    StatusDefinition,
-    get_status_definition,
-)
 
 
 class FlyingStatus(FrozenModel):

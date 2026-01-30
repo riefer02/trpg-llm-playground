@@ -7,7 +7,6 @@ from core.npc.validation import (
     validate_npc_ability_use,
 )
 from core.npc.models import NPCTemplate, NPCStats, NPCStatsBase, NPCAbility
-from core.npc.enums import NPCTier, NPCClass
 
 
 def _make_test_npc() -> NPCState:

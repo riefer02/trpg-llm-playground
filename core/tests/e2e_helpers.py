@@ -51,11 +51,6 @@ from core.shared.sitrep_resolution import (
     update_zone_control,
     check_victory_conditions,
 )
-from core.gm_toolkit.encounter_builder import (
-    EncounterDifficulty,
-    estimate_party_power,
-    calculate_enemy_force,
-)
 
 
 # =============================================================================

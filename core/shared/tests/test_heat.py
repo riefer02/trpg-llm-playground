@@ -14,7 +14,6 @@ from core.mech.combat_state import (
     CombatStats,
     CombatResources,
 )
-from core.shared.enums import StatusType
 
 
 @pytest.fixture

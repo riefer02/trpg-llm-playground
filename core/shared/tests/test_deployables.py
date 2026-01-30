@@ -11,26 +11,19 @@ from typing import Any
 import unittest
 
 from core.shared.deployables import (
-    MineType,
-    DroneActionType,
     MineEffectProfile,
     get_mine_effect_profile,
     get_default_detection_dc,
     get_default_disarm_dc,
     MineDetectionInput,
-    MineDetectionResult,
     resolve_mine_detection,
     MineDisarmInput,
-    MineDisarmResult,
     resolve_mine_disarm,
     DroneActivationInput,
-    DroneActivationResult,
     resolve_drone_activation,
     DroneMovementInput,
-    DroneMovementResult,
     resolve_drone_movement,
     MineDetonationInput,
-    MineDetonationResult,
     resolve_mine_detonation,
     should_arm_mine,
     arm_mines_at_turn_start,
@@ -40,9 +33,6 @@ from core.shared.deployables import (
     can_detect_mine,
     is_adjacent_to_mine,
 )
-from core.shared.enums import DamageType, SaveType
-from core.shared.models import FrozenModel
-from core.shared.heat import MeltdownState
 from core.mech.grid import HexCoord, HexPosition
 from core.mech.combat_state import (
     DeployableState,

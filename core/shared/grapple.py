@@ -30,7 +30,6 @@ Size Rules (per PR2 ~3823-3836):
 from __future__ import annotations
 
 from typing import Literal
-from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import SizeClass, StatusType
 from core.shared.dice import roll_dice

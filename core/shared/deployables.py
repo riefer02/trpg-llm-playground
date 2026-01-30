@@ -24,24 +24,20 @@ Resolution Pattern:
 
 from __future__ import annotations
 
-from typing import Literal, Any
+from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType, SaveType, SizeClass
 from core.shared.id_helpers import CombatantIdField
 from core.shared.dice import roll_dice
-from core.shared.terrain import TerrainMap, get_terrain_at, calculate_movement_cost
-from core.shared.saves import resolve_save, SaveRequest, SaveResult
 from core.shared.damage import (
-    resolve_damage_on_target,
-    DamageInput,
     DamageResolutionResult,
 )
 from core.shared.movement import (
     resolve_drone_movement,
 )
 from core.mech.grid import HexCoord, HexPosition, hexes_in_radius, adjacency_distance
-from core.mech.combat_state import DeployableState, DeployableKind, MechCombatScenario
+from core.mech.combat_state import DeployableState, MechCombatScenario
 
 
 MineType = Literal["explosive", "shroud", "breaching", "cluster", "emp"]
@@ -687,7 +683,6 @@ def is_adjacent_to_mine(
 from core.shared.movement import (
     DroneMovementInput,
     DroneMovementResult,
-    resolve_drone_movement,
     hex_line_simple,
     cube_round,
 )

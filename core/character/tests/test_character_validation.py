@@ -1,6 +1,5 @@
 """Tests for character validation."""
 
-import pytest
 
 from core.character import (
     Character,

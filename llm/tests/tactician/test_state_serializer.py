@@ -1,6 +1,5 @@
 """Unit tests for combat state serializer."""
 
-import pytest
 from core.mech.combat_state import (
     MechCombatScenario,
     CombatantState,
@@ -9,7 +8,6 @@ from core.mech.combat_state import (
     HexPosition,
     HexCoord,
 )
-from core.shared.enums import SizeClass
 from llm.src.tactician.state_serializer import serialize_combat_state
 
 
@@ -81,7 +79,6 @@ def test_serialize_single_combatant():
 def test_serialize_with_rounds_and_turns():
     """Test serialization with a round and turn in progress."""
     from core.mech.combat_state import CombatRound, CombatTurn, ActionUse
-    from core.shared.enums import ActionType
 
     combatant = CombatantState(
         id="actor_1",

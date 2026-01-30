@@ -9,7 +9,6 @@ Tests cover:
 - Multiple enemies with overlapping threat ranges
 """
 
-import pytest
 from core.shared.overwatch import (
     OverwatchOpportunity,
     OverwatchTriggerResult,

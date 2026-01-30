@@ -221,11 +221,11 @@ def _roll_contested_check(
     """
     from core.shared.dice import DiceExpression
 
-    attacker_dice = DiceExpression.parse(f"1d6").roll()
+    attacker_dice = DiceExpression.parse("1d6").roll()
     if settings and settings.forced_rolls:
         attacker_dice = list(settings.forced_rolls[:1])
 
-    defender_dice = DiceExpression.parse(f"1d6").roll()
+    defender_dice = DiceExpression.parse("1d6").roll()
     if settings and settings.forced_rolls and len(settings.forced_rolls) > 1:
         defender_dice = list(settings.forced_rolls[1:2])
 

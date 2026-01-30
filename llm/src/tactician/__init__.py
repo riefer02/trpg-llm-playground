@@ -9,7 +9,12 @@ from .prompts import (
     build_tactical_prompt,
     build_tactical_prompt_with_role,
 )
-from .action_parser import parse_llm_action
+from .action_parser import parse_llm_action, parse_llm_action_sequence
+from .tactician import (
+    LLMBackend,
+    TacticianConfig,
+    Tactician,
+)
 
 __all__ = [
     "serialize_combat_state",
@@ -17,4 +22,8 @@ __all__ = [
     "build_tactical_prompt",
     "build_tactical_prompt_with_role",
     "parse_llm_action",
+    "parse_llm_action_sequence",
+    "LLMBackend",
+    "TacticianConfig",
+    "Tactician",
 ]

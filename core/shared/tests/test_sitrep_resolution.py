@@ -1,6 +1,5 @@
 """Tests for enhanced SITREP resolution mechanics."""
 
-import pytest
 from core.shared.sitrep_resolution import (
     ZoneControlStateTracker,
     SitrepVictoryCondition,
@@ -16,8 +15,6 @@ from core.shared.sitrep_resolution import (
 )
 from core.shared.scenario import (
     SitrepZone,
-    VictoryCondition,
-    SitrepTemplate,
     ESCORT_TEMPLATE,
     CONTROL_TEMPLATE,
     EXTRACT_TEMPLATE,

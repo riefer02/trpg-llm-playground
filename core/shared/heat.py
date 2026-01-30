@@ -618,7 +618,6 @@ def trigger_meltdown(
         Tuple of (destroyed combatant, wreckage object)
     """
     from core.shared.battlefield_objects import WreckageState
-    from core.shared.enums import SizeClass
 
     size_value = _get_size_value(combatant.stats.size)
 

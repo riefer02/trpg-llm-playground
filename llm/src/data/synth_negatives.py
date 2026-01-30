@@ -5,7 +5,6 @@ Generates training examples where the correct response is to acknowledge
 that the context doesn't contain the answer.
 """
 
-import json
 from typing import Dict, List, Optional
 
 from ..utils.llm_client import call_llm

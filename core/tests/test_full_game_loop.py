@@ -8,19 +8,14 @@ Each test is independent and uses function-scoped fixtures from conftest.py.
 Real compendium data is used for realistic testing.
 """
 
-import pytest
 from datetime import date
 from core.character import Character
-from core.pilot.pilot import Pilot, create_ll0_pilot
-from core.pilot.background import Background
+from core.pilot.pilot import Pilot
 from core.pilot.skill import SkillSet, PilotTrigger
 from core.pilot.talent import Talent
 from core.pilot.license import License
-from core.pilot.core_bonus import CoreBonus
 from core.pilot.clone_state import CloneState
-from core.mech.frame import MechFrameDefinition
-from core.mech.build import MechBuild, compute_mech_stats
-from core.mech.compendium import get_frame_definition
+from core.mech.build import compute_mech_stats
 from core.shared.campaign.campaign import (
     Campaign,
     Session,
@@ -30,20 +25,16 @@ from core.shared.campaign.campaign import (
 )
 from core.shared.scenario import (
     SitrepTemplate,
-    MissionObjective,
-    SitrepZone,
-    VictoryCondition,
 )
 from core.shared.integration.narrative_combat import (
-    NarrativeCombatBridge,
     CombatEvent,
     CombatResult,
     CombatSetup,
 )
 from core.mech.combat_state import CombatStats
 from core.mech.action_economy import ActionEconomyState
-from core.shared.rolls import AttackRoll, SaveRoll
-from core.shared.downtime import Reserve, DowntimeAction, PowerAtACost
+from core.shared.rolls import AttackRoll
+from core.shared.downtime import Reserve, PowerAtACost
 
 
 class TestPilotCreationFlow:
@@ -303,7 +294,6 @@ class TestCombatResolution:
         integration_mech_everest: tuple,
     ):
         """Mech has correct action economy structure."""
-        from core.mech.action_economy import ActionEconomyState
 
         economy = ActionEconomyState(
             full_actions_used=0,
@@ -320,7 +310,6 @@ class TestCombatResolution:
         integration_mech_everest: tuple,
     ):
         """Attack resolution has required components."""
-        from core.shared.rolls import AttackRoll, SaveRoll
 
         attack = AttackRoll(
             target=10,
@@ -332,7 +321,6 @@ class TestCombatResolution:
     def test_structure_damage_handling(self):
         """Structure damage follows correct mechanics."""
         from core.mech.combat_state import CombatStats
-        from core.shared.enums import SizeClass
 
         stats = CombatStats(
             size="size_half",
@@ -346,7 +334,6 @@ class TestCombatResolution:
 
     def test_heat_overheat_system(self):
         """Heat mechanics work correctly."""
-        from core.mech.combat_state import CombatStats
 
         stats = CombatStats(
             size="size_half",
@@ -535,8 +522,7 @@ class TestNarrativeCombatBridge:
         integration_pilot_ll0: Pilot,
     ):
         """Narrative mode can transition to combat."""
-        from core.shared.narrative import NarrativeGoalTracker, NarrativeCombatState
-        from core.shared.integration.narrative_combat import CombatSetup
+        from core.shared.narrative import NarrativeCombatState
 
         combat_state = NarrativeCombatState()
 
@@ -553,7 +539,6 @@ class TestNarrativeCombatBridge:
 
     def test_combat_to_narrative_bridge(self):
         """Combat mode can transition back to narrative."""
-        from core.shared.integration.narrative_combat import CombatResult
 
         result = CombatResult(
             outcome="victory",
@@ -568,7 +553,6 @@ class TestNarrativeCombatBridge:
 
     def test_combat_event_triggers_goal_update(self):
         """Combat events can update narrative goals."""
-        from core.shared.integration.narrative_combat import CombatEvent
 
         event = CombatEvent(
             event_type="target_destroyed",
@@ -638,7 +622,7 @@ class TestCloningSystem:
 
     def test_cloning_state_creation(self):
         """Clone state can be created."""
-        from core.pilot.clone_state import CloneStatus, CloneState, Quirk, QuirkSource
+        from core.pilot.clone_state import CloneStatus, Quirk
 
         clone = CloneState(
             status=CloneStatus(times_cloned=0, is_dead=False),
@@ -671,7 +655,7 @@ class TestCloningSystem:
 
     def test_quirk_application(self):
         """Quirks apply correctly from cloning."""
-        from core.pilot.clone_state import Quirk, QuirkSource
+        from core.pilot.clone_state import Quirk
 
         quirk = Quirk(
             roll=1,

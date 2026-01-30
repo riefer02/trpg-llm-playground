@@ -118,7 +118,6 @@ from core.shared.effects import (
     AttackTargetingEffect,
     TargetMarkEffect,
     WeaponAIControlEffect,
-    WeaponGrantEffect,
     WeaponModEffect,
     WeaponRangeSpec,
     WeaponSizeBonus,
@@ -141,7 +140,6 @@ from core.shared.effects import (
     ZoneEndCondition,
     ProgressionEffect,
     GateProgressionEffect,
-    PerTargetCounterEffect,
 )
 
 

@@ -7,14 +7,13 @@ in combat context.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from pydantic import Field
 from core.shared.validation import ValidationIssue, ValidationResult
 
-from core.npc.models import NPCTemplate, NPCAbility, NPCGear
+from core.npc.models import NPCTemplate
 from core.npc.state import NPCState
 
 if TYPE_CHECKING:
-    from typing import Literal
+    pass
 
 NPCValidationIssue = ValidationIssue
 

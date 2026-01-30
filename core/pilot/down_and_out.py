@@ -366,8 +366,8 @@ def resolve_pilot_death(
 
     if clone_available:
         narrative_outcome = (
-            f"Pilot has died. Flash cloning is available - the pilot can be revived, "
-            f"but will return with complications."
+            "Pilot has died. Flash cloning is available - the pilot can be revived, "
+            "but will return with complications."
         )
         clone_effects = [
             "Pilot will be revived after mission completion",

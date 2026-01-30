@@ -1,13 +1,10 @@
 """Tests for NPC stat tier scaling."""
 
-import pytest
 from core.npc.models import (
     NPCTemplate,
     NPCStats,
     NPCStatsBase,
     NPCTierScaling,
-    NPCAbility,
-    NPCGear,
 )
 from core.npc.state import (
     NPCState,
@@ -15,8 +12,6 @@ from core.npc.state import (
     scale_npc_stats,
     convert_to_combat_stats,
 )
-from core.npc.enums import NPCTier, NPCClass
-from core.shared.enums import SizeClass
 
 
 def _make_test_scaling() -> NPCTierScaling:

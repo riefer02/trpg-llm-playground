@@ -35,7 +35,6 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
-from core.shared.enums import StatusType
 from core.shared.dice import DiceExpression
 from core.mech.combat_state import CombatantState
 
@@ -612,7 +611,6 @@ def check_has_ai_property(combatant: CombatantState) -> bool:
     if not combatant.inventory:
         return False
 
-    from core.mech.system import SystemType
 
     for system in combatant.inventory.systems:
         if system.system_id:
@@ -646,7 +644,6 @@ def check_has_nhp(combatant: CombatantState) -> bool:
     if not combatant.inventory:
         return False
 
-    from core.mech.system import SystemType
 
     for system in combatant.inventory.systems:
         if system.system_id:

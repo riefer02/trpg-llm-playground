@@ -363,7 +363,6 @@ def apply_rest_result(
     Returns:
         Updated combatant with rest effects applied
     """
-    from core.mech.combat_state import CombatResources, CombatantState
 
     updated_resources = combatant.resources
 

@@ -12,11 +12,10 @@ Resolution Pattern:
 
 from __future__ import annotations
 
-from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import DamageType, AttackType
-from core.shared.dice import DiceExpression, round_up
+from core.shared.dice import DiceExpression
 from core.shared.id_helpers import CombatantIdField
 from core.mech.combat_state import CombatantState
 from core.shared.rolls import resolve_attack

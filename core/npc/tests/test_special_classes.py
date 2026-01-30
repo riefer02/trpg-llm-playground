@@ -8,7 +8,6 @@ Tests cover:
 - Victory point calculation for SITREP resolution
 """
 
-import pytest
 from core.npc.special_classes import (
     NPC_SPECIAL_CLASSES,
     VICTORY_COUNTS,
@@ -20,23 +19,17 @@ from core.npc.special_classes import (
     get_veteran_traits,
     get_exotic_modules,
     get_commander_traits,
-    SPECIAL_HUMAN,
     SPECIAL_INFANTRY_SQUAD_T1,
     SPECIAL_MONSTROSITY_T1,
     SPECIAL_ULTRA_T1,
     SPECIAL_ELITE_T1,
     SPECIAL_GRUNT_T1,
     SPECIAL_VETERAN_T1,
-    SPECIAL_EXOTIC_T1,
     SPECIAL_DRONE_T1,
-    SPECIAL_MERCENARY_T1,
     SPECIAL_COMMANDER_T1,
-    SPECIAL_PIRATE_T1,
-    SPECIAL_SPACER_T1,
     SPECIAL_VEHICLE_T1,
     SPECIAL_SHIP_T1,
 )
-from core.npc.enums import NPCSpecialClass
 
 
 class TestVictoryCounts:

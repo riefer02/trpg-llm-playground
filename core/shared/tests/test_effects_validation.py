@@ -3,7 +3,6 @@ import pytest
 from core.shared.dice import DiceExpression
 from core.shared.effects import (
     CountdownDieEffect,
-    CountdownDieTrigger,
     DicePoolEffect,
     DicePoolGain,
     DicePoolSpendOption,

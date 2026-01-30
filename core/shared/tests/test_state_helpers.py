@@ -43,12 +43,9 @@ from core.mech.combat_state import (
     WeaponMountState,
     WeaponState,
     MechSystemState,
-    OverchargeState,
 )
 from core.shared.heat import MeltdownState
 from core.shared.turn_end import TurnEndEffectState
-from core.shared.effects import EffectDuration
-from core.shared.enums import StatusType
 
 
 @pytest.fixture

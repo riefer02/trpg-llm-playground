@@ -241,7 +241,6 @@ from pydantic import Field, model_validator
 from core.shared.models import FrozenModel
 
 from core.shared.id_helpers import (
-    ReactionIdField,
     WeaponIdField,
     ActionIdField,
     EffectIdField,
@@ -253,14 +252,11 @@ from core.shared.enums import (
     AttackType,
     CoverType,
     DamageType,
-    MountSlotType,
-    RangeType,
     SaveType,
     SizeClass,
     StatusType,
 )
 from core.shared.dice import DiceExpression
-from core.shared.payloads import DamageSpec
 
 # Import type aliases from types module
 from core.shared.effects.types import (
@@ -291,7 +287,6 @@ from core.shared.effects.types import (
     ResourceAmount,
     ResourceDirection,
     TechRangeType,
-    TechActionScope,
     UsesPer,
     BreakTriggerType,
     NonCombatInteractionScope,
@@ -303,8 +298,6 @@ from core.shared.effects.types import (
     PhaseState,
     HologramTrailTrigger,
     HologramDetonationTrigger,
-    DamageTypeScope,
-    DirectDamageType,
 )
 
 

@@ -24,8 +24,6 @@ from core.shared.flying import (
     FlightResult,
     LandingAttempt,
     LandingResult,
-    FlightEffects,
-    FallDamageResult,
     can_takeoff,
     attempt_takeoff,
     can_land,
@@ -39,7 +37,7 @@ from core.shared.flying import (
     is_hover_mode,
     get_altitude_accuracy_bonus,
 )
-from core.mech.combat_rules import FlightRules, DEFAULT_MECH_COMBAT_RULES
+from core.mech.combat_rules import FlightRules
 
 
 class TestFlyingStatus(unittest.TestCase):

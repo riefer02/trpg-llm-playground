@@ -1,49 +1,31 @@
 """Tests for combat resolution helpers."""
 
-import pytest
 from core.shared.combat_helpers import (
     AttackPattern,
-    AttackPatternType,
-    GeometryValidationResult,
     validate_attack_geometry,
     CriticalEffect,
-    CriticalEffectType,
-    CriticalDamageResult,
     calculate_critical_damage,
-    TargetAttackResult,
     AttackSequenceInput,
-    AttackSequenceResult,
     resolve_attack_sequence,
-    MovementPath,
     MovementInput,
-    MovementResult,
     resolve_movement,
     FullActionTurnInput,
-    FullActionTurnResult,
     resolve_full_action_turn,
     StatusCheckInput,
-    StatusInteractionResult,
     check_status_effects,
     TurretDroneAttackInput,
     resolve_turret_drone_attack,
     LatchDroneInput,
-    LatchDroneResult,
     resolve_latch_drone,
     RestockDroneInput,
-    RestockDroneResult,
     resolve_restock_drone,
     ICEOUTDroneInput,
-    ICEOUTDroneResult,
     resolve_iceout_drone,
     TrackingDroneInput,
-    TrackingDroneResult,
     resolve_tracking_drone,
     HiveDroneInput,
-    HiveDroneResult,
     resolve_hive_drone,
 )
-from core.shared.enums import DamageType, SaveType, StatusType
-from core.mech.grid import HexCoord
 
 
 class TestAttackPattern:

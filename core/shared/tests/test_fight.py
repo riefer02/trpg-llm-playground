@@ -1,11 +1,8 @@
 """Tests for pilot Fight action resolution."""
 
-import pytest
 from core.shared.fight import (
     resolve_fight,
     FightInput,
-    FightResolutionResult,
-    ActionTypeLiteral,
 )
 
 

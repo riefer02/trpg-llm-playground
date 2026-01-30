@@ -1,4 +1,3 @@
-import pytest
 
 from core.mech.build import compute_mech_stats
 from core.mech.compendium import SYSTEM_DEFINITIONS_BY_ID, WEAPON_DEFINITIONS_BY_ID

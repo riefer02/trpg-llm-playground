@@ -22,7 +22,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.training.evaluate_rpg import (
     load_eval_set,
     run_benchmark,
-    BenchmarkResults,
 )
 
 
@@ -175,7 +174,7 @@ def main():
         print(f"Using HuggingFace model: {model_path}")
         inference_fn = create_hf_inference_fn(model_path)
     else:
-        print(f"❌ Error: Unknown model format. Use 'ollama:name' or 'hf:path'")
+        print("❌ Error: Unknown model format. Use 'ollama:name' or 'hf:path'")
         sys.exit(1)
     
     # Run benchmark

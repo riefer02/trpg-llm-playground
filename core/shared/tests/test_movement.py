@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import unittest
 from core.shared.movement import (
-    MovementMode,
     MovementInput,
     MovementResult,
     hex_line_simple,
@@ -27,14 +26,12 @@ from core.shared.movement import (
     validate_teleport,
     resolve_movement,
     DroneMovementInput,
-    DroneMovementResult,
     resolve_drone_movement,
 )
-from core.shared.heat import MeltdownState
 from core.shared.enums import SizeClass
 from core.shared.terrain import TerrainHex
 from core.mech.grid import HexCoord, HexPosition
-from core.mech.terrain import TerrainMap, TerrainHex as TerrainHexType
+from core.mech.terrain import TerrainMap
 from core.mech.combat_state import (
     CombatantState,
     CombatStats,

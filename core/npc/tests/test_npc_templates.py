@@ -9,7 +9,6 @@ from core.npc.compendium import (
     get_templates_by_tier,
 )
 from core.npc.validation import validate_npc_template, batch_validate_templates
-from core.npc.enums import NPCClass, NPCTier
 
 
 def _assert_no_errors(validation) -> None:
@@ -84,7 +83,6 @@ class TestNPCTemplateValidation:
     def test_duplicate_ability_ids_flagged(self) -> None:
         """Template with duplicate ability IDs should fail validation."""
         from core.npc.models import NPCTemplate, NPCStats, NPCStatsBase, NPCAbility
-        from core.shared.effects import MechanicalEffect
 
         bad_template = NPCTemplate(
             id="test_duplicate",

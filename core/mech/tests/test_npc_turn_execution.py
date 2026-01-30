@@ -1,8 +1,6 @@
 """Tests for NPC turn execution and automated combat."""
 
-import pytest
 from core.mech.npc_turn_execution import (
-    NPCTurnResult,
     build_target_info_list,
     get_npc_role,
     execute_npc_turn,

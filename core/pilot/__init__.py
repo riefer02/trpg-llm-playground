@@ -262,7 +262,6 @@ __all__ = [
 ]
 
 # Rebuild Pilot model to resolve forward references to CloneState
-from core.pilot.pilot import Pilot
 from core.pilot.clone_state import CloneState
 
 Pilot.model_rebuild(_types_namespace={"CloneState": CloneState})

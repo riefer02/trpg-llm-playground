@@ -2,16 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Literal
-import pytest
-from core.shared.models import FrozenModel
 from core.shared.turn_end import (
     TurnEndEffectState,
     TurnEndTrigger,
     TurnEndInput,
-    TurnEndResult,
-    TurnEndTriggerResult,
-    TurnEndTriggerSource,
     resolve_turn_end_triggers,
     expire_end_of_turn_effects,
     advance_end_of_next_turn_effects,
@@ -22,7 +16,6 @@ from core.shared.turn_end import (
     get_active_effects_by_type,
     apply_turn_end_effect_to_state,
 )
-from core.shared.effects import EffectDuration
 
 
 class TestTurnEndEffectState:

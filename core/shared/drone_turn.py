@@ -30,12 +30,12 @@ Resolution Pattern:
 
 from __future__ import annotations
 
-from typing import Literal, Union
+from typing import Literal
 from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.enums import StatusType
 from core.shared.id_helpers import CombatantIdField
-from core.mech.grid import HexCoord, HexPosition, hexes_in_radius
+from core.mech.grid import HexPosition
 from core.mech.combat_state import DeployableState, MechCombatScenario
 
 

@@ -1,6 +1,5 @@
 """Integration tests for terrain generation with SITREP linkage."""
 
-import pytest
 from core.mech.grid import HexCoord
 from core.shared.scenario import (
     SitrepTemplate,
@@ -14,13 +13,11 @@ from core.shared.terrain import (
 )
 from core.shared.terrain_primitives import (
     MATERIAL_FORTIFIED,
-    FloorTile,
     Obstacle,
     compose_terrain_map,
 )
 from core.shared.terrain_generation import (
     TileSetType,
-    TileSetConfig,
     TILE_SETS,
     TerrainGeneratorParams,
     generate_terrain_from_sitrep,
@@ -31,7 +28,6 @@ from core.shared.hide_search import (
     SoftCoverZoneState,
     is_in_active_soft_cover_zone,
     check_soft_cover_for_hide,
-    is_soft_cover_area,
 )
 
 

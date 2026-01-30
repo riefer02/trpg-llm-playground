@@ -22,7 +22,6 @@ from core.shared.narrative import (
     NarrativeGoalTracker,
     NarrativeGoal,
     NarrativeGoalState,
-    NarrativeGoalStatus,
     NarrativeCombatState,
 )
 
