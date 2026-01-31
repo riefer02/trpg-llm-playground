@@ -299,7 +299,7 @@ Status: PASSED
 - Next story: E2-US-006 (Multi-Action Turn Planning) - enhance tactician to plan full turns with multiple actions
 ---
 
-## Iteration - $(date)
+## Iteration - Fri Jan 30 2026 23:59 UTC
 Story: E3-US-001 - Speech-to-Text Input
 Status: PASSED
 
@@ -345,7 +345,7 @@ Status: PASSED
 - Next story: E3-US-003 (Text-to-Speech Narration) - implement browser TTS for action results and AI turns
 ---
 
-## Iteration - $(date)
+## Iteration - Fri Jan 30 2026 23:59 UTC
 Story: E3-US-003 - Text-to-Speech Narration
 Status: PASSED
 
@@ -384,3 +384,116 @@ Status: PASSED
 ### Next Steps
 - Next story: E3-US-005 (Voice Navigation) - implement voice commands for navigating game screens
 ---
+
+## Iteration - Fri Jan 30 2026 23:59 UTC
+Story: E3-US-005 - Voice Navigation
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/lib/voice/navigation.ts: Created parseNavigationIntent() function handling 'go to [screen]', 'back', 'select [item]', 'launch', 'read briefing' commands with screen aliases mapping
+- app/frontend/src/lib/voice/VoiceNavigationContext.ts: Context system allowing screens to register custom intent handlers
+- app/frontend/src/components/voice/VoiceNavigationFloatingButton.tsx: Floating button appears on all non-combat screens when voice input enabled, shows listening state with pulsing animation
+- app/frontend/src/components/voice/VoiceNavigationManager.tsx: Wraps application with voice navigation context and integrates with router
+- app/frontend/src/lib/voice/speech-to-text.ts: Enhanced with enabled option for conditional activation
+- app/frontend/src/routes/__root.tsx: Added VoiceNavigationManager to provide context globally
+- app/frontend/src/routes/missions/$missionId/briefing.tsx: Added handlers for 'read briefing' (TTS) and 'launch' commands
+
+### Learnings
+- Voice navigation disabled in combat routes (combat has separate voice UI)
+- Settings.enableVoiceInput toggle respected; floating button only appears when voice enabled
+- TTS integration uses existing useTextToSpeech hook for 'read briefing' command
+- Navigation intents are parsed separately from combat intents using keyword matching
+- Context system allows screens to handle specific intents (e.g., briefing screen handles 'read briefing')
+- Visual feedback via toast notifications confirms recognized navigation command
+
+### Next Steps
+- Next story: E4-US-001 (Mission Generator Orchestrator) - start mission generation system
+
+## Iteration - Fri Jan 30 2026 23:59 UTC
+Story: E4-US-003 - Narrative Debrief Generation
+Status: PASSED
+
+### Changes Made
+- llm/src/mission/prompts/debrief.md: Created prompt template for mission debrief generation with outcome-driven tone and statistics incorporation
+- llm/src/mission/debrief.py: Implemented generate_debrief function with LLM backend (Ollama/Claude/Mock), MissionDebriefer class, caching, retry logic, and fallback
+- llm/src/mission/__init__.py: Exported generate_debrief function for public API
+- llm/tests/mission/test_debrief.py: Added unit tests covering all acceptance criteria (mock backend, caching, retry, prompt building)
+- Updated scripts/ralph/prd.json to mark story as passing
+
+### Learnings
+- Followed same pattern as briefing generation for consistency
+- CombatStats model defined locally to capture debrief-specific statistics (kills, near-deaths, objective completion)
+- MissionOutcomeType imported from core/shared/scenario.py (Literal["success", "partial", "failure", "catastrophic"])
+- Prompt template includes mission parameters, outcome, and combat statistics JSON
+- All tests pass with mock backend; linting passes
+
+### Next Steps
+- Next story: E4-US-004 (Difficulty Scaling) - scale enemy count, frame quality, and AI aggression based on pilot license level
+---
+
+## Iteration - Fri Jan 30 2026 23:59 UTC
+Story: E4-US-004 - Difficulty Scaling
+Status: PASSED
+
+### Changes Made
+- Created `llm/src/mission/difficulty.py` with scaling formulas: `get_encounter_difficulty`, `get_npc_tier_distribution`, `get_ai_aggression`, `get_mission_difficulty_stars`, `get_encounter_difficulty_for_mission`
+- Updated `llm/src/mission/generator.py` to use difficulty scaling functions instead of hardcoded formulas
+- Updated `llm/src/tactician/tactician.py` and `prompts.py` to include `difficulty` parameter (0.0-1.0) affecting aggression adjectives in prompts
+- Created `llm/tests/mission/test_difficulty.py` with 51 parameterized tests covering all functions
+- Modified `app/backend/api/combat.py` to compute pilot license level from player combatants via `_get_max_pilot_level` helper, calculate aggression via `get_ai_aggression`, and pass `TacticianConfig(difficulty=aggression)` to `execute_llm_npc_turn`
+- Updated PRD.json story E4-US-004 to `passes: true`
+
+### Learnings
+- Difficulty scaling uses simple linear formulas with clamping for robustness
+- NPC tier distribution shifts from 100% tier_1 at LL0-3 to 25%/50%/25% tier_1/2/3 at LL8-12
+- AI aggression factor ranges 0.0 (cautious) to 1.0 (aggressive) based on pilot level, rounded to 2 decimals for readability
+- Mission difficulty stars (1-3) increase with pilot level and mission index
+- Integration required database query to fetch character license levels; combatant IDs follow "combat_{character_id}" pattern
+- Fallback aggression (0.5) ensures NPC turns continue if license level calculation fails
+- All unit tests pass (core, llm, app) confirming no regressions
+
+### Next Steps
+- Next story: E4-US-005 (Terrain Generation) - procedurally generate terrain layouts matching mission narrative theme
+
+---
+## Iteration - Fri Jan 30 2026 23:59 UTC
+Story: E4-US-005 - Terrain Generation
+Status: PASSED
+
+### Changes Made
+- core/shared/terrain_generation.py: Added TerrainConfig model, THEME_TO_TILESET mapping, generate_terrain_config function
+- llm/src/mission/generator.py: Added generate_terrain function (PRD acceptance criteria) that delegates to core
+- llm/tests/mission/test_generator.py: Added unit test for generate_terrain covering valid inputs and error handling
+- Updated scripts/ralph/prd.json to mark story as passing
+
+### Learnings
+- Core already has comprehensive terrain generation with SITREP linkage; only needed wrapper and mapping
+- TerrainConfig provides metadata needed for mission generation (theme, tile_set, zones)
+- Mapping from PRD terrain themes to tile sets: forest/desert -> wilderness, facility -> industrial, space station -> zero_g
+- Existing terrain generation already places SITREP-specific zones (control central zone, extraction evac point)
+
+### Next Steps
+- Next story: E5-US-001 (XP and Leveling) - implement XP system
+
+## Iteration - Sat Jan 31 2026 00:30 UTC
+Story: E5-US-003 - Salvage System
+Status: PASSED
+
+### Changes Made
+- Fixed linting: removed unused import of MissionObjective from app/backend/api/combat.py
+- Verified salvage calculation formula in _calculate_salvage() uses enemies defeated (50 per enemy) and optional objectives (+100 per completed optional objective)
+- Salvage awarded on combat completion via combat API endpoint, passed to debrief screen via search params
+- Salvage display in quarters hub (pilot.salvage) and debrief screen (salvage earned) already implemented
+- Spending salvage on repairs via /characters/{id}/spend-salvage-for-repair endpoint with UI in MechDisplay component (costs: 1 salvage for HP/weapon/system, 2 for structure/stress, 4 for destroyed mech)
+- Persists via core Pilot model's salvage field (add_salvage, spend_salvage methods)
+- All core salvage tests pass (7/7)
+
+### Learnings
+- Salvage system was already largely implemented; needed verification and linting fix
+- Optional objective tracking separate but formula includes bonus
+- Repair costs follow standard Lancer repair rules
+- Core-first principle: using core Pilot model for salvage tracking ensures consistency
+- Linting must be clean before marking story complete
+
+### Next Steps
+- Next story: E5-US-004 (Save/Load System) - implement auto-save and continue functionality

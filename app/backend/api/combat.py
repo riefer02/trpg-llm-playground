@@ -5,17 +5,18 @@ It directly uses core.mech.combat_state models - no duplicate schemas.
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, status, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.backend.db.engine import get_session
-from app.backend.db.models import CombatSessionDB, utc_now
+from app.backend.db.models import CombatSessionDB, CharacterDB, utc_now
 from app.backend.dependencies import get_current_user
 from app.backend.exceptions import ConflictError, NotFoundError, ValidationError
 from app.backend.api.campaigns import record_campaign_session_outcome
@@ -31,6 +32,11 @@ from core.mech.combat_state import (
     CombatRound,
     CombatEnvironment,
 )
+
+# Import mission objectives for salvage calculation
+
+# Import character model for pilot license level
+from core.character import Character
 
 # Import core combat execution helpers
 from core.mech.combat_execution import (
@@ -69,6 +75,11 @@ from llm.src.voice.intent_parser import parse_voice_intent
 # Import NPC turn execution
 from core.mech.npc_turn_execution import execute_npc_turn
 from llm.src.tactician.integration import execute_llm_npc_turn
+from llm.src.tactician.tactician import TacticianConfig, LLMBackend
+from llm.src.mission.difficulty import get_ai_aggression
+
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/combat", tags=["combat"])
@@ -87,6 +98,49 @@ DemoScenarioType = Literal["skirmish", "control", "boss"]
 # =============================================================================
 
 SessionStatus = Literal["active", "paused", "completed", "abandoned"]
+
+
+def _calculate_salvage(
+    scenario: MechCombatScenario,
+    difficulty: int,
+    outcome: Literal["success", "partial", "failure", "catastrophic"],
+) -> int:
+    """Calculate salvage awarded based on combat outcome.
+
+    Formula:
+    - Base salvage per star: 100
+    - Outcome multiplier: success 1.0, partial 0.5, failure 0
+    - Enemies defeated: 50 per enemy (side != "player")
+    - Optional objectives: +100 per completed optional objective
+    """
+    outcome_multiplier = {
+        "success": 1.0,
+        "partial": 0.5,
+        "failure": 0.0,
+        "catastrophic": 0.0,
+    }.get(outcome, 0.0)
+
+    base_salvage_per_star = 100
+    base_salvage = difficulty * base_salvage_per_star * outcome_multiplier
+
+    # Count defeated enemies (side != "player" and hp_current <= 0)
+    enemy_defeated_count = 0
+    for combatant in scenario.combatants:
+        if combatant.side != "player":
+            # Check if defeated (hp <= 0 or structure <= 0)
+            if combatant.resources.hp_current <= 0:
+                enemy_defeated_count += 1
+
+    enemy_bonus = enemy_defeated_count * 50
+
+    # Count completed optional objectives
+    optional_objective_bonus = 0
+    for objective in scenario.objectives:
+        if objective.is_optional and objective.status == "completed":
+            optional_objective_bonus += 100  # bonus per optional objective
+
+    total_salvage = int(base_salvage + enemy_bonus + optional_objective_bonus)
+    return max(0, total_salvage)
 
 
 # =============================================================================
@@ -192,6 +246,13 @@ class CombatSessionListResponse(BaseModel):
     total: int
 
 
+class CombatSessionCompleteResponse(CombatSessionResponse):
+    """Extended response for combat completion with reward details."""
+
+    xp_awarded: int | None = None
+    salvage_awarded: int | None = None
+
+
 # =============================================================================
 # Helper Functions - Use core models directly
 # =============================================================================
@@ -249,6 +310,29 @@ def _session_to_response(session_db: CombatSessionDB) -> CombatSessionResponse:
         current_turn_index=session_db.current_turn_index,
         notes=session_db.notes,
         scenario=session_db.scenario,
+    )
+
+
+def _session_to_complete_response(
+    session_db: CombatSessionDB,
+    xp_awarded: int | None = None,
+    salvage_awarded: int | None = None,
+) -> CombatSessionCompleteResponse:
+    """Convert DB record to complete response with reward details."""
+    return CombatSessionCompleteResponse(
+        id=session_db.id,
+        gm_user_id=session_db.gm_user_id,
+        campaign_id=session_db.campaign_id,
+        created_at=session_db.created_at,
+        updated_at=session_db.updated_at,
+        name=session_db.name,
+        status=cast(SessionStatus, session_db.status),
+        current_round=session_db.current_round,
+        current_turn_index=session_db.current_turn_index,
+        notes=session_db.notes,
+        scenario=session_db.scenario,
+        xp_awarded=xp_awarded,
+        salvage_awarded=salvage_awarded,
     )
 
 
@@ -473,6 +557,12 @@ def _build_demo_terrain() -> None:
 )
 async def create_demo_combat(
     scenario_type: DemoScenarioType = "skirmish",
+    mission_id: str | None = Query(
+        None, description="Optional mission ID for XP tracking"
+    ),
+    mission_difficulty: int | None = Query(
+        None, ge=1, le=3, description="Mission difficulty stars (1-3)"
+    ),
     session: AsyncSession = Depends(get_session),
     user: dict = Depends(get_current_user),
 ) -> CombatSessionResponse:
@@ -521,6 +611,8 @@ async def create_demo_combat(
         gm_user_id=user["id"],
         campaign_id=None,  # Demo sessions have no campaign
         notes=f"Quick Battle demo ({scenario_type} scenario)",
+        mission_id=mission_id,
+        mission_difficulty=mission_difficulty,
     )
 
     session.add(db_session)
@@ -646,13 +738,13 @@ async def update_combat_session(
     return _session_to_response(combat_session)
 
 
-@router.post("/{session_id}/complete", response_model=CombatSessionResponse)
+@router.post("/{session_id}/complete", response_model=CombatSessionCompleteResponse)
 async def complete_combat_session(
     session_id: str,
     body: CombatSessionCompleteRequest,
     session: AsyncSession = Depends(get_session),
     user: dict = Depends(get_current_user),
-) -> CombatSessionResponse:
+) -> CombatSessionCompleteResponse:
     """Mark a combat session complete and propagate mission outcomes."""
     result = await session.exec(
         select(CombatSessionDB).where(
@@ -686,11 +778,76 @@ async def complete_combat_session(
             combat_session=combat_session,
         )
 
+    # Award XP and salvage to player's character(s) based on mission difficulty and outcome
+    xp_amount = 0
+    salvage_amount = 0
+
+    if (
+        combat_session.mission_difficulty is not None
+        and combat_session.mission_difficulty >= 1
+    ):
+        difficulty = combat_session.mission_difficulty
+        # Outcome multiplier
+        outcome_multiplier = {
+            "success": 1.0,
+            "partial": 0.5,
+            "failure": 0.0,
+            "catastrophic": 0.0,
+        }.get(body.outcome, 0.0)
+
+        # Calculate XP
+        base_xp_per_star = 500
+        xp_amount = int(difficulty * base_xp_per_star * outcome_multiplier)
+
+        # Calculate salvage (requires scenario for enemy count)
+        try:
+            scenario = MechCombatScenario.model_validate(combat_session.scenario)
+            salvage_amount = _calculate_salvage(scenario, difficulty, body.outcome)
+        except Exception as e:
+            logger.warning(f"Failed to calculate salvage: {e}")
+
+        # Find characters belonging to the user (GM)
+        result = await session.exec(
+            select(CharacterDB).where(CharacterDB.user_id == user["id"]).limit(1)
+        )
+        character_db = result.first()
+        if character_db:
+            # Hydrate core Character model
+            core_char = Character.model_validate(character_db.data)
+            updated_pilot = core_char.pilot
+
+            # Award XP if any
+            if xp_amount > 0:
+                updated_pilot = updated_pilot.add_xp(xp_amount)
+                logger.info(
+                    f"Awarded {xp_amount} XP to character {character_db.id} "
+                    f"(difficulty {difficulty}, outcome {body.outcome})"
+                )
+
+            # Award salvage if any
+            if salvage_amount > 0:
+                updated_pilot = updated_pilot.add_salvage(salvage_amount)
+                logger.info(
+                    f"Awarded {salvage_amount} salvage to character {character_db.id} "
+                    f"(difficulty {difficulty}, outcome {body.outcome})"
+                )
+
+            # Update character data if either XP or salvage changed
+            if xp_amount > 0 or salvage_amount > 0:
+                core_char = core_char.update_pilot(
+                    **updated_pilot.model_dump(mode="json")
+                )
+                character_db.data = core_char.model_dump(mode="json")
+                character_db.updated_at = utc_now()
+                session.add(character_db)
+
     session.add(combat_session)
     await session.commit()
     await session.refresh(combat_session)
 
-    return _session_to_response(combat_session)
+    return _session_to_complete_response(
+        combat_session, xp_awarded=xp_amount, salvage_awarded=salvage_amount
+    )
 
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -2370,6 +2527,54 @@ async def parse_voice_intent_endpoint(
     )
 
 
+async def _get_max_pilot_level(
+    scenario: MechCombatScenario,
+    session: AsyncSession,
+) -> int:
+    """Compute the maximum pilot license level among player combatants.
+
+    Args:
+        scenario: Current combat scenario
+        session: Database session for fetching character data
+
+    Returns:
+        Maximum pilot license level (0-12), or 0 if no player combatants found.
+    """
+    # Collect player combatant IDs
+    player_combatant_ids = []
+    for combatant in scenario.combatants:
+        if combatant.side == "players" and combatant.kind == "mech":
+            player_combatant_ids.append(combatant.id)
+
+    if not player_combatant_ids:
+        return 0
+
+    # Extract character IDs from combatant IDs (remove "combat_" prefix if present)
+    character_ids = []
+    for combatant_id in player_combatant_ids:
+        if combatant_id.startswith("combat_"):
+            character_ids.append(combatant_id[7:])  # Remove prefix
+        else:
+            # Assume combatant ID is character ID (fallback)
+            character_ids.append(combatant_id)
+
+    # Query characters
+    character_column = getattr(CharacterDB, "id")
+    result = await session.exec(
+        select(CharacterDB).where(character_column.in_(character_ids))
+    )
+    characters = result.all()
+
+    max_level = 0
+    for character_db in characters:
+        character = Character.model_validate(character_db.data)
+        level = character.pilot.total_license_levels()
+        if level > max_level:
+            max_level = level
+
+    return max_level
+
+
 @router.post("/{session_id}/turns/auto-npc", response_model=AutoNPCTurnResponse)
 async def execute_auto_npc_turn(
     session_id: str,
@@ -2446,12 +2651,29 @@ async def execute_auto_npc_turn(
 
     # Choose AI implementation based on ai_type
     if current_actor.ai_type == "llm":
+        # Compute difficulty scaling based on pilot license level
+        try:
+            max_pilot_level = await _get_max_pilot_level(scenario, session)
+            aggression = get_ai_aggression(max_pilot_level)
+        except Exception as e:
+            # Fallback to default aggression (0.5) if calculation fails
+            logger.warning(f"Failed to compute pilot level for AI aggression: {e}")
+            aggression = 0.5
+
+        # Create tactician config with aggression
+        tactician_config = TacticianConfig(
+            backend=LLMBackend.OLLAMA,
+            model="lancer-expert",
+            role=current_actor.npc_role,
+            difficulty=aggression,
+        )
         # Use LLM-powered tactician
         updated_scenario, npc_result = execute_llm_npc_turn(
             scenario,
             current_actor.id,
             combat_session.current_round,
             combat_session.current_turn_index,
+            tactician_config=tactician_config,
         )
     else:
         # Use rule-based NPC AI (default)
