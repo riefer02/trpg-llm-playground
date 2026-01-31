@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useSearch,
+} from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
 import { useSettings } from "../../lib/hooks/useSettings";
+import { useLowHPWarning } from "../../lib/hooks/useLowHPWarning";
 import { useCombatNarration } from "../../lib/voice/text-to-speech";
 import { useSpeechRecognition } from "../../lib/voice/speech-to-text";
 
@@ -18,6 +24,7 @@ import {
   usePendingDecisions,
   useSubmitDecision,
   useCompleteCombat,
+  useForfeitCombat,
   useSpendReserve,
   useWeapons,
   useAutoNpcTurn,
@@ -28,19 +35,40 @@ import {
   type ReactionRequest,
   type DecisionSubmitRequest,
   type CombatCompleteRequest,
+  type ActionPreviewResponse,
+  useActionPreview,
 } from "../../lib/api";
 import { useParseVoiceIntent } from "../../lib/api/combat";
-import { CombatCanvas, type TargetingMode, type ContextMenuInfo } from "../../components/combat/CombatCanvas";
+import {
+  CombatCanvas,
+  type TargetingMode,
+  type ContextMenuInfo,
+} from "../../components/combat/CombatCanvas";
 import { ViewportControls } from "../../components/combat/ViewportControls";
-import { ContextMenu, type ContextMenuTarget, type ContextMenuOption } from "../../components/combat/ContextMenu";
-import { MapTooltip, type HoverTarget } from "../../components/combat/MapTooltip";
+import {
+  ContextMenu,
+  type ContextMenuTarget,
+  type ContextMenuOption,
+} from "../../components/combat/ContextMenu";
+import {
+  MapTooltip,
+  type HoverTarget,
+} from "../../components/combat/MapTooltip";
+import { ActionPreviewPanel } from "../../components/combat/ActionPreviewPanel";
+import { AIThinkingIndicator } from "../../components/combat/AIThinkingIndicator";
 import {
   ActionLog,
   type SelectedAction,
 } from "../../components/combat/ActionLog";
-import { TurnControls, type TurnState } from "../../components/combat/TurnControls";
+import {
+  TurnControls,
+  type TurnState,
+} from "../../components/combat/TurnControls";
 import { TurnIndicator } from "../../components/combat/TurnIndicator";
-import { ActionPanel, type TargetMode } from "../../components/combat/ActionPanel";
+import {
+  ActionPanel,
+  type TargetMode,
+} from "../../components/combat/ActionPanel";
 import { ActionBar } from "../../components/combat/ActionBar";
 import { VoiceTranscriptDisplay } from "../../components/combat/VoiceTranscriptDisplay";
 import { VoiceActionConfirmationDialog } from "../../components/combat/VoiceActionConfirmationDialog";
@@ -49,6 +77,9 @@ import { ReactionPrompt } from "../../components/combat/ReactionPrompt";
 import { SaveCheckPrompt } from "../../components/combat/SaveCheckPrompt";
 import { TraumaSelectionPrompt } from "../../components/combat/TraumaSelectionPrompt";
 import { MissionCompleteModal } from "../../components/combat/MissionCompleteModal";
+import { ForfeitConfirmationModal } from "../../components/combat/ForfeitConfirmationModal";
+import { PauseMenu } from "../../components/combat/PauseMenu";
+import { VictoryCelebration } from "../../components/combat/VictoryCelebration";
 import { VictoryConditionPanel } from "../../components/combat/VictoryConditionPanel";
 import { ObjectiveTracker } from "../../components/combat/ObjectiveTracker";
 import { ReservesPanel } from "../../components/combat/ReservesPanel";
@@ -59,12 +90,7 @@ import {
 } from "../../lib/combat-render/adapter";
 import { createHexLayout } from "../../lib/combat-render/hex";
 import type { HexCoord, AttackPatternDefinition } from "../../lib/types/lancer";
-import {
-  Button,
-  Card,
-  CardContent,
-  Modal,
-} from "../../components/ui";
+import { Button, Card, CardContent, Modal } from "../../components/ui";
 import { CombatSessionSkeleton } from "../../components/skeletons";
 
 interface CombatSearch {
@@ -74,7 +100,8 @@ interface CombatSearch {
 export const Route = createFileRoute("/combat/$combatId")({
   component: CombatSessionPage,
   validateSearch: (search: Record<string, unknown>): CombatSearch => ({
-    missionId: typeof search.missionId === "string" ? search.missionId : undefined,
+    missionId:
+      typeof search.missionId === "string" ? search.missionId : undefined,
   }),
 });
 
@@ -99,10 +126,16 @@ function CombatSessionPage() {
   const executeAction = useExecuteAction(combatId);
   const submitReaction = useSubmitReaction(combatId);
   const completeCombat = useCompleteCombat(combatId);
+  const forfeitCombat = useForfeitCombat(combatId);
   const spendReserve = useSpendReserve(combatId);
   const autoNpcTurn = useAutoNpcTurn(combatId);
   const { settings } = useSettings();
-  const { narrateAction, narrateTurnStart, narrateStatusChange, narrateVictory } = useCombatNarration();
+  const {
+    narrateAction,
+    narrateTurnStart,
+    narrateStatusChange,
+    narrateVictory,
+  } = useCombatNarration();
   // Speech recognition
   const speechRecognition = useSpeechRecognition({
     language: settings.voiceLanguage,
@@ -111,11 +144,17 @@ function CombatSessionPage() {
   });
   const parseVoiceIntent = useParseVoiceIntent(combatId);
   // Voice control state
-  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceTranscript, setVoiceTranscript] = useState("");
   const [showVoiceConfirmation, setShowVoiceConfirmation] = useState(false);
-  const [parsedAction, setParsedAction] = useState<Record<string, unknown> | null>(null);
+  const [parsedAction, setParsedAction] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // ActionPanel ref for cancel targeting
+  const actionPanelRef = useRef<ActionPanelHandle>(null);
 
   // Extract scenario data early so it can be used in subsequent hooks
   const scenario = data?.scenario;
@@ -123,6 +162,7 @@ function CombatSessionPage() {
   const currentRound = data?.current_round ?? 1;
   const currentTurnIndex = data?.current_turn_index ?? 0;
   const combatants = scenario?.combatants ?? [];
+  const lowHPWarning = useLowHPWarning(combatants, 'players');
 
   // Determine current actor from turn order (needed for voice hooks)
   const currentActor = useMemo(() => {
@@ -137,16 +177,28 @@ function CombatSessionPage() {
     return combatants[0] ?? null;
   }, [scenario, currentRound, currentTurnIndex, combatants]);
 
+  // Determine if it's currently the player's turn (for forfeit validation)
+  const isPlayerTurn = useMemo(() => {
+    return currentActor?.side === "players";
+  }, [currentActor]);
+
   // Voice transcript parsing
-  const lastParsedTranscriptRef = useRef('');
+  const lastParsedTranscriptRef = useRef("");
   useEffect(() => {
     // Skip parsing if confirmation dialog is open (waiting for yes/no)
     if (showVoiceConfirmation) return;
-    if (!speechRecognition.isListening && speechRecognition.transcript && speechRecognition.transcript !== lastParsedTranscriptRef.current) {
+    if (
+      !speechRecognition.isListening &&
+      speechRecognition.transcript &&
+      speechRecognition.transcript !== lastParsedTranscriptRef.current
+    ) {
       lastParsedTranscriptRef.current = speechRecognition.transcript;
       setVoiceTranscript(speechRecognition.transcript);
       parseVoiceIntent.mutate(
-        { transcript: speechRecognition.transcript, actor_id: currentActor?.id },
+        {
+          transcript: speechRecognition.transcript,
+          actor_id: currentActor?.id,
+        },
         {
           onSuccess: (data) => {
             if (data.success && data.action) {
@@ -154,70 +206,148 @@ function CombatSessionPage() {
               setShowVoiceConfirmation(true);
               setVoiceError(null);
             } else {
-              setVoiceError(data.error || 'Could not understand command');
+              setVoiceError(data.error || "Could not understand command");
               setParsedAction(null);
             }
           },
           onError: (error) => {
-            setVoiceError(error.message || 'Failed to parse voice command');
+            setVoiceError(error.message || "Failed to parse voice command");
           },
-        }
+        },
       );
     }
-  }, [speechRecognition.isListening, speechRecognition.transcript, currentActor?.id, parseVoiceIntent, showVoiceConfirmation]);
+  }, [
+    speechRecognition.isListening,
+    speechRecognition.transcript,
+    currentActor?.id,
+    parseVoiceIntent,
+    showVoiceConfirmation,
+  ]);
 
   // Yes/No voice confirmation when dialog is open
   useEffect(() => {
-    if (showVoiceConfirmation && speechRecognition.transcript && !speechRecognition.isListening) {
+    if (
+      showVoiceConfirmation &&
+      speechRecognition.transcript &&
+      !speechRecognition.isListening
+    ) {
       const transcript = speechRecognition.transcript.trim().toLowerCase();
       // Check for yes/no keywords
-      if (transcript === 'yes' || transcript === 'confirm' || transcript === 'okay' || transcript === 'ok') {
+      if (
+        transcript === "yes" ||
+        transcript === "confirm" ||
+        transcript === "okay" ||
+        transcript === "ok"
+      ) {
         // Trigger confirm
         if (parsedAction) {
           executeAction.mutate(parsedAction as ActionRequest, {
             onSuccess: () => {
               setShowVoiceConfirmation(false);
               setParsedAction(null);
-              setVoiceTranscript('');
+              setVoiceTranscript("");
               speechRecognition.resetTranscript();
             },
             onError: (error) => {
-              setVoiceError(error.message || 'Action execution failed');
+              setVoiceError(error.message || "Action execution failed");
             },
           });
         }
-      } else if (transcript === 'no' || transcript === 'cancel' || transcript === 'dismiss') {
+      } else if (
+        transcript === "no" ||
+        transcript === "cancel" ||
+        transcript === "dismiss"
+      ) {
         // Trigger cancel
         setShowVoiceConfirmation(false);
         setVoiceError(null);
         setParsedAction(null);
-        setVoiceTranscript('');
+        setVoiceTranscript("");
         speechRecognition.resetTranscript();
       }
       // Reset transcript after processing to avoid re-triggering
       lastParsedTranscriptRef.current = speechRecognition.transcript;
     }
-  }, [showVoiceConfirmation, speechRecognition.transcript, speechRecognition.isListening, parsedAction, executeAction]);
+  }, [
+    showVoiceConfirmation,
+    speechRecognition.transcript,
+    speechRecognition.isListening,
+    parsedAction,
+    executeAction,
+  ]);
+
+  // Mission completion state (must be defined before useEffect that uses them)
+  const [showMissionCompleteModal, setShowMissionCompleteModal] =
+    useState(false);
+  const [showForfeitModal, setShowForfeitModal] = useState(false);
+  const [showVictoryCelebration, setShowVictoryCelebration] = useState(false);
+  const [victoryOutcome, setVictoryOutcome] = useState<"victory" | "defeat">(
+    "victory",
+  );
+
+  // Pause state
+  const [showPauseMenu, setShowPauseMenu] = useState(false);
+
+  // Global keyboard shortcut: Ctrl+Q to forfeit mission
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Q (or Cmd+Q on Mac) - forfeit mission
+      if ((e.ctrlKey || e.metaKey) && e.key === 'q' && !e.repeat) {
+        // Only trigger if mission is active, it's player's turn, and no modal is open
+        if (data?.status === 'active' && isPlayerTurn && !showForfeitModal && !showMissionCompleteModal) {
+          e.preventDefault();
+          setShowForfeitModal(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [data?.status, isPlayerTurn, showForfeitModal, showMissionCompleteModal]);
 
   // Weapons data (needed for voice confirmation mapping)
   const weaponsQuery = useWeapons();
 
   // Mapping functions for friendly names in voice confirmation dialog
-  const getCombatantName = useCallback((id: string): string => {
-    if (!data?.scenario?.combatants) return id;
-    const combatant = data.scenario.combatants[id];
-    return combatant?.name ?? id;
-  }, [data?.scenario?.combatants]);
+  const getCombatantName = useCallback(
+    (id: string): string => {
+      if (!data?.scenario?.combatants) return id;
+      const combatant = data.scenario.combatants[id];
+      return combatant?.name ?? id;
+    },
+    [data?.scenario?.combatants],
+  );
 
-  const getWeaponName = useCallback((id: string): string => {
-    // Map weapon ID to weapon name from compendium
-    if (weaponsQuery.data) {
-      const weapon = weaponsQuery.data.find(w => w.id === id);
-      if (weapon) return weapon.name;
-    }
-    // Fallback: humanized ID
-    return id.replace(/_/g, ' ');
-  }, [weaponsQuery.data]);
+  const getWeaponName = useCallback(
+    (id: string): string => {
+      // Map weapon ID to weapon name from compendium
+      if (weaponsQuery.data) {
+        const weapon = weaponsQuery.data.find((w) => w.id === id);
+        if (weapon) return weapon.name;
+      }
+      // Fallback: humanized ID
+      return id.replace(/_/g, " ");
+    },
+    [weaponsQuery.data],
+  );
+
+  // Helper to get first weapon ID for an action that requires a weapon
+  const getWeaponIdForAction = useCallback(
+    (action: AvailableActionItem): string | null => {
+      if (!action.requires_weapon || !currentActor?.inventory?.mounts) {
+        return null;
+      }
+      // Find first weapon in inventory (any mount)
+      for (const mount of currentActor.inventory.mounts) {
+        if (mount.weapons && mount.weapons.length > 0) {
+          // Return first weapon ID
+          return mount.weapons[0].weapon_id;
+        }
+      }
+      return null;
+    },
+    [currentActor],
+  );
 
   // Show error toast when voiceError changes
   useEffect(() => {
@@ -226,17 +356,62 @@ function CombatSessionPage() {
     }
   }, [voiceError]);
 
-  // Mission completion state
-  const [showMissionCompleteModal, setShowMissionCompleteModal] = useState(false);
-
-  // Turn state tracking
+  // Turn state tracking (must be defined before useEffect that uses turnActive)
   const [turnActive, setTurnActive] = useState(false);
   const [economy, setEconomy] = useState<ActionEconomyState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   // AI reasoning display
-  const [aiReasoning, setAiReasoning] = useState<AutoNPCTurnResponse | null>(null);
+  const [aiReasoning, setAiReasoning] = useState<AutoNPCTurnResponse | null>(
+    null,
+  );
   const [showReasoningPanel, setShowReasoningPanel] = useState(false);
 
+  // Overcharge confirmation state (must be before Escape key useEffect)
+  const [showOverchargeConfirm, setShowOverchargeConfirm] = useState(false);
+
+  // Context menu state (must be before Escape key useEffect)
+  const [contextMenu, setContextMenu] = useState<{
+    position: { x: number; y: number };
+    target: ContextMenuTarget;
+  } | null>(null);
+
+  // Escape key listener to cancel targeting or open pause menu
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle Escape key
+      if (event.key !== "Escape") return;
+      // Don't interfere with other dialogs (voice confirmation, overcharge, etc.)
+      if (
+        showVoiceConfirmation ||
+        showOverchargeConfirm ||
+        contextMenu ||
+        showForfeitModal ||
+        showMissionCompleteModal ||
+        showVictoryCelebration ||
+        showPauseMenu
+      )
+        return;
+      // If turn is active, try to cancel targeting first
+      if (turnActive && actionPanelRef.current?.cancel()) {
+        event.preventDefault();
+        return;
+      }
+      // Otherwise open pause menu
+      event.preventDefault();
+      setShowPauseMenu(true);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    turnActive,
+    showVoiceConfirmation,
+    showOverchargeConfirm,
+    contextMenu,
+    showForfeitModal,
+    showMissionCompleteModal,
+    showVictoryCelebration,
+    showPauseMenu,
+  ]);
 
   // Available actions query (only when turn is active)
   const { data: availableActions } = useAvailableActions(combatId, {
@@ -245,18 +420,22 @@ function CombatSessionPage() {
 
   // Canvas interaction state
   const [hovered, setHovered] = useState<HexCoord | null>(null);
-  const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(null);
+  const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(
+    null,
+  );
+
+  // Action preview state
+  const [previewAction, setPreviewAction] =
+    useState<AvailableActionItem | null>(null);
 
   // Targeting mode state
   const [targetMode, setTargetMode] = useState<TargetMode | null>(null);
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
   const [maxTargets, setMaxTargets] = useState<number>(1);
 
-  // Overcharge confirmation state
-  const [showOverchargeConfirm, setShowOverchargeConfirm] = useState(false);
-
   // Area targeting state for line/cone attacks
-  const [areaPattern, setAreaPattern] = useState<AttackPatternDefinition | null>(null);
+  const [areaPattern, setAreaPattern] =
+    useState<AttackPatternDefinition | null>(null);
   const [areaDirection, setAreaDirection] = useState<HexCoord | null>(null);
   // Preview origin for blast patterns (follows cursor)
   const [previewOrigin, setPreviewOrigin] = useState<HexCoord | null>(null);
@@ -283,13 +462,10 @@ function CombatSessionPage() {
   } = useCanvasViewport();
 
   // Canvas size ref for centering calculations
-  const canvasSizeRef = useRef<{ width: number; height: number }>({ width: 720, height: 520 });
-
-  // Context menu state
-  const [contextMenu, setContextMenu] = useState<{
-    position: { x: number; y: number };
-    target: ContextMenuTarget;
-  } | null>(null);
+  const canvasSizeRef = useRef<{ width: number; height: number }>({
+    width: 720,
+    height: 520,
+  });
 
   // Hover tooltip state
   const [hoverTooltip, setHoverTooltip] = useState<{
@@ -297,22 +473,78 @@ function CombatSessionPage() {
     position: { x: number; y: number };
   } | null>(null);
 
+  // Preview target ID for action preview (hovered or selected target)
+  const previewTargetId = useMemo(() => {
+    if (hoverTooltip?.target.type === "combatant") {
+      const combatant = hoverTooltip.target.combatant;
+      // Don't preview targeting self
+      if (combatant.id === currentActor?.id) return null;
+      return combatant.id;
+    }
+    if (selectedTargetIds.length > 0) {
+      return selectedTargetIds[0];
+    }
+    return null;
+  }, [hoverTooltip, selectedTargetIds, currentActor]);
+
+  // Preview target combatant object
+  const previewTargetCombatant = useMemo(() => {
+    if (!previewTargetId) return null;
+    return combatants.find((c) => c.id === previewTargetId) ?? null;
+  }, [previewTargetId, combatants]);
+
+  // Action preview mutation
+  const {
+    mutate: fetchPreview,
+    data: previewResponse,
+    isPending: isPreviewLoading,
+    error: previewError,
+    reset: resetPreview,
+  } = useActionPreview(combatId);
+
+  // Fetch action preview when preview action and target are available
+  useEffect(() => {
+    if (!previewAction || !previewTargetId || !currentActor?.id) {
+      resetPreview();
+      return;
+    }
+
+    // Debounce to avoid rapid calls
+    const timer = setTimeout(() => {
+      fetchPreview({
+        action_id: previewAction.action_id,
+        actor_id: currentActor.id,
+        target_id: previewTargetId,
+        weapon_id: getWeaponIdForAction(previewAction) ?? undefined,
+      });
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [
+    previewAction,
+    previewTargetId,
+    currentActor?.id,
+    fetchPreview,
+    getWeaponIdForAction,
+    resetPreview,
+  ]);
+
   // Get player combatants for reaction polling (when not our turn)
   const playerCombatants = useMemo(
     () => combatants.filter((c) => c.side === "players"),
-    [combatants]
+    [combatants],
   );
 
   // Poll for reaction opportunities when it's not our turn
   const firstPlayerCombatant = playerCombatants[0];
-  const playerCombatantName = firstPlayerCombatant?.name ?? 'Player';
+  const playerCombatantName = firstPlayerCombatant?.name ?? "Player";
   const { data: reactionOpportunity } = useReactionOpportunity(
     combatId,
     firstPlayerCombatant?.id ?? null,
     {
       enabled: !turnActive && !!firstPlayerCombatant,
       pollingInterval: 3000, // Poll every 3 seconds
-    }
+    },
   );
 
   // Poll for pending decisions (save prompts, system trauma)
@@ -322,7 +554,7 @@ function CombatSessionPage() {
     {
       enabled: !!firstPlayerCombatant,
       pollingInterval: 3000, // Poll every 3 seconds
-    }
+    },
   );
   const submitDecision = useSubmitDecision(combatId);
 
@@ -386,7 +618,11 @@ function CombatSessionPage() {
         // Narrate AI turn
         narrateTurnStart(response.actor_name, false);
         if (response.decision_action) {
-          narrateAction(response.actor_name, response.decision_action, response.decision_target);
+          narrateAction(
+            response.actor_name,
+            response.decision_action,
+            response.decision_target,
+          );
         }
         toast.success("NPC turn completed");
       },
@@ -395,7 +631,8 @@ function CombatSessionPage() {
   }, [autoNpcTurn, settings, narrateTurnStart, narrateAction]);
 
   // Action triggered from ActionBar (to pass to ActionPanel)
-  const [triggeredAction, setTriggeredAction] = useState<AvailableActionItem | null>(null);
+  const [triggeredAction, setTriggeredAction] =
+    useState<AvailableActionItem | null>(null);
 
   // Handle action selection from ActionPanel or ActionBar
   const handleActionSelect = useCallback((action: AvailableActionItem) => {
@@ -417,17 +654,22 @@ function CombatSessionPage() {
 
       // Check if any target is a deployable (Phase 60)
       const deployableIds = new Set(Object.keys(scenario?.deployables ?? {}));
-      const deployableTargets = (request.target_ids ?? []).filter((id) => deployableIds.has(id));
-      const combatantTargets = (request.target_ids ?? []).filter((id) => !deployableIds.has(id));
+      const deployableTargets = (request.target_ids ?? []).filter((id) =>
+        deployableIds.has(id),
+      );
+      const combatantTargets = (request.target_ids ?? []).filter(
+        (id) => !deployableIds.has(id),
+      );
 
       // Build final request with deployable targeting if applicable
-      const finalRequest: ActionRequest = deployableTargets.length > 0
-        ? {
-            ...request,
-            target_ids: combatantTargets,
-            target_deployable_id: deployableTargets[0], // Only one deployable target supported
-          }
-        : request;
+      const finalRequest: ActionRequest =
+        deployableTargets.length > 0
+          ? {
+              ...request,
+              target_ids: combatantTargets,
+              target_deployable_id: deployableTargets[0], // Only one deployable target supported
+            }
+          : request;
 
       setActionError(null);
       executeAction.mutate(finalRequest, {
@@ -441,16 +683,22 @@ function CombatSessionPage() {
             setAreaPattern(null);
             setAreaDirection(null);
             setPreviewOrigin(null);
-             setActionError(null);
-             toast.success("Action executed");
-             // Narrate action
-             narrateAction(playerCombatantName, request.action_id, undefined, result.damage_dealt);
+            setActionError(null);
+            toast.success("Action executed");
+            // Narrate action
+            narrateAction(
+              playerCombatantName,
+              request.action_id,
+              undefined,
+              result.damage_dealt,
+            );
 
             // Auto-end turn if all actions exhausted
             if (newEconomy) {
               const fullExhausted = newEconomy.full_actions_used >= 1;
               const quickTotal = 2 + (newEconomy.overcharge_used ? 1 : 0);
-              const quickExhausted = newEconomy.quick_actions_used >= quickTotal;
+              const quickExhausted =
+                newEconomy.quick_actions_used >= quickTotal;
 
               if (fullExhausted && quickExhausted) {
                 // Brief delay before auto-ending to let user see the result
@@ -473,7 +721,13 @@ function CombatSessionPage() {
         },
       });
     },
-    [executeAction, scenario?.deployables, handleEndTurn, narrateAction, playerCombatantName]
+    [
+      executeAction,
+      scenario?.deployables,
+      handleEndTurn,
+      narrateAction,
+      playerCombatantName,
+    ],
   );
 
   // Handle overcharge confirmation
@@ -493,7 +747,7 @@ function CombatSessionPage() {
           }
         },
         onError: (err) => toast.error(err.message || "Overcharge failed"),
-      }
+      },
     );
   }, [executeAction]);
 
@@ -505,7 +759,7 @@ function CombatSessionPage() {
         onError: (err) => toast.error(err.message || "Reaction failed"),
       });
     },
-    [submitReaction]
+    [submitReaction],
   );
 
   // Handle decision submission (save prompts, system trauma)
@@ -516,7 +770,7 @@ function CombatSessionPage() {
         onError: (err) => toast.error(err.message || "Decision failed"),
       });
     },
-    [submitDecision]
+    [submitDecision],
   );
 
   // Handle mission completion
@@ -524,45 +778,135 @@ function CombatSessionPage() {
     (request: CombatCompleteRequest) => {
       completeCombat.mutate(request, {
         onSuccess: (result) => {
-           setShowMissionCompleteModal(false);
-           toast.success("Mission completed");
-           // Narrate victory/defeat
-           const victoriousSide = request.outcome === "success" || request.outcome === "partial" ? "player" : "enemy";
-           narrateVictory(victoriousSide);
-          
-          // Redirect to debrief if missionId is known, otherwise to campaign/dashboard
+          setShowMissionCompleteModal(false);
+          toast.success("Mission completed");
+          // Narrate victory/defeat
+          const victoriousSide =
+            request.outcome === "success" || request.outcome === "partial"
+              ? "player"
+              : "enemy";
+          narrateVictory(victoriousSide);
+
+          // Determine victory/defeat for celebration
+          const outcome =
+            request.outcome === "success" || request.outcome === "partial"
+              ? "victory"
+              : "defeat";
+          setVictoryOutcome(outcome);
+          setShowVictoryCelebration(true);
+
+          // Schedule navigation after celebration delay (3 seconds)
+          const navigationTimer = setTimeout(() => {
+            // Redirect to debrief if missionId is known, otherwise to campaign/dashboard
+            if (search.missionId) {
+              // Compute statistics
+              const turnsTaken =
+                scenario?.rounds?.reduce(
+                  (acc, round) => acc + (round.turns?.length || 0),
+                  0,
+                ) || 0;
+              const enemyCount =
+                scenario?.combatants?.filter((c) => c.side !== "players")
+                  .length || 0;
+              const damageDealt = enemyCount * 300; // placeholder
+              const damageReceived = 1200; // placeholder
+              const xpEarned = result.xp_awarded ?? 0;
+              const salvageEarned = result.salvage_awarded ?? 0;
+
+              navigate({
+                to: "/missions/$missionId/debrief",
+                params: { missionId: search.missionId },
+                search: {
+                  outcome: outcome,
+                  turns: turnsTaken,
+                  damageDealt,
+                  damageReceived,
+                  xp: xpEarned,
+                  salvage: salvageEarned,
+                },
+              });
+            } else if (result.campaign_id) {
+              navigate({
+                to: "/campaigns/$campaignId",
+                params: { campaignId: result.campaign_id },
+              });
+            } else {
+              navigate({ to: "/" });
+            }
+          }, 3000); // 3 second pause for celebration
+
+          // Cleanup timer if component unmounts (though navigation will cause unmount)
+          return () => clearTimeout(navigationTimer);
+        },
+        onError: (err) =>
+          toast.error(err.message || "Failed to complete mission"),
+      });
+    },
+    [completeCombat, navigate, search, scenario, narrateVictory],
+  );
+
+  // Handle mission forfeit
+  const handleForfeitMission = useCallback(() => {
+    forfeitCombat.mutate(undefined, {
+      onSuccess: (result) => {
+        setShowForfeitModal(false);
+        toast.info("Mission forfeited - counted as defeat");
+        // Narrate enemy victory
+        narrateVictory("enemy");
+        // Set outcome for celebration
+        setVictoryOutcome("defeat");
+        setShowVictoryCelebration(true);
+
+        // Schedule navigation after celebration delay (3 seconds)
+        const navigationTimer = setTimeout(() => {
           if (search.missionId) {
-            // Compute statistics
-            const turnsTaken = scenario?.rounds?.reduce((acc, round) => acc + (round.turns?.length || 0), 0) || 0;
-            const enemyCount = scenario?.combatants?.filter(c => c.side !== "players").length || 0;
-            const damageDealt = enemyCount * 300; // placeholder
+            // Compute statistics (partial salvage based on enemies defeated)
+            const enemyCount =
+              scenario?.combatants?.filter((c) => c.side !== "players").length || 0;
+            const enemiesDefeated =
+              scenario?.combatants?.filter(
+                (c) => c.side !== "players" && c.status === "defeated"
+              ).length || 0;
+            const turnsTaken =
+              scenario?.rounds?.reduce(
+                (acc, round) => acc + (round.turns?.length || 0),
+                0
+              ) || 0;
+            const damageDealt = enemiesDefeated * 300; // placeholder
             const damageReceived = 1200; // placeholder
-            const xpEarned = result.xp_awarded ?? 0;
+            const xpEarned = 0; // No XP for forfeit
             const salvageEarned = result.salvage_awarded ?? 0;
-            
+
             navigate({
               to: "/missions/$missionId/debrief",
               params: { missionId: search.missionId },
               search: {
-                outcome: request.outcome === "success" || request.outcome === "partial" ? "victory" : "defeat",
+                outcome: "defeat",
                 turns: turnsTaken,
                 damageDealt,
                 damageReceived,
                 xp: xpEarned,
                 salvage: salvageEarned,
+                forfeit: true,
               },
             });
           } else if (result.campaign_id) {
-            navigate({ to: "/campaigns/$campaignId", params: { campaignId: result.campaign_id } });
+            navigate({
+              to: "/campaigns/$campaignId",
+              params: { campaignId: result.campaign_id },
+            });
           } else {
             navigate({ to: "/" });
           }
-        },
-        onError: (err) => toast.error(err.message || "Failed to complete mission"),
-      });
-    },
-    [completeCombat, navigate, search, scenario, narrateVictory]
-  );
+        }, 3000); // 3 second pause for celebration
+
+        // Cleanup timer if component unmounts
+        return () => clearTimeout(navigationTimer);
+      },
+      onError: (err) =>
+        toast.error(err.message || "Failed to forfeit mission"),
+    });
+  }, [forfeitCombat, navigate, search, scenario, narrateVictory]);
 
   // Handle reserve spending
   const handleSpendReserve = useCallback(
@@ -571,11 +915,12 @@ function CombatSessionPage() {
         { reserve_id: reserveId },
         {
           onSuccess: () => toast.success("Reserve spent"),
-          onError: (err) => toast.error(err.message || "Failed to spend reserve"),
-        }
+          onError: (err) =>
+            toast.error(err.message || "Failed to spend reserve"),
+        },
       );
     },
-    [spendReserve]
+    [spendReserve],
   );
 
   // Handle target mode changes from ActionPanel
@@ -588,36 +933,49 @@ function CombatSessionPage() {
   }, []);
 
   // Handle path mode changes from ActionPanel
-  const handlePathModeChange = useCallback((isActive: boolean, path: HexCoord[]) => {
-    setIsPathMode(isActive);
-    setMovementPath(path);
-    if (!isActive) {
-      setPathHexClick(null);
-    }
-  }, []);
+  const handlePathModeChange = useCallback(
+    (isActive: boolean, path: HexCoord[]) => {
+      setIsPathMode(isActive);
+      setMovementPath(path);
+      if (!isActive) {
+        setPathHexClick(null);
+      }
+    },
+    [],
+  );
 
   // Handle AoE preview changes from ActionPanel (weapon selection)
   const handleAreaPreviewChange = useCallback(
-    (pattern: AttackPatternDefinition | null, origin: HexCoord | null, direction: HexCoord | null) => {
+    (
+      pattern: AttackPatternDefinition | null,
+      origin: HexCoord | null,
+      direction: HexCoord | null,
+    ) => {
       setAreaPattern(pattern);
       setPreviewOrigin(origin);
       setAreaDirection(direction);
     },
-    []
+    [],
   );
 
   // Handle hex click for path building (from CombatCanvas)
-  const handlePathHexClick = useCallback((coord: HexCoord) => {
-    if (isPathMode) {
-      setPathHexClick(coord);
-    }
-  }, [isPathMode]);
+  const handlePathHexClick = useCallback(
+    (coord: HexCoord) => {
+      if (isPathMode) {
+        setPathHexClick(coord);
+      }
+    },
+    [isPathMode],
+  );
 
   // Handle movement range preview changes from ActionPanel
-  const handleMovementRangeChange = useCallback((show: boolean, speed: number) => {
-    setShowMovementRange(show);
-    setMovementRangeSpeed(speed);
-  }, []);
+  const handleMovementRangeChange = useCallback(
+    (show: boolean, speed: number) => {
+      setShowMovementRange(show);
+      setMovementRangeSpeed(speed);
+    },
+    [],
+  );
 
   // Viewport control handlers
   const handleZoomIn = useCallback(() => {
@@ -632,7 +990,7 @@ function CombatSessionPage() {
     (delta: number) => {
       setZoom(viewport.zoom + delta);
     },
-    [setZoom, viewport.zoom]
+    [setZoom, viewport.zoom],
   );
 
   const handleCenterOnActor = useCallback(() => {
@@ -665,14 +1023,23 @@ function CombatSessionPage() {
         return [...prev, tokenId];
       });
     },
-    [targetMode, maxTargets]
+    [targetMode, maxTargets],
   );
 
   // Handle right-click context menu on canvas
   const handleContextMenu = useCallback(
     (info: ContextMenuInfo) => {
-      // Don't show context menu during path mode or certain states
-      if (isPathMode) return;
+      // Right-click during path mode cancels path selection
+      if (isPathMode) {
+        actionPanelRef.current?.cancel();
+        return;
+      }
+
+      // If in targeting mode, right-click cancels targeting (both empty hex and tokens)
+      if (targetMode) {
+        actionPanelRef.current?.cancel();
+        return;
+      }
 
       // Determine what was clicked
       let target: ContextMenuTarget;
@@ -683,8 +1050,18 @@ function CombatSessionPage() {
         if (combatant) {
           const isEnemy = combatant.side !== "players";
           target = isEnemy
-            ? { type: "enemy", combatantId: combatant.id, combatantName: combatant.name, coord: info.coord }
-            : { type: "friendly", combatantId: combatant.id, combatantName: combatant.name, coord: info.coord };
+            ? {
+                type: "enemy",
+                combatantId: combatant.id,
+                combatantName: combatant.name,
+                coord: info.coord,
+              }
+            : {
+                type: "friendly",
+                combatantId: combatant.id,
+                combatantName: combatant.name,
+                coord: info.coord,
+              };
         } else {
           // Token not found in combatants, treat as empty hex
           target = { type: "empty", coord: info.coord };
@@ -709,7 +1086,7 @@ function CombatSessionPage() {
         target,
       });
     },
-    [combatants, scenario?.deployables, isPathMode]
+    [combatants, scenario?.deployables, isPathMode, targetMode, actionPanelRef],
   );
 
   // Handle context menu option selection
@@ -731,7 +1108,10 @@ function CombatSessionPage() {
         handleActionSelect(option.action);
 
         // If the action targets the right-clicked entity, pre-select it
-        if (contextMenu?.target.type === "enemy" || contextMenu?.target.type === "friendly") {
+        if (
+          contextMenu?.target.type === "enemy" ||
+          contextMenu?.target.type === "friendly"
+        ) {
           const targetId =
             contextMenu.target.type === "enemy"
               ? contextMenu.target.combatantId
@@ -742,7 +1122,7 @@ function CombatSessionPage() {
         }
       }
     },
-    [handleActionSelect, contextMenu]
+    [handleActionSelect, contextMenu],
   );
 
   // Build targeting mode for canvas
@@ -766,13 +1146,22 @@ function CombatSessionPage() {
       selectedTargetIds,
       maxTargets,
     };
-  }, [targetMode, combatants, currentActor, selectedTargetIds, maxTargets, scenario?.deployables]);
+  }, [
+    targetMode,
+    combatants,
+    currentActor,
+    selectedTargetIds,
+    maxTargets,
+    scenario?.deployables,
+  ]);
 
   // Derive active indices from selectedAction or fall back to current position
-  const activeRoundIndex = selectedAction?.roundIdx ?? clampIndex(currentRound - 1, rounds);
+  const activeRoundIndex =
+    selectedAction?.roundIdx ?? clampIndex(currentRound - 1, rounds);
   const round = rounds[activeRoundIndex] ?? null;
   const turns = round?.turns ?? [];
-  const activeTurnIndex = selectedAction?.turnIdx ?? clampIndex(currentTurnIndex, turns);
+  const activeTurnIndex =
+    selectedAction?.turnIdx ?? clampIndex(currentTurnIndex, turns);
   const turn = turns[activeTurnIndex] ?? null;
   const actions = turn?.actions ?? [];
   const activeActionIndex = selectedAction?.actionIdx ?? 0;
@@ -783,7 +1172,8 @@ function CombatSessionPage() {
     [scenario?.combatants],
   );
   const weaponDefinitions = useMemo(
-    () => new Map((weaponsQuery.data ?? []).map((weapon) => [weapon.id, weapon])),
+    () =>
+      new Map((weaponsQuery.data ?? []).map((weapon) => [weapon.id, weapon])),
     [weaponsQuery.data],
   );
 
@@ -804,7 +1194,9 @@ function CombatSessionPage() {
     let maxDistance = 0;
     for (const combatant of combatants) {
       if (combatant.position?.coord) {
-        const dist = Math.abs(combatant.position.coord.q) + Math.abs(combatant.position.coord.r);
+        const dist =
+          Math.abs(combatant.position.coord.q) +
+          Math.abs(combatant.position.coord.r);
         maxDistance = Math.max(maxDistance, dist);
       }
     }
@@ -828,7 +1220,9 @@ function CombatSessionPage() {
     const blockedHexes = new Set<string>();
     for (const combatant of combatants) {
       if (combatant.id !== currentActor.id && combatant.position?.coord) {
-        blockedHexes.add(`${combatant.position.coord.q},${combatant.position.coord.r}`);
+        blockedHexes.add(
+          `${combatant.position.coord.q},${combatant.position.coord.r}`,
+        );
       }
     }
 
@@ -840,7 +1234,13 @@ function CombatSessionPage() {
       }
     }
 
-    return buildMovementRangeOverlays(origin, speed, validHexes, blockedHexes, difficultHexes);
+    return buildMovementRangeOverlays(
+      origin,
+      speed,
+      validHexes,
+      blockedHexes,
+      difficultHexes,
+    );
   }, [showMovementRange, currentActor, scenario, movementRangeSpeed]);
 
   const renderOutput: CombatRenderAdapterOutput | null = useMemo(() => {
@@ -848,9 +1248,10 @@ function CombatSessionPage() {
       return null;
     }
     // For blast patterns, use preview origin (follows cursor) instead of actor position
-    const effectivePatternOrigin = areaPattern?.pattern === "blast" && previewOrigin
-      ? { coord: previewOrigin }
-      : currentActor?.position;
+    const effectivePatternOrigin =
+      areaPattern?.pattern === "blast" && previewOrigin
+        ? { coord: previewOrigin }
+        : currentActor?.position;
 
     const result = adaptCombatScenario({
       scenario,
@@ -874,7 +1275,18 @@ function CombatSessionPage() {
     }
 
     return result;
-  }, [action, hovered, round, scenario, turn, areaPattern, areaDirection, currentActor, previewOrigin, movementRangeOverlays]);
+  }, [
+    action,
+    hovered,
+    round,
+    scenario,
+    turn,
+    areaPattern,
+    areaDirection,
+    currentActor,
+    previewOrigin,
+    movementRangeOverlays,
+  ]);
 
   if (isLoading) {
     return <CombatSessionSkeleton />;
@@ -915,9 +1327,24 @@ function CombatSessionPage() {
       {!wsConnected && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-amber-500 text-amber-950 px-4 py-1.5 text-xs text-center font-medium shadow-lg animate-in slide-in-from-top duration-300">
           <div className="flex items-center justify-center gap-2">
-            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            <svg
+              className="w-3 h-3 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
             </svg>
             Reconnecting...
           </div>
@@ -927,21 +1354,44 @@ function CombatSessionPage() {
       {/* Compact header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/" className="text-primary hover:underline text-sm">←</Link>
+          <Link to="/" className="text-primary hover:underline text-sm">
+            ←
+          </Link>
           <div>
-            <h1 className="text-lg font-heading font-semibold text-foreground">{data.name}</h1>
-            <p className="text-xs text-muted-foreground">Round {data.current_round} · {data.status}</p>
+            <h1 className="text-lg font-heading font-semibold text-foreground">
+              {data.name}
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Round {data.current_round} · {data.status}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-500" : "bg-amber-500"}`} />
+            <span
+              className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-500" : "bg-amber-500"}`}
+            />
             {wsConnected ? "Live" : "Polling"}
           </div>
           {data.status === "active" && (
-            <Button variant="outline" size="sm" onClick={() => setShowMissionCompleteModal(true)}>
-              End Mission
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMissionCompleteModal(true)}
+              >
+                End Mission
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowForfeitModal(true)}
+                disabled={forfeitCombat.isPending || !isPlayerTurn}
+                title={!isPlayerTurn ? "Can only forfeit during your turn" : ""}
+              >
+                Forfeit
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -956,103 +1406,132 @@ function CombatSessionPage() {
         missionReserves={scenario?.mission_reserves}
       />
 
+      {/* Forfeit Confirmation Modal */}
+      <ForfeitConfirmationModal
+        isOpen={showForfeitModal}
+        onConfirm={handleForfeitMission}
+        onCancel={() => setShowForfeitModal(false)}
+        isSubmitting={forfeitCombat.isPending}
+      />
+
+      {/* Victory Celebration */}
+      <VictoryCelebration
+        isOpen={showVictoryCelebration}
+        outcome={victoryOutcome}
+        onClose={() => setShowVictoryCelebration(false)}
+      />
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* Canvas area - reduced height when action bar visible */}
         <div className="relative rounded-md border border-border bg-muted/30 p-2">
-          <div className={`min-h-[400px] w-full ${turnActive ? "h-[calc(100vh-280px)]" : "h-[calc(100vh-180px)]"}`}>
-                {renderOutput ? (
-                  <CombatCanvas
-                    width={720}
-                    height={520}
-                    resizeToParent
-                    layout={(size) => {
-                      // Store canvas size for centering calculations
-                      canvasSizeRef.current = size;
-                      return createHexLayout(30, {
-                        x: size.width / 2,
-                        y: size.height / 2,
-                      });
-                    }}
-                    state={renderOutput.state}
-                    styles={{
-                      grid: { strokeStyle: "rgba(148, 163, 184, 0.5)" },
-                      tokens: { strokeStyle: "#0f172a", lineWidth: 2 },
-                      overlays: { fillStyle: "rgba(59, 130, 246, 0.12)" },
-                      hover: {
-                        fillStyle: "rgba(59, 130, 246, 0.2)",
-                        strokeStyle: "rgba(59, 130, 246, 0.7)",
-                        lineWidth: 2,
+          <div
+            className={`min-h-[400px] w-full ${turnActive ? "h-[calc(100vh-280px)]" : "h-[calc(100vh-180px)]"}`}
+          >
+            {renderOutput ? (
+              <CombatCanvas
+                width={720}
+                height={520}
+                resizeToParent
+                layout={(size) => {
+                  // Store canvas size for centering calculations
+                  canvasSizeRef.current = size;
+                  return createHexLayout(30, {
+                    x: size.width / 2,
+                    y: size.height / 2,
+                  });
+                }}
+                state={renderOutput.state}
+                styles={{
+                  grid: { strokeStyle: "rgba(148, 163, 184, 0.5)" },
+                  tokens: { strokeStyle: "#0f172a", lineWidth: 2 },
+                  overlays: { fillStyle: "rgba(59, 130, 246, 0.12)" },
+                  hover: {
+                    fillStyle: "rgba(59, 130, 246, 0.2)",
+                    strokeStyle: "rgba(59, 130, 246, 0.7)",
+                    lineWidth: 2,
+                  },
+                }}
+                targetingMode={canvasTargetingMode}
+                movementPath={isPathMode ? movementPath : undefined}
+                isPathMode={isPathMode}
+                viewport={viewport}
+                onZoomAtPoint={zoomAtPoint}
+                onPan={setPan}
+                onZoomDelta={handleZoomDelta}
+                onCenterOnActor={handleCenterOnActor}
+                onHover={(coord, point) => {
+                  setHovered(coord);
+                  // Update blast preview origin when hovering (blast follows cursor)
+                  if (
+                    areaPattern?.pattern === "blast" &&
+                    targetMode?.requiresTarget
+                  ) {
+                    setPreviewOrigin(coord);
+                  }
+
+                  // Update hover tooltip
+                  if (!coord) {
+                    setHoverTooltip(null);
+                    return;
+                  }
+
+                  // Determine what's at this hex
+                  const combatant = combatants.find(
+                    (c) =>
+                      c.position?.coord?.q === coord.q &&
+                      c.position?.coord?.r === coord.r,
+                  );
+                  const deployableEntry = Object.entries(
+                    scenario?.deployables ?? {},
+                  ).find(
+                    ([_, d]) =>
+                      d.position?.coord?.q === coord.q &&
+                      d.position?.coord?.r === coord.r,
+                  );
+
+                  let target: HoverTarget;
+                  if (combatant) {
+                    target = {
+                      type: "combatant",
+                      combatant,
+                      isEnemy: combatant.side !== "players",
+                      coord,
+                    };
+                  } else if (deployableEntry) {
+                    target = {
+                      type: "deployable",
+                      deployable: deployableEntry[1],
+                      deployableId: deployableEntry[0],
+                      coord,
+                    };
+                  } else {
+                    target = { type: "empty", coord };
+                  }
+
+                  // Get screen position from canvas bounding rect + point offset
+                  const canvasEl = document.querySelector("canvas");
+                  if (canvasEl && point) {
+                    const rect = canvasEl.getBoundingClientRect();
+                    setHoverTooltip({
+                      target,
+                      position: {
+                        x: rect.left + point.x,
+                        y: rect.top + point.y,
                       },
-                    }}
-                    targetingMode={canvasTargetingMode}
-                    movementPath={isPathMode ? movementPath : undefined}
-                    isPathMode={isPathMode}
-                    viewport={viewport}
-                    onZoomAtPoint={zoomAtPoint}
-                    onPan={setPan}
-                    onZoomDelta={handleZoomDelta}
-                    onCenterOnActor={handleCenterOnActor}
-                    onHover={(coord, point) => {
-                      setHovered(coord);
-                      // Update blast preview origin when hovering (blast follows cursor)
-                      if (areaPattern?.pattern === "blast" && targetMode?.requiresTarget) {
-                        setPreviewOrigin(coord);
-                      }
-
-                      // Update hover tooltip
-                      if (!coord) {
-                        setHoverTooltip(null);
-                        return;
-                      }
-
-                      // Determine what's at this hex
-                      const combatant = combatants.find(
-                        (c) => c.position?.coord?.q === coord.q && c.position?.coord?.r === coord.r
-                      );
-                      const deployableEntry = Object.entries(scenario?.deployables ?? {}).find(
-                        ([_, d]) => d.position?.coord?.q === coord.q && d.position?.coord?.r === coord.r
-                      );
-
-                      let target: HoverTarget;
-                      if (combatant) {
-                        target = {
-                          type: "combatant",
-                          combatant,
-                          isEnemy: combatant.side !== "players",
-                          coord,
-                        };
-                      } else if (deployableEntry) {
-                        target = {
-                          type: "deployable",
-                          deployable: deployableEntry[1],
-                          deployableId: deployableEntry[0],
-                          coord,
-                        };
-                      } else {
-                        target = { type: "empty", coord };
-                      }
-
-                      // Get screen position from canvas bounding rect + point offset
-                      const canvasEl = document.querySelector("canvas");
-                      if (canvasEl && point) {
-                        const rect = canvasEl.getBoundingClientRect();
-                        setHoverTooltip({
-                          target,
-                          position: { x: rect.left + point.x, y: rect.top + point.y },
-                        });
-                      }
-                    }}
-                    onTokenClick={handleTokenClick}
-                    onHexClick={handlePathHexClick}
-                    onContextMenu={handleContextMenu}
-                    className="h-full w-full"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    No scenario data available yet.
-                  </div>
-                )}
+                    });
+                  }
+                }}
+                onTokenClick={handleTokenClick}
+                onHexClick={handlePathHexClick}
+                onContextMenu={handleContextMenu}
+                className="h-full w-full"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No scenario data available yet.
               </div>
+            )}
+          </div>
           {/* Viewport Controls (pan/zoom) */}
           <ViewportControls
             zoom={viewport.zoom}
@@ -1096,6 +1575,7 @@ function CombatSessionPage() {
               canOvercharge={availableActions?.can_overcharge ?? false}
               overchargeLevel={availableActions?.overcharge_level ?? 0}
               error={actionError}
+              confirmEndTurn={settings.confirmEndTurn}
             />
           </div>
 
@@ -1153,31 +1633,41 @@ function CombatSessionPage() {
                   {aiReasoning.situation_assessment && (
                     <div>
                       <div className="font-medium">Situation Assessment</div>
-                      <div className="text-muted-foreground whitespace-pre-wrap">{aiReasoning.situation_assessment}</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">
+                        {aiReasoning.situation_assessment}
+                      </div>
                     </div>
                   )}
                   {aiReasoning.considered_options && (
                     <div>
                       <div className="font-medium">Considered Options</div>
-                      <div className="text-muted-foreground whitespace-pre-wrap">{aiReasoning.considered_options}</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">
+                        {aiReasoning.considered_options}
+                      </div>
                     </div>
                   )}
                   {aiReasoning.rationale && (
                     <div>
                       <div className="font-medium">Rationale</div>
-                      <div className="text-muted-foreground whitespace-pre-wrap">{aiReasoning.rationale}</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">
+                        {aiReasoning.rationale}
+                      </div>
                     </div>
                   )}
                   {aiReasoning.confidence !== undefined && (
                     <div>
                       <div className="font-medium">Confidence</div>
-                      <div className="text-muted-foreground">{aiReasoning.confidence.toFixed(2)}</div>
+                      <div className="text-muted-foreground">
+                        {aiReasoning.confidence.toFixed(2)}
+                      </div>
                     </div>
                   )}
                   {aiReasoning.decision_reasoning && (
                     <div>
                       <div className="font-medium">Decision Reasoning</div>
-                      <div className="text-muted-foreground whitespace-pre-wrap">{aiReasoning.decision_reasoning}</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">
+                        {aiReasoning.decision_reasoning}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1187,6 +1677,7 @@ function CombatSessionPage() {
             {/* Action Panel (only when turn is active) */}
             {turnActive && (
               <ActionPanel
+                ref={actionPanelRef}
                 availableActions={availableActions ?? null}
                 economy={economy}
                 onActionSelect={handleActionSelect}
@@ -1204,11 +1695,14 @@ function CombatSessionPage() {
                 hexClickCoord={pathHexClick}
                 triggeredAction={triggeredAction}
                 onTriggeredActionProcessed={() => setTriggeredAction(null)}
+                onActionHover={setPreviewAction}
               />
             )}
 
             {/* Victory Conditions (if SITREP active) */}
-            <VictoryConditionPanel sitrepResolution={scenario?.sitrep_resolution} />
+            <VictoryConditionPanel
+              sitrepResolution={scenario?.sitrep_resolution}
+            />
 
             {/* Mission Objectives (if available) */}
             <ObjectiveTracker objectives={scenario?.objectives} />
@@ -1242,7 +1736,9 @@ function CombatSessionPage() {
                     <div className="font-medium truncate">
                       {combatant.name}
                       {combatant.id === currentActor?.id && (
-                        <span className="ml-1 text-[10px] text-primary font-normal">●</span>
+                        <span className="ml-1 text-[10px] text-primary font-normal">
+                          ●
+                        </span>
                       )}
                     </div>
                     <div className="text-[10px] text-muted-foreground ml-2">
@@ -1270,24 +1766,37 @@ function CombatSessionPage() {
           />
         )}
 
+        {/* AI Thinking Indicator */}
+        <AIThinkingIndicator
+          isThinking={autoNpcTurn.isPending}
+          reducedMotion={settings.reducedMotion}
+        />
+
         {/* Reaction Prompt (when not our turn and reaction opportunity exists) */}
         <Modal
-            isOpen={
-              !turnActive &&
-              reactionOpportunity?.pending_triggers?.length !== undefined &&
-              reactionOpportunity.pending_triggers.length > 0 &&
-              !!firstPlayerCombatant
-            }
-            disableBackdropClose
-            urgent
-          >
-            {reactionOpportunity?.pending_triggers?.[0] && firstPlayerCombatant && (
+          isOpen={
+            !turnActive &&
+            reactionOpportunity?.pending_triggers?.length !== undefined &&
+            reactionOpportunity.pending_triggers.length > 0 &&
+            !!firstPlayerCombatant
+          }
+          disableBackdropClose
+          urgent
+        >
+          {reactionOpportunity?.pending_triggers?.[0] &&
+            firstPlayerCombatant && (
               <ReactionPrompt
-                triggerType={reactionOpportunity.pending_triggers[0].trigger_type}
+                triggerType={
+                  reactionOpportunity.pending_triggers[0].trigger_type
+                }
                 reactorId={reactionOpportunity.combatant_id}
                 reactorName={reactionOpportunity.combatant_name}
-                triggeringActorName={reactionOpportunity.pending_triggers[0].triggering_actor_name}
-                availableReactions={reactionOpportunity.pending_triggers[0].available_reactions}
+                triggeringActorName={
+                  reactionOpportunity.pending_triggers[0].triggering_actor_name
+                }
+                availableReactions={
+                  reactionOpportunity.pending_triggers[0].available_reactions
+                }
                 inventory={firstPlayerCombatant.inventory}
                 validTargets={combatants
                   .filter((c) => c.side !== "players")
@@ -1301,37 +1810,14 @@ function CombatSessionPage() {
                 isSubmitting={submitReaction.isPending}
               />
             )}
-          </Modal>
+        </Modal>
 
-          {/* Pending Decision Prompts (save checks, system trauma) */}
-          {pendingDecisions?.has_pending &&
-            pendingDecisions.pending_decisions.map((decision) => {
-              const isUrgent = decision.decision_type === "hull_save";
-              // Render appropriate prompt based on decision type
-              if (decision.decision_type === "system_trauma") {
-                return (
-                  <Modal
-                    key={decision.decision_id}
-                    isOpen={true}
-                    disableBackdropClose
-                    urgent={isUrgent}
-                  >
-                    <TraumaSelectionPrompt
-                      decision={decision}
-                      combatantId={pendingDecisions.combatant_id}
-                      combatantName={pendingDecisions.combatant_name}
-                      inventory={firstPlayerCombatant?.inventory}
-                      onSubmit={handleDecisionSubmit}
-                      onDecline={() => {
-                        // User cancelled - no action taken
-                      }}
-                      isOpen={true}
-                      isSubmitting={submitDecision.isPending}
-                    />
-                  </Modal>
-                );
-              }
-              // Save prompts (hull_save, engineering_save, engineering_check)
+        {/* Pending Decision Prompts (save checks, system trauma) */}
+        {pendingDecisions?.has_pending &&
+          pendingDecisions.pending_decisions.map((decision) => {
+            const isUrgent = decision.decision_type === "hull_save";
+            // Render appropriate prompt based on decision type
+            if (decision.decision_type === "system_trauma") {
               return (
                 <Modal
                   key={decision.decision_id}
@@ -1339,10 +1825,11 @@ function CombatSessionPage() {
                   disableBackdropClose
                   urgent={isUrgent}
                 >
-                  <SaveCheckPrompt
+                  <TraumaSelectionPrompt
                     decision={decision}
                     combatantId={pendingDecisions.combatant_id}
                     combatantName={pendingDecisions.combatant_name}
+                    inventory={firstPlayerCombatant?.inventory}
                     onSubmit={handleDecisionSubmit}
                     onDecline={() => {
                       // User cancelled - no action taken
@@ -1352,7 +1839,29 @@ function CombatSessionPage() {
                   />
                 </Modal>
               );
-            })}
+            }
+            // Save prompts (hull_save, engineering_save, engineering_check)
+            return (
+              <Modal
+                key={decision.decision_id}
+                isOpen={true}
+                disableBackdropClose
+                urgent={isUrgent}
+              >
+                <SaveCheckPrompt
+                  decision={decision}
+                  combatantId={pendingDecisions.combatant_id}
+                  combatantName={pendingDecisions.combatant_name}
+                  onSubmit={handleDecisionSubmit}
+                  onDecline={() => {
+                    // User cancelled - no action taken
+                  }}
+                  isOpen={true}
+                  isSubmitting={submitDecision.isPending}
+                />
+              </Modal>
+            );
+          })}
 
         {/* Voice Confirmation Dialog */}
         <VoiceActionConfirmationDialog
@@ -1372,11 +1881,11 @@ function CombatSessionPage() {
               onSuccess: () => {
                 setShowVoiceConfirmation(false);
                 setParsedAction(null);
-                setVoiceTranscript('');
+                setVoiceTranscript("");
                 speechRecognition.resetTranscript();
               },
               onError: (error) => {
-                setVoiceError(error.message || 'Action execution failed');
+                setVoiceError(error.message || "Action execution failed");
               },
             });
           }}
@@ -1387,6 +1896,17 @@ function CombatSessionPage() {
           target={hoverTooltip?.target ?? null}
           position={hoverTooltip?.position ?? null}
           delay={300}
+        />
+
+        {/* Action Preview Panel */}
+        <ActionPreviewPanel
+          target={previewTargetCombatant}
+          previewAction={previewAction}
+          previewResponse={previewResponse}
+          position={hoverTooltip?.position ?? null}
+          isLoading={isPreviewLoading}
+          error={previewError}
+          delay={200}
         />
 
         {/* Context Menu (right-click on canvas) */}
@@ -1404,6 +1924,7 @@ function CombatSessionPage() {
 
         {/* Bottom Action Bar (WoW-style) */}
         <ActionBar
+          sessionId={combatId}
           availableActions={availableActions ?? null}
           economy={economy}
           onActionSelect={handleActionSelect}
@@ -1412,6 +1933,9 @@ function CombatSessionPage() {
           overchargeLevel={availableActions?.overcharge_level ?? 0}
           isExecuting={executeAction.isPending}
           visible={turnActive}
+          // Preview targeting
+          previewTargetId={previewTargetId}
+          currentActor={currentActor}
           // Voice control
           onVoiceToggle={speechRecognition.toggleListening}
           isVoiceListening={speechRecognition.isListening}

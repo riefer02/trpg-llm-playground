@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
+import { forwardRef, useImperativeHandle, useRef } from "react";
 import type {
   ActionEconomyState,
   ActionRequest,
   AvailableActionItem,
   AvailableActionsResponse,
-} from "../../lib/api/combat";
+} from "../../lib/api";
 import type {
   AttackPatternDefinition,
   FullTechOptionSelection,
@@ -94,6 +95,10 @@ export interface TargetMode {
   requiresWeapon: boolean;
 }
 
+export interface ActionPanelHandle {
+  cancel: () => void;
+}
+
 export interface ActionPanelProps {
   availableActions: AvailableActionsResponse | null;
   economy: ActionEconomyState | null;
@@ -121,9 +126,11 @@ export interface ActionPanelProps {
   triggeredAction?: AvailableActionItem | null;
   /** Callback when triggered action is processed */
   onTriggeredActionProcessed?: () => void;
+  /** Callback when action is hovered (for preview) */
+  onActionHover?: (action: AvailableActionItem | null) => void;
 }
 
-export function ActionPanel({
+export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
   availableActions,
   economy,
   onActionSelect,
@@ -141,7 +148,8 @@ export function ActionPanel({
   hexClickCoord,
   triggeredAction,
   onTriggeredActionProcessed,
-}: ActionPanelProps) {
+  onActionHover,
+}: ActionPanelProps, ref) => {
   const [panelState, setPanelState] = useState<ActionPanelState>("idle");
   const [selectedAction, setSelectedAction] = useState<AvailableActionItem | null>(null);
   const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
@@ -153,6 +161,39 @@ export function ActionPanel({
   const [lastProcessedClick, setLastProcessedClick] = useState<HexCoord | null>(null);
   const [fullTechStep, setFullTechStep] = useState<FullTechStep>(1);
   const [fullTechSelections, setFullTechSelections] = useState<FullTechSelectionState>({});
+
+  // Expose cancel method via ref
+  useImperativeHandle(ref, () => ({
+    cancel() {
+      // If we're in targeting mode, cancel back to confirming/idle
+      if (panelState === "selecting_target" || panelState === "selecting_full_tech_target") {
+        // Clear selected targets but keep the action selected
+        setSelectedTargetIds([]);
+        // Return to confirming state (or selecting_full_tech_option for full tech)
+        if (panelState === "selecting_full_tech_target") {
+          setPanelState("selecting_full_tech_option");
+          onTargetModeChange(null);
+        } else {
+          setPanelState("confirming");
+          onTargetModeChange(null);
+        }
+        return true;
+      }
+      // If we're in path mode, cancel back to idle/confirming (depending on action)
+      if (panelState === "selecting_path") {
+        // Clear path but keep action selected
+        const initialPath = actorPosition ? [actorPosition] : [];
+        setMovementPath(initialPath);
+        onPathModeChange(true, initialPath);
+        // Return to confirming state (or stay in selecting_path? Let's go to confirming)
+        setPanelState("confirming");
+        onTargetModeChange(null);
+        return true;
+      }
+      // Not in a cancellable state
+      return false;
+    },
+  }), [panelState, actorPosition, onTargetModeChange, onPathModeChange]);
 
   const selectedWeaponDefinition =
     selectedWeaponId && weaponDefinitions ? weaponDefinitions.get(selectedWeaponId) : undefined;
@@ -571,6 +612,20 @@ export function ActionPanel({
     onMovementRangeChange?.(false, 0);
   };
 
+  const handleCancelTargeting = () => {
+    // Clear selected targets but keep action selected
+    setPanelState("confirming");
+    onTargetModeChange(null);
+    // Note: selectedTargetIds is cleared by parent via onTargetModeChange
+  };
+
+  const handleCancelPath = () => {
+    // Cancel path selection but keep action selected
+    setPanelState("confirming");
+    onPathModeChange(false, []);
+    onMovementRangeChange?.(false, 0);
+  };
+
   // Reset state when action completes
   const resetAfterExecution = () => {
     setSelectedAction(null);
@@ -843,7 +898,7 @@ export function ActionPanel({
           Prompt for dangerous terrain checks (player only)
         </label>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="primary"
             size="sm"
@@ -855,8 +910,11 @@ export function ActionPanel({
           <Button variant="ghost" size="sm" onClick={handleClearPath}>
             Clear
           </Button>
+          <Button variant="ghost" size="sm" onClick={handleCancelPath}>
+            Cancel Path
+          </Button>
           <Button variant="ghost" size="sm" onClick={handleCancelAction}>
-            Cancel
+            Cancel Action
           </Button>
         </div>
       </div>
@@ -866,9 +924,9 @@ export function ActionPanel({
   // Show confirmation UI
   if (panelState === "confirming" || panelState === "selecting_target") {
     return (
-      <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
-        <div className="text-sm font-medium text-foreground">
-          {panelState === "selecting_target" ? "Select Target" : "Confirm Action"}
+       <div className={`rounded-md border ${panelState === "selecting_target" ? "border-blue-500" : "border-border"} bg-muted/30 p-3 space-y-3`}>
+         <div className="text-sm font-medium text-foreground">
+           {panelState === "selecting_target" ? "Select Target" : "Confirm Action"}
         </div>
 
         {selectedAction && (
@@ -922,6 +980,16 @@ export function ActionPanel({
           >
             {isExecuting ? "Executing..." : "Execute"}
           </Button>
+          {panelState === "selecting_target" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancelTargeting}
+              disabled={isExecuting}
+            >
+              Cancel Targeting
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -953,6 +1021,7 @@ export function ActionPanel({
           actions={availableActions.full_actions}
           disabled={economy.full_actions_used > 0}
           onActionClick={handleActionClick}
+          onActionHover={onActionHover}
         />
       )}
 
@@ -963,6 +1032,7 @@ export function ActionPanel({
           actions={availableActions.quick_actions}
           disabled={economy.quick_actions_used >= 2 + (economy.overcharge_used ? 1 : 0)}
           onActionClick={handleActionClick}
+          onActionHover={onActionHover}
         />
       )}
 
@@ -972,6 +1042,7 @@ export function ActionPanel({
           title="Free Actions"
           actions={availableActions.free_actions}
           onActionClick={handleActionClick}
+          onActionHover={onActionHover}
         />
       )}
 
@@ -981,6 +1052,7 @@ export function ActionPanel({
           title="Protocols"
           actions={availableActions.protocols}
           onActionClick={handleActionClick}
+          onActionHover={onActionHover}
         />
       )}
 
@@ -1004,27 +1076,30 @@ export function ActionPanel({
       )}
     </div>
   );
-}
+});
 
 interface ActionSectionProps {
   title: string;
   actions: AvailableActionItem[];
   disabled?: boolean;
   onActionClick: (action: AvailableActionItem) => void;
+  onActionHover?: (action: AvailableActionItem | null) => void;
 }
 
-function ActionSection({ title, actions, disabled, onActionClick }: ActionSectionProps) {
+function ActionSection({ title, actions, disabled, onActionClick, onActionHover }: ActionSectionProps) {
   return (
     <div className="space-y-1">
       <div className="text-xs text-muted-foreground font-medium">{title}</div>
       <div className="space-y-0.5">
         {actions.map((action) => (
-          <ActionItem
-            key={action.action_id}
-            action={action}
-            disabled={disabled || !action.is_available}
-            onClick={() => onActionClick(action)}
-          />
+           <ActionItem
+             key={action.action_id}
+             action={action}
+             disabled={disabled || !action.is_available}
+             onClick={() => onActionClick(action)}
+             onMouseEnter={() => onActionHover?.(action)}
+             onMouseLeave={() => onActionHover?.(null)}
+           />
         ))}
       </div>
     </div>
@@ -1035,16 +1110,32 @@ interface ActionItemProps {
   action: AvailableActionItem;
   disabled?: boolean;
   onClick: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
-function ActionItem({ action, disabled, onClick }: ActionItemProps) {
+function ActionItem({ action, disabled, onClick, onMouseEnter, onMouseLeave }: ActionItemProps) {
   const isAvailable = action.is_available && !disabled;
+  const reasonId = `reason-${action.action_id}`;
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isAvailable) {
+      e.preventDefault();
+      return;
+    }
+    onClick();
+  };
 
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={!isAvailable}
+      onClick={handleClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      aria-disabled={!isAvailable}
+      tabIndex={0}
+      aria-describedby={action.unavailable_reason ? reasonId : undefined}
+      title={action.unavailable_reason || undefined}
       className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
         isAvailable
           ? "hover:bg-primary/10 text-foreground cursor-pointer"
@@ -1074,7 +1165,7 @@ function ActionItem({ action, disabled, onClick }: ActionItemProps) {
         )}
       </div>
       {action.unavailable_reason && (
-        <div className="ml-4 text-xs text-muted-foreground/70">
+        <div id={reasonId} className="ml-4 text-xs text-muted-foreground/70">
           {action.unavailable_reason}
         </div>
       )}

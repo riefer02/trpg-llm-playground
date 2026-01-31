@@ -54,7 +54,11 @@ body {
   @apply m-0 bg-background text-foreground antialiased;
   font-family: "IBM Plex Sans", "Helvetica Neue", system-ui, sans-serif;
   background-image:
-    radial-gradient(circle at top left, hsl(198 74% 35% / 0.12), transparent 45%),
+    radial-gradient(
+      circle at top left,
+      hsl(198 74% 35% / 0.12),
+      transparent 45%
+    ),
     radial-gradient(circle at 20% 30%, hsl(18 85% 55% / 0.12), transparent 50%),
     linear-gradient(120deg, hsl(30 30% 98%), hsl(24 40% 96%));
   background-attachment: fixed;
@@ -101,11 +105,49 @@ h3,
 }
 
 @keyframes pulse-border {
-  0%, 100% {
-    box-shadow: 0 0 0 2px hsl(355 75% 55% / 0.4), 0 0 20px hsl(355 75% 55% / 0.2);
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px hsl(355 75% 55% / 0.4),
+      0 0 20px hsl(355 75% 55% / 0.2);
   }
   50% {
-    box-shadow: 0 0 0 4px hsl(355 75% 55% / 0.6), 0 0 30px hsl(355 75% 55% / 0.4);
+    box-shadow:
+      0 0 0 4px hsl(355 75% 55% / 0.6),
+      0 0 30px hsl(355 75% 55% / 0.4);
+  }
+}
+
+@keyframes scale-up {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+ @keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  33% {
+    transform: translateY(-10px) translateX(5px);
+  }
+  66% {
+    transform: translateY(5px) translateX(-5px);
+  }
+}
+
+@keyframes hp-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
   }
 }
 
@@ -113,8 +155,16 @@ h3,
   .app-shell {
     @apply min-h-screen;
     background-image:
-      radial-gradient(circle at 10% 20%, hsl(18 85% 55% / 0.15), transparent 40%),
-      radial-gradient(circle at 80% 0%, hsl(198 74% 35% / 0.18), transparent 45%),
+      radial-gradient(
+        circle at 10% 20%,
+        hsl(18 85% 55% / 0.15),
+        transparent 40%
+      ),
+      radial-gradient(
+        circle at 80% 0%,
+        hsl(198 74% 35% / 0.18),
+        transparent 45%
+      ),
       linear-gradient(150deg, hsl(30 30% 98%), hsl(24 40% 96%));
   }
 
@@ -140,6 +190,18 @@ h3,
   .animate-pulse-border {
     animation: pulse-border 1.5s ease-in-out infinite;
   }
+
+  .animate-scale-up {
+    animation: scale-up 0.5s ease-out both;
+  }
+
+   .animate-float {
+     animation: float 3s ease-in-out infinite;
+   }
+
+   .animate-hp-pulse {
+     animation: hp-pulse 1.5s ease-in-out infinite;
+   }
 }
 
 /* Print-friendly export layout */

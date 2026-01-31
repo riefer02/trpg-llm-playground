@@ -142,6 +142,8 @@ export {
   useSpendReserve,
   useCreateDemoCombat,
   useAutoNpcTurn,
+  useActionPreview,
+  useForfeitCombat,
   combatKeys,
 } from './combat'
 export type {
@@ -151,6 +153,8 @@ export type {
   TurnEndResponse,
   ActionRequest,
   ActionResponse,
+  ActionPreviewRequest,
+  ActionPreviewResponse,
   ReactionRequest,
   ReactionResponse,
   AvailableActionsResponse,

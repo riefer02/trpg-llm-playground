@@ -27,13 +27,17 @@ export interface Settings {
   reducedMotion: boolean
   highContrast: boolean
   
-  // AI
+   // AI
   showAIReasoning: boolean
+   
+   // Combat
+  confirmEndTurn: boolean
+  enableLowHPWarning: boolean
 }
 
 const STORAGE_KEY = 'lancer_tactics_settings'
 
-const defaultSettings: Settings = {
+ const defaultSettings: Settings = {
   masterVolume: 80,
   sfxVolume: 80,
   musicVolume: 60,
@@ -45,6 +49,8 @@ const defaultSettings: Settings = {
   reducedMotion: false,
   highContrast: false,
   showAIReasoning: true,
+  confirmEndTurn: true,
+  enableLowHPWarning: true,
 }
 
 function loadSettings(): Settings {

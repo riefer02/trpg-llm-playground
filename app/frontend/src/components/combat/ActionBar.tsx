@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Footprints,
   Zap,
@@ -27,6 +27,8 @@ import type {
   AvailableActionItem,
   AvailableActionsResponse,
 } from "../../lib/api/combat";
+import { useActionPreview } from "../../lib/api/combat";
+import type { CombatantState } from "../../lib/types/lancer";
 
 /**
  * WoW-style action bar for combat actions.
@@ -88,9 +90,43 @@ interface ActionButtonProps {
   disabled: boolean;
   onClick: () => void;
   shortcutKey?: string;
+  sessionId?: string;
+  actorId?: string | null;
+  targetId?: string | null;
+  weaponId?: string | null;
 }
 
-function ActionButton({ action, disabled, onClick, shortcutKey }: ActionButtonProps) {
+function ActionButton({ 
+  action, 
+  disabled, 
+  onClick, 
+  shortcutKey,
+  sessionId,
+  actorId = null,
+  targetId = null,
+  weaponId = null,
+}: ActionButtonProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const { mutate: fetchPreview, data: previewData, isPending: isPreviewLoading, error: previewError } = useActionPreview(sessionId || '');
+
+  // Fetch preview when hovered and we have required IDs
+  useEffect(() => {
+    if (!isHovered || !sessionId || !actorId || !targetId) {
+      return;
+    }
+    // Debounce to avoid rapid calls
+    const timer = setTimeout(() => {
+      fetchPreview({
+        sessionId,
+        actionId: action.action_id,
+        actorId,
+        targetId,
+        weaponId: weaponId ?? undefined,
+      });
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [isHovered, sessionId, actorId, targetId, weaponId, action.action_id, fetchPreview]);
+
   const Icon = ACTION_ICONS[action.action_id] ?? DEFAULT_ICON;
   const isAvailable = action.is_available && !disabled;
   const typeColor = ACTION_TYPE_COLORS[action.action_type as keyof typeof ACTION_TYPE_COLORS] ?? "border-gray-500";
@@ -100,6 +136,8 @@ function ActionButton({ action, disabled, onClick, shortcutKey }: ActionButtonPr
       <button
         type="button"
         onClick={onClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         disabled={!isAvailable}
         className={`
           relative w-12 h-12 rounded-lg border-2 transition-all
@@ -146,6 +184,49 @@ function ActionButton({ action, disabled, onClick, shortcutKey }: ActionButtonPr
           {shortcutKey && (
             <div className="text-xs text-muted-foreground/70 mt-1">
               Press {shortcutKey}
+            </div>
+          )}
+          {/* Action Preview */}
+          {isPreviewLoading && (
+            <div className="text-xs text-muted-foreground mt-1">
+              Calculating preview...
+            </div>
+          )}
+          {previewError && (
+            <div className="text-xs text-destructive mt-1">
+              Preview failed: {previewError.message}
+            </div>
+          )}
+          {previewData && !isPreviewLoading && !previewError && (
+            <div className="mt-2 pt-2 border-t border-border space-y-1">
+              {/* Hit Probability */}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Hit Chance</span>
+                <span className="font-mono text-foreground">
+                  {(previewData.hit_probability * 100).toFixed(0)}%
+                </span>
+              </div>
+              {/* Damage Range */}
+              {previewData.damage_average > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Damage</span>
+                  <span className="font-mono text-foreground">
+                    {previewData.damage_min}-{previewData.damage_max} avg {previewData.damage_average.toFixed(1)}
+                  </span>
+                </div>
+              )}
+              {/* Damage Types */}
+              {previewData.damage_types.length > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  Damage types: {previewData.damage_types.join(', ')}
+                </div>
+              )}
+              {/* Predicted Effects */}
+              {previewData.predicted_effects.length > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  Effects: {previewData.predicted_effects.length} predicted
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -226,6 +307,7 @@ function EconomyDisplay({ economy, canOvercharge, overchargeLevel }: EconomyDisp
 }
 
 export interface ActionBarProps {
+  sessionId: string;
   availableActions: AvailableActionsResponse | null;
   economy: ActionEconomyState | null;
   onActionSelect: (action: AvailableActionItem) => void;
@@ -234,6 +316,9 @@ export interface ActionBarProps {
   overchargeLevel?: number;
   isExecuting?: boolean;
   visible?: boolean;
+  // Preview targeting
+  previewTargetId?: string | null;
+  currentActor?: CombatantState | null;
   // Voice control
   onVoiceToggle?: () => void;
   isVoiceListening?: boolean;
@@ -242,6 +327,7 @@ export interface ActionBarProps {
 }
 
 export function ActionBar({
+  sessionId,
   availableActions,
   economy,
   onActionSelect,
@@ -250,12 +336,30 @@ export function ActionBar({
   overchargeLevel = 0,
   isExecuting = false,
   visible = true,
+  // Preview targeting
+  previewTargetId = null,
+  currentActor = null,
   // Voice control
   onVoiceToggle = () => {},
   isVoiceListening = false,
   voiceEnabled = false,
   voiceSupported = false,
 }: ActionBarProps) {
+  // Helper to get first weapon ID for an action that requires a weapon
+  const getWeaponIdForAction = (action: AvailableActionItem): string | null => {
+    if (!action.requires_weapon || !currentActor?.inventory?.mounts) {
+      return null;
+    }
+    // Find first weapon in inventory (any mount)
+    for (const mount of currentActor.inventory.mounts) {
+      if (mount.weapons && mount.weapons.length > 0) {
+        // Return first weapon ID
+        return mount.weapons[0].weapon_id;
+      }
+    }
+    return null;
+  };
+
   // Flatten actions into a single array with shortcuts
   const allActions = [
     ...(availableActions?.full_actions ?? []),
@@ -356,6 +460,10 @@ export function ActionBar({
                       disabled={getDisabledState(action)}
                       onClick={() => onActionSelect(action)}
                       shortcutKey={getNextShortcut()}
+                      sessionId={sessionId}
+                      actorId={currentActor?.id ?? null}
+                      targetId={previewTargetId}
+                      weaponId={getWeaponIdForAction(action)}
                     />
                   ))}
                 </div>
@@ -374,6 +482,10 @@ export function ActionBar({
                       disabled={getDisabledState(action)}
                       onClick={() => onActionSelect(action)}
                       shortcutKey={getNextShortcut()}
+                      sessionId={sessionId}
+                      actorId={currentActor?.id ?? null}
+                      targetId={previewTargetId}
+                      weaponId={getWeaponIdForAction(action)}
                     />
                   ))}
                 </div>
@@ -396,6 +508,10 @@ export function ActionBar({
                         disabled={getDisabledState(action)}
                         onClick={() => onActionSelect(action)}
                         shortcutKey={getNextShortcut()}
+                        sessionId={sessionId}
+                        actorId={currentActor?.id ?? null}
+                        targetId={previewTargetId}
+                        weaponId={getWeaponIdForAction(action)}
                       />
                     ))}
                   </div>
@@ -414,6 +530,10 @@ export function ActionBar({
                         disabled={getDisabledState(action)}
                         onClick={() => onActionSelect(action)}
                         shortcutKey={getNextShortcut()}
+                        sessionId={sessionId}
+                        actorId={currentActor?.id ?? null}
+                        targetId={previewTargetId}
+                        weaponId={getWeaponIdForAction(action)}
                       />
                     ))}
                   </div>

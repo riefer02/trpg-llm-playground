@@ -53,6 +53,14 @@ from core.mech.combat_execution import (
     ActionEconomyState,
 )
 
+# Import prediction utilities for action preview
+from core.mech.prediction import (
+    compute_damage_stats,
+    estimate_hit_probability,
+)
+from core.mech.compendium import get_weapon_definition
+from core.mech.weapon import resolve_weapon_profile
+
 # Import grid types for position handling
 from core.mech.grid import HexCoord, HexPosition
 from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
@@ -200,6 +208,17 @@ class SpendReserveRequest(BaseModel):
     """Request body for spending a mission reserve."""
 
     reserve_id: str = Field(..., description="ID of the reserve to spend")
+
+
+class ActionPreviewRequest(BaseModel):
+    """Request body for action preview (damage, hit chance, effects)."""
+
+    action_id: str = Field(..., description="ID of the action to preview")
+    actor_id: str = Field(..., description="ID of the acting combatant")
+    target_id: str = Field(..., description="ID of the target combatant")
+    weapon_id: str | None = Field(
+        None, description="Optional weapon ID for weapon-specific preview"
+    )
 
 
 # =============================================================================
@@ -942,6 +961,117 @@ async def complete_combat_session(
     )
 
 
+@router.post("/{session_id}/forfeit", response_model=CombatSessionCompleteResponse)
+async def forfeit_combat_session(
+    session_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> CombatSessionCompleteResponse:
+    """Forfeit the combat session, treating it as a defeat.
+
+    Only allowed during player turn (current actor side = "players").
+    Awards partial rewards based on enemies defeated before forfeit.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+    if combat_session.status == "completed":
+        raise ConflictError("Combat session already completed")
+
+    # Load scenario to check current actor
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+    current_actor = get_current_actor(
+        scenario,
+        combat_session.current_round,
+        combat_session.current_turn_index,
+    )
+    if current_actor is None:
+        raise ValidationError("Cannot forfeit - no active actor in combat")
+    if current_actor.side != "players":
+        raise ValidationError("Cannot forfeit during enemy turn - wait for your turn")
+
+    # Mark session as completed with failure outcome
+    combat_session.status = "completed"
+    combat_session.updated_at = utc_now()
+
+    # Prepare mission outcome report with failure
+    mission_outcome = MissionOutcomeReport(
+        outcome="failure",
+        completion_score=0.0,
+        debrief_notes="Mission forfeited by player",
+    )
+
+    if combat_session.campaign_id and combat_session.campaign_session_id:
+        await record_campaign_session_outcome(
+            session,
+            combat_session.campaign_id,
+            combat_session.campaign_session_id,
+            mission_outcome,
+            combat_session=combat_session,
+        )
+
+    # Award XP and salvage (partial rewards)
+    xp_amount = 0
+    salvage_amount = 0
+
+    if (
+        combat_session.mission_difficulty is not None
+        and combat_session.mission_difficulty >= 1
+    ):
+        difficulty = combat_session.mission_difficulty
+        # Outcome multiplier for failure is 0.0 (no XP)
+        outcome_multiplier = 0.0
+
+        # Calculate XP (none for failure)
+        base_xp_per_star = 500
+        xp_amount = int(difficulty * base_xp_per_star * outcome_multiplier)
+
+        # Calculate salvage based on enemies defeated (partial rewards)
+        salvage_amount = _calculate_salvage(scenario, difficulty, "failure")
+
+        # Find characters belonging to the user (GM)
+        result = await session.exec(
+            select(CharacterDB).where(CharacterDB.user_id == user["id"]).limit(1)
+        )
+        character_db = result.first()
+        if character_db:
+            # Hydrate core Character model
+            core_char = Character.model_validate(character_db.data)
+            updated_pilot = core_char.pilot
+
+            # Award salvage if any
+            if salvage_amount > 0:
+                updated_pilot = updated_pilot.add_salvage(salvage_amount)
+                logger.info(
+                    f"Awarded {salvage_amount} salvage to character {character_db.id} "
+                    f"(difficulty {difficulty}, outcome failure)"
+                )
+
+            # Update character data if salvage changed
+            if salvage_amount > 0:
+                core_char = core_char.update_pilot(
+                    **updated_pilot.model_dump(mode="json")
+                )
+                character_db.data = core_char.model_dump(mode="json")
+                character_db.updated_at = utc_now()
+                session.add(character_db)
+
+    session.add(combat_session)
+    await session.commit()
+    await session.refresh(combat_session)
+
+    return _session_to_complete_response(
+        combat_session, xp_awarded=xp_amount, salvage_awarded=salvage_amount
+    )
+
+
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_combat_session(
     session_id: str,
@@ -1238,6 +1368,31 @@ class ReactionOpportunityResponse(BaseModel):
     combatant_name: str
     has_reaction_available: bool
     pending_triggers: list[ReactionTrigger]
+
+
+class ActionPreviewResponse(BaseModel):
+    """Response model for action preview (damage, hit chance, effects)."""
+
+    action_id: str
+    actor_id: str
+    target_id: str
+    weapon_id: str | None = None
+
+    # Damage prediction
+    damage_min: int = 0
+    damage_max: int = 0
+    damage_average: float = 0.0
+    damage_types: list[str] = Field(default_factory=list)
+
+    # Hit probability
+    hit_probability: float = Field(..., ge=0.0, le=1.0)
+
+    # Effects prediction
+    predicted_effects: list[dict[str, Any]] = Field(default_factory=list)
+
+    # Additional metadata
+    is_valid: bool = True
+    validation_errors: list[str] = Field(default_factory=list)
 
 
 # =============================================================================
@@ -1889,6 +2044,118 @@ async def get_combat_available_actions(
         protocols=[to_item(a) for a in available.protocols],
         can_overcharge=available.can_overcharge,
         overcharge_level=overcharge_level,
+    )
+
+
+@router.post("/{session_id}/action-preview", response_model=ActionPreviewResponse)
+async def preview_action(
+    session_id: str,
+    body: ActionPreviewRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> ActionPreviewResponse:
+    """Preview action outcome (damage, hit chance, effects) before committing.
+
+    This endpoint computes predicted damage statistics, hit probability,
+    and potential effects for a proposed action without modifying game state.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    if combat_session.status != "active":
+        raise ValidationError(
+            f"Cannot preview action: session status is '{combat_session.status}'",
+            errors=[
+                {
+                    "loc": ["status"],
+                    "msg": "Session must be active",
+                    "type": "value_error",
+                }
+            ],
+        )
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Find actor and target combatants
+    actor = next((c for c in scenario.combatants if c.id == body.actor_id), None)
+    target = next((c for c in scenario.combatants if c.id == body.target_id), None)
+
+    if not actor:
+        raise NotFoundError("Combatant (actor)", body.actor_id)
+    if not target:
+        raise NotFoundError("Combatant (target)", body.target_id)
+
+    # Compute damage prediction if weapon specified
+    damage_min = 0
+    damage_max = 0
+    damage_average = 0.0
+    damage_types = []
+
+    if body.weapon_id:
+        # Find weapon in actor's inventory
+        weapon_state = None
+        if actor.inventory and actor.inventory.mounts:
+            for mount in actor.inventory.mounts:
+                for weapon in mount.weapons:
+                    if weapon.weapon_id == body.weapon_id:
+                        weapon_state = weapon
+                        break
+                if weapon_state:
+                    break
+
+        if weapon_state:
+            # Get weapon definition and damage profile
+            weapon_def = get_weapon_definition(weapon_state.weapon_id)
+            if weapon_def:
+                profile = resolve_weapon_profile(weapon_def)
+                if profile.damage:
+                    damage_stats = compute_damage_stats(profile.damage)
+                    damage_min = damage_stats["min"]
+                    damage_max = damage_stats["max"]
+                    damage_average = damage_stats["average"]
+                    damage_types = damage_stats["damage_types"]
+
+    # Estimate hit probability
+    # TODO: Determine attack bonus and defense based on action/weapon
+    # For now, use basic combatant stats
+    attack_bonus = 0  # Default attack bonus (LL0)
+    target_defense = target.stats.evasion if target.stats else 10
+
+    # Determine accuracy/difficulty bonuses based on action/weapon tags
+    accuracy_bonus = 0
+    difficulty_bonus = 0
+
+    hit_probability = estimate_hit_probability(
+        attack_bonus=attack_bonus,
+        target_defense=target_defense,
+        accuracy_bonus=accuracy_bonus,
+        difficulty_bonus=difficulty_bonus,
+        samples=1000,  # Faster preview
+    )
+
+    # Get predicted effects (placeholder)
+    predicted_effects = []
+
+    return ActionPreviewResponse(
+        action_id=body.action_id,
+        actor_id=body.actor_id,
+        target_id=body.target_id,
+        weapon_id=body.weapon_id,
+        damage_min=damage_min,
+        damage_max=damage_max,
+        damage_average=damage_average,
+        damage_types=damage_types,
+        hit_probability=hit_probability,
+        predicted_effects=predicted_effects,
     )
 
 

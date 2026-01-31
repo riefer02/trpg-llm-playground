@@ -61,6 +61,13 @@ export function useParseVoiceIntent(sessionId: string) {
   });
 }
 
+export function useActionPreview(sessionId: string) {
+  return useMutation({
+    mutationFn: (request: ActionPreviewRequest) =>
+      api.post<ActionPreviewResponse>(`/combat/${sessionId}/action-preview`, request),
+  });
+}
+
 export interface ActionResponse {
   success: boolean;
   error?: string;
@@ -137,6 +144,28 @@ export interface ReactionOpportunityResponse {
   combatant_name: string;
   has_reaction_available: boolean;
   pending_triggers: ReactionTrigger[];
+}
+
+export interface ActionPreviewRequest {
+  action_id: string;
+  actor_id: string;
+  target_id: string;
+  weapon_id?: string;
+}
+
+export interface ActionPreviewResponse {
+  action_id: string;
+  actor_id: string;
+  target_id: string;
+  weapon_id?: string;
+  damage_min: number;
+  damage_max: number;
+  damage_average: number;
+  damage_types: string[];
+  hit_probability: number;
+  predicted_effects: Record<string, unknown>[];
+  is_valid: boolean;
+  validation_errors: string[];
 }
 
 export interface ActionEconomyState {
@@ -411,6 +440,38 @@ export function useCompleteCombat(sessionId: string) {
   return useMutation({
     mutationFn: (request: CombatCompleteRequest) =>
       api.post<CombatSessionResponse>(`/combat/${sessionId}/complete`, request),
+    onSuccess: (data) => {
+      queryClient.setQueryData<CombatSessionResponse>(
+        combatKeys.detail(sessionId),
+        data,
+      );
+      // Invalidate characters query to reflect XP/salvage changes
+      queryClient.invalidateQueries({ queryKey: characterKeys.lists() });
+      
+      // Auto-save updated character
+      const characterId = getActiveCharacterId();
+      if (characterId) {
+        queryClient.fetchQuery({
+          queryKey: characterKeys.detail(characterId),
+        }).then((character) => {
+          autoSave(character as CharacterResponse);
+        }).catch(() => {
+          // Ignore errors (character may not exist)
+        });
+      }
+    },
+  });
+}
+
+// =============================================================================
+// Mission Forfeit Types and Hooks
+// =============================================================================
+
+export function useForfeitCombat(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<CombatSessionResponse>(`/combat/${sessionId}/forfeit`),
     onSuccess: (data) => {
       queryClient.setQueryData<CombatSessionResponse>(
         combatKeys.detail(sessionId),

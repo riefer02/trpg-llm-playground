@@ -578,8 +578,8 @@
         "`make test-app` passes"
       ],
       "priority": 28,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Keyboard shortcuts modal implemented with useKeyboardShortcuts hook listening for '?' key (without modifiers). Modal displays categorized shortcuts (Navigation, Combat, Voice, General) with context-specific filtering based on route (combat vs hub). Fully screen reader accessible with proper ARIA labels, focus management, and keyboard navigation (Escape closes). Integrated globally via KeyboardShortcutsManager in root layout. All acceptance criteria satisfied."
     },
     {
       "id": "E7-US-001",
@@ -597,8 +597,8 @@
         "`make test-app` passes"
       ],
       "priority": 29,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented ActionPreviewPanel component with hit chance percentage (color-coded: green ≥70%, amber ≥40%, red <40%), damage range (min/max/average), target current vs predicted HP. Integrated into combat page with debounced API calls to existing /action-preview endpoint. Panel positioned screen-aware (similar to MapTooltip) to avoid obscuring target. Keyboard accessibility via existing focus management in ActionPanel. Works for all action types (shows placeholder for non-damage actions). All acceptance criteria satisfied and tests pass."
     },
     {
       "id": "E7-US-002",
@@ -615,8 +615,8 @@
         "`make test-app` passes"
       ],
       "priority": 30,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented EndTurnConfirmationDialog component with remaining action list, End Anyway/Cancel buttons, keyboard shortcuts (Enter/Escape). Added confirmEndTurn setting to Settings interface and Combat section toggle. Integrated into TurnControls with conditional confirmation based on remaining actions and setting. All acceptance criteria satisfied."
     },
     {
       "id": "E7-US-003",
@@ -633,8 +633,8 @@
         "`make test-app` passes"
       ],
       "priority": 31,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented AIThinkingIndicator component with spinner animation (static border for reduced motion), 'Enemy is thinking...' message, 10-second timeout message, progress bar visual feedback. Integrated into combat page, displays when autoNpcTurn.isPending is true, respects reduced motion setting, clears when AI action begins. All acceptance criteria satisfied."
     },
     {
       "id": "E7-US-004",
@@ -652,8 +652,8 @@
         "`make test-app` passes"
       ],
       "priority": 32,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "All acceptance criteria satisfied: Escape key listener calls actionPanelRef.current?.cancel(); Cancel Targeting button visible in selecting_target state; Right-click in handleContextMenu cancels targeting; Returns to confirming state (action still selected); No game state changes until onExecuteAction called; Works for selecting_path mode via same cancel method; Visual indication via blue border and title change. Tests pass."
     },
     {
       "id": "E7-US-005",
@@ -669,8 +669,8 @@
         "`make test-app` passes"
       ],
       "priority": 33,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added title tooltip, aria-describedby, and aria-disabled for disabled actions. Screen reader announces unavailable_reason. Visual distinction already present."
     },
     {
       "id": "E7-US-006",
@@ -687,8 +687,8 @@
         "`make test-app` passes"
       ],
       "priority": 34,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented VictoryCelebration component with distinct visual treatment for victory (green gradient, confetti animation, pulse) and defeat (red gradient, cracked effect). Shows 'VICTORY'/'DEFEAT' text prominently with scale-up animation. 3-second pause before auto-navigation to debrief. Audio cue via existing TTS narration (narrateVictory). Respects reduced motion setting (static display). All acceptance criteria satisfied."
     },
     {
       "id": "E7-US-007",
@@ -706,8 +706,8 @@
         "`make test-app` passes"
       ],
       "priority": 35,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added enableLowHPWarning setting toggle in Combat section of settings. Created useLowHPWarning hook monitoring player combatants for HP ≤25% (hp_current/hp_max) or structure damage (structure_current < 4). Visual warning: HP bar pulses with @keyframes hp-pulse animation when warning active (respects reduced motion). Audio warning: periodic subtle beep every 15 seconds via Web Audio API (respects master/SFX volume). Warning persists until HP recovers above 25% and structure repaired. Can be disabled in settings. All acceptance criteria satisfied."
     },
     {
       "id": "E8-US-001",
@@ -724,8 +724,8 @@
         "`make test-app` passes"
       ],
       "priority": 36,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Backend API endpoint added at POST /combat/{session_id}/forfeit with validation (only during player turn). Frontend: forfeit mutation hook, ForfeitConfirmationModal component with confirmation dialog, forfeit button in combat header next to End Mission (disabled during enemy turn). Keyboard shortcut Ctrl+Q opens modal during player turn. Forfeit navigates to debrief with DEFEAT outcome and partial salvage based on enemies defeated. All acceptance criteria satisfied."
     },
     {
       "id": "E8-US-002",

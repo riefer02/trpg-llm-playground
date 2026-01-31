@@ -250,6 +250,27 @@ function SettingsScreen() {
             </CardContent>
           </Card>
 
+          {/* Combat Section */}
+          <Card className="dashboard-surface">
+            <CardHeader>
+              <CardTitle>Combat</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+               <Toggle
+                 label="Confirm End Turn"
+                 checked={settings.confirmEndTurn}
+                 onChange={(checked) => updateSettings({ confirmEndTurn: checked })}
+                 description="Show confirmation dialog when ending turn with unused actions"
+               />
+               <Toggle
+                 label="Low HP Warning"
+                 checked={settings.enableLowHPWarning}
+                 onChange={(checked) => updateSettings({ enableLowHPWarning: checked })}
+                 description="Audio/visual cue when player mech is critically damaged (≤25% HP or structure damage)"
+               />
+            </CardContent>
+          </Card>
+
           {/* Display Section */}
           <Card className="dashboard-surface">
             <CardHeader>

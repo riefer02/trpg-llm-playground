@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import type { CombatantState, DeployableState } from "../../lib/types/lancer";
+import { useSettings } from "../../lib/hooks/useSettings";
 
 /**
  * Tooltip that appears when hovering over map elements.
@@ -139,6 +140,15 @@ function CombatantTooltip({ combatant, isEnemy }: CombatantTooltipProps) {
   const hpPercent = hpMax > 0 ? Math.round((hpCurrent / hpMax) * 100) : 0;
   const heatPercent = heatCap > 0 ? Math.round((heatCurrent / heatCap) * 100) : 0;
 
+  const { settings } = useSettings();
+  const isPlayer = !isEnemy;
+  const hpPercentDecimal = hpMax > 0 ? hpCurrent / hpMax : 0;
+  const isLowHP = hpPercentDecimal <= 0.25 && hpCurrent > 0;
+  const structureCurrent = combatant.resources?.structure_current;
+  const hasStructureDamage = structureCurrent !== undefined && structureCurrent < 4;
+  const shouldWarn = settings.enableLowHPWarning && isPlayer && (isLowHP || hasStructureDamage);
+  const reducedMotion = settings.reducedMotion;
+
   return (
     <div className="space-y-2">
       {/* Name */}
@@ -164,7 +174,7 @@ function CombatantTooltip({ combatant, isEnemy }: CombatantTooltipProps) {
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
-            className={`h-full transition-all ${getHpBarColor(hpPercent)}`}
+            className={`h-full transition-all ${getHpBarColor(hpPercent)}${shouldWarn && !reducedMotion ? ' animate-hp-pulse' : ''}`}
             style={{ width: `${hpPercent}%` }}
           />
         </div>

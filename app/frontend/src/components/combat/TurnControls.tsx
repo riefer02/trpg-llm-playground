@@ -1,5 +1,7 @@
 import type { ActionEconomyState } from "../../lib/api/combat";
 import { Button } from "../ui";
+import { EndTurnConfirmationDialog } from "./EndTurnConfirmationDialog";
+import { useState } from "react";
 
 export type TurnState = "not_started" | "active" | "ending";
 
@@ -21,6 +23,8 @@ export interface TurnControlsProps {
   overchargeLevel?: number;
   /** Error message to display prominently */
   error?: string | null;
+  /** Whether to show confirmation dialog when ending turn with unused actions */
+  confirmEndTurn?: boolean;
 }
 
 export function TurnControls({
@@ -39,6 +43,7 @@ export function TurnControls({
   canOvercharge = false,
   overchargeLevel = 0,
   error,
+  confirmEndTurn = true,
 }: TurnControlsProps) {
   // Calculate remaining actions
   const fullRemaining = economy ? 1 - economy.full_actions_used : 1;
@@ -46,7 +51,27 @@ export function TurnControls({
   const quickRemaining = economy ? quickTotal - economy.quick_actions_used : 2;
   const reactRemaining = economy ? 1 - economy.reactions_used_this_turn : 1;
 
-  return (
+  // End turn confirmation state
+  const [showConfirmation, setShowConfirmation] = useState(false);
+
+  const handleEndTurnClick = () => {
+    if (confirmEndTurn && (fullRemaining > 0 || quickRemaining > 0 || reactRemaining > 0)) {
+      setShowConfirmation(true);
+    } else {
+      onEndTurn();
+    }
+  };
+
+  const handleConfirmEndTurn = () => {
+    setShowConfirmation(false);
+    onEndTurn();
+  };
+
+  const handleCancelEndTurn = () => {
+    setShowConfirmation(false);
+  };
+
+  return (<>
     <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
       {/* Header row: Actor name + Turn state badge */}
       <div className="flex items-center justify-between">
@@ -139,7 +164,7 @@ export function TurnControls({
           <Button
             variant="secondary"
             size="sm"
-            onClick={onEndTurn}
+            onClick={handleEndTurnClick}
             disabled={isEnding}
           >
             {isEnding ? "Ending..." : "End Turn"}
@@ -153,7 +178,18 @@ export function TurnControls({
         )}
       </div>
     </div>
-  );
+    <EndTurnConfirmationDialog
+      isOpen={showConfirmation}
+      fullRemaining={fullRemaining}
+      quickRemaining={quickRemaining}
+      reactRemaining={reactRemaining}
+      canOvercharge={canOvercharge && !economy?.overcharge_used}
+      overchargeLevel={overchargeLevel}
+      isProcessing={isEnding}
+      onConfirm={handleConfirmEndTurn}
+      onCancel={handleCancelEndTurn}
+    />
+  </>);
 }
 
 function TurnStateBadge({ state }: { state: TurnState }) {

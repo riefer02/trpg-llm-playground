@@ -664,7 +664,8 @@ async def test_auto_npc_turn_success(client: AsyncClient) -> None:
                 if start_resp2.status_code == 200:
                     start_data2 = start_resp2.json()
                     actor2 = next(
-                        (c for c in combatants if c["id"] == start_data2["actor_id"]), None
+                        (c for c in combatants if c["id"] == start_data2["actor_id"]),
+                        None,
                     )
                     if actor2 and actor2.get("ai_controlled", False):
                         # End this turn and then call auto-npc
@@ -750,3 +751,95 @@ async def test_demo_combat_npc_roles_set(client: AsyncClient) -> None:
     # Check elite roles
     for elite in elites:
         assert elite.get("npc_role") == "defender"
+
+
+@pytest.mark.asyncio
+async def test_action_preview(client: AsyncClient) -> None:
+    """Test action preview endpoint returns predicted damage and hit chance."""
+    # Create a combat session with two mechs
+    attacker = make_combatant(
+        id="attacker",
+        name="Attacker",
+        side="players",
+        ai_controlled=False,
+        hp_max=10,
+        hp_current=10,
+        evasion=10,
+        e_defense=8,
+    )
+    target = make_combatant(
+        id="target",
+        name="Target",
+        side="hostiles",
+        ai_controlled=True,
+        hp_max=10,
+        hp_current=10,
+        evasion=12,
+        e_defense=10,
+    )
+
+    # Add inventory with a weapon for attacker
+    attacker["inventory"] = {
+        "mounts": [
+            {
+                "mount_index": 0,
+                "slot_type": "main",
+                "weapons": [
+                    {
+                        "weapon_id": "assault_rifle",
+                        "tags": ["reliable"],
+                        "destroyed": False,
+                    }
+                ],
+                "destroyed": False,
+            }
+        ]
+    }
+
+    create_resp = await client.post(
+        "/api/combat",
+        json=make_session_create(
+            name="Preview Test",
+            combatants=[attacker, target],
+        ),
+    )
+    if create_resp.status_code != 201:
+        print(f"Create combat session failed: {create_resp.status_code}")
+        print(f"Response: {create_resp.json()}")
+    assert create_resp.status_code == 201
+    session_id = create_resp.json()["id"]
+
+    # Start turn for attacker
+    start_resp = await client.post(f"/api/combat/{session_id}/turns/start")
+    assert start_resp.status_code == 200
+    actor_id = start_resp.json()["actor_id"]
+    assert actor_id == "attacker"
+
+    # Preview action (skirmish with assault rifle)
+    preview_resp = await client.post(
+        f"/api/combat/{session_id}/action-preview",
+        json={
+            "action_id": "skirmish",
+            "actor_id": "attacker",
+            "target_id": "target",
+            "weapon_id": "assault_rifle",
+        },
+    )
+    assert preview_resp.status_code == 200
+    data = preview_resp.json()
+
+    # Validate response structure
+    assert data["action_id"] == "skirmish"
+    assert data["actor_id"] == "attacker"
+    assert data["target_id"] == "target"
+    assert data["weapon_id"] == "assault_rifle"
+    assert "damage_min" in data
+    assert "damage_max" in data
+    assert "damage_average" in data
+    assert "damage_types" in data
+    assert "hit_probability" in data
+    assert 0.0 <= data["hit_probability"] <= 1.0
+    assert "predicted_effects" in data
+    assert isinstance(data["predicted_effects"], list)
+    assert data["is_valid"] is True
+    assert data["validation_errors"] == []

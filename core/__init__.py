@@ -324,6 +324,14 @@ from core.mech import (
     evaluate_example_combat_scenario_with_lock_on_consumption,
 )
 
+# Prediction utilities
+from core.mech.prediction import (
+    compute_damage_stats,
+    compute_average_weapon_damage,
+    estimate_hit_probability,
+    predict_action_preview,
+)
+
 __all__ = [
     # Character domain (unified Pilot + Mech)
     "Character",

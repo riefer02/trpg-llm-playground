@@ -344,6 +344,9 @@ class TestApplyFullTechResult:
 
     def test_apply_full_tech_miss_no_conditions(self, test_combatant: CombatantState):
         """Test Full Tech invade miss doesn't apply conditions."""
+        from core.mech.combat_resolution import ResolutionSettings
+
+        # Force a low roll to ensure miss (nat 20 always hits regardless of defense)
         input = FullTechInput(
             actor_id="test_mech",
             first_option=FullTechFirstOption(
@@ -358,6 +361,7 @@ class TestApplyFullTechResult:
                 option="scan",
                 scan_params=ScanTechParams(target_id="target_mech"),
             ),
+            settings=ResolutionSettings(forced_roll=5),
         )
         result = resolve_full_tech(input)
         applied = apply_full_tech_result(test_combatant, result)
