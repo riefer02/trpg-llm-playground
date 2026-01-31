@@ -30,3 +30,6 @@ export type { SliderProps } from './slider'
 
 export { Toggle } from './toggle'
 export type { ToggleProps } from './toggle'
+
+export { KeyboardShortcutsModal } from './keyboard-shortcuts-modal'
+export type { KeyboardShortcutsModalProps } from './keyboard-shortcuts-modal'

@@ -17,6 +17,8 @@ import { useState } from 'react'
 
 import appCss from '../styles.css?url'
 import { Breadcrumbs } from '../components/Breadcrumbs'
+import { VoiceNavigationManager } from '../components/voice/VoiceNavigationManager'
+import { KeyboardShortcutsManager } from '../components/KeyboardShortcutsManager'
 
 // Create QueryClient with sensible defaults
 function makeQueryClient() {
@@ -80,33 +82,36 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <div className="app-shell flex flex-col">
-            {!isTitleScreen && <Header />}
-            {!isTitleScreen && <Breadcrumbs />}
-            <main className="flex-1">
-              {children}
-            </main>
-          </div>
-          <TanStackDevtools
-            config={{ position: 'bottom-right' }}
-            plugins={[
-              {
-                name: 'TanStack Router',
-                render: <TanStackRouterDevtoolsPanel />,
-              },
-            ]}
-          />
+          <VoiceNavigationManager>
+            <div className="app-shell flex flex-col">
+              {!isTitleScreen && <Header />}
+              {!isTitleScreen && <Breadcrumbs />}
+              <main className="flex-1">
+                {children}
+              </main>
+            </div>
+            <KeyboardShortcutsManager />
+            <TanStackDevtools
+              config={{ position: 'bottom-right' }}
+              plugins={[
+                {
+                  name: 'TanStack Router',
+                  render: <TanStackRouterDevtoolsPanel />,
+                },
+              ]}
+            />
+          </VoiceNavigationManager>
         </QueryClientProvider>
-        <Toaster
-          theme="light"
-          position="top-right"
-          richColors
-          closeButton
-          toastOptions={{
-            duration: 4000,
-          }}
-        />
-        <Scripts />
+           <Toaster
+             theme="light"
+             position="top-right"
+             richColors
+             closeButton
+             toastOptions={{
+               duration: 4000,
+             }}
+           />
+           <Scripts />
       </body>
     </html>
   )

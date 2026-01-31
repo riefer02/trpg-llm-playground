@@ -24,6 +24,7 @@ from core.mech.frame import MechFrameDefinition
 from core.mech.compendium import get_frame_definition
 from core.shared.effects import MechanicalEffect
 from core.shared.id_helpers import CharacterIdField, MechIdField, FrameIdField
+from core.character.damage_state import MechDamageState
 
 if TYPE_CHECKING:
     from core.character.validation import CharacterValidation
@@ -43,6 +44,10 @@ class MechConfiguration(BaseModel):
     build: MechBuild = Field(
         default_factory=lambda: MechBuild(frame_id="gms_everest"),
         description="Weapon and system loadout",
+    )
+    damage_state: MechDamageState | None = Field(
+        default=None,
+        description="Current damage state (None = full health)",
     )
 
     model_config = {"validate_assignment": True}

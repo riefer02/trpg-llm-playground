@@ -18,7 +18,7 @@ echo "📦 Generating JSON Schema from Python models..."
 cd "$REPO_ROOT"
 
 # Generate combined schema
-python -m core.export --output-dir "$FRONTEND_DIR/schemas" --combined
+"$REPO_ROOT/.venv/bin/python" -m core.export --output-dir "$FRONTEND_DIR/schemas" --combined
 
 echo "🔄 Converting JSON Schema to TypeScript..."
 cd "$FRONTEND_DIR"

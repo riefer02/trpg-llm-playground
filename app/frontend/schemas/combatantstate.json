@@ -13228,6 +13228,40 @@
       "title": "EffectRemoval",
       "type": "object"
     },
+    "FlyingStatus": {
+      "description": "State tracking for flying status effects.\n\nTracks whether a character is flying, current altitude level, and hover mode.\nThe caller is responsible for:\n- Setting is_flying when character takes off\n- Tracking current altitude_level (0 = ground, 1+ = elevated)\n- Handling hover mode for units that can hover\n- Clearing flying status on landing",
+      "properties": {
+        "is_flying": {
+          "default": false,
+          "title": "Is Flying",
+          "type": "boolean"
+        },
+        "altitude_level": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Altitude Level",
+          "type": "integer"
+        },
+        "is_hover": {
+          "default": false,
+          "title": "Is Hover",
+          "type": "boolean"
+        },
+        "movement_mode": {
+          "default": "ground",
+          "enum": [
+            "ground",
+            "flight",
+            "hover",
+            "teleport"
+          ],
+          "title": "Movement Mode",
+          "type": "string"
+        }
+      },
+      "title": "FlyingStatus",
+      "type": "object"
+    },
     "ForcedMovement": {
       "description": "Forced push/pull movement applied to a target.\n\nPer PR2 4146-4151: Forced movement moves targets against their will.\nPush moves away from source, pull moves toward source or zone.\n\nExamples:\n    ForcedMovement(direction=\"pull\", distance=5, ignores_engagement=True)",
       "properties": {
@@ -20151,7 +20185,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -20191,7 +20226,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -20221,7 +20257,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -22215,7 +22252,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -23265,7 +23303,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -30641,7 +30680,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -30963,7 +31003,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -31279,7 +31320,8 @@
                 "exposed",
                 "engaged",
                 "burn",
-                "unshackled"
+                "unshackled",
+                "falling"
               ],
               "type": "string"
             },
@@ -31341,7 +31383,8 @@
                 "exposed",
                 "engaged",
                 "burn",
-                "unshackled"
+                "unshackled",
+                "falling"
               ],
               "type": "string"
             },
@@ -31724,7 +31767,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -31788,7 +31832,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -32106,7 +32151,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -32407,7 +32453,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -32878,7 +32925,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -33645,7 +33693,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -39426,7 +39475,8 @@
           "exposed",
           "engaged",
           "burn",
-          "unshackled"
+          "unshackled",
+          "falling"
         ],
         "type": "string"
       },
@@ -39451,7 +39501,8 @@
           "exposed",
           "engaged",
           "burn",
-          "unshackled"
+          "unshackled",
+          "falling"
         ],
         "type": "string"
       },
@@ -39487,7 +39538,8 @@
         {
           "enum": [
             "compcon",
-            "nhp"
+            "nhp",
+            "llm"
           ],
           "type": "string"
         },
@@ -39496,7 +39548,7 @@
         }
       ],
       "default": null,
-      "description": "Type of AI installed (compcon or nhp)",
+      "description": "Type of AI installed (compcon, nhp, or llm)",
       "title": "Ai Type"
     },
     "ai_control_state": {
@@ -39743,6 +39795,32 @@
       "description": "Whether eject has been used this combat (mech only)",
       "title": "Eject Used",
       "type": "boolean"
+    },
+    "flying_status": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FlyingStatus"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Current flying status (altitude, hover mode, etc.)"
+    },
+    "falling_from_altitude": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "If falling, the altitude level falling from (for damage calc)",
+      "title": "Falling From Altitude"
     }
   },
   "required": [

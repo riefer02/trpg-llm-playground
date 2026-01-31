@@ -5,15 +5,20 @@
  */
 
 import { createFileRoute, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useEffect, useRef } from 'react';
 import { Button } from "../../../components/ui/button";
 import { ArrowLeft, Award, Target, Users, Zap, Shield, Heart, TrendingUp } from "lucide-react";
 import { useMission } from "../../../lib/api/missions";
+import { useActiveCharacter } from "../../../lib/api/quarters";
+import { useAutoSave } from "../../../lib/save/useSaveSlots";
 
 interface DebriefSearch {
   outcome?: "victory" | "defeat";
   turns?: number;
   damageDealt?: number;
   damageReceived?: number;
+  xp?: number;
+  salvage?: number;
 }
 
 export const Route = createFileRoute("/missions/$missionId/debrief" as const)({
@@ -23,6 +28,8 @@ export const Route = createFileRoute("/missions/$missionId/debrief" as const)({
     turns: typeof search.turns === "number" ? search.turns : 8,
     damageDealt: typeof search.damageDealt === "number" ? search.damageDealt : 2450,
     damageReceived: typeof search.damageReceived === "number" ? search.damageReceived : 1200,
+    xp: typeof search.xp === "number" ? search.xp : undefined,
+    salvage: typeof search.salvage === "number" ? search.salvage : undefined,
   }),
 });
 
@@ -31,6 +38,16 @@ function MissionDebrief() {
   const { missionId } = useParams({ from: "/missions/$missionId/debrief" });
   const search = useSearch({ from: "/missions/$missionId/debrief" });
   const { mission, isLoading, error } = useMission(missionId);
+  const { character } = useActiveCharacter();
+  const { triggerAutoSave } = useAutoSave();
+  const hasAutoSaved = useRef(false);
+
+  useEffect(() => {
+    if (search.salvage !== undefined && character && !hasAutoSaved.current) {
+      triggerAutoSave(character);
+      hasAutoSaved.current = true;
+    }
+  }, [search.salvage, character, triggerAutoSave]);
 
   const handleContinue = () => navigate({ to: "/quarters" });
   const handleBack = () => navigate({ to: "/missions" });
@@ -42,9 +59,9 @@ function MissionDebrief() {
 
   const epilogue = search.outcome === "victory" ? epilogueVictory : epilogueDefeat;
 
-  // Reward values (placeholder)
-  const xpEarned = mission?.difficulty ? mission.difficulty * 250 : 500;
-  const salvageEarned = mission?.difficulty ? mission.difficulty * 150 : 300;
+  // Reward values (use actual awarded amounts if provided, otherwise placeholder)
+  const xpEarned = search.xp ?? (mission?.difficulty ? mission.difficulty * 250 : 500);
+  const salvageEarned = search.salvage ?? (mission?.difficulty ? mission.difficulty * 150 : 300);
 
   if (isLoading) {
     return (

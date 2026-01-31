@@ -5,17 +5,57 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./client";
-import { characterKeys, useCharacters, type CharacterResponse } from "./characters";
+import { characterKeys, useCharacters, useCharacter, type CharacterResponse } from "./characters";
+import { getActiveCharacterId, clearActiveCharacterId } from "../save/saveSystem";
 
 /**
- * Hook to get the active character (first character in list for MVP).
+ * Hook to get the active character.
+ * Priority: active character ID from localStorage → first character in list.
  * Returns loading state, error, and character data.
  */
 export function useActiveCharacter() {
-  const { data, isLoading, error } = useCharacters();
+  const activeCharacterId = getActiveCharacterId();
+  const {
+    data: activeCharData,
+    isLoading: isLoadingActive,
+    error: activeError,
+  } = useCharacter(activeCharacterId || '');
+  const {
+    data: charactersData,
+    isLoading: isLoadingChars,
+    error: charsError,
+  } = useCharacters();
 
-  // For MVP: first character is considered active
-  const character = data?.items?.[0] || null;
+  // Determine which data to use
+  let character = null;
+  let isLoading = false;
+  let error = null;
+
+  if (activeCharacterId) {
+    if (activeCharData) {
+      // Active character found
+      character = activeCharData;
+      isLoading = isLoadingActive;
+      error = activeError;
+    } else if (!isLoadingActive) {
+      // Active character query finished but no data (not found or error)
+      // Fall back to first character
+      character = charactersData?.items?.[0] || null;
+      isLoading = isLoadingChars;
+      error = charsError;
+      // Clear invalid active ID
+      clearActiveCharacterId();
+    } else {
+      // Still loading active character
+      isLoading = isLoadingActive;
+      error = activeError;
+    }
+  } else {
+    // No active ID, use first character
+    character = charactersData?.items?.[0] || null;
+    isLoading = isLoadingChars;
+    error = charsError;
+  }
 
   return {
     character,

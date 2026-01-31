@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./client";
+import { characterKeys, type CharacterResponse } from "./characters";
 import type { FullTechOptionSelection, MechCombatScenario } from "../types/lancer";
+import { getActiveCharacterId, autoSave } from '../save/saveSystem';
 
 // =============================================================================
 // Request/Response Types for Combat Execution
@@ -159,6 +161,8 @@ export interface CombatSessionResponse {
   current_round: number;
   current_turn_index: number;
   notes: string;
+  xp_awarded?: number;
+  salvage_awarded?: number;
   scenario: MechCombatScenario;
 }
 
@@ -412,6 +416,20 @@ export function useCompleteCombat(sessionId: string) {
         combatKeys.detail(sessionId),
         data,
       );
+      // Invalidate characters query to reflect XP/salvage changes
+      queryClient.invalidateQueries({ queryKey: characterKeys.lists() });
+      
+      // Auto-save updated character
+      const characterId = getActiveCharacterId();
+      if (characterId) {
+        queryClient.fetchQuery({
+          queryKey: characterKeys.detail(characterId),
+        }).then((character) => {
+          autoSave(character as CharacterResponse);
+        }).catch(() => {
+          // Ignore errors (character may not exist)
+        });
+      }
     },
   });
 }
@@ -444,11 +462,25 @@ export function useSpendReserve(sessionId: string) {
 
 export type DemoScenarioType = "skirmish" | "control" | "boss";
 
+export interface CreateDemoCombatOptions {
+  scenarioType?: DemoScenarioType;
+  missionId?: string;
+  missionDifficulty?: number;
+}
+
 export function useCreateDemoCombat() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (scenarioType: DemoScenarioType = "skirmish") =>
-      api.post<CombatSessionResponse>(`/combat/demo?scenario_type=${scenarioType}`),
+    mutationFn: (options: CreateDemoCombatOptions | DemoScenarioType = "skirmish") => {
+      // Backward compatibility: allow string scenarioType
+      const params = typeof options === "string" ? { scenarioType: options } : options;
+      const scenarioType = params.scenarioType || "skirmish";
+      const queryParams = new URLSearchParams();
+      queryParams.set("scenario_type", scenarioType);
+      if (params.missionId) queryParams.set("mission_id", params.missionId);
+      if (params.missionDifficulty) queryParams.set("mission_difficulty", params.missionDifficulty.toString());
+      return api.post<CombatSessionResponse>(`/combat/demo?${queryParams.toString()}`);
+    },
     onSuccess: () => {
       // Invalidate combat list to include the new demo session
       queryClient.invalidateQueries({ queryKey: combatKeys.all });

@@ -8,6 +8,12 @@ export interface ModalProps {
   disableBackdropClose?: boolean;
   /** Adds pulsing border animation for urgent prompts */
   urgent?: boolean;
+  /** ARIA label for the dialog (optional, prefer aria-labelledby) */
+  ariaLabel?: string;
+  /** ID of the element that labels the dialog */
+  ariaLabelledBy?: string;
+  /** ID of the element that describes the dialog */
+  ariaDescribedBy?: string;
 }
 
 /**
@@ -20,6 +26,9 @@ export function Modal({
   children,
   disableBackdropClose = false,
   urgent = false,
+  ariaLabel,
+  ariaLabelledBy,
+  ariaDescribedBy,
 }: ModalProps) {
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -58,6 +67,9 @@ export function Modal({
       className="fixed inset-0 z-50 flex items-center justify-center"
       role="dialog"
       aria-modal="true"
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      aria-describedby={ariaDescribedBy}
     >
       {/* Backdrop */}
       <div

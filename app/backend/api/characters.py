@@ -15,7 +15,7 @@ that passes data to core models via model_validate(). Never duplicate
 validation logic - let core handle it.
 """
 
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, status
@@ -49,6 +49,9 @@ from core.character import (
     validate_character,
     create_ll0_character,
 )
+from core.character.damage_state import MechDamageState
+from core.mech.build import compute_mech_stats
+from core.mech.compendium import get_frame_definition
 from core.pilot import (
     Pilot,
     SkillSet,
@@ -61,6 +64,7 @@ from core.pilot import (
 )
 from core.mech import MechBuild
 from core.mech.build_validation import validate_mech_build
+from core.shared.repair import calculate_repair_cost, DEFAULT_REST_RULES
 
 router = APIRouter(prefix="/characters", tags=["characters"])
 
@@ -141,6 +145,31 @@ class CharacterUpdateRequest(BaseModel):
     background: dict[str, Any] | None = None
     notes: str | None = None
     active_mech_id: str | None = None
+    salvage: int | None = Field(
+        default=None, ge=0, description="Pilot salvage currency"
+    )
+
+
+class SalvageRepairRequest(BaseModel):
+    """Request body for spending salvage on repairs."""
+
+    repair_type: Literal[
+        "hp",
+        "structure",
+        "stress",
+        "destroyed_weapon",
+        "destroyed_system",
+        "destroyed_mech",
+    ] = Field(..., description="Type of repair to perform")
+    mech_id: str = Field(..., description="ID of the mech to repair")
+    weapon_id: str | None = Field(
+        default=None,
+        description="Weapon ID to repair (required for destroyed_weapon repair)",
+    )
+    system_id: str | None = Field(
+        default=None,
+        description="System ID to repair (required for destroyed_system repair)",
+    )
 
 
 class MechAddRequest(BaseModel):
@@ -220,6 +249,7 @@ class CharacterResponse(DatabaseMetadata):
     background: dict[str, Any] | None
     pilot_gear: dict[str, Any] | None
     notes: str
+    salvage: int
 
     # Pilot computed fields
     grit: int
@@ -418,6 +448,9 @@ def _update_character_from_request(
         pilot_updates["background"] = validate_core_model(
             Background, request.background, "background"
         )
+
+    if request.salvage is not None:
+        pilot_updates["salvage"] = request.salvage
 
     # Apply pilot updates if any
     if pilot_updates:
@@ -963,6 +996,125 @@ async def set_active_mech(
         updated_char = core_char.set_active_mech(mech_id)
     except ValueError as e:
         raise ValidationError(str(e))
+
+    # Update database
+    char_db.data = updated_char.model_dump(mode="json")
+    char_db.updated_at = utc_now()
+
+    session.add(char_db)
+    await session.commit()
+    await session.refresh(char_db)
+
+    return await _character_to_response(session, char_db)
+
+
+@router.post(
+    "/{character_id}/spend-salvage-for-repair", response_model=CharacterResponse
+)
+async def spend_salvage_for_repair(
+    character_id: str,
+    body: SalvageRepairRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> CharacterResponse:
+    """Spend salvage currency to repair a mech.
+
+    Repair costs match standard repair costs:
+    - HP/weapon/system: 1 salvage
+    - Structure/stress: 2 salvage
+    - Destroyed mech: 4 salvage
+    """
+    result = await session.exec(
+        select(CharacterDB).where(
+            CharacterDB.id == character_id,
+            CharacterDB.user_id == user["id"],
+        )
+    )
+    char_db = result.first()
+
+    if not char_db:
+        raise NotFoundError("Character", character_id)
+
+    # Hydrate existing character
+    core_char = Character.model_validate(char_db.data)
+
+    # Verify mech exists
+    mech = core_char.get_mech(body.mech_id)
+    if not mech:
+        raise NotFoundError("Mech", body.mech_id)
+
+    # Calculate salvage cost using standard repair costs
+    salvage_cost = calculate_repair_cost(body.repair_type, DEFAULT_REST_RULES)
+
+    # Check pilot has enough salvage
+    if core_char.pilot.salvage < salvage_cost:
+        raise ValidationError(
+            f"Insufficient salvage: need {salvage_cost}, have {core_char.pilot.salvage}"
+        )
+
+    # Spend salvage (creates new Pilot instance)
+    try:
+        updated_pilot = core_char.pilot.spend_salvage(salvage_cost)
+    except ValueError as e:
+        raise ValidationError(str(e))
+
+    # Update character with new pilot
+    updated_char = core_char.update_pilot(salvage=updated_pilot.salvage)
+
+    # Apply repair effect to mech damage state
+    frame = get_frame_definition(mech.frame_id)
+    if not frame:
+        raise ValidationError(f"Unknown frame ID: {mech.frame_id}")
+
+    # Compute max stats for this mech with current pilot skills/grit
+    stats = compute_mech_stats(
+        frame=frame,
+        skills=core_char.pilot.skills,
+        grit=core_char.pilot.grit,
+        bonus_effects=core_char.core_bonus_effects
+        if core_char.core_bonus_effects
+        else None,
+    )
+
+    # Get or create damage state
+    damage_state = mech.damage_state
+    if damage_state is None:
+        # Full health: hp_max, structure 4, stress 0
+        damage_state = MechDamageState.full_health(
+            hp_max=stats.hp,
+            structure_max=4,
+            stress_capacity=stats.heat_cap,
+        )
+
+    # Validate weapon_id/system_id for specific repairs
+    weapon_id = body.weapon_id
+    system_id = body.system_id
+    if body.repair_type == "destroyed_weapon" and not weapon_id:
+        raise ValidationError("weapon_id required for destroyed_weapon repair")
+    if body.repair_type == "destroyed_system" and not system_id:
+        raise ValidationError("system_id required for destroyed_system repair")
+    if body.repair_type not in ["destroyed_weapon", "destroyed_system"] and (
+        weapon_id or system_id
+    ):
+        raise ValidationError(
+            "weapon_id/system_id only allowed for destroyed_weapon/destroyed_system repairs"
+        )
+
+    # Apply repair
+    updated_damage_state = damage_state.apply_repair(
+        repair_type=body.repair_type,
+        hp_max=stats.hp,
+        structure_max=4,
+        stress_capacity=stats.heat_cap,
+        weapon_id=weapon_id,
+        system_id=system_id,
+    )
+
+    # Update the mech with new damage state
+    updated_char = updated_char.update_mech(
+        mech_id=body.mech_id,
+        damage_state=updated_damage_state,
+    )
 
     # Update database
     char_db.data = updated_char.model_dump(mode="json")

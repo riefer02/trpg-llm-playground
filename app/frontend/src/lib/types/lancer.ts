@@ -40,6 +40,7 @@ export type LancerTTRPGSchema =
   | PilotCombatRules
   | Character
   | MechConfiguration
+  | MechDamageState
   | Campaign
   | Session
   | MissionPrepPlan
@@ -322,6 +323,14 @@ export type Gear = [] | [string] | [string, string] | [string, string, string];
  * License Level (LL0-LL12)
  */
 export type Level = number;
+/**
+ * Experience points earned
+ */
+export type Xp = number;
+/**
+ * Salvage currency earned from missions
+ */
+export type Salvage = number;
 export type Hull = number;
 export type Agility = number;
 export type Systems = number;
@@ -452,6 +461,14 @@ export type SaveTarget = number;
  * Base attack bonus from grit.
  */
 export type AttackBonus = number;
+/**
+ * XP needed to reach next level.
+ */
+export type XpToNextLevel = number;
+/**
+ * Progress to next level as fraction (0.0 to 1.0).
+ */
+export type LevelProgress = number;
 export type SkillType = "hull" | "agility" | "systems" | "engineering";
 export type Rank3 = number;
 export type Bonus = number;
@@ -2933,6 +2950,7 @@ export type DisallowTargetStatuses = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type ProvidesSoftCover = boolean;
 export type SharesSpace = boolean;
@@ -2954,6 +2972,7 @@ export type DismountOnCarrierStatuses = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type DismountOnCarrierDestroyed = boolean;
 export type DismountOnRiderStatuses = (
@@ -2973,6 +2992,7 @@ export type DismountOnRiderStatuses = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type KnocksProneOnDismount = boolean;
 export type Condition7 =
@@ -5324,6 +5344,7 @@ export type StatusesIfUnlicensedPilot = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type Condition17 =
   | (
@@ -10215,7 +10236,8 @@ export type Status =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type Target26 = "self" | "enemy" | "ally" | "adjacent";
 export type ActivationAction = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type ActivationTiming =
@@ -10567,6 +10589,7 @@ export type Status1 =
       | "engaged"
       | "burn"
       | "unshackled"
+      | "falling"
     )
   | ("invisible" | "flying");
 export type Target27 = "self" | "enemy" | "ally" | "adjacent" | "all";
@@ -10877,6 +10900,7 @@ export type Status2 =
       | "engaged"
       | "burn"
       | "unshackled"
+      | "falling"
     )
   | ("burn" | "any" | "tech");
 export type Target28 = "self" | "enemy" | "ally" | "adjacent" | "all";
@@ -10898,7 +10922,8 @@ export type Status3 =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type Target29 = "self" | "enemy" | "ally" | "adjacent" | "all";
 export type BreakTriggers = (
   | "attack"
@@ -11155,7 +11180,8 @@ export type Status4 =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type MaxStacks1 = number;
 export type Target30 = "self" | "enemy" | "ally" | "adjacent" | "all";
 export type Condition39 =
@@ -11402,7 +11428,8 @@ export type Status5 =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type Target31 = "self" | "enemy" | "ally" | "adjacent";
 export type MovementModes = ("move" | "boost" | "other" | "any")[];
 export type EndsOn = "movement_end" | "turn_end";
@@ -11884,7 +11911,8 @@ export type Status6 =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type AllowAttackTypes = ("melee" | "ranged" | "tech")[];
 export type AllowActionCategories = ("attack" | "movement" | "tech" | "utility" | "defense" | "reaction")[];
 export type Target33 = "self" | "enemy" | "ally" | "adjacent" | "all";
@@ -12366,6 +12394,7 @@ export type Statuses = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type Restriction = "cannot_gain" | "cannot_benefit";
 export type Target35 = "self" | "enemy" | "ally" | "adjacent" | "all";
@@ -22133,6 +22162,7 @@ export type BreakIfStatuses = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type SharesSpace1 = boolean;
 export type MovesWithTarget = boolean;
@@ -25470,7 +25500,8 @@ export type Status7 =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type Target75 = "self" | "enemy" | "ally" | "adjacent";
 export type Condition96 =
   | (
@@ -28040,7 +28071,8 @@ export type Status8 =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type Duration33 = "end_of_turn" | "start_of_next_turn" | "end_of_next_turn" | "until_cleared" | "scene";
 export type BreakTriggers1 = (
   | "attack"
@@ -28136,6 +28168,30 @@ export type Weapons1 = MountedWeapon[];
 export type SystemId = string;
 export type SpCost = number | null;
 export type Systems1 = InstalledSystem[];
+/**
+ * Current HP
+ */
+export type HpCurrent = number;
+/**
+ * Current structure (0-4)
+ */
+export type StructureCurrent = number;
+/**
+ * Current reactor stress
+ */
+export type StressCurrent = number;
+/**
+ * Weapon IDs that are destroyed and need repair
+ */
+export type DestroyedWeapons = string[];
+/**
+ * System IDs that are destroyed and need repair
+ */
+export type DestroyedSystems = string[];
+/**
+ * Whether the mech is completely destroyed (wreck)
+ */
+export type IsDestroyed = boolean;
 /**
  * Mech configurations owned by this character
  */
@@ -29006,6 +29062,7 @@ export type UnlicensedStatusPenalties = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type StartsWithCorePower = boolean;
 export type RestoresOnMissionStart = boolean;
@@ -29064,7 +29121,8 @@ export type Status14 =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type Category2 = "status" | "condition";
 export type RangedAttackDifficulty = number;
 export type AllAttackDifficulty = number;
@@ -29101,6 +29159,7 @@ export type GrantsConditions = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type MaxVoluntarySpeed1 = number | null;
 export type OnlyRegularMove = boolean;
@@ -29139,7 +29198,8 @@ export type Status15 =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 /**
  * Round when status was applied
  */
@@ -29394,6 +29454,7 @@ export type OnHitStatuses = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type KnockbackSpaces = number | null;
 export type DistanceMultiplier = number;
@@ -29422,6 +29483,7 @@ export type InflictsConditions = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type Duration35 = ("end_of_next_turn" | "until_cleared") | null;
 export type OptionsPerAction = number | null;
@@ -29458,6 +29520,7 @@ export type ClearableConditions = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type HeldActionType = "free" | "quick" | "full" | "reaction" | "protocol" | "move";
 export type BlocksOtherActions = boolean;
@@ -29480,7 +29543,8 @@ export type AppliesStatus =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type ClearsExposed = boolean;
 export type CoolsHeatToZero = boolean;
 export type EndsTechEffects = boolean;
@@ -29501,7 +29565,8 @@ export type ClearsStatus =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type RequiresAdjacent4 = boolean;
 export type EjectDistance = number | null;
 export type EjectCausesImpairedUntilFullRepair = boolean;
@@ -29528,7 +29593,8 @@ export type GrantsStatus =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type ResistAllDamageFromTrigger = boolean;
 export type ResistHeatFromTrigger = boolean;
 export type ResistBurnFromTrigger = boolean;
@@ -29557,6 +29623,7 @@ export type InflictsConditions1 = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type Heat = number;
 export type Damage3 = number;
@@ -29578,7 +29645,8 @@ export type Condition105 =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type Duration36 = "until_consumed" | "until_cleared" | "end_of_next_turn";
 export type Consumable = boolean;
 export type ConsumedBy = "hostile_attack";
@@ -29599,7 +29667,8 @@ export type GrantsCondition =
   | "exposed"
   | "engaged"
   | "burn"
-  | "unshackled";
+  | "unshackled"
+  | "falling";
 export type DisallowIfEngaged = boolean;
 export type RequiresHardOrAreaSoftCover = boolean;
 export type CoverMustConcealSize = boolean;
@@ -29624,11 +29693,11 @@ export type Grit2 = number;
  * Engineering skill for saves
  */
 export type EngineeringSkill = number;
-export type HpCurrent = number;
+export type HpCurrent1 = number;
 export type HeatCurrent = number;
 export type HeatCap2 = number;
-export type StructureCurrent = number;
-export type StressCurrent = number;
+export type StructureCurrent1 = number;
+export type StressCurrent1 = number;
 export type RepairsRemaining = number;
 /**
  * Accumulated burn damage
@@ -29655,6 +29724,7 @@ export type Statuses1 = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 export type Conditions = (
   | "braced"
@@ -29673,6 +29743,7 @@ export type Conditions = (
   | "engaged"
   | "burn"
   | "unshackled"
+  | "falling"
 )[];
 /**
  * Tracked status instances with duration metadata for automatic expiration
@@ -29719,9 +29790,9 @@ export type LimitedChargesRemaining1 = number | null;
 export type Systems3 = MechSystemState[];
 export type AiControlled = boolean;
 /**
- * Type of AI installed (compcon or nhp)
+ * Type of AI installed (compcon, nhp, or llm)
  */
-export type AiType = ("compcon" | "nhp") | null;
+export type AiType = ("compcon" | "nhp" | "llm") | null;
 /**
  * Current control state of the mech
  */
@@ -29952,6 +30023,14 @@ export type MountedPilotId = string | null;
  * Whether eject has been used this combat (mech only)
  */
 export type EjectUsed = boolean;
+export type IsFlying = boolean;
+export type AltitudeLevel = number;
+export type IsHover = boolean;
+export type MovementMode = "ground" | "flight" | "hover" | "teleport";
+/**
+ * If falling, the altitude level falling from (for damage calc)
+ */
+export type FallingFromAltitude = number | null;
 export type GrapplerId = string;
 export type TargetId6 = string;
 export type GrapplerTotalSize = number;
@@ -30036,6 +30115,7 @@ export type Status16 =
       | "engaged"
       | "burn"
       | "unshackled"
+      | "falling"
     )
   | null;
 export type TargetId9 = string | null;
@@ -30043,7 +30123,7 @@ export type WeaponId4 = string | null;
 export type LogEffects = ActionLogEffect[];
 export type ActorId = string;
 export type MoveUsed = boolean;
-export type MovementMode = "ground" | "flight" | "hover" | "teleport";
+export type MovementMode1 = "ground" | "flight" | "hover" | "teleport";
 export type MovementPath = HexPosition[];
 export type Actions1 = ActionUse[];
 /**
@@ -30066,7 +30146,7 @@ export type MaxHp = number;
 export type Armor5 = number;
 export type Evasion7 = number;
 export type Cover6 = ("soft" | "hard") | null;
-export type IsDestroyed = boolean;
+export type IsDestroyed1 = boolean;
 export type IsActive1 = boolean;
 export type CanAct = boolean;
 export type CanMove = boolean;
@@ -30259,6 +30339,18 @@ export type StressDamage = number;
 export type ForcedRolls = number[] | null;
 export type ForcedSystemTraumaRoll = number | null;
 /**
+ * Forced d20 roll for attack resolution
+ */
+export type ForcedRoll = number | null;
+/**
+ * Forced accuracy d6 rolls
+ */
+export type ForcedAccuracyRolls = number[] | null;
+/**
+ * Forced difficulty d6 rolls
+ */
+export type ForcedDifficultyRolls = number[] | null;
+/**
  * ID of the combatant taking action
  */
 export type ActorId1 = string;
@@ -30333,6 +30425,14 @@ export type DeployName = string | null;
  * Type of mine being deployed
  */
 export type MineType = ("explosive" | "shroud" | "breaching" | "cluster" | "emp") | null;
+/**
+ * Mount index to target for called shot (adds +1 difficulty, destroys mount on hit)
+ */
+export type TargetMountId = number | null;
+/**
+ * ID of deployable to target (instead of combatant)
+ */
+export type TargetDeployableId = string | null;
 /**
  * Whether action executed successfully
  */
@@ -30477,6 +30577,30 @@ export type DangerousTerrainCheckPassed = boolean | null;
  */
 export type DangerousTerrainDamage1 = number;
 /**
+ * Whether the actor started falling this turn due to status (stunned/immobilized/shutdown)
+ */
+export type StartedFalling = boolean;
+/**
+ * Altitude level the actor is falling from (if started_falling)
+ */
+export type FallingFromAltitude1 = number | null;
+/**
+ * Whether a same-size grapple contested HULL check was triggered
+ */
+export type SameSizeGrappleCheck = boolean;
+/**
+ * Whether the grapple was broken due to winning the contest
+ */
+export type GrappleBrokeOnTurnStart = boolean;
+/**
+ * The d20 roll result for the grapple contest
+ */
+export type GrappleContestRoll = number | null;
+/**
+ * ID of the opponent in the grapple contest
+ */
+export type GrappleContestOpponentId = string | null;
+/**
  * ID of the actor whose turn ended
  */
 export type ActorId3 = string;
@@ -30546,6 +30670,18 @@ export type BurnCleared = boolean;
  * IDs of drones that primed at end of this turn
  */
 export type DronesPrimed = string[];
+/**
+ * Whether a fall was resolved this turn
+ */
+export type FallResolved = boolean;
+/**
+ * Damage taken from fall (1 per altitude level, armor-piercing)
+ */
+export type FallDamage = number;
+/**
+ * Altitude level the actor fell from
+ */
+export type FellFromAltitude = number | null;
 /**
  * ID of the reacting combatant
  */
@@ -30826,7 +30962,7 @@ export type MaxHp1 = number;
 export type Armor7 = number;
 export type Evasion9 = number;
 export type Material = "organic" | "tough" | "hardy" | "fortified" | "armored";
-export type IsDestroyed1 = boolean;
+export type IsDestroyed2 = boolean;
 export type ProvidesSoftCover8 = boolean;
 export type ProvidesHardCover7 = boolean;
 export type HardCoverSize7 = ("size_half" | "size_1" | "size_2" | "size_3" | "size_4" | "size_5") | null;
@@ -31018,6 +31154,8 @@ export interface Pilot {
    */
   pilot_gear?: PilotLoadout | null;
   level?: Level;
+  xp?: Xp;
+  salvage?: Salvage;
   skills?: SkillSet;
   triggers?: Triggers1;
   talents?: Talents;
@@ -31040,6 +31178,8 @@ export interface Pilot {
   size: Size;
   save_target: SaveTarget;
   attack_bonus: AttackBonus;
+  xp_to_next_level: XpToNextLevel;
+  level_progress: LevelProgress;
   [k: string]: unknown;
 }
 /**
@@ -34295,6 +34435,8 @@ export interface Pilot1 {
    */
   pilot_gear?: PilotLoadout | null;
   level?: Level;
+  xp?: Xp;
+  salvage?: Salvage;
   skills?: SkillSet;
   triggers?: Triggers1;
   talents?: Talents;
@@ -34317,6 +34459,8 @@ export interface Pilot1 {
   size: Size;
   save_target: SaveTarget;
   attack_bonus: AttackBonus;
+  xp_to_next_level: XpToNextLevel;
+  level_progress: LevelProgress;
   [k: string]: unknown;
 }
 /**
@@ -34331,6 +34475,10 @@ export interface MechConfiguration {
   name: Name27;
   frame_id: FrameId1;
   build?: MechBuild;
+  /**
+   * Current damage state (None = full health)
+   */
+  damage_state?: MechDamageState | null;
   [k: string]: unknown;
 }
 /**
@@ -34357,6 +34505,22 @@ export interface MountedWeapon {
 export interface InstalledSystem {
   system_id: SystemId;
   sp_cost?: SpCost;
+  [k: string]: unknown;
+}
+/**
+ * Damage state for a mech between combats.
+ *
+ * Tracks current resource levels and destroyed components.
+ * Default values represent a fully healthy mech (full HP, structure, stress,
+ * no destroyed components).
+ */
+export interface MechDamageState {
+  hp_current: HpCurrent;
+  structure_current: StructureCurrent;
+  stress_current: StressCurrent;
+  destroyed_weapons?: DestroyedWeapons;
+  destroyed_systems?: DestroyedSystems;
+  is_destroyed?: IsDestroyed;
   [k: string]: unknown;
 }
 /**
@@ -36190,11 +36354,11 @@ export interface CombatStats {
  * Resource tracks for a combatant.
  */
 export interface CombatResources {
-  hp_current: HpCurrent;
+  hp_current: HpCurrent1;
   heat_current?: HeatCurrent;
   heat_cap?: HeatCap2;
-  structure_current?: StructureCurrent;
-  stress_current?: StressCurrent;
+  structure_current?: StructureCurrent1;
+  stress_current?: StressCurrent1;
   repairs_remaining?: RepairsRemaining;
   burn_marked?: BurnMarked;
   [k: string]: unknown;
@@ -36256,6 +36420,11 @@ export interface CombatantState {
   piloting_mech_id?: PilotingMechId;
   mounted_pilot_id?: MountedPilotId;
   eject_used?: EjectUsed;
+  /**
+   * Current flying status (altitude, hover mode, etc.)
+   */
+  flying_status?: FlyingStatus | null;
+  falling_from_altitude?: FallingFromAltitude;
   [k: string]: unknown;
 }
 /**
@@ -36493,6 +36662,23 @@ export interface EffectData1 {
   [k: string]: unknown;
 }
 /**
+ * State tracking for flying status effects.
+ *
+ * Tracks whether a character is flying, current altitude level, and hover mode.
+ * The caller is responsible for:
+ * - Setting is_flying when character takes off
+ * - Tracking current altitude_level (0 = ground, 1+ = elevated)
+ * - Handling hover mode for units that can hover
+ * - Clearing flying status on landing
+ */
+export interface FlyingStatus {
+  is_flying?: IsFlying;
+  altitude_level?: AltitudeLevel;
+  is_hover?: IsHover;
+  movement_mode?: MovementMode;
+  [k: string]: unknown;
+}
+/**
  * Link between grappling combatants.
  */
 export interface GrappleLink {
@@ -36565,7 +36751,7 @@ export interface ActionLogEffect {
 export interface CombatTurn {
   actor_id: ActorId;
   move_used?: MoveUsed;
-  movement_mode?: MovementMode;
+  movement_mode?: MovementMode1;
   movement_path?: MovementPath;
   actions?: Actions1;
   has_moved_or_acted?: HasMovedOrActed;
@@ -36633,7 +36819,7 @@ export interface DeployableState {
   armor?: Armor5;
   evasion?: Evasion7;
   cover?: Cover6;
-  is_destroyed?: IsDestroyed;
+  is_destroyed?: IsDestroyed1;
   is_active?: IsActive1;
   can_act?: CanAct;
   can_move?: CanMove;
@@ -36889,6 +37075,9 @@ export interface OverheatResolution {
 export interface ResolutionSettings {
   forced_rolls?: ForcedRolls;
   forced_system_trauma_roll?: ForcedSystemTraumaRoll;
+  forced_roll?: ForcedRoll;
+  forced_accuracy_rolls?: ForcedAccuracyRolls;
+  forced_difficulty_rolls?: ForcedDifficultyRolls;
   [k: string]: unknown;
 }
 /**
@@ -36929,6 +37118,8 @@ export interface ActionExecutionInput {
   deploy_kind?: DeployKind;
   deploy_name?: DeployName;
   mine_type?: MineType;
+  target_mount_id?: TargetMountId;
+  target_deployable_id?: TargetDeployableId;
   [k: string]: unknown;
 }
 /**
@@ -36994,6 +37185,7 @@ export interface StatusesApplied {
     | "engaged"
     | "burn"
     | "unshackled"
+    | "falling"
   )[];
 }
 /**
@@ -37054,6 +37246,12 @@ export interface TurnStartResult {
   dangerous_terrain_auto_resolved?: DangerousTerrainAutoResolved;
   dangerous_terrain_check_passed?: DangerousTerrainCheckPassed;
   dangerous_terrain_damage?: DangerousTerrainDamage1;
+  started_falling?: StartedFalling;
+  falling_from_altitude?: FallingFromAltitude1;
+  same_size_grapple_check?: SameSizeGrappleCheck;
+  grapple_broke_on_turn_start?: GrappleBrokeOnTurnStart;
+  grapple_contest_roll?: GrappleContestRoll;
+  grapple_contest_opponent_id?: GrappleContestOpponentId;
   [k: string]: unknown;
 }
 /**
@@ -37082,6 +37280,9 @@ export interface TurnEndResult {
    */
   burn_tick_result?: BurnTickResult | null;
   drones_primed?: DronesPrimed;
+  fall_resolved?: FallResolved;
+  fall_damage?: FallDamage;
+  fell_from_altitude?: FellFromAltitude;
   [k: string]: unknown;
 }
 /**
@@ -37419,7 +37620,7 @@ export interface DestructibleTerrainState {
   armor?: Armor7;
   evasion?: Evasion9;
   material?: Material;
-  is_destroyed?: IsDestroyed1;
+  is_destroyed?: IsDestroyed2;
   provides_soft_cover?: ProvidesSoftCover8;
   provides_hard_cover?: ProvidesHardCover7;
   hard_cover_size?: HardCoverSize7;

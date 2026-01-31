@@ -26,6 +26,7 @@ export interface UseSpeechRecognitionOptions {
   language?: string
   continuous?: boolean
   interimResults?: boolean
+  enabled?: boolean
 }
 
 export interface UseSpeechRecognitionReturn {
@@ -55,6 +56,7 @@ export function useSpeechRecognition(
     language = 'en-US',
     continuous = false,
     interimResults = true,
+    enabled = true,
   } = options
   
   const { settings } = useSettings()
@@ -77,6 +79,15 @@ export function useSpeechRecognition(
   
   // Initialize SpeechRecognition instance
   useEffect(() => {
+    if (!enabled) {
+      // If disabled, clear any existing recognition instance
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+        recognitionRef.current = null
+      }
+      return
+    }
+    
     if (!recognitionSupported) {
       setError('Speech recognition is not supported in this browser.')
       return
@@ -131,19 +142,40 @@ export function useSpeechRecognition(
         recognitionRef.current.stop()
       }
     }
-  }, [recognitionSupported, currentLanguage, continuous, interimResults])
+  }, [enabled, recognitionSupported, currentLanguage, continuous, interimResults])
   
   // Update language when recognition instance changes
   useEffect(() => {
-    if (recognitionRef.current) {
+    if (recognitionRef.current && enabled) {
       recognitionRef.current.lang = currentLanguage
     }
-  }, [currentLanguage])
-  
+  }, [currentLanguage, enabled])
+
+  // Define control functions before the useEffect that uses them
+  const startListening = useCallback(() => {
+    if (!recognitionRef.current || isListening) return
+
+    try {
+      recognitionRef.current.start()
+    } catch (err) {
+      setError(`Failed to start listening: ${err}`)
+    }
+  }, [isListening])
+
+  const stopListening = useCallback(() => {
+    if (!recognitionRef.current || !isListening) return
+
+    try {
+      recognitionRef.current.stop()
+    } catch (err) {
+      setError(`Failed to stop listening: ${err}`)
+    }
+  }, [isListening])
+
   // Push-to-talk spacebar handler
   useEffect(() => {
-    if (!settings.enableVoiceInput) return
-    
+    if (!settings.enableVoiceInput || !enabled) return
+
     const handleKeyDown = (event: KeyboardEvent) => {
       // Only activate spacebar when not in an input element
       if (event.code === 'Space' && !isInputElement(event.target)) {
@@ -153,7 +185,7 @@ export function useSpeechRecognition(
         }
       }
     }
-    
+
     const handleKeyUp = (event: KeyboardEvent) => {
       if (event.code === 'Space' && !isInputElement(event.target)) {
         if (isListening && recognitionRef.current) {
@@ -161,35 +193,15 @@ export function useSpeechRecognition(
         }
       }
     }
-    
+
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [settings.enableVoiceInput, isListening, startListening, stopListening])
-  
-  const startListening = useCallback(() => {
-    if (!recognitionRef.current || isListening) return
-    
-    try {
-      recognitionRef.current.start()
-    } catch (err) {
-      setError(`Failed to start listening: ${err}`)
-    }
-  }, [isListening])
-  
-  const stopListening = useCallback(() => {
-    if (!recognitionRef.current || !isListening) return
-    
-    try {
-      recognitionRef.current.stop()
-    } catch (err) {
-      setError(`Failed to stop listening: ${err}`)
-    }
-  }, [isListening])
+  }, [settings.enableVoiceInput, enabled, isListening, startListening, stopListening])
   
   const toggleListening = useCallback(() => {
     if (isListening) {

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "database-reader": {
+      "command": "/Users/andrew/Code/mcp-prototype/myenv/bin/python3",
+      "args": ["/Users/andrew/Code/mcp-prototype/database_read.py"],
+      "env": {
+        "PYTHONPATH": "/Users/andrew/Code/trpg-llm-playground",
+        "PYTHONUNBUFFERED": "1",
+        "MCP_SERVER_MODE": "stdio",
+        "DATABASE_TARGET_ENV": "local",
+        "DATABASE_URL_LOCAL": "postgresql://lancer:lancer@localhost:5433/lancer",
+        "DATABASE_URL_STAGING": "",
+        "DATABASE_URL_PRODUCTION": ""
+      }
+    }
+  }
+}

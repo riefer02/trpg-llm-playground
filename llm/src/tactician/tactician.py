@@ -39,6 +39,7 @@ class TacticianConfig:
         fallback_to_random: bool = True,
         enable_logging: bool = True,
         role: Optional[str] = None,
+        difficulty: float = 0.5,
         **backend_kwargs,
     ):
         self.backend = backend
@@ -47,6 +48,7 @@ class TacticianConfig:
         self.fallback_to_random = fallback_to_random
         self.enable_logging = enable_logging
         self.role = role  # NPC role: striker, defender, artillery, controller
+        self.difficulty = max(0.0, min(1.0, difficulty))  # clamp 0-1
         self.backend_kwargs = backend_kwargs
 
 
@@ -198,9 +200,11 @@ class Tactician:
 
         # Build prompt (with role if specified)
         if self.config.role:
-            prompt = build_tactical_prompt_with_role(combat_state, self.config.role)
+            prompt = build_tactical_prompt_with_role(
+                combat_state, self.config.role, self.config.difficulty
+            )
         else:
-            prompt = build_tactical_prompt(combat_state)
+            prompt = build_tactical_prompt(combat_state, self.config.difficulty)
 
         # Retry loop
         last_error = None

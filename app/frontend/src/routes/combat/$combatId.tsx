@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
@@ -117,6 +117,26 @@ function CombatSessionPage() {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  // Extract scenario data early so it can be used in subsequent hooks
+  const scenario = data?.scenario;
+  const rounds = scenario?.rounds ?? [];
+  const currentRound = data?.current_round ?? 1;
+  const currentTurnIndex = data?.current_turn_index ?? 0;
+  const combatants = scenario?.combatants ?? [];
+
+  // Determine current actor from turn order (needed for voice hooks)
+  const currentActor = useMemo(() => {
+    if (!scenario) return null;
+    // Find combatant based on turn order in the current round
+    const round = scenario.rounds?.[currentRound - 1];
+    const turn = round?.turns?.[currentTurnIndex];
+    if (turn?.actor_id) {
+      return combatants.find((c) => c.id === turn.actor_id) ?? null;
+    }
+    // Fall back to first combatant if no turn data
+    return combatants[0] ?? null;
+  }, [scenario, currentRound, currentTurnIndex, combatants]);
+
   // Voice transcript parsing
   const lastParsedTranscriptRef = useRef('');
   useEffect(() => {
@@ -179,6 +199,9 @@ function CombatSessionPage() {
     }
   }, [showVoiceConfirmation, speechRecognition.transcript, speechRecognition.isListening, parsedAction, executeAction]);
 
+  // Weapons data (needed for voice confirmation mapping)
+  const weaponsQuery = useWeapons();
+
   // Mapping functions for friendly names in voice confirmation dialog
   const getCombatantName = useCallback((id: string): string => {
     if (!data?.scenario?.combatants) return id;
@@ -219,7 +242,6 @@ function CombatSessionPage() {
   const { data: availableActions } = useAvailableActions(combatId, {
     enabled: turnActive,
   });
-  const weaponsQuery = useWeapons();
 
   // Canvas interaction state
   const [hovered, setHovered] = useState<HexCoord | null>(null);
@@ -274,25 +296,6 @@ function CombatSessionPage() {
     target: HoverTarget;
     position: { x: number; y: number };
   } | null>(null);
-
-  const scenario = data?.scenario;
-  const rounds = scenario?.rounds ?? [];
-  const currentRound = data?.current_round ?? 1;
-  const currentTurnIndex = data?.current_turn_index ?? 0;
-  const combatants = scenario?.combatants ?? [];
-
-  // Determine current actor from turn order
-  const currentActor = useMemo(() => {
-    if (!scenario) return null;
-    // Find combatant based on turn order in the current round
-    const round = scenario.rounds?.[currentRound - 1];
-    const turn = round?.turns?.[currentTurnIndex];
-    if (turn?.actor_id) {
-      return combatants.find((c) => c.id === turn.actor_id) ?? null;
-    }
-    // Fall back to first combatant if no turn data
-    return combatants[0] ?? null;
-  }, [scenario, currentRound, currentTurnIndex, combatants]);
 
   // Get player combatants for reaction polling (when not our turn)
   const playerCombatants = useMemo(
@@ -534,6 +537,8 @@ function CombatSessionPage() {
             const enemyCount = scenario?.combatants?.filter(c => c.side !== "players").length || 0;
             const damageDealt = enemyCount * 300; // placeholder
             const damageReceived = 1200; // placeholder
+            const xpEarned = result.xp_awarded ?? 0;
+            const salvageEarned = result.salvage_awarded ?? 0;
             
             navigate({
               to: "/missions/$missionId/debrief",
@@ -543,6 +548,8 @@ function CombatSessionPage() {
                 turns: turnsTaken,
                 damageDealt,
                 damageReceived,
+                xp: xpEarned,
+                salvage: salvageEarned,
               },
             });
           } else if (result.campaign_id) {

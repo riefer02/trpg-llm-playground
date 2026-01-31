@@ -31,6 +31,9 @@ from core.mech.combat_state import (
     CombatTurn,
     CombatRound,
     CombatEnvironment,
+    MechInventory,
+    WeaponMountState,
+    WeaponState,
 )
 
 # Import mission objectives for salvage calculation
@@ -360,23 +363,69 @@ def _session_to_list_item(session_db: CombatSessionDB) -> CombatSessionListItem:
 def _build_demo_player_squad() -> list[CombatantState]:
     """Build 4 LL0 pilots with GMS Everest mechs for demo combat.
 
-    Squad composition:
-    - VANGUARD: Melee focus
-    - SENTINEL: Ranged focus
-    - WARDEN: Support/tank
-    - GHOST: Tech/mobility
+    Squad composition with GMS weapons (GMS Everest has HEAVY, MAIN, FLEXIBLE mounts):
+    - VANGUARD: Melee focus (Heavy Melee, Tactical Knife x2)
+    - SENTINEL: Ranged focus (Anti-Material Rifle, Assault Rifle)
+    - WARDEN: Support/tank (Assault Rifle, Tactical Knife)
+    - GHOST: Tech/mobility (Hand Cannon x2, Tactical Knife)
     """
     players = []
     positions = [(0, -3), (-2, -2), (2, -2), (0, -1)]  # Back row deployment
-    pilot_configs = [
-        ("VANGUARD", "Alpha"),
-        ("SENTINEL", "Bravo"),
-        ("WARDEN", "Charlie"),
-        ("GHOST", "Delta"),
+
+    # Each config: (callsign, name, weapon_loadout)
+    # GMS Everest mounts: 0=Heavy, 1=Main, 2=Flexible (Main/Aux)
+    pilot_configs: list[tuple[str, str, list[tuple[int, str]]]] = [
+        (
+            "VANGUARD",
+            "Alpha",
+            [
+                (0, "heavy_melee_weapon"),  # Heavy mount
+                (2, "tactical_knife"),  # Flexible mount
+                (2, "tactical_knife"),  # Flexible mount (second aux slot)
+            ],
+        ),
+        (
+            "SENTINEL",
+            "Bravo",
+            [
+                (0, "anti_material_rifle"),  # Heavy mount
+                (1, "assault_rifle"),  # Main mount
+            ],
+        ),
+        (
+            "WARDEN",
+            "Charlie",
+            [
+                (1, "assault_rifle"),  # Main mount
+                (2, "tactical_knife"),  # Flexible mount
+            ],
+        ),
+        (
+            "GHOST",
+            "Delta",
+            [
+                (2, "hand_cannon"),  # Flexible mount
+                (2, "hand_cannon"),  # Flexible mount (second slot)
+            ],
+        ),
     ]
 
-    for idx, (callsign, name) in enumerate(pilot_configs):
+    for idx, (callsign, name, weapon_loadout) in enumerate(pilot_configs):
         q, r = positions[idx]
+
+        # Build weapon inventory from loadout
+        mount_weapons: dict[int, list[WeaponState]] = {}
+        for mount_idx, weapon_id in weapon_loadout:
+            if mount_idx not in mount_weapons:
+                mount_weapons[mount_idx] = []
+            mount_weapons[mount_idx].append(WeaponState(weapon_id=weapon_id))
+
+        mounts = [
+            WeaponMountState(mount_index=mount_idx, weapons=weapons)
+            for mount_idx, weapons in sorted(mount_weapons.items())
+        ]
+        inventory = MechInventory(mounts=mounts)
+
         combatant = CombatantState(
             id=f"demo_player_{idx + 1}",
             name=f"{callsign}'s Everest",
@@ -402,6 +451,7 @@ def _build_demo_player_squad() -> list[CombatantState]:
                 repairs_remaining=4,
             ),
             position=HexPosition(coord=HexCoord(q=q, r=r), elevation=0),
+            inventory=inventory,
         )
         players.append(combatant)
 
@@ -444,7 +494,16 @@ def _build_demo_enemy_squad(scenario_type: DemoScenarioType) -> list[CombatantSt
 
 
 def _make_grunt(id: str, q: int, r: int) -> CombatantState:
-    """Create a GMS Grunt T1 NPC."""
+    """Create a GMS Grunt T1 NPC with assault rifle."""
+    # Grunt loadout: Assault Rifle (standard infantry weapon)
+    inventory = MechInventory(
+        mounts=[
+            WeaponMountState(
+                mount_index=0,
+                weapons=[WeaponState(weapon_id="assault_rifle")],
+            ),
+        ]
+    )
     return CombatantState(
         id=f"demo_{id}",
         name=f"GMS Grunt ({id.replace('_', ' ').title()})",
@@ -471,11 +530,25 @@ def _make_grunt(id: str, q: int, r: int) -> CombatantState:
         position=HexPosition(coord=HexCoord(q=q, r=r), elevation=0),
         ai_controlled=True,
         npc_role="striker",  # Grunts are aggressive
+        inventory=inventory,
     )
 
 
 def _make_elite(id: str, q: int, r: int) -> CombatantState:
-    """Create a GMS Elite T2 NPC."""
+    """Create a GMS Elite T2 NPC with assault rifle and heavy hammer."""
+    # Elite loadout: Assault Rifle + Heavy Kinetic Hammer
+    inventory = MechInventory(
+        mounts=[
+            WeaponMountState(
+                mount_index=0,
+                weapons=[WeaponState(weapon_id="assault_rifle")],
+            ),
+            WeaponMountState(
+                mount_index=1,
+                weapons=[WeaponState(weapon_id="heavy_melee_weapon")],
+            ),
+        ]
+    )
     return CombatantState(
         id=f"demo_{id}",
         name=f"GMS Elite ({id.replace('_', ' ').title()})",
@@ -502,11 +575,29 @@ def _make_elite(id: str, q: int, r: int) -> CombatantState:
         position=HexPosition(coord=HexCoord(q=q, r=r), elevation=0),
         ai_controlled=True,
         npc_role="defender",  # Elites hold ground
+        inventory=inventory,
     )
 
 
 def _make_boss(id: str, q: int, r: int) -> CombatantState:
-    """Create an IPS-N Boss T3 NPC."""
+    """Create an IPS-N Boss T3 NPC with heavy weapons."""
+    # Boss loadout: Anti-Material Rifle + Heavy Melee Weapon + Assault Rifle
+    inventory = MechInventory(
+        mounts=[
+            WeaponMountState(
+                mount_index=0,
+                weapons=[WeaponState(weapon_id="anti_material_rifle")],
+            ),
+            WeaponMountState(
+                mount_index=1,
+                weapons=[WeaponState(weapon_id="heavy_melee_weapon")],
+            ),
+            WeaponMountState(
+                mount_index=2,
+                weapons=[WeaponState(weapon_id="assault_rifle")],
+            ),
+        ]
+    )
     return CombatantState(
         id=f"demo_{id}",
         name="IPS-N Commander",
@@ -533,6 +624,7 @@ def _make_boss(id: str, q: int, r: int) -> CombatantState:
         position=HexPosition(coord=HexCoord(q=q, r=r), elevation=0),
         ai_controlled=True,
         npc_role="striker",  # Bosses deal damage
+        inventory=inventory,
     )
 
 

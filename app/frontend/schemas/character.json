@@ -17889,6 +17889,18 @@
         "build": {
           "$ref": "#/$defs/MechBuild",
           "description": "Weapon and system loadout"
+        },
+        "damage_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MechDamageState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Current damage state (None = full health)"
         }
       },
       "required": [
@@ -17897,6 +17909,59 @@
         "frame_id"
       ],
       "title": "MechConfiguration",
+      "type": "object"
+    },
+    "MechDamageState": {
+      "description": "Damage state for a mech between combats.\n\nTracks current resource levels and destroyed components.\nDefault values represent a fully healthy mech (full HP, structure, stress,\nno destroyed components).",
+      "properties": {
+        "hp_current": {
+          "description": "Current HP",
+          "minimum": 0,
+          "title": "Hp Current",
+          "type": "integer"
+        },
+        "structure_current": {
+          "description": "Current structure (0-4)",
+          "maximum": 4,
+          "minimum": 0,
+          "title": "Structure Current",
+          "type": "integer"
+        },
+        "stress_current": {
+          "description": "Current reactor stress",
+          "minimum": 0,
+          "title": "Stress Current",
+          "type": "integer"
+        },
+        "destroyed_weapons": {
+          "description": "Weapon IDs that are destroyed and need repair",
+          "items": {
+            "type": "string"
+          },
+          "title": "Destroyed Weapons",
+          "type": "array"
+        },
+        "destroyed_systems": {
+          "description": "System IDs that are destroyed and need repair",
+          "items": {
+            "type": "string"
+          },
+          "title": "Destroyed Systems",
+          "type": "array"
+        },
+        "is_destroyed": {
+          "default": false,
+          "description": "Whether the mech is completely destroyed (wreck)",
+          "title": "Is Destroyed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "hp_current",
+        "structure_current",
+        "stress_current"
+      ],
+      "title": "MechDamageState",
       "type": "object"
     },
     "MechDerivedStats": {
@@ -20124,7 +20189,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -20164,7 +20230,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -20194,7 +20261,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -22219,7 +22287,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -23269,7 +23338,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -24611,6 +24681,20 @@
           "title": "Level",
           "type": "integer"
         },
+        "xp": {
+          "default": 0,
+          "description": "Experience points earned",
+          "minimum": 0,
+          "title": "Xp",
+          "type": "integer"
+        },
+        "salvage": {
+          "default": 0,
+          "description": "Salvage currency earned from missions",
+          "minimum": 0,
+          "title": "Salvage",
+          "type": "integer"
+        },
         "skills": {
           "$ref": "#/$defs/SkillSet"
         },
@@ -24739,6 +24823,18 @@
           "readOnly": true,
           "title": "Attack Bonus",
           "type": "integer"
+        },
+        "xp_to_next_level": {
+          "description": "XP needed to reach next level.",
+          "readOnly": true,
+          "title": "Xp To Next Level",
+          "type": "integer"
+        },
+        "level_progress": {
+          "description": "Progress to next level as fraction (0.0 to 1.0).",
+          "readOnly": true,
+          "title": "Level Progress",
+          "type": "number"
         }
       },
       "required": [
@@ -24751,7 +24847,9 @@
         "speed",
         "size",
         "save_target",
-        "attack_bonus"
+        "attack_bonus",
+        "xp_to_next_level",
+        "level_progress"
       ],
       "title": "Pilot",
       "type": "object"
@@ -30694,7 +30792,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -31016,7 +31115,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -31332,7 +31432,8 @@
                 "exposed",
                 "engaged",
                 "burn",
-                "unshackled"
+                "unshackled",
+                "falling"
               ],
               "type": "string"
             },
@@ -31394,7 +31495,8 @@
                 "exposed",
                 "engaged",
                 "burn",
-                "unshackled"
+                "unshackled",
+                "falling"
               ],
               "type": "string"
             },
@@ -31778,7 +31880,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -32096,7 +32199,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -32397,7 +32501,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -32868,7 +32973,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -33635,7 +33741,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },

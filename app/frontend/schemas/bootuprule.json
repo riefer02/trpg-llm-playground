@@ -19,7 +19,8 @@
         "exposed",
         "engaged",
         "burn",
-        "unshackled"
+        "unshackled",
+        "falling"
       ],
       "title": "Clears Status",
       "type": "string"

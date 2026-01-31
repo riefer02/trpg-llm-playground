@@ -329,173 +329,186 @@ export function ActionBar({
   return (
     <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
       <div className="flex justify-center pb-4">
-        <div className="pointer-events-auto bg-background/95 backdrop-blur-sm border border-border rounded-xl shadow-xl px-4 py-3 flex items-center gap-6">
-          {/* Economy Display */}
-          <EconomyDisplay
-            economy={economy}
-            canOvercharge={canOvercharge}
-            overchargeLevel={overchargeLevel}
-          />
+        <div className="pointer-events-auto bg-background/95 backdrop-blur-sm border border-border rounded-xl shadow-xl px-4 py-3 flex flex-col gap-3">
+          {/* Top Row: Economy + Full + Quick Actions */}
+          <div className="flex items-center justify-center gap-6">
+            {/* Economy Display */}
+            <EconomyDisplay
+              economy={economy}
+              canOvercharge={canOvercharge}
+              overchargeLevel={overchargeLevel}
+            />
 
-          {/* Divider */}
-          <div className="w-px h-10 bg-border" />
-
-          {/* Full Actions */}
-          {fullActions.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-blue-400 uppercase font-medium">Full</span>
-              <div className="flex gap-1.5">
-                {fullActions.map((action) => (
-                  <ActionButton
-                    key={action.action_id}
-                    action={action}
-                    disabled={getDisabledState(action)}
-                    onClick={() => onActionSelect(action)}
-                    shortcutKey={getNextShortcut()}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Quick Actions */}
-          {quickActions.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-green-400 uppercase font-medium">Quick</span>
-              <div className="flex gap-1.5">
-                {quickActions.map((action) => (
-                  <ActionButton
-                    key={action.action_id}
-                    action={action}
-                    disabled={getDisabledState(action)}
-                    onClick={() => onActionSelect(action)}
-                    shortcutKey={getNextShortcut()}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Free Actions */}
-          {freeActions.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground uppercase font-medium">Free</span>
-              <div className="flex gap-1.5">
-                {freeActions.map((action) => (
-                  <ActionButton
-                    key={action.action_id}
-                    action={action}
-                    disabled={getDisabledState(action)}
-                    onClick={() => onActionSelect(action)}
-                    shortcutKey={getNextShortcut()}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Protocols */}
-          {protocols.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-purple-400 uppercase font-medium">Protocol</span>
-              <div className="flex gap-1.5">
-                {protocols.map((action) => (
-                  <ActionButton
-                    key={action.action_id}
-                    action={action}
-                    disabled={getDisabledState(action)}
-                    onClick={() => onActionSelect(action)}
-                    shortcutKey={getNextShortcut()}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Overcharge Button */}
-          {canOvercharge && !economy.overcharge_used && (
-            <>
+            {/* Divider */}
+            {(fullActions.length > 0 || quickActions.length > 0) && (
               <div className="w-px h-10 bg-border" />
-              <div className="group relative">
-                <button
-                  type="button"
-                  onClick={onOvercharge}
-                  disabled={isExecuting}
-                  className={`
-                    relative w-12 h-12 rounded-lg border-2 border-amber-500 transition-all
-                    flex items-center justify-center
-                    bg-amber-500/10 hover:bg-amber-500/30 hover:border-amber-400
-                    cursor-pointer shadow-md hover:shadow-lg hover:scale-105
-                    ${isExecuting ? "opacity-40 cursor-not-allowed" : ""}
-                  `}
-                  aria-label="Overcharge"
-                >
-                  <Flame className="w-6 h-6 text-amber-500" />
-                </button>
-                {/* Tooltip */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 pointer-events-none z-50">
-                  <div className="bg-popover border border-border rounded-md shadow-lg px-3 py-2 min-w-[160px]">
-                    <div className="font-medium text-sm text-amber-500">Overcharge</div>
-                    <div className="text-xs text-muted-foreground">
-                      +1 Quick action, generates heat
-                    </div>
-                    <div className="text-xs text-amber-400/70 mt-1">
-                      Level {overchargeLevel + 1} heat
-                    </div>
-                  </div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
-                    <div className="w-2 h-2 bg-popover border-r border-b border-border rotate-45" />
-                  </div>
+            )}
+
+            {/* Full Actions */}
+            {fullActions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-blue-400 uppercase font-medium">Full</span>
+                <div className="flex gap-1.5">
+                  {fullActions.map((action) => (
+                    <ActionButton
+                      key={action.action_id}
+                      action={action}
+                      disabled={getDisabledState(action)}
+                      onClick={() => onActionSelect(action)}
+                      shortcutKey={getNextShortcut()}
+                    />
+                  ))}
                 </div>
               </div>
-            </>
-          )}
+            )}
 
-          {/* Voice Toggle Button */}
-          {voiceSupported && voiceEnabled && (
-            <>
-              <div className="w-px h-10 bg-border" />
-              <div className="group relative">
-                {/* Pulsing ring when listening */}
-                {isVoiceListening && (
-                  <div className="absolute inset-0 rounded-lg border-2 border-green-500 animate-ping opacity-60" />
-                )}
-                <button
-                  type="button"
-                  onClick={onVoiceToggle}
-                  disabled={isExecuting}
-                  className={`
-                    relative w-12 h-12 rounded-lg border-2 transition-all
-                    flex items-center justify-center
-                    ${isVoiceListening
-                      ? "border-green-500 bg-green-500/10 hover:bg-green-500/30 hover:border-green-400 animate-pulse"
-                      : "border-blue-500 bg-blue-500/10 hover:bg-blue-500/30 hover:border-blue-400"
-                    }
-                    cursor-pointer shadow-md hover:shadow-lg hover:scale-105
-                    ${isExecuting ? "opacity-40 cursor-not-allowed" : ""}
-                  `}
-                  aria-label="Voice control"
-                >
-                  <Mic className={`w-6 h-6 ${isVoiceListening ? "text-green-500" : "text-blue-500"}`} />
-                </button>
-                {/* Tooltip */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 pointer-events-none z-50">
-                  <div className="bg-popover border border-border rounded-md shadow-lg px-3 py-2 min-w-[160px]">
-                    <div className="font-medium text-sm">
-                      {isVoiceListening ? "Stop voice input" : "Start voice input"}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {isVoiceListening ? "Click or press space to stop" : "Click or press space to start"}
-                    </div>
-                  </div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
-                    <div className="w-2 h-2 bg-popover border-r border-b border-border rotate-45" />
-                  </div>
+            {/* Quick Actions */}
+            {quickActions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-green-400 uppercase font-medium">Quick</span>
+                <div className="flex gap-1.5">
+                  {quickActions.map((action) => (
+                    <ActionButton
+                      key={action.action_id}
+                      action={action}
+                      disabled={getDisabledState(action)}
+                      onClick={() => onActionSelect(action)}
+                      shortcutKey={getNextShortcut()}
+                    />
+                  ))}
                 </div>
               </div>
-            </>
-          )}
+            )}
+          </div>
 
+          {/* Bottom Row: Free + Protocol + Overcharge + Voice */}
+          {(freeActions.length > 0 || protocols.length > 0 || (canOvercharge && !economy.overcharge_used) || (voiceSupported && voiceEnabled)) && (
+            <div className="flex items-center justify-center gap-6">
+              {/* Free Actions */}
+              {freeActions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground uppercase font-medium">Free</span>
+                  <div className="flex gap-1.5">
+                    {freeActions.map((action) => (
+                      <ActionButton
+                        key={action.action_id}
+                        action={action}
+                        disabled={getDisabledState(action)}
+                        onClick={() => onActionSelect(action)}
+                        shortcutKey={getNextShortcut()}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Protocols */}
+              {protocols.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-purple-400 uppercase font-medium">Protocol</span>
+                  <div className="flex gap-1.5">
+                    {protocols.map((action) => (
+                      <ActionButton
+                        key={action.action_id}
+                        action={action}
+                        disabled={getDisabledState(action)}
+                        onClick={() => onActionSelect(action)}
+                        shortcutKey={getNextShortcut()}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Overcharge Button */}
+              {canOvercharge && !economy.overcharge_used && (
+                <>
+                  {(freeActions.length > 0 || protocols.length > 0) && (
+                    <div className="w-px h-10 bg-border" />
+                  )}
+                  <div className="group relative">
+                    <button
+                      type="button"
+                      onClick={onOvercharge}
+                      disabled={isExecuting}
+                      className={`
+                        relative w-12 h-12 rounded-lg border-2 border-amber-500 transition-all
+                        flex items-center justify-center
+                        bg-amber-500/10 hover:bg-amber-500/30 hover:border-amber-400
+                        cursor-pointer shadow-md hover:shadow-lg hover:scale-105
+                        ${isExecuting ? "opacity-40 cursor-not-allowed" : ""}
+                      `}
+                      aria-label="Overcharge"
+                    >
+                      <Flame className="w-6 h-6 text-amber-500" />
+                    </button>
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 pointer-events-none z-50">
+                      <div className="bg-popover border border-border rounded-md shadow-lg px-3 py-2 min-w-[160px]">
+                        <div className="font-medium text-sm text-amber-500">Overcharge</div>
+                        <div className="text-xs text-muted-foreground">
+                          +1 Quick action, generates heat
+                        </div>
+                        <div className="text-xs text-amber-400/70 mt-1">
+                          Level {overchargeLevel + 1} heat
+                        </div>
+                      </div>
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                        <div className="w-2 h-2 bg-popover border-r border-b border-border rotate-45" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Voice Toggle Button */}
+              {voiceSupported && voiceEnabled && (
+                <>
+                  {(freeActions.length > 0 || protocols.length > 0 || (canOvercharge && !economy.overcharge_used)) && (
+                    <div className="w-px h-10 bg-border" />
+                  )}
+                  <div className="group relative">
+                    {/* Pulsing ring when listening */}
+                    {isVoiceListening && (
+                      <div className="absolute inset-0 rounded-lg border-2 border-green-500 animate-ping opacity-60" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={onVoiceToggle}
+                      disabled={isExecuting}
+                      className={`
+                        relative w-12 h-12 rounded-lg border-2 transition-all
+                        flex items-center justify-center
+                        ${isVoiceListening
+                          ? "border-green-500 bg-green-500/10 hover:bg-green-500/30 hover:border-green-400 animate-pulse"
+                          : "border-blue-500 bg-blue-500/10 hover:bg-blue-500/30 hover:border-blue-400"
+                        }
+                        cursor-pointer shadow-md hover:shadow-lg hover:scale-105
+                        ${isExecuting ? "opacity-40 cursor-not-allowed" : ""}
+                      `}
+                      aria-label="Voice control"
+                    >
+                      <Mic className={`w-6 h-6 ${isVoiceListening ? "text-green-500" : "text-blue-500"}`} />
+                    </button>
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 pointer-events-none z-50">
+                      <div className="bg-popover border border-border rounded-md shadow-lg px-3 py-2 min-w-[160px]">
+                        <div className="font-medium text-sm">
+                          {isVoiceListening ? "Stop voice input" : "Start voice input"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {isVoiceListening ? "Click or press space to stop" : "Click or press space to start"}
+                        </div>
+                      </div>
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                        <div className="w-2 h-2 bg-popover border-r border-b border-border rotate-45" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

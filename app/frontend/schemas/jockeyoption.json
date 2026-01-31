@@ -28,7 +28,8 @@
           "exposed",
           "engaged",
           "burn",
-          "unshackled"
+          "unshackled",
+          "falling"
         ],
         "type": "string"
       },

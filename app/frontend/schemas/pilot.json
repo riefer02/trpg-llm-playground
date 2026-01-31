@@ -392,6 +392,20 @@
       "title": "Level",
       "type": "integer"
     },
+    "xp": {
+      "default": 0,
+      "description": "Experience points earned",
+      "minimum": 0,
+      "title": "Xp",
+      "type": "integer"
+    },
+    "salvage": {
+      "default": 0,
+      "description": "Salvage currency earned from missions",
+      "minimum": 0,
+      "title": "Salvage",
+      "type": "integer"
+    },
     "skills": {
       "$ref": "#/$defs/SkillSet"
     },
@@ -520,6 +534,18 @@
       "readOnly": true,
       "title": "Attack Bonus",
       "type": "integer"
+    },
+    "xp_to_next_level": {
+      "description": "XP needed to reach next level.",
+      "readOnly": true,
+      "title": "Xp To Next Level",
+      "type": "integer"
+    },
+    "level_progress": {
+      "description": "Progress to next level as fraction (0.0 to 1.0).",
+      "readOnly": true,
+      "title": "Level Progress",
+      "type": "number"
     }
   },
   "required": [
@@ -532,7 +558,9 @@
     "speed",
     "size",
     "save_target",
-    "attack_bonus"
+    "attack_bonus",
+    "xp_to_next_level",
+    "level_progress"
   ],
   "title": "Pilot",
   "type": "object"

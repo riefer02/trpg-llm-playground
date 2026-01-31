@@ -18,7 +18,8 @@
         "exposed",
         "engaged",
         "burn",
-        "unshackled"
+        "unshackled",
+        "falling"
       ],
       "title": "Status",
       "type": "string"

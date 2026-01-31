@@ -93,6 +93,7 @@ export interface MechConfig {
   name: string;
   frame_id: string;
   build: MechBuild;
+  damage_state: import("../types/lancer").MechDamageState | null;
 }
 
 export interface CharacterResponse {
@@ -104,23 +105,24 @@ export interface CharacterResponse {
   created_at: string;
   updated_at: string;
 
-  // Pilot data (uses generated primitives)
-  pilot_id: string;
-  callsign: string;
-  name: string;
-  level: number;
-  skills: SkillSet;
-  triggers: PilotTrigger[];
-  talents: Talent[];
-  licenses: License[];
-  core_bonuses: CoreBonus[];
-  background: Background | null;
-  pilot_gear: PilotLoadout | null;
-  notes: string;
+   // Pilot data (uses generated primitives)
+   pilot_id: string;
+   callsign: string;
+   name: string;
+   level: number;
+   skills: SkillSet;
+   triggers: PilotTrigger[];
+   talents: Talent[];
+   licenses: License[];
+   core_bonuses: CoreBonus[];
+   background: Background | null;
+   pilot_gear: PilotLoadout | null;
+   notes: string;
+   salvage: number;
 
-  // Pilot computed fields
-  grit: number;
-  pilot_hp: number;
+   // Pilot computed fields
+   grit: number;
+   pilot_hp: number;
 
   // Mech data
   mechs: MechConfig[];
@@ -310,6 +312,31 @@ export function useDeleteCharacter() {
     onSuccess: (_, id) => {
       queryClient.removeQueries({ queryKey: characterKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: characterKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Hook for spending salvage on repairs.
+ */
+export interface SalvageRepairRequest {
+  repair_type: "hp" | "structure" | "stress" | "destroyed_weapon" | "destroyed_system" | "destroyed_mech";
+  mech_id: string;
+  weapon_id?: string;
+  system_id?: string;
+}
+
+export function useSpendSalvageForRepair() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ characterId, data }: { characterId: string; data: SalvageRepairRequest }) =>
+      api.post<CharacterResponse>(`/characters/${characterId}/spend-salvage-for-repair`, data),
+    onSuccess: (updatedCharacter) => {
+      queryClient.setQueryData(
+        characterKeys.detail(updatedCharacter.id),
+        updatedCharacter
+      );
     },
   });
 }

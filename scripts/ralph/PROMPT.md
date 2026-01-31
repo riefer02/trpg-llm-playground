@@ -148,6 +148,53 @@ assert result.hit is False  # Always passes
 ### Running Tests
 Always use `make test-core`, `make test-llm`, or `make test-app`. These handle PYTHONPATH and venv correctly. Raw `pytest` commands may fail with import errors.
 
+### Database Migrations
+When adding new fields to `app/backend/db/models.py`, you MUST create a migration:
+
+1. **Check if migration needed**: Compare `models.py` to existing migrations in `app/backend/db/migrations/versions/`
+2. **Create migration file**: Revision ID must be ≤32 characters (Alembic's `alembic_version` table uses `varchar(32)`)
+3. **Run migration**: `make db-migrate` to apply
+4. **Verify**: Use the database reader MCP tools to confirm schema changes applied
+
+```python
+# Migration naming: use short IDs like "007_mission_fields" NOT "007_combat_session_mission_fields"
+revision = "007_mission_fields"  # ✅ 18 chars
+revision = "007_combat_session_mission_fields"  # ❌ 34 chars, will fail!
+```
+
+**Database Reader MCP Tools** (read-only database inspection):
+- `mcp__database-reader__health_check` - Check database connectivity
+- `mcp__database-reader__list_tables` - List all tables
+- `mcp__database-reader__get_table_schema(table_name="...")` - Get schema for a table
+- `mcp__database-reader__database_query(query="SELECT ...")` - Run read-only SQL
+
+Use these to verify migrations:
+```
+# After creating migration, verify the new column exists
+mcp__database-reader__get_table_schema(table_name="combat_sessions")
+```
+
+### React Hook Ordering
+In React components, hooks (`useCallback`, `useMemo`, `useEffect`) can only reference variables that are already defined above them. If you see "Cannot access X before initialization":
+
+```typescript
+// ❌ WRONG: useEffect references currentActor before it's defined
+useEffect(() => { doSomething(currentActor) }, [currentActor]);
+const currentActor = useMemo(() => ..., []);
+
+// ✅ RIGHT: Define before use
+const currentActor = useMemo(() => ..., []);
+useEffect(() => { doSomething(currentActor) }, [currentActor]);
+```
+
+### Runtime Validation
+Tests passing does NOT guarantee the app works. After implementing app features:
+
+1. Run `make dev` to start the app
+2. Navigate to the affected page in browser
+3. Check browser console for errors (F12 → Console)
+4. If errors appear, fix them before marking story complete
+
 ### Check Existing Patterns First
 Before writing new tests, look at existing tests in the same module for patterns. The codebase has 4000+ tests with established conventions.
 

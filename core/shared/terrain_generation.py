@@ -26,6 +26,7 @@ from pydantic import Field
 from core.shared.models import FrozenModel
 from core.shared.scenario import SitrepTemplate, SitrepZone
 from core.mech.grid import HexCoord
+from core.shared.terrain import TerrainMap
 from core.shared.terrain_primitives import (
     MaterialType,
     MaterialProperties,
@@ -54,6 +55,9 @@ __all__ = [
     "generate_zone_coords",
     "place_obstacles_around_zone",
     "generate_random_terrain",
+    "THEME_TO_TILESET",
+    "TerrainConfig",
+    "generate_terrain_config",
 ]
 
 
@@ -62,6 +66,14 @@ __all__ = [
 # =============================================================================
 
 TileSetType = Literal["urban", "industrial", "wilderness", "zero_g"]
+
+THEME_TO_TILESET: dict[str, TileSetType] = {
+    "urban": "urban",
+    "forest": "wilderness",
+    "desert": "wilderness",
+    "facility": "industrial",
+    "space station": "zero_g",
+}
 FeatureType = Literal[
     # Urban
     "building",
@@ -102,6 +114,17 @@ class TileSetConfig(FrozenModel):
     elevation_range: tuple[int, int] = Field(default=(0, 0))
     soft_cover_zones: bool = False
     special_rules: list[str] = Field(default_factory=list)
+
+
+class TerrainConfig(FrozenModel):
+    """Configuration for generated terrain with metadata."""
+
+    terrain_map: TerrainMap
+    zones: dict[str, list[HexCoord]] = Field(default_factory=dict)
+    tile_set: TileSetType
+    theme: str
+    sitrep_type: str
+    seed: int | None = None
 
 
 TILE_SETS: dict[TileSetType, TileSetConfig] = {
@@ -592,7 +615,9 @@ def _generate_tile_set_features(
     # Calculate how many features to place
     total_hexes = params.map_width * params.map_height
     available_hexes = total_hexes - len(occupied)
-    target_features = int(available_hexes * params.density * tile_set_config.cover_density)
+    target_features = int(
+        available_hexes * params.density * tile_set_config.cover_density
+    )
 
     features_placed = 0
     attempts = 0
@@ -687,7 +712,9 @@ def _generate_tile_set_features(
                     id=f"hazard_{primitive_counter[0]}",
                     name=f"{hazard_type.title()} Hazard",
                     coords=[hazard_coord],
-                    hazard_subtype=hazard_type if hazard_type in ("lava", "acid", "radiation", "electricity") else "acid",
+                    hazard_subtype=hazard_type
+                    if hazard_type in ("lava", "acid", "radiation", "electricity")
+                    else "acid",
                     damage_type="energy" if hazard_type == "electricity" else "kinetic",
                 )
                 primitives.append(hazard)
@@ -730,3 +757,52 @@ def generate_random_terrain(
     primitives.extend(random_primitives)
 
     return compose_terrain_map(primitives)
+
+
+def generate_terrain_config(
+    sitrep_type: str,
+    theme: str,
+    seed: int | None = None,
+    map_width: int = 20,
+    map_height: int = 16,
+) -> TerrainConfig:
+    """Generate terrain configuration for given SITREP type and theme.
+
+    Args:
+        sitrep_type: SITREP type (e.g., "control", "extract")
+        theme: Terrain theme (e.g., "urban", "forest", "desert", "facility", "space station")
+        seed: Optional random seed
+        map_width: Map width in hexes
+        map_height: Map height in hexes
+
+    Returns:
+        TerrainConfig with generated terrain map and metadata
+    """
+    from core.shared.scenario import SITREP_TEMPLATES
+
+    template = SITREP_TEMPLATES.get(sitrep_type)
+    if template is None:
+        raise ValueError(f"Unknown SITREP type: {sitrep_type}")
+
+    tile_set = THEME_TO_TILESET.get(theme)
+    if tile_set is None:
+        raise ValueError(f"Unknown theme: {theme}")
+
+    params = TerrainGeneratorParams(
+        map_width=map_width,
+        map_height=map_height,
+        sitrep_template=template,
+        tile_set=tile_set,
+        seed=seed,
+        density=0.3,
+    )
+
+    generated = generate_terrain_from_sitrep(template, params)
+    return TerrainConfig(
+        terrain_map=generated.terrain_map,
+        zones=generated.zones,
+        tile_set=tile_set,
+        theme=theme,
+        sitrep_type=sitrep_type,
+        seed=seed,
+    )

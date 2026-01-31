@@ -1,0 +1,51 @@
+/**
+ * Context for voice navigation to allow screens to handle specific intents.
+ */
+
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { NavigationIntent } from './navigation'
+
+type IntentHandler = (intent: NavigationIntent) => boolean // return true if handled
+
+interface VoiceNavigationContextValue {
+  currentIntent: NavigationIntent | null
+  registerHandler: (handler: IntentHandler) => () => void
+  unregisterHandler: (handler: IntentHandler) => void
+}
+
+const VoiceNavigationContext = createContext<VoiceNavigationContextValue | undefined>(undefined)
+
+interface VoiceNavigationProviderProps {
+  children: ReactNode
+  intent: NavigationIntent | null
+  onIntent?: (intent: NavigationIntent) => void
+}
+
+export function VoiceNavigationProvider({
+  children,
+  intent,
+  onIntent,
+}: VoiceNavigationProviderProps) {
+  // TODO: restore functionality
+  const value: VoiceNavigationContextValue = {
+    currentIntent: intent,
+    registerHandler: () => () => {},
+    unregisterHandler: () => {},
+  }
+  
+  const Provider = VoiceNavigationContext.Provider
+  
+  return (
+    <Provider value={value}>
+      {children}
+    </Provider>
+  )
+}
+
+export function useVoiceNavigationContext() {
+  const context = useContext(VoiceNavigationContext)
+  if (context === undefined) {
+    throw new Error('useVoiceNavigationContext must be used within a VoiceNavigationProvider')
+  }
+  return context
+}

@@ -19,6 +19,7 @@ import { Route as CharactersIndexRouteImport } from './routes/characters/index'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns/index'
 import { Route as QuartersPilotRouteImport } from './routes/quarters/pilot'
 import { Route as QuartersMechRouteImport } from './routes/quarters/mech'
+import { Route as QuartersLicensesRouteImport } from './routes/quarters/licenses'
 import { Route as PilotsNewRouteImport } from './routes/pilots/new'
 import { Route as PilotsPilotIdRouteImport } from './routes/pilots/$pilotId'
 import { Route as InvitesTokenRouteImport } from './routes/invites/$token'
@@ -78,6 +79,11 @@ const QuartersPilotRoute = QuartersPilotRouteImport.update({
 const QuartersMechRoute = QuartersMechRouteImport.update({
   id: '/quarters/mech',
   path: '/quarters/mech',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuartersLicensesRoute = QuartersLicensesRouteImport.update({
+  id: '/quarters/licenses',
+  path: '/quarters/licenses',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PilotsNewRoute = PilotsNewRouteImport.update({
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/quarters/licenses': typeof QuartersLicensesRoute
   '/quarters/mech': typeof QuartersMechRoute
   '/quarters/pilot': typeof QuartersPilotRoute
   '/campaigns': typeof CampaignsIndexRoute
@@ -166,6 +173,7 @@ export interface FileRoutesByTo {
   '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/quarters/licenses': typeof QuartersLicensesRoute
   '/quarters/mech': typeof QuartersMechRoute
   '/quarters/pilot': typeof QuartersPilotRoute
   '/campaigns': typeof CampaignsIndexRoute
@@ -189,6 +197,7 @@ export interface FileRoutesById {
   '/invites/$token': typeof InvitesTokenRoute
   '/pilots/$pilotId': typeof PilotsPilotIdRoute
   '/pilots/new': typeof PilotsNewRoute
+  '/quarters/licenses': typeof QuartersLicensesRoute
   '/quarters/mech': typeof QuartersMechRoute
   '/quarters/pilot': typeof QuartersPilotRoute
   '/campaigns/': typeof CampaignsIndexRoute
@@ -213,6 +222,7 @@ export interface FileRouteTypes {
     | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
+    | '/quarters/licenses'
     | '/quarters/mech'
     | '/quarters/pilot'
     | '/campaigns'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
+    | '/quarters/licenses'
     | '/quarters/mech'
     | '/quarters/pilot'
     | '/campaigns'
@@ -257,6 +268,7 @@ export interface FileRouteTypes {
     | '/invites/$token'
     | '/pilots/$pilotId'
     | '/pilots/new'
+    | '/quarters/licenses'
     | '/quarters/mech'
     | '/quarters/pilot'
     | '/campaigns/'
@@ -280,6 +292,7 @@ export interface RootRouteChildren {
   InvitesTokenRoute: typeof InvitesTokenRoute
   PilotsPilotIdRoute: typeof PilotsPilotIdRoute
   PilotsNewRoute: typeof PilotsNewRoute
+  QuartersLicensesRoute: typeof QuartersLicensesRoute
   QuartersMechRoute: typeof QuartersMechRoute
   QuartersPilotRoute: typeof QuartersPilotRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
@@ -362,6 +375,13 @@ declare module '@tanstack/react-router' {
       path: '/quarters/mech'
       fullPath: '/quarters/mech'
       preLoaderRoute: typeof QuartersMechRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quarters/licenses': {
+      id: '/quarters/licenses'
+      path: '/quarters/licenses'
+      fullPath: '/quarters/licenses'
+      preLoaderRoute: typeof QuartersLicensesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pilots/new': {
@@ -460,6 +480,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvitesTokenRoute: InvitesTokenRoute,
   PilotsPilotIdRoute: PilotsPilotIdRoute,
   PilotsNewRoute: PilotsNewRoute,
+  QuartersLicensesRoute: QuartersLicensesRoute,
   QuartersMechRoute: QuartersMechRoute,
   QuartersPilotRoute: QuartersPilotRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,

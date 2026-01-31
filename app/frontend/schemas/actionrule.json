@@ -85,7 +85,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -130,7 +131,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Clears Status",
           "type": "string"
@@ -160,7 +162,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Grants Status",
           "type": "string"
@@ -334,7 +337,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Grants Condition",
           "type": "string"
@@ -398,7 +402,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -481,7 +486,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Condition",
           "type": "string"
@@ -756,7 +762,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Applies Status",
           "type": "string"
@@ -850,7 +857,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -930,7 +938,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },

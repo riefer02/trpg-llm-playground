@@ -55,10 +55,11 @@ function QuartersHub() {
   // Refs for keyboard navigation
   const pilotButtonRef = useRef<HTMLButtonElement>(null);
   const mechButtonRef = useRef<HTMLButtonElement>(null);
+  const licensesButtonRef = useRef<HTMLButtonElement>(null);
   const missionsButtonRef = useRef<HTMLButtonElement>(null);
   const compendiumButtonRef = useRef<HTMLButtonElement>(null);
   const deployButtonRef = useRef<HTMLButtonElement>(null);
-  const buttonRefs = [pilotButtonRef, mechButtonRef, missionsButtonRef, compendiumButtonRef, deployButtonRef];
+  const buttonRefs = [pilotButtonRef, mechButtonRef, licensesButtonRef, missionsButtonRef, compendiumButtonRef, deployButtonRef];
 
   // Keyboard navigation with arrow keys
   useEffect(() => {
@@ -83,6 +84,7 @@ function QuartersHub() {
   // Extract pilot and mech info
   const pilotName = character?.callsign || "Unknown";
   const licenseLevel = character?.level || 0;
+  const salvage = character?.pilot?.salvage || 0;
   
   // Find active mech frame name
   let mechFrame = "No active mech";
@@ -101,6 +103,7 @@ function QuartersHub() {
   // Navigation handlers
   const handlePilot = () => navigate({ to: "/quarters/pilot" });
   const handleMech = () => navigate({ to: "/quarters/mech" });
+  const handleLicenses = () => navigate({ to: "/quarters/licenses" });
   const handleMissions = () => navigate({ to: "/missions" });
   const handleCompendium = () => navigate({ to: "/compendium" });
   const handleDeploy = () => {
@@ -128,13 +131,14 @@ function QuartersHub() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  Pilot
-                </h3>
-                <p className="text-2xl font-bold">{pilotName}</p>
-                <p className="text-sm">License Level: LL{licenseLevel}</p>
-              </div>
+               <div className="space-y-2">
+                 <h3 className="text-sm font-medium text-muted-foreground">
+                   Pilot
+                 </h3>
+                 <p className="text-2xl font-bold">{pilotName}</p>
+                 <p className="text-sm">License Level: LL{licenseLevel}</p>
+                 <p className="text-sm">Salvage: {salvage} ⚙️</p>
+               </div>
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-muted-foreground">
                   Mech
@@ -149,7 +153,7 @@ function QuartersHub() {
         </Card>
 
         {/* Navigation Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <Button
             variant="secondary"
             size="lg"
@@ -171,6 +175,17 @@ function QuartersHub() {
           >
             <span className="text-2xl mb-2">🤖</span>
             <span>Mech</span>
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={handleLicenses}
+            ref={licensesButtonRef}
+            className="h-24 flex flex-col items-center justify-center p-4"
+            aria-label="Unlock licenses"
+          >
+            <span className="text-2xl mb-2">🔓</span>
+            <span>Licenses</span>
           </Button>
           <Button
             variant="secondary"

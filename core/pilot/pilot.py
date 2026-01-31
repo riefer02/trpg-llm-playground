@@ -34,6 +34,22 @@ if TYPE_CHECKING:
     from core.pilot.down_and_out import DownAndOutResult
 
 
+def _total_xp_for_level(level: int) -> int:
+    """Return total XP required to reach given level from level 0."""
+    if level <= 0:
+        return 0
+    # sum_{i=1}^{level} i * 1000 = 1000 * level * (level + 1) / 2
+    return level * (level + 1) * 500
+
+
+def _xp_for_next_level(level: int) -> int:
+    """Return XP required to reach the next level from current level."""
+    if level < 0 or level >= LEVEL_CAP:
+        return 0
+    # XP formula: (level + 1) * 1000
+    return (level + 1) * 1000
+
+
 class Pilot(BaseModel):
     """
     A Lancer pilot character.
@@ -63,6 +79,10 @@ class Pilot(BaseModel):
     # Progression
     level: int = Field(
         default=0, ge=0, le=LEVEL_CAP, description="License Level (LL0-LL12)"
+    )
+    xp: int = Field(default=0, ge=0, description="Experience points earned")
+    salvage: int = Field(
+        default=0, ge=0, description="Salvage currency earned from missions"
     )
 
     # Skills (mech stats + pilot triggers)
@@ -182,6 +202,64 @@ class Pilot(BaseModel):
     def attack_bonus(self) -> int:
         """Base attack bonus from grit."""
         return self.grit
+
+    @computed_field
+    @property
+    def xp_to_next_level(self) -> int:
+        """XP needed to reach next level."""
+        if self.level >= LEVEL_CAP:
+            return 0
+        next_level_total = _total_xp_for_level(self.level + 1)
+        return max(0, next_level_total - self.xp)
+
+    @computed_field
+    @property
+    def level_progress(self) -> float:
+        """Progress to next level as fraction (0.0 to 1.0)."""
+        if self.level >= LEVEL_CAP:
+            return 1.0
+        next_level_total = _total_xp_for_level(self.level + 1)
+        current_level_total = _total_xp_for_level(self.level)
+        total_needed = next_level_total - current_level_total
+        if total_needed <= 0:
+            return 1.0
+        xp_in_level = self.xp - current_level_total
+        return min(1.0, max(0.0, xp_in_level / total_needed))
+
+    def add_xp(self, amount: int) -> "Pilot":
+        """Add XP to pilot, possibly leveling up."""
+        if amount <= 0:
+            return self
+        new_xp = self.xp + amount
+        # Level up loop
+        pilot = self.model_copy(update={"xp": new_xp})
+        while pilot.level < LEVEL_CAP:
+            next_level_total = _total_xp_for_level(pilot.level + 1)
+            if pilot.xp < next_level_total:
+                break
+            # Level up
+            pilot = pilot.model_copy(update={"level": pilot.level + 1})
+        return pilot
+
+    def add_salvage(self, amount: int) -> "Pilot":
+        """Add salvage currency to pilot."""
+        if amount < 0:
+            raise ValueError("Cannot add negative salvage")
+        if amount == 0:
+            return self
+        new_salvage = self.salvage + amount
+        return self.model_copy(update={"salvage": new_salvage})
+
+    def spend_salvage(self, amount: int) -> "Pilot":
+        """Spend salvage currency from pilot."""
+        if amount < 0:
+            raise ValueError("Cannot spend negative salvage")
+        if amount == 0:
+            return self
+        if self.salvage < amount:
+            raise ValueError(f"Insufficient salvage: {self.salvage} < {amount}")
+        new_salvage = self.salvage - amount
+        return self.model_copy(update={"salvage": new_salvage})
 
     # Progression Helpers
 

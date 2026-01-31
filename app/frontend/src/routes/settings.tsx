@@ -3,9 +3,106 @@
  */
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, Slider, Toggle } from "../components/ui";
 import { useSettings } from "../lib/hooks/useSettings";
+import { useSaveSlots } from "../lib/save/useSaveSlots";
+import { useActiveCharacter } from "../lib/api/quarters";
+
+function SaveLoadManager() {
+  const { slots, saveToSlot, deleteSlot, loadSlot, isLoading } = useSaveSlots();
+  const { character } = useActiveCharacter();
+  const [message, setMessage] = useState<string | null>(null);
+
+  const handleSave = (slotIndex: number) => {
+    if (!character) {
+      setMessage("No active character to save.");
+      return;
+    }
+    try {
+      saveToSlot(slotIndex, character, `Manual save ${new Date().toLocaleDateString()}`);
+      setMessage(`Saved to slot ${slotIndex + 1}`);
+    } catch (error) {
+      setMessage(`Error saving: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleLoad = (slotIndex: number) => {
+    const slot = slots.find(s => s.slot === slotIndex);
+    if (!slot) {
+      setMessage(`No save in slot ${slotIndex + 1}`);
+      return;
+    }
+    try {
+      loadSlot(slotIndex);
+      setMessage(`Loaded slot ${slotIndex + 1}: ${slot.character.callsign} is now active.`);
+    } catch (error) {
+      setMessage(`Error loading: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleDelete = (slotIndex: number) => {
+    if (confirm(`Delete save slot ${slotIndex + 1}?`)) {
+      deleteSlot(slotIndex);
+      setMessage(`Deleted slot ${slotIndex + 1}`);
+    }
+  };
+
+  const formatDate = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4">
+        {[0, 1, 2].map(slotIndex => {
+          const slot = slots.find(s => s.slot === slotIndex);
+          return (
+            <div key={slotIndex} className="border rounded-lg p-4 bg-muted/30">
+              <h3 className="font-bold text-lg mb-2">Slot {slotIndex + 1}</h3>
+              {slot ? (
+                <>
+                  <p className="text-sm text-muted-foreground">{slot.name || 'Unnamed save'}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(slot.timestamp)}</p>
+                  <p className="text-sm">Pilot: {slot.character.callsign}</p>
+                  <div className="flex flex-col gap-2 mt-4">
+                    <Button size="sm" onClick={() => handleSave(slotIndex)} disabled={isLoading}>
+                      Overwrite Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleLoad(slotIndex)}>
+                      Load
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleDelete(slotIndex)}>
+                      Delete
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground italic">Empty</p>
+                  <div className="mt-4">
+                    <Button size="sm" onClick={() => handleSave(slotIndex)} disabled={isLoading || !character}>
+                      Save
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {message && (
+        <div className="p-3 rounded bg-muted/50 text-sm">
+          {message}
+        </div>
+      )}
+      <p className="text-sm text-muted-foreground">
+        Save data is stored in your browser's local storage. Export/import coming soon.
+      </p>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/settings" as const)({
   component: SettingsScreen,
@@ -186,9 +283,19 @@ function SettingsScreen() {
                 onChange={(checked) => updateSettings({ highContrast: checked })}
                 description="Increase contrast for better visibility"
               />
-            </CardContent>
-          </Card>
-        </div>
+             </CardContent>
+           </Card>
+
+           {/* Save/Load Section */}
+           <Card className="dashboard-surface">
+             <CardHeader>
+               <CardTitle>Save/Load</CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-6">
+               <SaveLoadManager />
+             </CardContent>
+           </Card>
+         </div>
 
         {/* Keyboard navigation note */}
         <div className="text-sm text-muted-foreground pt-8 border-t border-border">

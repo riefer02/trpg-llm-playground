@@ -38,7 +38,7 @@
       "id": "E6",
       "name": "Accessibility Polish",
       "priority": "P3",
-      "description": "Canvas accessibility, screen reader support, reduced motion, keyboard shortcuts"
+      "description": "Keyboard shortcuts reference. Screen reader support deferred - voice interface provides primary accessibility; tactical hex grid UX via screen reader needs real user feedback before investing."
     },
     {
       "id": "E7",
@@ -51,6 +51,12 @@
       "name": "Game Flow Safety",
       "priority": "P4 - QoL",
       "description": "Mid-mission controls, pause functionality, auto-save, progress protection"
+    },
+    {
+      "id": "E9",
+      "name": "Visual & UX Polish",
+      "priority": "P4 - QoL",
+      "description": "Visual improvements for combat readability: enemy color schemes, terrain patterns, frame-based token shapes, contextual help, and UI layout optimization"
     }
   ],
   "userStories": [
@@ -554,63 +560,8 @@
         "`make test-app` passes"
       ],
       "priority": 27,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "E6-US-001",
-      "epic": "E6",
-      "title": "Canvas Accessibility",
-      "description": "Provide text-based alternative to hex grid canvas for screen reader users.",
-      "acceptanceCriteria": [
-        "Toggle for text grid mode in accessibility settings",
-        "Text grid shows unit positions in table format",
-        "Keyboard targeting: arrow keys to select hex, Enter to confirm",
-        "Current selection announced to screen reader",
-        "Action available at selected hex displayed",
-        "Equivalent functionality to canvas interaction",
-        "`make test-app` passes"
-      ],
-      "priority": 28,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "E6-US-002",
-      "epic": "E6",
-      "title": "Screen Reader Combat",
-      "description": "Announce turn changes, action results, and status updates to screen readers.",
-      "acceptanceCriteria": [
-        "ARIA live region for combat announcements",
-        "Turn start: 'Your turn' or 'Enemy Striker's turn'",
-        "Actions: 'Striker attacks you with rifle, 8 damage'",
-        "Status: 'You are now IMMOBILIZED'",
-        "Round changes announced",
-        "Victory/defeat announced",
-        "Works with NVDA and VoiceOver",
-        "`make test-app` passes"
-      ],
-      "priority": 29,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "E6-US-003",
-      "epic": "E6",
-      "title": "Reduced Motion Mode",
-      "description": "Disable animations and transitions for users sensitive to motion.",
-      "acceptanceCriteria": [
-        "Reduced motion toggle in accessibility settings",
-        "Respects prefers-reduced-motion media query",
-        "When enabled: instant transitions, no projectile animations",
-        "Static backgrounds (no parallax or ambient motion)",
-        "Combat still clearly indicates actions taken",
-        "Setting persists across sessions",
-        "`make test-app` passes"
-      ],
-      "priority": 30,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented auto-save after mission completion and on mission launch. Manual save option in settings screen with 3 save slots, export/import, delete confirmation. Continue button loads most recent save. All acceptance criteria satisfied."
     },
     {
       "id": "E6-US-004",
@@ -626,7 +577,7 @@
         "Shows context-specific shortcuts (different in combat vs hub)",
         "`make test-app` passes"
       ],
-      "priority": 31,
+      "priority": 28,
       "passes": false,
       "notes": ""
     },
@@ -645,7 +596,7 @@
         "Keyboard accessible: preview shown when action focused",
         "`make test-app` passes"
       ],
-      "priority": 32,
+      "priority": 29,
       "passes": false,
       "notes": ""
     },
@@ -663,7 +614,7 @@
         "Keyboard: Enter confirms, Escape cancels",
         "`make test-app` passes"
       ],
-      "priority": 33,
+      "priority": 30,
       "passes": false,
       "notes": ""
     },
@@ -681,7 +632,7 @@
         "Indicator clears when AI action begins",
         "`make test-app` passes"
       ],
-      "priority": 34,
+      "priority": 31,
       "passes": false,
       "notes": ""
     },
@@ -700,7 +651,7 @@
         "Clear visual indication of 'targeting mode' vs 'confirmed'",
         "`make test-app` passes"
       ],
-      "priority": 35,
+      "priority": 32,
       "passes": false,
       "notes": ""
     },
@@ -717,7 +668,7 @@
         "Visual distinction between 'available' and 'unavailable but visible'",
         "`make test-app` passes"
       ],
-      "priority": 36,
+      "priority": 33,
       "passes": false,
       "notes": ""
     },
@@ -735,7 +686,7 @@
         "Respects reduced motion setting",
         "`make test-app` passes"
       ],
-      "priority": 37,
+      "priority": 34,
       "passes": false,
       "notes": ""
     },
@@ -754,7 +705,7 @@
         "Can be disabled in settings",
         "`make test-app` passes"
       ],
-      "priority": 38,
+      "priority": 35,
       "passes": false,
       "notes": ""
     },
@@ -772,7 +723,7 @@
         "Keyboard shortcut: Ctrl+Q or similar",
         "`make test-app` passes"
       ],
-      "priority": 39,
+      "priority": 36,
       "passes": false,
       "notes": ""
     },
@@ -791,7 +742,7 @@
         "Help shows combat-specific keyboard shortcuts",
         "`make test-app` passes"
       ],
-      "priority": 40,
+      "priority": 37,
       "passes": false,
       "notes": ""
     },
@@ -809,7 +760,7 @@
         "Works with existing save/load system (E5-US-004)",
         "`make test-app` passes"
       ],
-      "priority": 41,
+      "priority": 38,
       "passes": false,
       "notes": ""
     },
@@ -827,7 +778,7 @@
         "Works on all browsers (beforeunload event)",
         "`make test-app` passes"
       ],
-      "priority": 42,
+      "priority": 39,
       "passes": false,
       "notes": ""
     },
@@ -845,7 +796,111 @@
         "Stats stored with mission completion record",
         "`make test-app` passes"
       ],
+      "priority": 40,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E9-US-001",
+      "epic": "E9",
+      "title": "Enemy Team Red/Crimson Color Scheme",
+      "description": "Make enemy team visually distinct with consistent red/crimson coloring across all UI elements.",
+      "acceptanceCriteria": [
+        "Enemy tokens use red/crimson color scheme (#dc2626 or similar)",
+        "Enemy names in turn order, combatant list, and action log use hostile red",
+        "Player tokens keep blue with subtle friendly glow",
+        "'Enemy Turn' banner is prominently red vs 'Your Turn' blue/green",
+        "Targeting enemies shows crimson highlighting"
+      ],
+      "priority": 41,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E9-US-002",
+      "epic": "E9",
+      "title": "Terrain SVG Patterns",
+      "description": "Render terrain tiles with visually distinct SVG patterns that convey terrain type at a glance.",
+      "acceptanceCriteria": [
+        "Forest terrain: Green pattern with tree/leaf motif",
+        "Urban terrain: Gray pattern with building/grid motif",
+        "Water terrain: Blue pattern with wave motif",
+        "Hazard terrain: Red/orange pattern with warning motif",
+        "Elevation changes have visual depth/shadow indicators",
+        "Cover positions have clear icon indicators on hex edges"
+      ],
+      "priority": 42,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E9-US-003",
+      "epic": "E9",
+      "title": "Frame-Based Token Shapes",
+      "description": "Use unique token shapes for different mech frames for quick visual identification.",
+      "acceptanceCriteria": [
+        "Each major frame type gets a distinct shape silhouette",
+        "GMS Everest: Standard circle (baseline)",
+        "IPS-N frames (Raleigh, Blackbeard, Drake): Angular/aggressive shapes",
+        "SSC frames (Metalmark, Monarch): Sleek/pointed shapes",
+        "HORUS frames (Goblin, Balor): Unusual/asymmetric shapes",
+        "HA frames (Sherman, Barbarossa): Heavy/blocky shapes",
+        "NPCs/Grunts: Simple geometric shapes (triangle, diamond)",
+        "Callsign initial or frame icon displayed inside token"
+      ],
       "priority": 43,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E9-US-004",
+      "epic": "E9",
+      "title": "Contextual Help System",
+      "description": "Provide on-demand help that explains what's happening and what the player can do.",
+      "acceptanceCriteria": [
+        "'?' help button in action bar opens quick reference overlay",
+        "Turn phase explanation: 'You can use 1 Full + 2 Quick actions'",
+        "Hover tooltips on action buttons explain what each action does",
+        "First combat shows brief tutorial overlay",
+        "Help panel shows keyboard shortcuts and voice commands",
+        "Context-sensitive tips based on game state"
+      ],
+      "priority": 44,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E9-US-005",
+      "epic": "E9",
+      "title": "Compact Combat Header",
+      "description": "Minimize header real estate to maximize focus on the game board.",
+      "acceptanceCriteria": [
+        "Header collapses to thin strip during active turn",
+        "Essential info (round, mission name) in compact format",
+        "'End Mission' moved to side panel or menu",
+        "Back navigation uses minimal icon only",
+        "Header can be hidden entirely with toggle",
+        "Full header expands on hover or when turn inactive"
+      ],
+      "priority": 45,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "E9-US-006",
+      "epic": "E9",
+      "title": "Side Panel Information Hierarchy",
+      "description": "Reorganize side panel for clearer information hierarchy and easier scanning.",
+      "acceptanceCriteria": [
+        "Current actor section is most prominent (larger, top)",
+        "HP/Heat displayed as large, easy-to-read gauges",
+        "Status conditions shown as clear badges with tooltips",
+        "Initiative order compressed into horizontal strip",
+        "Action log collapsible/expandable",
+        "Combatant list shows HP bars at a glance",
+        "Clear visual separation between sections"
+      ],
+      "priority": 46,
       "passes": false,
       "notes": ""
     }
@@ -884,7 +939,6 @@
         "E5-US-001",
         "E5-US-002",
         "E5-US-004",
-        "E6-US-001",
         "E6-US-004"
       ]
     },
@@ -909,19 +963,36 @@
         "E8-US-004",
         "E8-US-005"
       ]
+    },
+    {
+      "phase": "Phase 6 - Visual & UX Polish",
+      "stories": [
+        "E9-US-001",
+        "E9-US-002",
+        "E9-US-003",
+        "E9-US-004",
+        "E9-US-005",
+        "E9-US-006"
+      ]
     }
   ],
   "verification": [
     "Title to Combat flow: Start app, click New Pilot, complete creation, go to Missions, select one, launch, play combat, see debrief",
     "Voice combat: Enable voice, speak 'attack striker', confirm action executes",
     "AI reasoning: Watch NPC turn, see reasoning displayed before action",
-    "Accessibility: Navigate entire flow with keyboard only, verify screen reader announces turns",
+    "Accessibility: Navigate entire flow with keyboard only",
     "Tests: `make test` passes after each story",
     "Combat QoL: Hover attack to see damage preview, try to end turn with actions remaining, see AI thinking indicator",
     "Undo flow: Start targeting, press Escape, verify returns to action selection without executing",
     "Pause flow: Press Escape during combat, verify game pauses, resume works",
     "Forfeit flow: Open pause, click forfeit, confirm, verify debrief shows defeat",
     "Victory moment: Win combat, verify celebration animation and clear victory text before debrief",
-    "Low HP warning: Take damage to <25% HP, verify visual/audio warning"
+    "Low HP warning: Take damage to <25% HP, verify visual/audio warning",
+    "Enemy colors: Start combat, verify enemy tokens are red/crimson, player tokens are blue",
+    "Terrain patterns: View combat map, verify terrain tiles have distinct SVG patterns for each type",
+    "Token shapes: Check different frame types have unique token silhouettes",
+    "Help system: Press '?' in combat, verify help overlay shows action explanations and shortcuts",
+    "Compact header: During active turn, verify header collapses to minimal strip",
+    "Side panel hierarchy: Verify current actor is prominent at top with large HP/Heat gauges"
   ]
 }

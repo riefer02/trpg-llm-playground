@@ -17,8 +17,10 @@ import {
   useFrames,
   useWeapons,
   useSystems,
+  useSpendSalvageForRepair,
 } from "../../lib/api";
 import type { CharacterResponse } from "../../lib/api";
+import { Button } from "../ui/button";
 
 
 interface MechDisplayProps {
@@ -74,8 +76,108 @@ export function MechDisplay({ character }: MechDisplayProps) {
     );
   }
 
+  const { mutate: spendSalvage, isPending } = useSpendSalvageForRepair();
+
+  const handleRepair = (repairType: string, weaponId?: string, systemId?: string) => {
+    spendSalvage({
+      characterId: character.id,
+      data: {
+        repair_type: repairType,
+        mech_id: activeMech.id,
+        weapon_id: weaponId,
+        system_id: systemId,
+      },
+    }, {
+      onSuccess: () => {
+        toast({
+          title: "Repair successful",
+          description: `Spent salvage to repair ${repairType}.`,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Repair failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
+  const repairCosts = {
+    hp: 1,
+    structure: 2,
+    stress: 2,
+    destroyed_weapon: 1,
+    destroyed_system: 1,
+    destroyed_mech: 4,
+  };
+
+  // Determine if repairs are needed
+  const damageState = activeMech.damage_state;
+  const maxHp = stats?.hp ?? 0;
+  const currentHp = damageState?.hp_current ?? maxHp;
+  const currentStructure = damageState?.structure_current ?? 4;
+  const currentStress = damageState?.stress_current ?? 0;
+  const hasDestroyedWeapons = damageState?.destroyed_weapons && damageState.destroyed_weapons.length > 0;
+  const hasDestroyedSystems = damageState?.destroyed_systems && damageState.destroyed_systems.length > 0;
+  const isDestroyed = damageState?.is_destroyed ?? false;
+
   return (
     <div className="space-y-6">
+      {/* Salvage & Repairs */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Salvage & Repairs</CardTitle>
+          <CardDescription>
+            Spend salvage to repair your mech. Current salvage: {character.salvage}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              disabled={isPending || currentHp >= maxHp || character.salvage < repairCosts.hp}
+              onClick={() => handleRepair('hp')}
+            >
+              Repair HP ({repairCosts.hp} salvage)
+            </Button>
+            <Button
+              disabled={isPending || currentStructure >= 4 || character.salvage < repairCosts.structure}
+              onClick={() => handleRepair('structure')}
+            >
+              Repair Structure ({repairCosts.structure} salvage)
+            </Button>
+            <Button
+              disabled={isPending || currentStress <= 0 || character.salvage < repairCosts.stress}
+              onClick={() => handleRepair('stress')}
+            >
+              Repair Stress ({repairCosts.stress} salvage)
+            </Button>
+            <Button
+              disabled={isPending || !hasDestroyedWeapons || character.salvage < repairCosts.destroyed_weapon}
+              onClick={() => handleRepair('destroyed_weapon')}
+            >
+              Repair Destroyed Weapon ({repairCosts.destroyed_weapon} salvage)
+            </Button>
+            <Button
+              disabled={isPending || !hasDestroyedSystems || character.salvage < repairCosts.destroyed_system}
+              onClick={() => handleRepair('destroyed_system')}
+            >
+              Repair Destroyed System ({repairCosts.destroyed_system} salvage)
+            </Button>
+            <Button
+              disabled={isPending || !isDestroyed || character.salvage < repairCosts.destroyed_mech}
+              onClick={() => handleRepair('destroyed_mech')}
+            >
+              Restore Destroyed Mech ({repairCosts.destroyed_mech} salvage)
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            Repair costs match standard repair costs: 1 salvage for HP/weapon/system, 2 for structure/stress, 4 for destroyed mech.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Mech Stats */}
       <Card>
         <CardHeader>
@@ -96,9 +198,14 @@ export function MechDisplay({ character }: MechDisplayProps) {
           {stats ? (
             <>
               <div className="grid grid-cols-3 gap-4 mb-4">
-                <StatBlock label="HP" value={stats.hp} />
+                <StatBlock label="HP" value={`${currentHp}/${stats.hp}`} />
                 <StatBlock label="Armor" value={stats.armor} />
                 <StatBlock label="Size" value={stats.size.replace("size_", "")} />
+              </div>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <StatBlock label="Structure" value={`${currentStructure}/4`} />
+                <StatBlock label="Stress" value={currentStress} />
+                <StatBlock label="Status" value={isDestroyed ? "DESTROYED" : (hasDestroyedWeapons || hasDestroyedSystems ? "DAMAGED" : "OK")} />
               </div>
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <StatBlock label="Evasion" value={stats.evasion} />

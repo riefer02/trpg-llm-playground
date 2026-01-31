@@ -5,7 +5,7 @@
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "../components/ui/button";
-import { useSavedPilot } from "../lib/api/title";
+import { useContinueSave } from "../lib/save/useSaveSlots";
 import { useCreateDemoCombat } from "../lib/api";
 
 export const Route = createFileRoute("/" as const)({
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/" as const)({
 
 function TitleScreen() {
   const navigate = useNavigate();
-  const { hasSavedPilot, isLoading } = useSavedPilot();
+  const { hasSavedGame, loadMostRecent } = useContinueSave();
   const createDemo = useCreateDemoCombat();
 
   const handleNewPilot = () => {
@@ -22,7 +22,13 @@ function TitleScreen() {
   };
 
   const handleContinue = () => {
-    navigate({ to: "/quarters" });
+    const slot = loadMostRecent();
+    if (slot) {
+      navigate({ to: "/quarters" });
+    } else {
+      // Should not happen because button is disabled when no saved game
+      console.error('No saved game to load');
+    }
   };
 
   const handleQuickBattle = async () => {
@@ -67,22 +73,13 @@ function TitleScreen() {
             variant="secondary"
             size="lg"
             onClick={handleContinue}
-            disabled={!hasSavedPilot || isLoading}
+            disabled={!hasSavedGame}
             className="w-full py-6 text-lg"
-            aria-label={hasSavedPilot ? "Continue with saved pilot" : isLoading ? "Checking for saved pilot..." : "No saved pilot available"}
+            aria-label={hasSavedGame ? "Continue with saved game" : "No saved game available"}
           >
-            {isLoading ? (
-              <>
-                <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                Checking...
-              </>
-            ) : (
-              <>
-                Continue
-                {!hasSavedPilot && (
-                  <span className="ml-2 text-xs opacity-70">(No saved pilot)</span>
-                )}
-              </>
+            Continue
+            {!hasSavedGame && (
+              <span className="ml-2 text-xs opacity-70">(No saved game)</span>
             )}
           </Button>
           <Button

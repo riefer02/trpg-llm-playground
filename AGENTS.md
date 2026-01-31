@@ -344,6 +344,22 @@ export const Route = createFileRoute('/campaigns/')({
 })
 ```
 
+**React Hook Ordering (Critical)**:
+
+Hooks can only reference variables defined above them. This causes "Cannot access X before initialization" errors at runtime (tests pass, app crashes):
+
+```typescript
+// ❌ WRONG: useEffect references currentActor before it's defined
+useEffect(() => { doSomething(currentActor?.id) }, [currentActor?.id]);
+const currentActor = useMemo(() => findActor(), [deps]);
+
+// ✅ RIGHT: Define useMemo/useCallback before useEffect that uses them
+const currentActor = useMemo(() => findActor(), [deps]);
+useEffect(() => { doSomething(currentActor?.id) }, [currentActor?.id]);
+```
+
+**Runtime Validation**: Tests don't catch hook ordering bugs. After modifying React components, always load the page in a browser and check the console for errors.
+
 ### Type Bridge
 
 TypeScript types are auto-generated from Python Pydantic models:
@@ -402,6 +418,27 @@ make db-up              # Start PostgreSQL
 make db-migrate         # Apply migrations
 make db-revision MSG="description"  # Create migration
 ```
+
+**Database Reader MCP Tool**: A read-only MCP tool is available for inspecting database state:
+- `mcp__database-reader__health_check` - Check connectivity
+- `mcp__database-reader__list_tables` - List all tables
+- `mcp__database-reader__get_table_schema(table_name="...")` - Get table schema
+- `mcp__database-reader__get_all_schemas` - Get all schemas with sample data
+- `mcp__database-reader__database_query(query="SELECT ...")` - Run read-only queries
+
+Use these tools to verify migrations applied correctly and debug database issues.
+
+**Migration Gotchas**:
+
+1. **New model fields require migrations**: If you add a field to `app/backend/db/models.py`, you MUST create a migration file or the app will crash with "column does not exist"
+
+2. **Revision ID length limit**: Alembic's `alembic_version` table uses `varchar(32)`. Keep revision IDs short:
+   ```python
+   revision = "007_mission_fields"  # ✅ Good (18 chars)
+   revision = "007_combat_session_mission_fields"  # ❌ Too long (34 chars)
+   ```
+
+3. **Verify migrations work**: After creating a migration, run `make db-migrate` and then `make dev` to confirm the app starts without database errors
 
 ### Testing
 

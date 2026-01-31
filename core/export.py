@@ -271,6 +271,7 @@ from core.character import (
     Character,
     MechConfiguration,
 )
+from core.character.damage_state import MechDamageState
 from core.shared.campaign import (
     Campaign,
     Session,
@@ -366,6 +367,7 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     # Character domain (unified pilot + mech)
     "Character": Character,
     "MechConfiguration": MechConfiguration,
+    "MechDamageState": MechDamageState,
     # Campaign persistence
     "Campaign": Campaign,
     "Session": Session,

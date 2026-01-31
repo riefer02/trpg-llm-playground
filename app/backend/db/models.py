@@ -177,3 +177,5 @@ class CombatSessionDB(TimestampMixin, table=True):
 
     # Optional metadata
     notes: str = Field(default="")
+    mission_id: str | None = Field(default=None, index=True)
+    mission_difficulty: int | None = Field(default=None, ge=1, le=3)

@@ -10,6 +10,11 @@ import { ArrowLeft, Shield, Target, Users, Map } from "lucide-react";
 import { useMission } from "../../../lib/api/missions";
 import { useActiveCharacter } from "../../../lib/api/quarters";
 import { useCreateDemoCombat, DemoScenarioType } from "../../../lib/api/combat";
+import { autoSave } from "../../../lib/save/saveSystem";
+import { useVoiceNavigationContext } from "../../../lib/voice/VoiceNavigationContext";
+import { useTextToSpeech } from "../../../lib/voice/text-to-speech";
+import { useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 
 export const Route = createFileRoute("/missions/$missionId/briefing" as const)({
   component: MissionBriefing,
@@ -23,10 +28,15 @@ function MissionBriefing() {
   const createDemo = useCreateDemoCombat();
 
   const handleBack = () => navigate({ to: "/missions" });
-  const handleLaunch = async () => {
+  const handleLaunch = useCallback(async () => {
     if (!mission) return;
-    
-    // Map SITREP to demo scenario type
+     
+    // Auto-save before mission launch
+    if (character) {
+      autoSave(character);
+    }
+
+     // Map SITREP to demo scenario type
     const sitrepToScenario: Record<string, DemoScenarioType> = {
       control: "control",
       extract: "skirmish",
@@ -39,15 +49,50 @@ function MissionBriefing() {
     const scenarioType = sitrepToScenario[mission.sitrep] || "skirmish";
     
     try {
-      const session = await createDemo.mutateAsync(scenarioType);
+      const session = await createDemo.mutateAsync({
+        scenarioType,
+        missionId: mission.id,
+        missionDifficulty: mission.difficulty,
+      });
       navigate({ to: `/combat/${session.id}`, search: { missionId: mission.id } });
     } catch (error) {
       console.error("Failed to launch mission:", error);
       alert(`Failed to launch mission: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
-  };
+  }, [mission, createDemo, navigate, character]);
 
   const handleViewLoadout = () => navigate({ to: "/quarters/mech" });
+
+  // Voice navigation handling for briefing screen
+  const { registerHandler } = useVoiceNavigationContext()
+  const { speak } = useTextToSpeech()
+  
+  useEffect(() => {
+    const handler = (intent) => {
+      switch (intent.type) {
+        case 'launch':
+          toast.info(`Launching mission via voice command`, {
+            description: `Voice command: "${intent.rawCommand}"`,
+          })
+          handleLaunch()
+          return true
+        case 'read_briefing':
+          toast.info(`Reading briefing via voice command`, {
+            description: `Voice command: "${intent.rawCommand}"`,
+          })
+          // Speak the briefing text
+          if (mission) {
+            speak(mission.briefing, { priority: 'normal' })
+          }
+          return true
+        default:
+          return false
+      }
+    }
+    
+    const unregister = registerHandler(handler)
+    return unregister
+  }, [registerHandler, speak, mission, handleLaunch])
 
   if (isLoading) {
     return (

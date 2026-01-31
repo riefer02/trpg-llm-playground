@@ -152,6 +152,31 @@
       },
       "title": "Drones Primed",
       "type": "array"
+    },
+    "fall_resolved": {
+      "default": false,
+      "description": "Whether a fall was resolved this turn",
+      "title": "Fall Resolved",
+      "type": "boolean"
+    },
+    "fall_damage": {
+      "default": 0,
+      "description": "Damage taken from fall (1 per altitude level, armor-piercing)",
+      "title": "Fall Damage",
+      "type": "integer"
+    },
+    "fell_from_altitude": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Altitude level the actor fell from",
+      "title": "Fell From Altitude"
     }
   },
   "required": [

@@ -29,6 +29,53 @@
       ],
       "default": null,
       "title": "Forced System Trauma Roll"
+    },
+    "forced_roll": {
+      "anyOf": [
+        {
+          "maximum": 20,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Forced d20 roll for attack resolution",
+      "title": "Forced Roll"
+    },
+    "forced_accuracy_rolls": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Forced accuracy d6 rolls",
+      "title": "Forced Accuracy Rolls"
+    },
+    "forced_difficulty_rolls": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Forced difficulty d6 rolls",
+      "title": "Forced Difficulty Rolls"
     }
   },
   "title": "ResolutionSettings",

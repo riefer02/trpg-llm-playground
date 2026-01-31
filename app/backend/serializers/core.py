@@ -13,6 +13,9 @@ def _serialize_mech_config(mech: MechConfiguration) -> dict[str, Any]:
         "name": mech.name,
         "frame_id": mech.frame_id,
         "build": mech.build.model_dump(mode="json"),
+        "damage_state": mech.damage_state.model_dump(mode="json")
+        if mech.damage_state
+        else None,
     }
 
 
@@ -38,6 +41,9 @@ def _serialize_pilot_base(core_pilot: Pilot) -> dict[str, Any]:
         "callsign": core_pilot.callsign,
         "name": core_pilot.name,
         "level": core_pilot.level,
+        "xp": core_pilot.xp,
+        "xp_to_next_level": core_pilot.xp_to_next_level,
+        "level_progress": core_pilot.level_progress,
         "skills": core_pilot.skills.as_dict(),
         "triggers": [t.model_dump() for t in core_pilot.triggers],
         "talents": [t.model_dump() for t in core_pilot.talents],
@@ -50,6 +56,7 @@ def _serialize_pilot_base(core_pilot: Pilot) -> dict[str, Any]:
         if core_pilot.pilot_gear
         else None,
         "notes": core_pilot.notes,
+        "salvage": core_pilot.salvage,
     }
 
 

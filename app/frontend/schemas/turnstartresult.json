@@ -166,6 +166,63 @@
       "description": "Damage taken from failed dangerous terrain check",
       "title": "Dangerous Terrain Damage",
       "type": "integer"
+    },
+    "started_falling": {
+      "default": false,
+      "description": "Whether the actor started falling this turn due to status (stunned/immobilized/shutdown)",
+      "title": "Started Falling",
+      "type": "boolean"
+    },
+    "falling_from_altitude": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Altitude level the actor is falling from (if started_falling)",
+      "title": "Falling From Altitude"
+    },
+    "same_size_grapple_check": {
+      "default": false,
+      "description": "Whether a same-size grapple contested HULL check was triggered",
+      "title": "Same Size Grapple Check",
+      "type": "boolean"
+    },
+    "grapple_broke_on_turn_start": {
+      "default": false,
+      "description": "Whether the grapple was broken due to winning the contest",
+      "title": "Grapple Broke On Turn Start",
+      "type": "boolean"
+    },
+    "grapple_contest_roll": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The d20 roll result for the grapple contest",
+      "title": "Grapple Contest Roll"
+    },
+    "grapple_contest_opponent_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ID of the opponent in the grapple contest",
+      "title": "Grapple Contest Opponent Id"
     }
   },
   "required": [

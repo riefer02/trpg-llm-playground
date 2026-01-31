@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from core.mech.combat_models import AvailableAction, ActionExecutionInput
-from core.mech.grid import HexCoord, HexPosition
+from core.mech.grid import HexPosition
 from core.mech.combat_state import MechCombatScenario
 from llm.src.voice.intent_parser import (
     parse_voice_intent,

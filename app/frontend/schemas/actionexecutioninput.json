@@ -338,6 +338,33 @@
       "default": null,
       "description": "Type of mine being deployed",
       "title": "Mine Type"
+    },
+    "target_mount_id": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Mount index to target for called shot (adds +1 difficulty, destroys mount on hit)",
+      "title": "Target Mount Id"
+    },
+    "target_deployable_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ID of deployable to target (instead of combatant)",
+      "title": "Target Deployable Id"
     }
   },
   "required": [

@@ -396,6 +396,20 @@
           "title": "Level",
           "type": "integer"
         },
+        "xp": {
+          "default": 0,
+          "description": "Experience points earned",
+          "minimum": 0,
+          "title": "Xp",
+          "type": "integer"
+        },
+        "salvage": {
+          "default": 0,
+          "description": "Salvage currency earned from missions",
+          "minimum": 0,
+          "title": "Salvage",
+          "type": "integer"
+        },
         "skills": {
           "$ref": "#/$defs/SkillSet"
         },
@@ -524,6 +538,18 @@
           "readOnly": true,
           "title": "Attack Bonus",
           "type": "integer"
+        },
+        "xp_to_next_level": {
+          "description": "XP needed to reach next level.",
+          "readOnly": true,
+          "title": "Xp To Next Level",
+          "type": "integer"
+        },
+        "level_progress": {
+          "description": "Progress to next level as fraction (0.0 to 1.0).",
+          "readOnly": true,
+          "title": "Level Progress",
+          "type": "number"
         }
       },
       "required": [
@@ -536,7 +562,9 @@
         "speed",
         "size",
         "save_target",
-        "attack_bonus"
+        "attack_bonus",
+        "xp_to_next_level",
+        "level_progress"
       ],
       "title": "Pilot",
       "type": "object"
@@ -20367,7 +20395,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -20407,7 +20436,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -20437,7 +20467,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -22431,7 +22462,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -23481,7 +23513,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -30515,7 +30548,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -30837,7 +30871,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -31153,7 +31188,8 @@
                 "exposed",
                 "engaged",
                 "burn",
-                "unshackled"
+                "unshackled",
+                "falling"
               ],
               "type": "string"
             },
@@ -31215,7 +31251,8 @@
                 "exposed",
                 "engaged",
                 "burn",
-                "unshackled"
+                "unshackled",
+                "falling"
               ],
               "type": "string"
             },
@@ -31599,7 +31636,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -31917,7 +31955,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -32218,7 +32257,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -32689,7 +32729,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -33456,7 +33497,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -40499,7 +40541,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -41247,6 +41290,18 @@
         "build": {
           "$ref": "#/$defs/MechBuild",
           "description": "Weapon and system loadout"
+        },
+        "damage_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MechDamageState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Current damage state (None = full health)"
         }
       },
       "required": [
@@ -41255,6 +41310,59 @@
         "frame_id"
       ],
       "title": "MechConfiguration",
+      "type": "object"
+    },
+    "MechDamageState": {
+      "description": "Damage state for a mech between combats.\n\nTracks current resource levels and destroyed components.\nDefault values represent a fully healthy mech (full HP, structure, stress,\nno destroyed components).",
+      "properties": {
+        "hp_current": {
+          "description": "Current HP",
+          "minimum": 0,
+          "title": "Hp Current",
+          "type": "integer"
+        },
+        "structure_current": {
+          "description": "Current structure (0-4)",
+          "maximum": 4,
+          "minimum": 0,
+          "title": "Structure Current",
+          "type": "integer"
+        },
+        "stress_current": {
+          "description": "Current reactor stress",
+          "minimum": 0,
+          "title": "Stress Current",
+          "type": "integer"
+        },
+        "destroyed_weapons": {
+          "description": "Weapon IDs that are destroyed and need repair",
+          "items": {
+            "type": "string"
+          },
+          "title": "Destroyed Weapons",
+          "type": "array"
+        },
+        "destroyed_systems": {
+          "description": "System IDs that are destroyed and need repair",
+          "items": {
+            "type": "string"
+          },
+          "title": "Destroyed Systems",
+          "type": "array"
+        },
+        "is_destroyed": {
+          "default": false,
+          "description": "Whether the mech is completely destroyed (wreck)",
+          "title": "Is Destroyed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "hp_current",
+        "structure_current",
+        "stress_current"
+      ],
+      "title": "MechDamageState",
       "type": "object"
     },
     "MechDerivedStats": {
@@ -45077,7 +45185,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -45537,7 +45646,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -45608,7 +45718,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -45674,7 +45785,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Status",
           "type": "string"
@@ -47437,7 +47549,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -47482,7 +47595,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Clears Status",
           "type": "string"
@@ -47512,7 +47626,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Grants Status",
           "type": "string"
@@ -47659,7 +47774,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Grants Condition",
           "type": "string"
@@ -47723,7 +47839,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -47806,7 +47923,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Condition",
           "type": "string"
@@ -48081,7 +48199,8 @@
             "exposed",
             "engaged",
             "burn",
-            "unshackled"
+            "unshackled",
+            "falling"
           ],
           "title": "Applies Status",
           "type": "string"
@@ -48175,7 +48294,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -48255,7 +48375,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -48839,6 +48960,40 @@
         "effect_id"
       ],
       "title": "CooldownState",
+      "type": "object"
+    },
+    "FlyingStatus": {
+      "description": "State tracking for flying status effects.\n\nTracks whether a character is flying, current altitude level, and hover mode.\nThe caller is responsible for:\n- Setting is_flying when character takes off\n- Tracking current altitude_level (0 = ground, 1+ = elevated)\n- Handling hover mode for units that can hover\n- Clearing flying status on landing",
+      "properties": {
+        "is_flying": {
+          "default": false,
+          "title": "Is Flying",
+          "type": "boolean"
+        },
+        "altitude_level": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Altitude Level",
+          "type": "integer"
+        },
+        "is_hover": {
+          "default": false,
+          "title": "Is Hover",
+          "type": "boolean"
+        },
+        "movement_mode": {
+          "default": "ground",
+          "enum": [
+            "ground",
+            "flight",
+            "hover",
+            "teleport"
+          ],
+          "title": "Movement Mode",
+          "type": "string"
+        }
+      },
+      "title": "FlyingStatus",
       "type": "object"
     },
     "MechInventory": {
@@ -49481,7 +49636,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -49506,7 +49662,8 @@
               "exposed",
               "engaged",
               "burn",
-              "unshackled"
+              "unshackled",
+              "falling"
             ],
             "type": "string"
           },
@@ -49542,7 +49699,8 @@
             {
               "enum": [
                 "compcon",
-                "nhp"
+                "nhp",
+                "llm"
               ],
               "type": "string"
             },
@@ -49551,7 +49709,7 @@
             }
           ],
           "default": null,
-          "description": "Type of AI installed (compcon or nhp)",
+          "description": "Type of AI installed (compcon, nhp, or llm)",
           "title": "Ai Type"
         },
         "ai_control_state": {
@@ -49798,6 +49956,32 @@
           "description": "Whether eject has been used this combat (mech only)",
           "title": "Eject Used",
           "type": "boolean"
+        },
+        "flying_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlyingStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Current flying status (altitude, hover mode, etc.)"
+        },
+        "falling_from_altitude": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If falling, the altitude level falling from (for damage calc)",
+          "title": "Falling From Altitude"
         }
       },
       "required": [
@@ -49873,7 +50057,8 @@
                 "exposed",
                 "engaged",
                 "burn",
-                "unshackled"
+                "unshackled",
+                "falling"
               ],
               "type": "string"
             },
@@ -51558,6 +51743,53 @@
           ],
           "default": null,
           "title": "Forced System Trauma Roll"
+        },
+        "forced_roll": {
+          "anyOf": [
+            {
+              "maximum": 20,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Forced d20 roll for attack resolution",
+          "title": "Forced Roll"
+        },
+        "forced_accuracy_rolls": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Forced accuracy d6 rolls",
+          "title": "Forced Accuracy Rolls"
+        },
+        "forced_difficulty_rolls": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Forced difficulty d6 rolls",
+          "title": "Forced Difficulty Rolls"
         }
       },
       "title": "ResolutionSettings",
@@ -51853,6 +52085,33 @@
           "default": null,
           "description": "Type of mine being deployed",
           "title": "Mine Type"
+        },
+        "target_mount_id": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mount index to target for called shot (adds +1 difficulty, destroys mount on hit)",
+          "title": "Target Mount Id"
+        },
+        "target_deployable_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of deployable to target (instead of combatant)",
+          "title": "Target Deployable Id"
         }
       },
       "required": [
@@ -52032,7 +52291,8 @@
                 "exposed",
                 "engaged",
                 "burn",
-                "unshackled"
+                "unshackled",
+                "falling"
               ],
               "type": "string"
             },
@@ -52250,6 +52510,63 @@
           "description": "Damage taken from failed dangerous terrain check",
           "title": "Dangerous Terrain Damage",
           "type": "integer"
+        },
+        "started_falling": {
+          "default": false,
+          "description": "Whether the actor started falling this turn due to status (stunned/immobilized/shutdown)",
+          "title": "Started Falling",
+          "type": "boolean"
+        },
+        "falling_from_altitude": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Altitude level the actor is falling from (if started_falling)",
+          "title": "Falling From Altitude"
+        },
+        "same_size_grapple_check": {
+          "default": false,
+          "description": "Whether a same-size grapple contested HULL check was triggered",
+          "title": "Same Size Grapple Check",
+          "type": "boolean"
+        },
+        "grapple_broke_on_turn_start": {
+          "default": false,
+          "description": "Whether the grapple was broken due to winning the contest",
+          "title": "Grapple Broke On Turn Start",
+          "type": "boolean"
+        },
+        "grapple_contest_roll": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The d20 roll result for the grapple contest",
+          "title": "Grapple Contest Roll"
+        },
+        "grapple_contest_opponent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ID of the opponent in the grapple contest",
+          "title": "Grapple Contest Opponent Id"
         }
       },
       "required": [
@@ -52412,6 +52729,31 @@
           },
           "title": "Drones Primed",
           "type": "array"
+        },
+        "fall_resolved": {
+          "default": false,
+          "description": "Whether a fall was resolved this turn",
+          "title": "Fall Resolved",
+          "type": "boolean"
+        },
+        "fall_damage": {
+          "default": 0,
+          "description": "Damage taken from fall (1 per altitude level, armor-piercing)",
+          "title": "Fall Damage",
+          "type": "integer"
+        },
+        "fell_from_altitude": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Altitude level the actor fell from",
+          "title": "Fell From Altitude"
         }
       },
       "required": [
@@ -54831,6 +55173,9 @@
     },
     {
       "$ref": "#/$defs/MechConfiguration"
+    },
+    {
+      "$ref": "#/$defs/MechDamageState"
     },
     {
       "$ref": "#/$defs/Campaign"

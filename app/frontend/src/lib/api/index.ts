@@ -28,6 +28,7 @@ export {
   useAddMech,
   useRemoveMech,
   useSetActiveMech,
+  useSpendSalvageForRepair,
   characterKeys,
 } from './characters'
 export type {
@@ -42,6 +43,7 @@ export type {
   MechStats,
   MechConfig,
   ValidationIssue,
+  SalvageRepairRequest,
 } from './characters'
 
 // Compendium hooks (reference data for character creation)

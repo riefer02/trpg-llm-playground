@@ -154,6 +154,52 @@ PYTHONPATH=$(pwd) .venv/bin/python -m pytest <path> -v
 - Frontend types at `app/frontend/src/lib/types/lancer.ts` are auto-generated
 - Accessibility is a core requirement (voice control, no fast clicking)
 
+## MCP Tools
+
+### Database Reader
+A read-only database MCP tool is available for inspecting the PostgreSQL database state. Use it to:
+- Verify migrations applied correctly
+- Check table schemas and data
+- Debug database-related issues
+
+Available tools:
+- `mcp__database-reader__health_check` - Check database connectivity
+- `mcp__database-reader__list_tables` - List all tables in the database
+- `mcp__database-reader__get_table_schema` - Get schema for a specific table
+- `mcp__database-reader__get_all_schemas` - Get schemas for all tables with sample data
+- `mcp__database-reader__database_query` - Execute read-only SQL queries
+
+Example usage:
+```
+# Check if migration added a new column
+mcp__database-reader__get_table_schema(table_name="combat_sessions")
+
+# Verify data integrity
+mcp__database-reader__database_query(query="SELECT id, mission_id FROM combat_sessions LIMIT 5")
+```
+
+## Common Gotchas
+
+### Database Migrations
+When adding fields to `app/backend/db/models.py`, you MUST create an Alembic migration or the app will crash. Migration revision IDs must be ≤32 characters (e.g., `007_mission_fields` not `007_combat_session_mission_fields`).
+
+**Verification**: After creating a migration, use the database reader MCP tools to verify the schema changes were applied correctly.
+
+### React Hook Ordering
+Hooks can only reference variables defined above them. This causes runtime errors that tests don't catch:
+```typescript
+// ❌ Crashes: useEffect uses currentActor before it's defined
+useEffect(() => { ... currentActor?.id ... }, [currentActor?.id]);
+const currentActor = useMemo(() => ..., []);
+
+// ✅ Works: Define before use
+const currentActor = useMemo(() => ..., []);
+useEffect(() => { ... currentActor?.id ... }, [currentActor?.id]);
+```
+
+### Runtime Validation
+Tests passing ≠ app working. After app changes, run `make dev` and check the browser console for errors.
+
 ## Autonomous Development (Ralph)
 
 The project supports autonomous AI development via the Ralph loop pattern. Ralph repeatedly runs an AI coding agent until all PRD items are complete.

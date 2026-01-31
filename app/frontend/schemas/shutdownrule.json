@@ -19,7 +19,8 @@
         "exposed",
         "engaged",
         "burn",
-        "unshackled"
+        "unshackled",
+        "falling"
       ],
       "title": "Applies Status",
       "type": "string"
