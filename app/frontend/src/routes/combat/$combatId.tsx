@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-r
 import { toast } from "sonner";
 import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
 import { useSettings } from "../../lib/hooks/useSettings";
+import { useCombatNarration } from "../../lib/voice/text-to-speech";
 
 import {
   useCombatSession,
@@ -97,6 +98,7 @@ function CombatSessionPage() {
   const spendReserve = useSpendReserve(combatId);
   const autoNpcTurn = useAutoNpcTurn(combatId);
   const { settings } = useSettings();
+  const { narrateAction, narrateTurnStart, narrateStatusChange, narrateVictory } = useCombatNarration();
   const navigate = useNavigate();
 
   // Mission completion state
@@ -197,6 +199,7 @@ function CombatSessionPage() {
 
   // Poll for reaction opportunities when it's not our turn
   const firstPlayerCombatant = playerCombatants[0];
+  const playerCombatantName = firstPlayerCombatant?.name ?? 'Player';
   const { data: reactionOpportunity } = useReactionOpportunity(
     combatId,
     firstPlayerCombatant?.id ?? null,
@@ -233,13 +236,14 @@ function CombatSessionPage() {
         setTurnActive(true);
         setEconomy(result.economy);
         toast.success("Turn started");
+        narrateTurnStart(playerCombatantName, true);
       },
       onError: (err) => {
         setActionError(err.message || "Failed to start turn");
         toast.error(err.message || "Failed to start turn");
       },
     });
-  }, [startTurn]);
+  }, [startTurn, narrateTurnStart, playerCombatantName]);
 
   // Handle end turn
   const handleEndTurn = useCallback(() => {
@@ -273,11 +277,16 @@ function CombatSessionPage() {
         if (settings.showAIReasoning) {
           setShowReasoningPanel(true);
         }
+        // Narrate AI turn
+        narrateTurnStart(response.actor_name, false);
+        if (response.decision_action) {
+          narrateAction(response.actor_name, response.decision_action, response.decision_target);
+        }
         toast.success("NPC turn completed");
       },
       onError: (err) => toast.error(err.message || "NPC turn failed"),
     });
-  }, [autoNpcTurn, settings]);
+  }, [autoNpcTurn, settings, narrateTurnStart, narrateAction]);
 
   // Action triggered from ActionBar (to pass to ActionPanel)
   const [triggeredAction, setTriggeredAction] = useState<AvailableActionItem | null>(null);
@@ -326,8 +335,10 @@ function CombatSessionPage() {
             setAreaPattern(null);
             setAreaDirection(null);
             setPreviewOrigin(null);
-            setActionError(null);
-            toast.success("Action executed");
+             setActionError(null);
+             toast.success("Action executed");
+             // Narrate action
+             narrateAction(playerCombatantName, request.action_id, undefined, result.damage_dealt);
 
             // Auto-end turn if all actions exhausted
             if (newEconomy) {
@@ -356,7 +367,7 @@ function CombatSessionPage() {
         },
       });
     },
-    [executeAction, scenario?.deployables, handleEndTurn]
+    [executeAction, scenario?.deployables, handleEndTurn, narrateAction, playerCombatantName]
   );
 
   // Handle overcharge confirmation
@@ -407,8 +418,11 @@ function CombatSessionPage() {
     (request: CombatCompleteRequest) => {
       completeCombat.mutate(request, {
         onSuccess: (result) => {
-          setShowMissionCompleteModal(false);
-          toast.success("Mission completed");
+           setShowMissionCompleteModal(false);
+           toast.success("Mission completed");
+           // Narrate victory/defeat
+           const victoriousSide = request.outcome === "success" || request.outcome === "partial" ? "player" : "enemy";
+           narrateVictory(victoriousSide);
           
           // Redirect to debrief if missionId is known, otherwise to campaign/dashboard
           if (search.missionId) {
@@ -437,7 +451,7 @@ function CombatSessionPage() {
         onError: (err) => toast.error(err.message || "Failed to complete mission"),
       });
     },
-    [completeCombat, navigate, search, scenario]
+    [completeCombat, navigate, search, scenario, narrateVictory]
   );
 
   // Handle reserve spending

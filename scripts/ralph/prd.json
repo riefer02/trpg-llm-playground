@@ -333,8 +333,8 @@
         "`make test-llm` passes"
       ],
       "priority": 15,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented voice intent parser with LLM backend (Ollama/Claude/Mock), context-aware parsing using combat state, confidence scoring, fallback prompts, and unit tests. The module `llm/src/voice/intent_parser.py` includes `parse_voice_intent()` function that matches acceptance criteria signature. Handles natural phrasings, target position conversion, fuzzy matching, and random fallback. All acceptance criteria satisfied."
     },
     {
       "id": "E3-US-003",
@@ -352,8 +352,8 @@
         "`make test-app` passes"
       ],
       "priority": 16,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented text-to-speech module with Web Speech API, queue system, interruption support, configurable voice/speed/volume, and integration into combat UI. The module respects enableTTS setting and narrates turn starts, action results, AI turns, and victory/defeat. All acceptance criteria satisfied."
     },
     {
       "id": "E3-US-004",

@@ -320,3 +320,46 @@ Status: PASSED
 ### Next Steps
 - Next story: E3-US-002 (Voice Intent Parser) - parse natural language commands into combat actions
 ---
+## Iteration - Fri Jan 30 18:01:17 CST 2026
+Story: E3-US-002 - Voice Intent Parser
+Status: PASSED
+
+### Changes Made
+- Created `llm/src/voice/intent_parser.py` with `VoiceIntentParser` class and `parse_voice_intent()` function matching acceptance criteria signature
+- Added LLM backends (Ollama, Claude, Mock) following similar pattern to Tactician
+- Implemented context-aware parsing using combat state to resolve ambiguous targets
+- Added confidence scoring and fallback prompts for unclear commands
+- Created `llm/src/voice/prompts/voice_intent.md` comprehensive system prompt with examples
+- Fixed type errors: `AvailableAction` structure, `HexPosition` conversion, `MechCombatScenario` constructor
+- Created unit tests in `llm/tests/voice/test_intent_parser.py` with 9 tests covering all acceptance criteria
+- Updated `scripts/ralph/prd.json` to mark story as passing
+
+### Learnings
+- `AvailableAction` model does not have `parameters` attribute; includes `requires_weapon`, `requires_system`, `max_targets`
+- `target_position` must be `HexPosition` object with `coord` (HexCoord) and optional `elevation`
+- `MechCombatScenario` fields: `combatants`, `grapples`, `rounds`, `terrain`, `environment`, `deployables`, `sitrep_resolution`, `pending_decisions`, `objectives`, `mission_reserves`
+- Voice intent parser can reuse `serialize_combat_state` and `find_matching_action` from tactician module
+- Unit tests must import `MechCombatScenario` and handle optional `fallback` string type
+
+### Next Steps
+- Next story: E3-US-003 (Text-to-Speech Narration) - implement browser TTS for action results and AI turns
+---
+
+## Iteration - $(date)
+Story: E3-US-003 - Text-to-Speech Narration
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/lib/voice/text-to-speech.ts: Created TTS module with Web Speech API, queue system, priority interruption, and combat narration helper
+- app/frontend/src/routes/combat/$combatId.tsx: Integrated TTS narration for turn starts, action results, AI turns, and victory/defeat
+- Updated settings UI already includes enableTTS toggle, voice speed, language
+
+### Learnings
+- Web Speech API's speechSynthesis.getVoices() loads asynchronously; need onvoiceschanged event
+- Queue system prevents overlapping speech; high priority interrupts current speech
+- Integration with existing mutation callbacks ensures narration follows game events
+- Settings.enableTTS must be checked before speaking; volume uses masterVolume
+
+### Next Steps
+- Next story: E3-US-004 (Voice Combat UI) - implement UI components for voice control
+---
