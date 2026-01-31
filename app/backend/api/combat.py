@@ -31,34 +31,45 @@ from core.mech.combat_state import (
     CombatRound,
     CombatEnvironment,
 )
-from core.mech.grid import HexPosition, HexCoord
-from core.shared.campaign.campaign import MissionOutcomeReport
-from core.mech.action_economy import ActionEconomyState
+
+# Import core combat execution helpers
 from core.mech.combat_execution import (
-    start_turn,
-    end_turn,
-    execute_action,
-    execute_reaction,
-    get_available_actions,
     get_current_actor,
+    get_available_actions,
+    start_turn,
+    execute_action,
+    end_turn,
+    execute_reaction,
     apply_damage,
-    ActionExecutionInput,
-    ReactionInput,
+    ActionEconomyState,
 )
+
+# Import grid types for position handling
+from core.mech.grid import HexCoord, HexPosition
 from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
-from core.shared.overwatch import check_overwatch_triggers_for_movement
+
+# Import combat models for action execution
+from core.mech.combat_models import ActionExecutionInput, ReactionInput
 from core.shared.full_tech import FullTechOptionSelection
+from core.shared.campaign.campaign import MissionOutcomeReport
+from core.shared.overwatch import check_overwatch_triggers_for_movement
 from core.shared.decisions import (
+    get_pending_decisions_for_combatant,
     DecisionResolution,
     resolve_save_decision,
-    resolve_trauma_decision,
-    get_pending_decisions_for_combatant,
-    remove_decision_from_scenario,
-    apply_system_trauma_selection,
     apply_failed_hull_save,
+    resolve_trauma_decision,
+    apply_system_trauma_selection,
+    remove_decision_from_scenario,
 )
+
+# Import LLM voice intent parser
+from llm.src.voice.intent_parser import parse_voice_intent
+
+# Import NPC turn execution
 from core.mech.npc_turn_execution import execute_npc_turn
 from llm.src.tactician.integration import execute_llm_npc_turn
+
 
 router = APIRouter(prefix="/combat", tags=["combat"])
 
@@ -2231,6 +2242,132 @@ class AutoNPCTurnResponse(BaseModel):
     skipped: bool
     skip_reason: str | None = None
     scenario: dict[str, Any]
+
+
+# =============================================================================
+# Voice Intent Parsing Endpoint
+# =============================================================================
+
+
+class VoiceIntentRequest(BaseModel):
+    """Request body for voice intent parsing."""
+
+    transcript: str = Field(..., description="Player's spoken command")
+    actor_id: str | None = Field(
+        None, description="Optional actor ID; defaults to current actor"
+    )
+
+
+class VoiceIntentResponse(BaseModel):
+    """Response model for voice intent parsing."""
+
+    success: bool
+    transcript: str
+    action: dict[str, Any] | None = None
+    confidence: float | None = None
+    fallback_prompt: str | None = None
+    error: str | None = None
+    scenario: dict[str, Any]
+
+
+@router.post("/{session_id}/voice-intent", response_model=VoiceIntentResponse)
+async def parse_voice_intent_endpoint(
+    session_id: str,
+    body: VoiceIntentRequest,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> VoiceIntentResponse:
+    """Parse a voice command into a combat action.
+
+    This endpoint takes a spoken command transcript and returns a validated
+    combat action that can be executed via the combat action endpoint.
+    """
+    result = await session.exec(
+        select(CombatSessionDB).where(
+            CombatSessionDB.id == session_id,
+            CombatSessionDB.gm_user_id == user["id"],
+        )
+    )
+    combat_session = result.first()
+
+    if not combat_session:
+        raise NotFoundError("Combat session", session_id)
+
+    if combat_session.status != "active":
+        raise ValidationError(
+            f"Cannot parse voice intent: session status is '{combat_session.status}'",
+            errors=[
+                {
+                    "loc": ["status"],
+                    "msg": "Session must be active",
+                    "type": "value_error",
+                }
+            ],
+        )
+
+    # Hydrate scenario
+    scenario = MechCombatScenario.model_validate(combat_session.scenario)
+
+    # Determine actor ID (use provided or current actor)
+    actor_id = body.actor_id
+    if actor_id is None:
+        current_actor = get_current_actor(
+            scenario,
+            combat_session.current_round,
+            combat_session.current_turn_index,
+        )
+        if current_actor is None:
+            raise ValidationError(
+                "No current actor found",
+                errors=[
+                    {"loc": ["actor"], "msg": "Turn not started", "type": "value_error"}
+                ],
+            )
+        actor_id = current_actor.id
+
+    # Get available actions for the actor
+    economy = _get_session_economy(session_id)
+    if economy is None:
+        economy = ActionEconomyState()
+    available = get_available_actions(scenario, actor_id, economy)
+
+    # Combine all available action lists
+    all_available = (
+        available.full_actions
+        + available.quick_actions
+        + available.free_actions
+        + available.reactions
+        + available.protocols
+    )
+
+    try:
+        # Parse voice intent
+        action_input = parse_voice_intent(
+            transcript=body.transcript,
+            available_actions=all_available,
+            scenario=scenario,
+            actor_id=actor_id,
+        )
+    except ValueError as e:
+        return VoiceIntentResponse(
+            success=False,
+            transcript=body.transcript,
+            action=None,
+            confidence=None,
+            fallback_prompt=str(e),
+            error=f"Failed to parse voice command: {e}",
+            scenario=combat_session.scenario,
+        )
+
+    return VoiceIntentResponse(
+        success=True,
+        transcript=body.transcript,
+        action=action_input.model_dump(),
+        confidence=None,
+        fallback_prompt=None,
+        error=None,
+        scenario=combat_session.scenario,
+    )
 
 
 @router.post("/{session_id}/turns/auto-npc", response_model=AutoNPCTurnResponse)

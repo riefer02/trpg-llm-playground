@@ -17,23 +17,46 @@ export interface TurnStartResponse {
   scenario: MechCombatScenario;
 }
 
-export interface ActionRequest {
-  action_id: string;
-  action_type: "full" | "quick" | "free" | "reaction" | "protocol" | "move";
-  target_ids?: string[];
-  target_position?: { coord: { q: number; r: number } };
-  weapon_id?: string;
-  weapon_profile_id?: string;
-  system_id?: string;
-  full_tech_first?: FullTechOptionSelection;
-  full_tech_second?: FullTechOptionSelection;
-  movement_path?: { coord: { q: number; r: number } }[];
-  prompt_dangerous_terrain?: boolean;
-  is_overcharge?: boolean;
-  use_thrown?: boolean;
-  // Phase 60: Mount & Deployable targeting
-  target_mount_id?: number;
-  target_deployable_id?: string;
+// =============================================================================
+// Voice Intent Parsing Types and Hooks
+// =============================================================================
+
+export interface VoiceIntentRequest {
+  transcript: string;
+  actor_id?: string;
+}
+
+export interface VoiceIntentResponse {
+  success: boolean;
+  transcript: string;
+  action?: Record<string, unknown>;
+  confidence?: number;
+  fallback_prompt?: string;
+  error?: string;
+  scenario: MechCombatScenario;
+}
+
+export function useParseVoiceIntent(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: VoiceIntentRequest) =>
+      api.post<VoiceIntentResponse>(`/combat/${sessionId}/voice-intent`, request),
+    onSuccess: (data) => {
+      if (data.success) {
+        // Update combat session with latest scenario (if changed)
+        queryClient.setQueryData<CombatSessionResponse>(
+          combatKeys.detail(sessionId),
+          (prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              scenario: data.scenario,
+            };
+          },
+        );
+      }
+    },
+  });
 }
 
 export interface ActionResponse {

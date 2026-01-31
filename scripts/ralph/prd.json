@@ -371,8 +371,8 @@
         "`make test-app` passes"
       ],
       "priority": 17,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented voice toggle button in action bar with pulsing indicator, transcript display component, confirmation dialog with friendly combatant/weapon names, yes/no voice command detection, error state with retry, keyboard accessibility (Tab, Enter, Escape). All acceptance criteria satisfied."
     },
     {
       "id": "E3-US-005",

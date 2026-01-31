@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Skull,
   Target,
+  Mic,
   type LucideIcon,
 } from "lucide-react";
 
@@ -219,8 +220,8 @@ function EconomyDisplay({ economy, canOvercharge, overchargeLevel }: EconomyDisp
         <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/20 text-destructive font-medium">
           OC{overchargeLevel}
         </span>
-      )}
-    </div>
+          )}
+        </div>
   );
 }
 
@@ -233,6 +234,11 @@ export interface ActionBarProps {
   overchargeLevel?: number;
   isExecuting?: boolean;
   visible?: boolean;
+  // Voice control
+  onVoiceToggle?: () => void;
+  isVoiceListening?: boolean;
+  voiceEnabled?: boolean;
+  voiceSupported?: boolean;
 }
 
 export function ActionBar({
@@ -244,6 +250,11 @@ export function ActionBar({
   overchargeLevel = 0,
   isExecuting = false,
   visible = true,
+  // Voice control
+  onVoiceToggle = () => {},
+  isVoiceListening = false,
+  voiceEnabled = false,
+  voiceSupported = false,
 }: ActionBarProps) {
   // Flatten actions into a single array with shortcuts
   const allActions = [
@@ -439,6 +450,52 @@ export function ActionBar({
               </div>
             </>
           )}
+
+          {/* Voice Toggle Button */}
+          {voiceSupported && voiceEnabled && (
+            <>
+              <div className="w-px h-10 bg-border" />
+              <div className="group relative">
+                {/* Pulsing ring when listening */}
+                {isVoiceListening && (
+                  <div className="absolute inset-0 rounded-lg border-2 border-green-500 animate-ping opacity-60" />
+                )}
+                <button
+                  type="button"
+                  onClick={onVoiceToggle}
+                  disabled={isExecuting}
+                  className={`
+                    relative w-12 h-12 rounded-lg border-2 transition-all
+                    flex items-center justify-center
+                    ${isVoiceListening
+                      ? "border-green-500 bg-green-500/10 hover:bg-green-500/30 hover:border-green-400 animate-pulse"
+                      : "border-blue-500 bg-blue-500/10 hover:bg-blue-500/30 hover:border-blue-400"
+                    }
+                    cursor-pointer shadow-md hover:shadow-lg hover:scale-105
+                    ${isExecuting ? "opacity-40 cursor-not-allowed" : ""}
+                  `}
+                  aria-label="Voice control"
+                >
+                  <Mic className={`w-6 h-6 ${isVoiceListening ? "text-green-500" : "text-blue-500"}`} />
+                </button>
+                {/* Tooltip */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 pointer-events-none z-50">
+                  <div className="bg-popover border border-border rounded-md shadow-lg px-3 py-2 min-w-[160px]">
+                    <div className="font-medium text-sm">
+                      {isVoiceListening ? "Stop voice input" : "Start voice input"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {isVoiceListening ? "Click or press space to stop" : "Click or press space to start"}
+                    </div>
+                  </div>
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                    <div className="w-2 h-2 bg-popover border-r border-b border-border rotate-45" />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
         </div>
       </div>
     </div>

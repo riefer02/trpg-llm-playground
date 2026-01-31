@@ -363,3 +363,24 @@ Status: PASSED
 ### Next Steps
 - Next story: E3-US-004 (Voice Combat UI) - implement UI components for voice control
 ---
+
+## Iteration - Fri Jan 30 2026 23:45 UTC
+Story: E3-US-004 - Voice Combat UI
+Status: PASSED
+
+### Changes Made
+- Added yes/no voice command detection in confirmation dialog
+- Enhanced confirmation dialog with friendly combatant and weapon names
+- Updated UI to indicate voice commands "Yes" or "No"
+- Verified keyboard accessibility (Tab, Enter, Escape)
+- All acceptance criteria satisfied
+
+### Learnings
+- Voice detection can be integrated by checking transcript when dialog is open
+- Combatant names available via scenario.combatants mapping
+- Weapon names can be retrieved from compendium via useWeapons hook
+- Existing voice toggle button and transcript display already met criteria
+
+### Next Steps
+- Next story: E3-US-005 (Voice Navigation) - implement voice commands for navigating game screens
+---

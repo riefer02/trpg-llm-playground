@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
 import { useSettings } from "../../lib/hooks/useSettings";
 import { useCombatNarration } from "../../lib/voice/text-to-speech";
+import { useSpeechRecognition } from "../../lib/voice/speech-to-text";
 
 import {
   useCombatSession,
@@ -28,6 +29,7 @@ import {
   type DecisionSubmitRequest,
   type CombatCompleteRequest,
 } from "../../lib/api";
+import { useParseVoiceIntent } from "../../lib/api/combat";
 import { CombatCanvas, type TargetingMode, type ContextMenuInfo } from "../../components/combat/CombatCanvas";
 import { ViewportControls } from "../../components/combat/ViewportControls";
 import { ContextMenu, type ContextMenuTarget, type ContextMenuOption } from "../../components/combat/ContextMenu";
@@ -40,6 +42,8 @@ import { TurnControls, type TurnState } from "../../components/combat/TurnContro
 import { TurnIndicator } from "../../components/combat/TurnIndicator";
 import { ActionPanel, type TargetMode } from "../../components/combat/ActionPanel";
 import { ActionBar } from "../../components/combat/ActionBar";
+import { VoiceTranscriptDisplay } from "../../components/combat/VoiceTranscriptDisplay";
+import { VoiceActionConfirmationDialog } from "../../components/combat/VoiceActionConfirmationDialog";
 import { OverchargeConfirm } from "../../components/combat/OverchargeConfirm";
 import { ReactionPrompt } from "../../components/combat/ReactionPrompt";
 import { SaveCheckPrompt } from "../../components/combat/SaveCheckPrompt";
@@ -99,7 +103,105 @@ function CombatSessionPage() {
   const autoNpcTurn = useAutoNpcTurn(combatId);
   const { settings } = useSettings();
   const { narrateAction, narrateTurnStart, narrateStatusChange, narrateVictory } = useCombatNarration();
+  // Speech recognition
+  const speechRecognition = useSpeechRecognition({
+    language: settings.voiceLanguage,
+    continuous: false,
+    interimResults: true,
+  });
+  const parseVoiceIntent = useParseVoiceIntent(combatId);
+  // Voice control state
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [showVoiceConfirmation, setShowVoiceConfirmation] = useState(false);
+  const [parsedAction, setParsedAction] = useState<Record<string, unknown> | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // Voice transcript parsing
+  const lastParsedTranscriptRef = useRef('');
+  useEffect(() => {
+    // Skip parsing if confirmation dialog is open (waiting for yes/no)
+    if (showVoiceConfirmation) return;
+    if (!speechRecognition.isListening && speechRecognition.transcript && speechRecognition.transcript !== lastParsedTranscriptRef.current) {
+      lastParsedTranscriptRef.current = speechRecognition.transcript;
+      setVoiceTranscript(speechRecognition.transcript);
+      parseVoiceIntent.mutate(
+        { transcript: speechRecognition.transcript, actor_id: currentActor?.id },
+        {
+          onSuccess: (data) => {
+            if (data.success && data.action) {
+              setParsedAction(data.action);
+              setShowVoiceConfirmation(true);
+              setVoiceError(null);
+            } else {
+              setVoiceError(data.error || 'Could not understand command');
+              setParsedAction(null);
+            }
+          },
+          onError: (error) => {
+            setVoiceError(error.message || 'Failed to parse voice command');
+          },
+        }
+      );
+    }
+  }, [speechRecognition.isListening, speechRecognition.transcript, currentActor?.id, parseVoiceIntent, showVoiceConfirmation]);
+
+  // Yes/No voice confirmation when dialog is open
+  useEffect(() => {
+    if (showVoiceConfirmation && speechRecognition.transcript && !speechRecognition.isListening) {
+      const transcript = speechRecognition.transcript.trim().toLowerCase();
+      // Check for yes/no keywords
+      if (transcript === 'yes' || transcript === 'confirm' || transcript === 'okay' || transcript === 'ok') {
+        // Trigger confirm
+        if (parsedAction) {
+          executeAction.mutate(parsedAction as ActionRequest, {
+            onSuccess: () => {
+              setShowVoiceConfirmation(false);
+              setParsedAction(null);
+              setVoiceTranscript('');
+              speechRecognition.resetTranscript();
+            },
+            onError: (error) => {
+              setVoiceError(error.message || 'Action execution failed');
+            },
+          });
+        }
+      } else if (transcript === 'no' || transcript === 'cancel' || transcript === 'dismiss') {
+        // Trigger cancel
+        setShowVoiceConfirmation(false);
+        setVoiceError(null);
+        setParsedAction(null);
+        setVoiceTranscript('');
+        speechRecognition.resetTranscript();
+      }
+      // Reset transcript after processing to avoid re-triggering
+      lastParsedTranscriptRef.current = speechRecognition.transcript;
+    }
+  }, [showVoiceConfirmation, speechRecognition.transcript, speechRecognition.isListening, parsedAction, executeAction]);
+
+  // Mapping functions for friendly names in voice confirmation dialog
+  const getCombatantName = useCallback((id: string): string => {
+    if (!data?.scenario?.combatants) return id;
+    const combatant = data.scenario.combatants[id];
+    return combatant?.name ?? id;
+  }, [data?.scenario?.combatants]);
+
+  const getWeaponName = useCallback((id: string): string => {
+    // Map weapon ID to weapon name from compendium
+    if (weaponsQuery.data) {
+      const weapon = weaponsQuery.data.find(w => w.id === id);
+      if (weapon) return weapon.name;
+    }
+    // Fallback: humanized ID
+    return id.replace(/_/g, ' ');
+  }, [weaponsQuery.data]);
+
+  // Show error toast when voiceError changes
+  useEffect(() => {
+    if (voiceError) {
+      toast.error(`Voice command error: ${voiceError}`);
+    }
+  }, [voiceError]);
 
   // Mission completion state
   const [showMissionCompleteModal, setShowMissionCompleteModal] = useState(false);
@@ -111,6 +213,7 @@ function CombatSessionPage() {
   // AI reasoning display
   const [aiReasoning, setAiReasoning] = useState<AutoNPCTurnResponse | null>(null);
   const [showReasoningPanel, setShowReasoningPanel] = useState(false);
+
 
   // Available actions query (only when turn is active)
   const { data: availableActions } = useAvailableActions(combatId, {
@@ -1010,6 +1113,20 @@ function CombatSessionPage() {
               </div>
             </div>
 
+            {/* Voice Transcription Display */}
+            <VoiceTranscriptDisplay
+              isListening={speechRecognition.isListening}
+              transcript={speechRecognition.transcript}
+              error={speechRecognition.error}
+              recognitionSupported={speechRecognition.recognitionSupported}
+              voiceEnabled={settings.enableVoiceInput}
+              onRetry={() => {
+                speechRecognition.stopListening();
+                speechRecognition.resetTranscript();
+                setTimeout(() => speechRecognition.startListening(), 100);
+              }}
+            />
+
             {/* AI Reasoning Panel */}
             {showReasoningPanel && aiReasoning && (
               <div className="rounded-md border border-border bg-muted/30 p-2 space-y-1">
@@ -1230,6 +1347,34 @@ function CombatSessionPage() {
               );
             })}
 
+        {/* Voice Confirmation Dialog */}
+        <VoiceActionConfirmationDialog
+          isOpen={showVoiceConfirmation}
+          transcript={voiceTranscript}
+          parsedAction={parsedAction}
+          error={voiceError}
+          isExecuting={executeAction.isPending}
+          getCombatantName={getCombatantName}
+          getWeaponName={getWeaponName}
+          onClose={() => {
+            setShowVoiceConfirmation(false);
+            setVoiceError(null);
+          }}
+          onConfirm={(action) => {
+            executeAction.mutate(action as ActionRequest, {
+              onSuccess: () => {
+                setShowVoiceConfirmation(false);
+                setParsedAction(null);
+                setVoiceTranscript('');
+                speechRecognition.resetTranscript();
+              },
+              onError: (error) => {
+                setVoiceError(error.message || 'Action execution failed');
+              },
+            });
+          }}
+        />
+
         {/* Hover Tooltip */}
         <MapTooltip
           target={hoverTooltip?.target ?? null}
@@ -1260,6 +1405,11 @@ function CombatSessionPage() {
           overchargeLevel={availableActions?.overcharge_level ?? 0}
           isExecuting={executeAction.isPending}
           visible={turnActive}
+          // Voice control
+          onVoiceToggle={speechRecognition.toggleListening}
+          isVoiceListening={speechRecognition.isListening}
+          voiceEnabled={settings.enableVoiceInput}
+          voiceSupported={speechRecognition.recognitionSupported}
         />
       </div>
     </div>
