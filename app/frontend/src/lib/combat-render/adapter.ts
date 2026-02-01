@@ -23,6 +23,7 @@ import type {
 } from "./canvas";
 import { buildHexGrid } from "./canvas";
 import { hex } from "./hex";
+import { mapMissionTerrainToPattern } from "./terrain-patterns";
 import {
   hexCone,
   hexConeCentered,
@@ -47,6 +48,8 @@ export type CombatRenderAdapterInput = {
   gridOrigin?: HexCoord;
   overlayStyle?: HoverStyle;
   tokenColors?: Partial<Record<Side, string>>;
+  /** Terrain type for visual pattern rendering (forest, urban, water, etc.) */
+  terrainType?: string;
 };
 
 export type RenderTokenMetadata = {
@@ -137,7 +140,10 @@ export function adaptCombatScenario(
     input.tokenColors,
     activeActorId,
   );
-  const terrainTiles = buildTerrainTiles(input.scenario.terrain ?? null);
+  const terrainTiles = buildTerrainTiles(
+    input.scenario.terrain ?? null,
+    input.terrainType,
+  );
   const markers = buildMarkers(combatants, input.scenario.deployables);
 
   const overlayBuild = buildOverlays({
@@ -334,10 +340,16 @@ function buildMarkers(
 
 function buildTerrainTiles(
   terrain: MechCombatScenario["terrain"] | null,
+  scenarioTileSet?: string,
 ): RenderTerrainTile[] {
   if (!terrain?.tiles?.length) {
     return [];
   }
+
+  // Map scenario tile_set to pattern type
+  const terrainType = scenarioTileSet 
+    ? mapMissionTerrainToPattern(scenarioTileSet) 
+    : undefined;
 
   return terrain.tiles.map((tile: TerrainHex) => ({
     coord: tile.coord,
@@ -347,6 +359,7 @@ function buildTerrainTiles(
     providesSoftCover: tile.provides_soft_cover ?? false,
     providesHardCover: tile.provides_hard_cover ?? false,
     blocksLineOfSight: tile.blocks_line_of_sight ?? false,
+    terrainType,
   }));
 }
 

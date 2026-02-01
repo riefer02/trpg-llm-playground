@@ -15,7 +15,7 @@ set -e
 
 # Parse arguments
 TOOL="claude"  # Default
-MODEL=""
+MODEL="opencode/kimi-k2.5-free"
 MAX_ITERATIONS=10
 
 while [[ $# -gt 0 ]]; do

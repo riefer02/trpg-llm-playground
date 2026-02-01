@@ -12,6 +12,7 @@ import {
   attachHoverHandlers,
   renderCombatCanvas,
   drawMovementPath,
+  preloadTerrainPatternsForContext,
 } from "../../lib/combat-render/canvas";
 import type { HexLayout } from "../../lib/combat-render/hex";
 import { createHexLayout, pixelToAxial } from "../../lib/combat-render/hex";
@@ -189,6 +190,20 @@ export function CombatCanvas({
     return () => {
       window.removeEventListener("resize", updatePixelRatio);
     };
+  }, []);
+
+  // Preload terrain patterns when canvas context is first available
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Preload terrain patterns for SVG-based terrain rendering
+    preloadTerrainPatternsForContext(ctx).catch((err) => {
+      console.warn("Failed to preload terrain patterns:", err);
+    });
   }, []);
 
   useEffect(() => {

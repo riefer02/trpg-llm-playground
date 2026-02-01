@@ -4,6 +4,8 @@ import { getMarkerIconConfig } from "../combat-effects";
 
 import type { HexLayout, PixelPoint } from "./hex";
 import { axialToPixel, hex, hexCorners, pixelToAxial } from "./hex";
+import type { TerrainPatternType } from "./terrain-patterns";
+import { getTerrainFallbackFill } from "./terrain-patterns";
 
 export type HexGrid = {
   coords: HexCoord[];
@@ -81,6 +83,8 @@ export type RenderTerrainTile = {
   providesSoftCover?: boolean;
   providesHardCover?: boolean;
   blocksLineOfSight?: boolean;
+  /** Terrain type for visual pattern rendering (forest, urban, water, etc.) */
+  terrainType?: TerrainPatternType;
 };
 
 export type TerrainStyle = {
@@ -96,6 +100,12 @@ export type TerrainStyle = {
   elevationBadgeStroke?: string;
   elevationTextColor?: string;
   elevationFont?: string;
+  /** Shadow color for elevation depth indicator */
+  elevationShadowColor?: string;
+  /** Cover indicator fill color */
+  coverIndicatorFill?: string;
+  /** Cover indicator stroke color */
+  coverIndicatorStroke?: string;
 };
 
 export const DEFAULT_TERRAIN_STYLE: Required<TerrainStyle> = {
@@ -111,6 +121,9 @@ export const DEFAULT_TERRAIN_STYLE: Required<TerrainStyle> = {
   elevationBadgeStroke: "rgba(71, 85, 105, 0.8)",
   elevationTextColor: "#0f172a",
   elevationFont: "bold 10px 'Space Grotesk', sans-serif",
+  elevationShadowColor: "rgba(0, 0, 0, 0.15)",
+  coverIndicatorFill: "rgba(56, 189, 248, 0.6)",
+  coverIndicatorStroke: "rgba(15, 23, 42, 0.8)",
 };
 
 export type CombatRenderState = {
@@ -323,6 +336,17 @@ export function drawMarkers(
   }
 }
 
+/** Cache for preloaded terrain patterns */
+let cachedTerrainPatterns: Partial<Record<TerrainPatternType, CanvasPattern>> | null = null;
+
+/** Preload and cache terrain patterns for efficient rendering */
+export async function preloadTerrainPatternsForContext(
+  ctx: CanvasRenderingContext2D,
+): Promise<void> {
+  const { preloadTerrainPatterns } = await import("./terrain-patterns");
+  cachedTerrainPatterns = await preloadTerrainPatterns(ctx);
+}
+
 export function drawTerrainTiles(
   ctx: CanvasRenderingContext2D,
   layout: HexLayout,
@@ -330,11 +354,13 @@ export function drawTerrainTiles(
   style: TerrainStyle = {},
 ): void {
   const mergedStyle = { ...DEFAULT_TERRAIN_STYLE, ...style };
+
   for (const tile of tiles) {
     const center = axialToPixel(tile.coord, layout);
     const corners = hexCorners(center, layout);
 
-    const drawPolygon = (fillStyle?: string, strokeStyle?: string, lineWidth?: number) => {
+    // Helper to draw hex polygon
+    const drawPolygon = (fillStyle?: string | CanvasPattern, strokeStyle?: string, lineWidth?: number) => {
       ctx.beginPath();
       ctx.moveTo(corners[0].x, corners[0].y);
       for (let i = 1; i < corners.length; i += 1) {
@@ -354,38 +380,34 @@ export function drawTerrainTiles(
       }
     };
 
-    if (tile.dangerous) {
-      drawPolygon(mergedStyle.dangerousFill);
-    } else if (tile.difficult) {
-      drawPolygon(mergedStyle.difficultFill);
+    // 1. Draw terrain type pattern (if available)
+    if (tile.terrainType) {
+      const pattern = cachedTerrainPatterns?.[tile.terrainType];
+      if (pattern) {
+        drawPolygon(pattern);
+      } else {
+        // Fallback to solid color if pattern not loaded
+        drawPolygon(getTerrainFallbackFill(tile.terrainType));
+      }
     }
 
-    if (tile.blocksLineOfSight) {
-      drawPolygon(
-        mergedStyle.blockingFill,
-        mergedStyle.blockingStroke,
-        mergedStyle.hardCoverLineWidth,
-      );
-    }
-
-    const hasHardCover = tile.providesHardCover;
-    const hasSoftCover = tile.providesSoftCover && !hasHardCover;
-
-    if (hasHardCover) {
-      drawPolygon(
-        undefined,
-        mergedStyle.hardCoverStroke,
-        mergedStyle.hardCoverLineWidth,
-      );
-    } else if (hasSoftCover) {
-      drawPolygon(
-        undefined,
-        mergedStyle.softCoverStroke,
-        mergedStyle.softCoverLineWidth,
-      );
-    }
-
+    // 2. Draw elevation depth/shadow indicators
     if (tile.elevation && tile.elevation > 0) {
+      // Draw shadow on the bottom-right edges to create depth effect
+      const shadowOffset = Math.min(tile.elevation * 2, 8);
+      ctx.beginPath();
+      // Shadow along bottom edges (indices 2, 3, 4 in hex corners)
+      ctx.moveTo(corners[2].x + shadowOffset, corners[2].y + shadowOffset);
+      ctx.lineTo(corners[3].x + shadowOffset, corners[3].y + shadowOffset);
+      ctx.lineTo(corners[4].x + shadowOffset, corners[4].y + shadowOffset);
+      ctx.lineTo(corners[4].x, corners[4].y);
+      ctx.lineTo(corners[3].x, corners[3].y);
+      ctx.lineTo(corners[2].x, corners[2].y);
+      ctx.closePath();
+      ctx.fillStyle = mergedStyle.elevationShadowColor;
+      ctx.fill();
+
+      // Draw elevation badge
       const badgeRadius = layout.size * 0.18;
       const badgeCenter = {
         x: center.x + layout.size * 0.32,
@@ -405,6 +427,80 @@ export function drawTerrainTiles(
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(tile.elevation), badgeCenter.x, badgeCenter.y);
+    }
+
+    // 3. Draw dangerous/difficult terrain overlays
+    if (tile.dangerous) {
+      drawPolygon(mergedStyle.dangerousFill);
+    } else if (tile.difficult) {
+      drawPolygon(mergedStyle.difficultFill);
+    }
+
+    // 4. Draw line-of-sight blocking
+    if (tile.blocksLineOfSight) {
+      drawPolygon(
+        mergedStyle.blockingFill,
+        mergedStyle.blockingStroke,
+        mergedStyle.hardCoverLineWidth,
+      );
+    }
+
+    // 5. Draw cover indicators on hex edges
+    const hasHardCover = tile.providesHardCover;
+    const hasSoftCover = tile.providesSoftCover && !hasHardCover;
+
+    if (hasHardCover || hasSoftCover) {
+      // Draw hex outline for cover
+      drawPolygon(
+        undefined,
+        hasHardCover ? mergedStyle.hardCoverStroke : mergedStyle.softCoverStroke,
+        hasHardCover ? mergedStyle.hardCoverLineWidth : mergedStyle.softCoverLineWidth,
+      );
+
+      // Draw cover indicators on specific edges (small markers)
+      const indicatorSize = layout.size * 0.12;
+      const edgeCenters = [
+        // Top edge
+        { x: (corners[0].x + corners[1].x) / 2, y: (corners[0].y + corners[1].y) / 2 },
+        // Top-right edge
+        { x: (corners[1].x + corners[2].x) / 2, y: (corners[1].y + corners[2].y) / 2 },
+        // Bottom-right edge
+        { x: (corners[2].x + corners[3].x) / 2, y: (corners[2].y + corners[3].y) / 2 },
+        // Bottom edge
+        { x: (corners[3].x + corners[4].x) / 2, y: (corners[3].y + corners[4].y) / 2 },
+        // Bottom-left edge
+        { x: (corners[4].x + corners[5].x) / 2, y: (corners[4].y + corners[5].y) / 2 },
+        // Top-left edge
+        { x: (corners[5].x + corners[0].x) / 2, y: (corners[5].y + corners[0].y) / 2 },
+      ];
+
+      // Draw small cover indicators on alternating edges
+      edgeCenters.forEach((edgeCenter, index) => {
+        // Skip some edges to avoid clutter
+        if (index % 2 === 0) return;
+
+        ctx.beginPath();
+        ctx.arc(edgeCenter.x, edgeCenter.y, indicatorSize, 0, Math.PI * 2);
+        ctx.fillStyle = mergedStyle.coverIndicatorFill;
+        ctx.fill();
+        ctx.strokeStyle = mergedStyle.coverIndicatorStroke;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Draw shield icon representation (small hexagon)
+        const shieldSize = indicatorSize * 0.5;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 3) * i;
+          const x = edgeCenter.x + shieldSize * Math.cos(angle);
+          const y = edgeCenter.y + shieldSize * Math.sin(angle);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.fill();
+      });
     }
   }
 }
