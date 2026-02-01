@@ -11,6 +11,21 @@ import type { CharacterResponse } from '../api/characters';
 // Save Slot Schema
 // =============================================================================
 
+export interface MissionState {
+  /** Mission ID */
+  missionId: string;
+  /** Mission name */
+  missionName: string;
+  /** SITREP type */
+  sitrep: string;
+  /** Mission difficulty (1-3) */
+  difficulty: number;
+  /** Combat session ID if mission is in progress */
+  combatSessionId?: string;
+  /** Whether the mission is currently in progress */
+  inProgress: boolean;
+}
+
 export interface SaveSlot {
   /** Slot index (0-2) */
   slot: number;
@@ -22,6 +37,10 @@ export interface SaveSlot {
   name?: string;
   /** Game version for compatibility checking */
   version: string;
+  /** Mission state if a mission was in progress */
+  missionState?: MissionState;
+  /** Whether this is an auto-save (vs manual save) */
+  isAutoSave?: boolean;
 }
 
 export interface SaveSlotsData {
@@ -115,7 +134,9 @@ export function getSaveSlot(slotIndex: number): SaveSlot | undefined {
 export function saveToSlot(
   slotIndex: number,
   character: CharacterResponse,
-  name?: string
+  name?: string,
+  missionState?: MissionState,
+  isAutoSave?: boolean
 ): SaveSlot {
   if (slotIndex < 0 || slotIndex >= MAX_SLOTS) {
     throw new Error(`Invalid slot index: ${slotIndex}`);
@@ -129,6 +150,8 @@ export function saveToSlot(
     timestamp: new Date().toISOString(),
     name,
     version: CURRENT_VERSION,
+    missionState,
+    isAutoSave: isAutoSave ?? false,
   };
 
   if (existingIndex >= 0) {
@@ -147,11 +170,75 @@ export function saveToSlot(
 
 /**
  * Auto-save character to the last used slot, or slot 0 if none.
+ * This is a general auto-save that doesn't include mission state.
  */
 export function autoSave(character: CharacterResponse): SaveSlot {
   const data = loadSaveSlots();
   const slotIndex = data.lastUsedSlot !== null ? data.lastUsedSlot : 0;
-  return saveToSlot(slotIndex, character, `Auto-save ${new Date().toLocaleDateString()}`);
+  return saveToSlot(slotIndex, character, `Auto-save ${new Date().toLocaleDateString()}`, undefined, true);
+}
+
+/**
+ * Auto-save character with mission context when launching a mission.
+ * Uses a dedicated auto-save slot that doesn't overwrite manual saves.
+ */
+export function autoSaveMissionLaunch(
+  character: CharacterResponse,
+  missionState: MissionState
+): SaveSlot {
+  // Use a dedicated auto-save slot (slot 2) for mission launches
+  // This preserves manual saves in slots 0-1
+  const autoSaveSlotIndex = 2;
+  return saveToSlot(
+    autoSaveSlotIndex,
+    character,
+    `Mission: ${missionState.missionName}`,
+    missionState,
+    true
+  );
+}
+
+/**
+ * Check if there's a mission in progress that can be resumed.
+ */
+export function getMissionInProgress(): SaveSlot | undefined {
+  const slots = getSaveSlots();
+  // Look for auto-saves with mission state marked as inProgress
+  return slots.find(slot => 
+    slot.isAutoSave && 
+    slot.missionState?.inProgress && 
+    !slot.missionState?.combatSessionId
+  );
+}
+
+/**
+ * Check if there's a combat session in progress.
+ */
+export function getCombatInProgress(): SaveSlot | undefined {
+  const slots = getSaveSlots();
+  return slots.find(slot => 
+    slot.isAutoSave && 
+    slot.missionState?.inProgress && 
+    slot.missionState?.combatSessionId
+  );
+}
+
+/**
+ * Clear mission state from a save slot (call when mission completes or is forfeited).
+ */
+export function clearMissionState(slotIndex: number): void {
+  const slot = getSaveSlot(slotIndex);
+  if (!slot) return;
+  
+  const data = loadSaveSlots();
+  const existingIndex = data.slots.findIndex(s => s.slot === slotIndex);
+  if (existingIndex >= 0) {
+    data.slots[existingIndex] = {
+      ...slot,
+      missionState: undefined,
+    };
+    saveSaveSlots(data);
+  }
 }
 
 /**

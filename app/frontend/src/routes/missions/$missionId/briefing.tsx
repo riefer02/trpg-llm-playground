@@ -10,10 +10,11 @@ import { ArrowLeft, Shield, Target, Users, Map } from "lucide-react";
 import { useMission } from "../../../lib/api/missions";
 import { useActiveCharacter } from "../../../lib/api/quarters";
 import { useCreateDemoCombat, DemoScenarioType } from "../../../lib/api/combat";
-import { autoSave } from "../../../lib/save/saveSystem";
+import { autoSaveMissionLaunch, type MissionState } from "../../../lib/save/saveSystem";
+import { SaveIndicator } from "../../../components/save/SaveIndicator";
 import { useVoiceNavigationContext } from "../../../lib/voice/VoiceNavigationContext";
 import { useTextToSpeech } from "../../../lib/voice/text-to-speech";
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute("/missions/$missionId/briefing" as const)({
@@ -26,14 +27,28 @@ function MissionBriefing() {
   const { mission, isLoading, error } = useMission(missionId);
   const { character } = useActiveCharacter();
   const createDemo = useCreateDemoCombat();
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleBack = () => navigate({ to: "/missions" });
   const handleLaunch = useCallback(async () => {
     if (!mission) return;
-     
-    // Auto-save before mission launch
+    
+    // Auto-save before mission launch with mission context
     if (character) {
-      autoSave(character);
+      setIsSaving(true);
+      try {
+        const missionState: MissionState = {
+          missionId: mission.id,
+          missionName: mission.name,
+          sitrep: mission.sitrep,
+          difficulty: mission.difficulty,
+          inProgress: true,
+        };
+        autoSaveMissionLaunch(character, missionState);
+      } finally {
+        // Keep indicator visible briefly after save
+        setTimeout(() => setIsSaving(false), 500);
+      }
     }
 
      // Map SITREP to demo scenario type
@@ -58,6 +73,7 @@ function MissionBriefing() {
     } catch (error) {
       console.error("Failed to launch mission:", error);
       alert(`Failed to launch mission: ${error instanceof Error ? error.message : "Unknown error"}`);
+      setIsSaving(false);
     }
   }, [mission, createDemo, navigate, character]);
 
@@ -299,6 +315,9 @@ function MissionBriefing() {
           </div>
         </div>
       </div>
+      
+      {/* Save indicator */}
+      <SaveIndicator isSaving={isSaving} message="Saving mission..." />
     </div>
   );
 }

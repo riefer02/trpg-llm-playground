@@ -5,8 +5,10 @@
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "../components/ui/button";
-import { useContinueSave } from "../lib/save/useSaveSlots";
+import { useContinueSave, useSaveSlots } from "../lib/save/useSaveSlots";
+import { CrashRecoveryModal } from "../components/save/CrashRecoveryModal";
 import { useCreateDemoCombat } from "../lib/api";
+import { useState, useCallback } from 'react';
 
 export const Route = createFileRoute("/" as const)({
   component: TitleScreen,
@@ -15,21 +17,65 @@ export const Route = createFileRoute("/" as const)({
 function TitleScreen() {
   const navigate = useNavigate();
   const { hasSavedGame, loadMostRecent } = useContinueSave();
+  const { getMissionInProgress, getCombatInProgress, loadSlot } = useSaveSlots();
   const createDemo = useCreateDemoCombat();
+  const [showCrashRecovery, setShowCrashRecovery] = useState(false);
+  const [missionInProgress, setMissionInProgress] = useState<ReturnType<typeof getMissionInProgress>>(undefined);
 
   const handleNewPilot = () => {
     navigate({ to: "/characters/new" });
   };
 
-  const handleContinue = () => {
+  const handleContinue = useCallback(() => {
+    // Check if there's a mission or combat in progress
+    const missionSlot = getMissionInProgress();
+    const combatSlot = getCombatInProgress();
+    const activeSlot = missionSlot || combatSlot;
+    
+    if (activeSlot?.missionState) {
+      // Show crash recovery modal
+      setMissionInProgress(activeSlot);
+      setShowCrashRecovery(true);
+    } else {
+      // Normal continue flow
+      const slot = loadMostRecent();
+      if (slot) {
+        navigate({ to: "/quarters" });
+      } else {
+        // Should not happen because button is disabled when no saved game
+        console.error('No saved game to load');
+      }
+    }
+  }, [getMissionInProgress, getCombatInProgress, loadMostRecent, navigate]);
+
+  const handleResumeMission = useCallback(() => {
+    setShowCrashRecovery(false);
+    if (missionInProgress?.missionState?.combatSessionId) {
+      // Resume combat session
+      navigate({ 
+        to: `/combat/${missionInProgress.missionState.combatSessionId}`,
+        search: { missionId: missionInProgress.missionState.missionId }
+      });
+    } else if (missionInProgress?.missionState) {
+      // Resume at briefing
+      navigate({ 
+        to: `/missions/${missionInProgress.missionState.missionId}/briefing` 
+      });
+    }
+  }, [missionInProgress, navigate]);
+
+  const handleReturnToQuarters = useCallback(() => {
+    setShowCrashRecovery(false);
     const slot = loadMostRecent();
     if (slot) {
       navigate({ to: "/quarters" });
-    } else {
-      // Should not happen because button is disabled when no saved game
-      console.error('No saved game to load');
     }
-  };
+  }, [loadMostRecent, navigate]);
+
+  const handleCloseCrashRecovery = useCallback(() => {
+    setShowCrashRecovery(false);
+    setMissionInProgress(undefined);
+  }, []);
 
   const handleQuickBattle = async () => {
     try {
@@ -118,6 +164,17 @@ function TitleScreen() {
           </p>
         </div>
       </div>
+      
+      {/* Crash Recovery Modal */}
+      {missionInProgress?.missionState && (
+        <CrashRecoveryModal
+          isOpen={showCrashRecovery}
+          missionState={missionInProgress.missionState}
+          onResume={handleResumeMission}
+          onReturnToQuarters={handleReturnToQuarters}
+          onClose={handleCloseCrashRecovery}
+        />
+      )}
     </div>
   );
 }

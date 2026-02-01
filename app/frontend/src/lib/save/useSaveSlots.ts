@@ -4,7 +4,10 @@
 
 import { useCallback, useState, useEffect } from 'react';
 import type { CharacterResponse } from '../api/characters';
+import type { MissionState } from './saveSystem';
 import * as saveSystem from './saveSystem';
+
+export type { MissionState };
 
 // =============================================================================
 // Hook: useSaveSlots
@@ -52,6 +55,33 @@ export function useSaveSlots() {
     } finally {
       setIsLoading(false);
     }
+  }, [refreshSlots]);
+
+  const autoSaveMissionLaunch = useCallback((
+    character: CharacterResponse,
+    missionState: MissionState
+  ) => {
+    setIsLoading(true);
+    try {
+      const savedSlot = saveSystem.autoSaveMissionLaunch(character, missionState);
+      refreshSlots();
+      return savedSlot;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [refreshSlots]);
+
+  const getMissionInProgress = useCallback(() => {
+    return saveSystem.getMissionInProgress();
+  }, []);
+
+  const getCombatInProgress = useCallback(() => {
+    return saveSystem.getCombatInProgress();
+  }, []);
+
+  const clearMissionState = useCallback((slotIndex: number) => {
+    saveSystem.clearMissionState(slotIndex);
+    refreshSlots();
   }, [refreshSlots]);
 
   const loadSlot = useCallback((slotIndex: number) => {
@@ -114,9 +144,13 @@ export function useSaveSlots() {
     saveToSlot,
     deleteSlot,
     autoSave,
+    autoSaveMissionLaunch,
     loadSlot,
     loadMostRecent,
     getMostRecent,
+    getMissionInProgress,
+    getCombatInProgress,
+    clearMissionState,
     exportSlot,
     importSlot,
     clearAll,
