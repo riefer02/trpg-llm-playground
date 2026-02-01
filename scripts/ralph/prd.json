@@ -797,8 +797,8 @@
         "`make test-app` passes"
       ],
       "priority": 40,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented combat statistics tracking: CombatStatistics model with ActionTypeCount, CombatantStatistics; CombatStatisticsTracker class for mutable tracking during combat; update_statistics_from_action and update_statistics_for_turn_end integration functions. Backend initializes stats on scenario creation, updates during actions/turns, returns in completion response. Frontend reads stats from API response and passes to debrief page which displays damage dealt/received, enemies destroyed, turns taken, closest call HP, max overkill, and action breakdown (attacks/moves/techs). Fixed circular import in core.shared.combat.__init__.py."
     },
     {
       "id": "E9-US-001",

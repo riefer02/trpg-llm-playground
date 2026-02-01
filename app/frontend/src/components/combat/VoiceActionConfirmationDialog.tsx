@@ -1,4 +1,4 @@
-import { CheckCircle, XCircle, AlertCircle, Move, Sword, Zap, Target, Navigation } from "lucide-react";
+import { CheckCircle, AlertCircle, Move, Sword, Zap, Target, Navigation } from "lucide-react";
 import { Button } from "../ui";
 import { useEffect, useCallback } from "react";
 
@@ -39,15 +39,13 @@ export function VoiceActionConfirmationDialog({
   getCombatantName = (id) => id,
   getWeaponName = (id) => id,
 }: VoiceActionConfirmationDialogProps) {
-  if (!isOpen) {
-    return null;
-  }
-
   const hasError = error !== null;
   const hasAction = parsedAction !== null && !hasError;
 
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isOpen) return; // Guard inside callback instead
     if (e.key === 'Escape') {
       e.preventDefault();
       onClose();
@@ -56,14 +54,19 @@ export function VoiceActionConfirmationDialog({
       e.preventDefault();
       onConfirm(parsedAction!);
     }
-  }, [hasAction, isExecuting, onClose, onConfirm, parsedAction]);
+  }, [isOpen, hasAction, isExecuting, onClose, onConfirm, parsedAction]);
 
   useEffect(() => {
+    if (!isOpen) return; // Guard inside effect instead
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleKeyDown]);
+  }, [isOpen, handleKeyDown]);
+
+  if (!isOpen) {
+    return null;
+  }
 
   // Helper to get action type display
   const getActionTypeDisplay = (actionType: string): { label: string; icon: React.ReactNode; color: string } => {

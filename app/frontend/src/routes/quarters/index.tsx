@@ -17,38 +17,7 @@ function QuartersHub() {
   const navigate = useNavigate();
   const { character, isLoading, error } = useActiveCharacter();
 
-  // Redirect to title if no active pilot
-  if (!isLoading && !character) {
-    navigate({ to: "/" });
-    return null;
-  }
-
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground">Loading pilot quarters...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-destructive">Failed to load pilot data</p>
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // Mission count (placeholder)
   const { count: missionCount } = useMissionCount();
 
@@ -80,6 +49,38 @@ function QuartersHub() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Redirect to title if no active pilot
+  if (!isLoading && !character) {
+    navigate({ to: "/" });
+    return null;
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground">Loading pilot quarters...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-destructive">Failed to load pilot data</p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Extract pilot and mech info
   const pilotName = character?.callsign || "Unknown";

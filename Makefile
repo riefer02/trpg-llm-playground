@@ -11,7 +11,8 @@
 .PHONY: help test test-core test-llm test-app \
         dev dev-backend dev-frontend \
         db-up db-down db-migrate db-revision \
-        generate-types install-app lint
+        generate-types install-app \
+        lint lint-frontend lint-fix
 
 # =============================================================================
 # Help
@@ -43,6 +44,10 @@ help:
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install-app   - Install app dependencies (Python + Node)"
+	@echo ""
+	@echo "Linting:"
+	@echo "  make lint          - Run all linters (catches React hooks errors)"
+	@echo "  make lint-frontend - Run ESLint on frontend only"
 
 # =============================================================================
 # Testing
@@ -123,9 +128,18 @@ install-app:
 	@echo "Done! Run 'make db-up && make dev' to start development."
 
 # =============================================================================
-# Linting (optional, for CI)
+# Linting
 # =============================================================================
+# Frontend linting catches React hooks ordering errors BEFORE they cause
+# runtime crashes. Run before committing to catch issues early.
 
 lint:
 	ruff check core llm app/backend
-	cd app/frontend && npm run lint 2>/dev/null || true
+	cd app/frontend && npm run lint
+
+lint-frontend:
+	cd app/frontend && npm run lint
+
+lint-fix:
+	ruff check core llm app/backend --fix
+	cd app/frontend && npm run lint:fix

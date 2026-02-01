@@ -57,16 +57,14 @@ git checkout -b <branchName> || git checkout <branchName>
 
 ### Step 4: Run Quality Checks
 
-ALL changes must pass before committing:
+**CRITICAL**: ALL changes must pass BOTH tests AND lint before committing:
 ```bash
 make test-core    # Core tests (required)
-make lint         # Linting (required)
+make test-app     # App tests (if implementing app features)
+make lint         # Linting (REQUIRED - catches React hooks errors!)
 ```
 
-If implementing app features:
-```bash
-make test-app     # App tests
-```
+**Why lint is required**: React hooks ordering errors (e.g., hooks after early returns) don't show up in tests - they only crash at runtime. ESLint catches these instantly. Running `make lint` prevents runtime-only bugs that tests miss.
 
 ### Step 5: Commit Changes
 
@@ -124,6 +122,8 @@ After updating both files:
 
 ## Quality Standards
 
+- **Tests AND lint required**: Run both `make test` and `make lint` before committing
+- **React changes need lint**: `make lint-frontend` catches hooks errors that tests miss
 - **Tests required**: New functionality needs tests
 - **Type safety**: Use typed IDs from `core/shared/ids.py`
 - **Core-first**: Validation belongs in core, not API layer
@@ -174,9 +174,30 @@ Use these to verify migrations:
 mcp__database-reader__get_table_schema(table_name="combat_sessions")
 ```
 
-### React Hook Ordering
-In React components, hooks (`useCallback`, `useMemo`, `useEffect`) can only reference variables that are already defined above them. If you see "Cannot access X before initialization":
+### React Hook Ordering (Rules of Hooks)
+React Hooks must be called in the same order on every render. Tests don't catch these errors - **only `make lint` does!**
 
+**Most common error: Hooks after early returns**
+```typescript
+// ❌ WRONG: useEffect called AFTER early return
+function Component({ isOpen }) {
+  if (!isOpen) return null;  // Early return
+
+  useEffect(() => { ... }, []);  // ERROR! Hook after return
+}
+
+// ✅ RIGHT: Move hooks BEFORE early returns, guard INSIDE
+function Component({ isOpen }) {
+  useEffect(() => {
+    if (!isOpen) return;  // Guard inside the hook
+    // ... do work
+  }, [isOpen]);
+
+  if (!isOpen) return null;  // Early return AFTER all hooks
+}
+```
+
+**Hook ordering within component**
 ```typescript
 // ❌ WRONG: useEffect references currentActor before it's defined
 useEffect(() => { doSomething(currentActor) }, [currentActor]);
@@ -186,6 +207,8 @@ const currentActor = useMemo(() => ..., []);
 const currentActor = useMemo(() => ..., []);
 useEffect(() => { doSomething(currentActor) }, [currentActor]);
 ```
+
+**Detection**: Run `make lint-frontend` after any React changes. It catches these errors instantly with clear messages like "React Hook useEffect is called conditionally".
 
 ### Runtime Validation
 Tests passing does NOT guarantee the app works. After implementing app features:
@@ -197,6 +220,28 @@ Tests passing does NOT guarantee the app works. After implementing app features:
 
 ### Check Existing Patterns First
 Before writing new tests, look at existing tests in the same module for patterns. The codebase has 4000+ tests with established conventions.
+
+### Circular Imports in Core
+
+When adding new modules to `core/`, watch for circular imports. They cause ALL tests to fail with `ImportError: cannot import name 'X' from partially initialized module`.
+
+**Common Cause**: Package `__init__.py` re-exports a module that imports back into the same package tree.
+
+**Prevention**:
+1. **Don't re-export cross-dependent modules from `__init__.py`**. Instead, document that users should import directly from the module.
+2. **Use `TYPE_CHECKING`** for type-only imports that would create cycles.
+3. **Test immediately** after adding new imports: `make test-core`. If all tests fail with import errors, you've created a cycle.
+
+```python
+# ❌ In __init__.py - creates cycle if new_module imports from same package
+from core.shared.combat.new_module import func
+
+# ✅ In __init__.py - document direct import instead
+# Note: Import directly from module:
+#   from core.shared.combat.new_module import func
+```
+
+**Fixing**: Trace the import chain from the error. Remove the problematic import from `__init__.py`.
 
 ## Key Files Reference
 
@@ -210,4 +255,5 @@ Before writing new tests, look at existing tests in the same module for patterns
 - Each iteration gets fresh context - rely on `progress.txt` for continuity
 - If you discover reusable patterns, add them to `AGENTS.md`
 - If quality checks fail, fix the issue and try again within this iteration
-- Do NOT skip tests or force commits
+- **Do NOT skip tests or lint** - both must pass before committing
+- **Always run `make lint` after React changes** - it catches runtime-only errors that tests miss

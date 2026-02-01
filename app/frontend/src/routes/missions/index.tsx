@@ -26,37 +26,11 @@ function MissionSelect() {
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
-  // Redirect to quarters if no active pilot (should not happen due to quarters redirect)
-  if (!isLoading && !character) {
-    navigate({ to: "/quarters" });
-    return null;
-  }
-
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground">Loading available missions...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-destructive">Failed to load mission data</p>
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
+  // Navigation handlers (defined here so useEffect can reference them)
+  const handleSelectMission = (missionId: string) => {
+    navigate({ to: "/missions/$missionId/briefing", params: { missionId } });
+  };
 
   // Keyboard navigation with arrow keys
   useEffect(() => {
@@ -96,12 +70,40 @@ function MissionSelect() {
     }
   }, [missions]);
 
+  // Redirect to quarters if no active pilot (should not happen due to quarters redirect)
+  if (!isLoading && !character) {
+    navigate({ to: "/quarters" });
+    return null;
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground">Loading available missions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-destructive">Failed to load mission data</p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Navigation handlers
   const handleBack = () => navigate({ to: "/quarters" });
-  const handleSelectMission = (missionId: string) => {
-    // Navigate to briefing page (placeholder)
-    navigate({ to: "/missions/$missionId/briefing", params: { missionId } });
-  };
 
   // Render stars for difficulty
   const renderStars = (difficulty: number) => {

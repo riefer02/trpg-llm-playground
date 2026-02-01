@@ -1,5 +1,20 @@
 """Tactical combat primitives for Lancer mech combat."""
 
+from core.shared.combat.statistics import (
+    ActionTypeCount,
+    CombatStatistics,
+    CombatStatisticsTracker,
+    CombatantStatistics,
+)
+
+# Note: statistics_integration functions are NOT exported here to avoid
+# circular imports. Import them directly from:
+#   from core.shared.combat.statistics_integration import (
+#       initialize_statistics_for_scenario,
+#       update_statistics_for_turn_end,
+#       update_statistics_from_action,
+#   )
+
 from core.shared.combat.tactical_initiative import (
     ActorPriority,
     CombatSide,
@@ -32,8 +47,13 @@ from core.shared.combat.phased_tracker import (
 )
 
 __all__ = [
+    "ActionTypeCount",
     "ActorPriority",
     "CombatSide",
+    "CombatStatistics",
+    "CombatStatisticsTracker",
+    "CombatantStatistics",
+    # Note: statistics_integration functions not exported to avoid circular imports
     "TacticalInitiativeTracker",
     "PhasedTacticalTracker",
     "advance_to_next_actor",

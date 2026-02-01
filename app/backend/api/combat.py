@@ -34,6 +34,7 @@ from core.mech.combat_state import (
     MechInventory,
     WeaponMountState,
     WeaponState,
+    CombatStatistics,
 )
 
 # Import mission objectives for salvage calculation
@@ -69,6 +70,11 @@ from core.mech.combat_rules import DEFAULT_MECH_COMBAT_RULES
 from core.mech.combat_models import ActionExecutionInput, ReactionInput
 from core.shared.full_tech import FullTechOptionSelection
 from core.shared.campaign.campaign import MissionOutcomeReport
+from core.shared.combat.statistics_integration import (
+    initialize_statistics_for_scenario,
+    update_statistics_for_turn_end,
+    update_statistics_from_action,
+)
 from core.shared.overwatch import check_overwatch_triggers_for_movement
 from core.shared.decisions import (
     get_pending_decisions_for_combatant,
@@ -273,6 +279,7 @@ class CombatSessionCompleteResponse(CombatSessionResponse):
 
     xp_awarded: int | None = None
     salvage_awarded: int | None = None
+    statistics: dict | None = None  # CombatStatistics as dict
 
 
 # =============================================================================
@@ -303,13 +310,18 @@ def _validate_scenario(
     validated_combatants = [_validate_combatant(c) for c in combatants]
 
     try:
-        return MechCombatScenario(
+        scenario = MechCombatScenario(
             combatants=validated_combatants,
             environment=environment,
             rounds=[],
             grapples=[],
             deployables={},
         )
+        # Initialize combat statistics
+        scenario = scenario.model_copy(
+            update={"statistics": initialize_statistics_for_scenario(scenario)}
+        )
+        return scenario
     except PydanticValidationError as e:
         errors = [
             {"loc": list(err["loc"]), "msg": err["msg"], "type": err["type"]}
@@ -341,6 +353,14 @@ def _session_to_complete_response(
     salvage_awarded: int | None = None,
 ) -> CombatSessionCompleteResponse:
     """Convert DB record to complete response with reward details."""
+    # Extract statistics from scenario if available
+    statistics_dict = None
+    try:
+        scenario = MechCombatScenario.model_validate(session_db.scenario)
+        statistics_dict = scenario.statistics.model_dump(mode="json")
+    except Exception:
+        pass  # Statistics not available
+
     return CombatSessionCompleteResponse(
         id=session_db.id,
         gm_user_id=session_db.gm_user_id,
@@ -355,6 +375,7 @@ def _session_to_complete_response(
         scenario=session_db.scenario,
         xp_awarded=xp_awarded,
         salvage_awarded=salvage_awarded,
+        statistics=statistics_dict,
     )
 
 
@@ -703,6 +724,10 @@ async def create_demo_combat(
         grapples=[],
         rounds=[],
         deployables={},
+    )
+    # Initialize combat statistics
+    scenario = scenario.model_copy(
+        update={"statistics": initialize_statistics_for_scenario(scenario)}
     )
 
     # Create session name based on scenario type
@@ -1742,6 +1767,16 @@ async def execute_combat_action(
             ),
         )
 
+    # Update combat statistics
+    updated_statistics = update_statistics_from_action(
+        statistics=scenario.statistics,
+        scenario=updated_scenario,
+        actor=current_actor,
+        action_result=action_result,
+        action_type=body.action_type,
+        is_overcharge=body.is_overcharge,
+    )
+
     final_scenario = MechCombatScenario(
         combatants=list(updated_scenario.combatants),
         grapples=list(updated_scenario.grapples),
@@ -1749,6 +1784,11 @@ async def execute_combat_action(
         terrain=updated_scenario.terrain,
         environment=updated_scenario.environment,
         deployables=dict(updated_scenario.deployables),
+        sitrep_resolution=updated_scenario.sitrep_resolution,
+        pending_decisions=updated_scenario.pending_decisions,
+        objectives=updated_scenario.objectives,
+        mission_reserves=updated_scenario.mission_reserves,
+        statistics=updated_statistics,
     )
 
     # Persist
@@ -1846,6 +1886,29 @@ async def end_combat_turn(
         combat_session.current_round,
         combat_session.current_turn_index,
         current_turn,
+    )
+
+    # Update combat statistics for turn end
+    is_new_round = turn_end_result.round_advanced
+    updated_statistics = update_statistics_for_turn_end(
+        statistics=scenario.statistics,
+        combatant_id=turn_end_result.actor_id,
+        is_new_round=is_new_round,
+    )
+
+    # Create scenario with updated statistics
+    updated_scenario = MechCombatScenario(
+        combatants=list(updated_scenario.combatants),
+        grapples=list(updated_scenario.grapples),
+        rounds=list(updated_scenario.rounds),
+        terrain=updated_scenario.terrain,
+        environment=updated_scenario.environment,
+        deployables=dict(updated_scenario.deployables),
+        sitrep_resolution=updated_scenario.sitrep_resolution,
+        pending_decisions=updated_scenario.pending_decisions,
+        objectives=updated_scenario.objectives,
+        mission_reserves=updated_scenario.mission_reserves,
+        statistics=updated_statistics,
     )
 
     # Persist

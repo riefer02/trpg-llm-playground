@@ -22,9 +22,12 @@ Monorepo with three domains:
 | Layer | Purpose | Status |
 |-------|---------|--------|
 | **Core Engine** | All Lancer rules encoded | ✅ Complete (4000+ tests) |
-| **AI Tactician** | LLM that reasons about tactics and executes actions | 🔲 Next |
-| **Voice Interface** | Speech-to-action, text-to-speech narration | 🔲 Planned |
-| **Mission Generator** | Procedural objectives with narrative | 🔲 Planned |
+| **AI Tactician** | LLM that reasons about tactics and executes actions | ✅ Complete |
+| **Voice Interface** | Speech-to-action, text-to-speech narration | ✅ Complete |
+| **Mission Generator** | Procedural objectives with narrative | ✅ Complete |
+| **Game Flow** | Title screen, quarters hub, mission select, debrief | ✅ Complete |
+| **Combat Polish** | Action preview, confirmations, undo, statistics | ✅ Complete |
+| **Visual Polish** | Enemy colors, terrain patterns, help system | 🔲 Next |
 
 ### What We're NOT Building
 
@@ -84,6 +87,11 @@ make dev              # Start backend (8000) + frontend (5173)
 
 # Type Generation (after changing core/ models)
 make generate-types   # Python → JSON Schema → TypeScript
+
+# Linting (catches React hooks errors before runtime!)
+make lint             # Run all linters
+make lint-frontend    # ESLint only (catches hooks ordering issues)
+make lint-fix         # Auto-fix what can be fixed
 
 # Autonomous Development (Ralph Loop)
 ./scripts/ralph/ralph.sh                      # Claude Code, 10 iterations
@@ -185,8 +193,32 @@ When adding fields to `app/backend/db/models.py`, you MUST create an Alembic mig
 
 **Verification**: After creating a migration, use the database reader MCP tools to verify the schema changes were applied correctly.
 
-### React Hook Ordering
-Hooks can only reference variables defined above them. This causes runtime errors that tests don't catch:
+### React Hook Ordering (Rules of Hooks)
+React Hooks must be called in the same order on every render. This causes runtime errors that tests don't catch.
+
+**Run `make lint-frontend` to catch these errors before runtime!**
+
+**Most common error: Hooks after early returns**
+```typescript
+// ❌ WRONG: useEffect called after early return
+function MyComponent({ isOpen }) {
+  if (!isOpen) return null;  // Early return
+
+  useEffect(() => { ... }, []); // ERROR: Hook after return!
+}
+
+// ✅ CORRECT: Move hooks before early returns, guard inside
+function MyComponent({ isOpen }) {
+  useEffect(() => {
+    if (!isOpen) return;  // Guard INSIDE the hook
+    // ... do work
+  }, [isOpen]);
+
+  if (!isOpen) return null;  // Early return AFTER hooks
+}
+```
+
+**Hook ordering within component**
 ```typescript
 // ❌ Crashes: useEffect uses currentActor before it's defined
 useEffect(() => { ... currentActor?.id ... }, [currentActor?.id]);
@@ -199,6 +231,47 @@ useEffect(() => { ... currentActor?.id ... }, [currentActor?.id]);
 
 ### Runtime Validation
 Tests passing ≠ app working. After app changes, run `make dev` and check the browser console for errors.
+
+### Circular Imports in Core
+
+The `core/` module has deep interdependencies. When adding new modules, be careful of circular imports:
+
+**Common Circular Import Pattern**:
+```
+combat_state.py → new_module.py → combat_models.py → damage.py → combat_state.py
+```
+
+**Prevention Strategies**:
+
+1. **Don't re-export cross-dependent modules from `__init__.py`**:
+```python
+# ❌ WRONG: __init__.py re-exports module that imports from same package
+from core.shared.combat.statistics_integration import (...)  # Creates cycle
+
+# ✅ RIGHT: Document that users should import directly
+# In __init__.py:
+# Note: Import statistics_integration directly:
+#   from core.shared.combat.statistics_integration import func
+```
+
+2. **Use TYPE_CHECKING for type hints that create cycles**:
+```python
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.mech.combat_state import MechCombatScenario  # Only for type hints
+
+def my_func(scenario: "MechCombatScenario") -> None:  # String annotation
+    ...
+```
+
+3. **Move shared types to a lower-level module** that doesn't import from higher-level modules.
+
+**Debugging Circular Imports**:
+- Error: `ImportError: cannot import name 'X' from partially initialized module`
+- Run `make test-core` - if ALL tests fail with import errors, it's a circular import
+- Trace the import chain from the error message
+- Fix by removing the cycle (usually via `__init__.py` changes or TYPE_CHECKING)
 
 ## Autonomous Development (Ralph)
 

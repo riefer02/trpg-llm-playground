@@ -61,6 +61,9 @@ export function MechDisplay({ character }: MechDisplayProps) {
 
   const spLimit = stats?.system_points ?? 0;
 
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
+  const { mutate: spendSalvage, isPending } = useSpendSalvageForRepair();
+
   if (!activeMech) {
     return (
       <Card>
@@ -75,8 +78,6 @@ export function MechDisplay({ character }: MechDisplayProps) {
       </Card>
     );
   }
-
-  const { mutate: spendSalvage, isPending } = useSpendSalvageForRepair();
 
   const handleRepair = (repairType: string, weaponId?: string, systemId?: string) => {
     spendSalvage({

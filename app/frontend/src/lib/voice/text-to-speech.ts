@@ -72,9 +72,15 @@ export function useTextToSpeech(): UseTextToSpeechReturn {
   const synthesisRef = useRef<SpeechSynthesis | null>(null)
   const queueRef = useRef<QueuedUtterance[]>([])
   const currentUtteranceRef = useRef<QueuedUtterance | null>(null)
+  const isSpeakingRef = useRef(false)
   
   // Check if speechSynthesis is supported
   const ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
+
+  // Keep ref in sync with state for stable callbacks
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking
+  }, [isSpeaking])
   
   // Initialize speechSynthesis and load voices
   useEffect(() => {
@@ -115,16 +121,17 @@ export function useTextToSpeech(): UseTextToSpeechReturn {
     const synthesis = synthesisRef.current
     if (!synthesis || queueRef.current.length === 0) {
       setIsSpeaking(false)
+      isSpeakingRef.current = false
       return
     }
-    
+
     // If already speaking and current utterance is high priority, don't interrupt
-    if (isSpeaking && currentUtteranceRef.current?.options.priority === 'high') {
+    if (isSpeakingRef.current && currentUtteranceRef.current?.options.priority === 'high') {
       return
     }
-    
+
     // Cancel current speech if any (unless it's also high priority)
-    if (isSpeaking && currentUtteranceRef.current?.options.priority !== 'high') {
+    if (isSpeakingRef.current && currentUtteranceRef.current?.options.priority !== 'high') {
       synthesis.cancel()
     }
     
@@ -153,19 +160,22 @@ export function useTextToSpeech(): UseTextToSpeechReturn {
     // Event handlers
     utterance.onstart = () => {
       setIsSpeaking(true)
+      isSpeakingRef.current = true
       nextUtterance.options.onStart?.()
     }
-    
+
     utterance.onend = () => {
       setIsSpeaking(false)
+      isSpeakingRef.current = false
       nextUtterance.options.onEnd?.()
       currentUtteranceRef.current = null
       // Process next item after a short delay
       setTimeout(() => processQueue(), 100)
     }
-    
+
     utterance.onerror = (event) => {
       setIsSpeaking(false)
+      isSpeakingRef.current = false
       const errorMsg = `Speech synthesis error: ${event.error}`
       setError(errorMsg)
       nextUtterance.options.onError?.(errorMsg)
@@ -173,10 +183,10 @@ export function useTextToSpeech(): UseTextToSpeechReturn {
       // Process next item after error
       setTimeout(() => processQueue(), 100)
     }
-    
+
     // Start speaking
     synthesis.speak(utterance)
-  }, [isSpeaking, settings.voiceLanguage, settings.voiceSpeed, settings.masterVolume, availableVoices])
+  }, [settings.voiceLanguage, settings.voiceSpeed, settings.masterVolume, availableVoices])
   
   // Speak function - adds utterance to queue
   const speak = useCallback((text: string, options: TtsOptions = {}) => {
@@ -207,12 +217,12 @@ export function useTextToSpeech(): UseTextToSpeechReturn {
       queueRef.current.push(queuedItem)
       setQueueLength(queueRef.current.length)
     }
-    
+
     // If not currently speaking, start processing
-    if (!isSpeaking) {
+    if (!isSpeakingRef.current) {
       processQueue()
     }
-  }, [ttsSupported, settings.enableTTS, isSpeaking, processQueue])
+  }, [ttsSupported, settings.enableTTS, processQueue])
   
   const cancel = useCallback(() => {
     const synthesis = synthesisRef.current

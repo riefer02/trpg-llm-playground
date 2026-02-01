@@ -34,14 +34,10 @@ export function EndTurnConfirmationDialog({
   onConfirm,
   onCancel,
 }: EndTurnConfirmationDialogProps) {
-  if (!isOpen) {
-    return null;
-  }
-
-
-
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isOpen) return; // Guard inside callback instead
     if (e.key === 'Escape') {
       e.preventDefault();
       onCancel();
@@ -50,14 +46,19 @@ export function EndTurnConfirmationDialog({
       e.preventDefault();
       onConfirm();
     }
-  }, [isProcessing, onCancel, onConfirm]);
+  }, [isOpen, isProcessing, onCancel, onConfirm]);
 
   useEffect(() => {
+    if (!isOpen) return; // Guard inside effect instead
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleKeyDown]);
+  }, [isOpen, handleKeyDown]);
+
+  if (!isOpen) {
+    return null;
+  }
 
   const renderActionList = () => {
     const items = [];

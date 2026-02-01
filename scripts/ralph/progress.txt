@@ -685,3 +685,33 @@ Status: PASSED
 ### Next Steps
 - Next story: E8-US-005 (Combat Statistics Tracking) - implement statistics collection during combat
 ---
+
+## Iteration - Sat Feb 1 2026 08:55 UTC
+Story: E8-US-005 - Combat Statistics Tracking
+Status: PASSED (fix applied)
+
+### Issue Found
+The Ralph loop introduced a circular import when implementing combat statistics:
+- `combat_state.py` → `statistics.py` → `statistics_integration.py` → `combat_models.py` → `damage.py` → `combat_state.py`
+
+### Changes Made
+- core/shared/combat/__init__.py: Removed `statistics_integration` imports to break circular dependency. Functions can be imported directly from the module when needed.
+- core/shared/combat/statistics_integration.py: Fixed action counting to track BOTH action type (full/quick) AND action category (attack/move)
+- core/shared/combat/statistics_integration.py: Fixed closest call HP calculation to use hp_change from resource_changes instead of stale scenario state
+- scripts/ralph/prd.json: Marked E8-US-005 as passing with notes
+
+### Verification
+- `make test-core`: 4023 passed
+- `make test-app`: 108 passed (backend), 30 passed (frontend)
+- `make test-llm`: 30 passed
+- New statistics files pass linting
+
+### Learnings
+- Circular imports in Python often happen when `__init__.py` re-exports modules that have cross-dependencies
+- The fix is to not re-export problematic modules and require direct imports instead
+- When tracking HP changes during combat, the scenario state represents BEFORE values, not AFTER values
+- Action tracking needs to record both the timing type (full/quick) AND the semantic category (attack/move)
+
+### Next Steps
+- Remaining stories are in E9 (Visual & UX Polish): enemy colors, terrain patterns, token shapes, help system, compact header, side panel
+---

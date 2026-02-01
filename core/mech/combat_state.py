@@ -22,6 +22,7 @@ from core.shared.sitrep_resolution import SitrepResolution
 from core.shared.decisions import PendingDecision
 from core.shared.scenario import MissionObjective
 from core.shared.campaign.campaign import ReservePlanEntry
+from core.shared.combat.statistics import CombatStatistics
 from core.shared.rolls import ContestedCheck
 from core.shared.dice import DiceExpression
 from core.mech.grid import HexPosition, HexCoord
@@ -449,6 +450,11 @@ class MechCombatScenario(FrozenModel):
     mission_reserves: list[ReservePlanEntry] = Field(
         default_factory=list,
         description="Reserves from campaign lobby available for spending during combat",
+    )
+    # Combat statistics tracking for mission debrief
+    statistics: CombatStatistics = Field(
+        default_factory=CombatStatistics,
+        description="Combat statistics tracking for post-mission debriefing",
     )
 
 

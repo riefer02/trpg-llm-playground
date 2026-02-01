@@ -125,16 +125,15 @@ function CampaignDetailPage() {
     [data?.invites],
   );
 
-  if (isLoading || !data) {
-    return <CampaignDetailSkeleton />;
-  }
+  // Derive these values safely (may be undefined during loading)
+  const campaignModel = data?.data as LancerCampaign | undefined;
+  const lobbyState = campaignModel?.lobby_state;
+  const readiness = data?.readiness_summary;
+  const missionSummary = data?.mission_summary;
 
-  const campaignModel = data.data as LancerCampaign;
-  const lobbyState = campaignModel.lobby_state;
-  const readiness = data.readiness_summary;
-  const missionSummary = data.mission_summary;
-
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   useEffect(() => {
+    if (!campaignModel) return; // Guard for loading state
     setIdentityForm({
       squad_name: campaignModel.identity?.squad_name ?? "",
       patron: campaignModel.identity?.patron ?? "",
@@ -144,15 +143,17 @@ function CampaignDetailPage() {
       gm_prompts: [...(campaignModel.identity?.gm_prompts ?? [])],
     });
   }, [
-    campaignModel.identity?.patron,
-    campaignModel.identity?.squad_name,
-    campaignModel.identity?.who_we_are,
-    campaignModel.identity?.relationships,
-    campaignModel.identity?.themes,
-    campaignModel.identity?.gm_prompts,
+    campaignModel,
+    campaignModel?.identity?.patron,
+    campaignModel?.identity?.squad_name,
+    campaignModel?.identity?.who_we_are,
+    campaignModel?.identity?.relationships,
+    campaignModel?.identity?.themes,
+    campaignModel?.identity?.gm_prompts,
   ]);
 
   useEffect(() => {
+    if (!readiness) return; // Guard for loading state
     setLobbyForm({
       mission_name: lobbyState?.mission_plan?.mission_name ?? "",
       briefing_notes: lobbyState?.mission_plan?.briefing_notes ?? "",
@@ -171,13 +172,18 @@ function CampaignDetailPage() {
     });
     setStakePresetId("");
   }, [
+    readiness,
     lobbyState?.assigned_member_ids,
     lobbyState?.mission_plan,
     lobbyState?.min_pilot_count,
     lobbyState?.preferred_pilot_count,
-    readiness.min_pilots,
-    readiness.preferred_pilots,
+    readiness?.min_pilots,
+    readiness?.preferred_pilots,
   ]);
+
+  if (isLoading || !data || !campaignModel || !readiness) {
+    return <CampaignDetailSkeleton />;
+  }
 
   const handleInvite = (event: React.FormEvent) => {
     event.preventDefault();

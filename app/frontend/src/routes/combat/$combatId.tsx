@@ -858,17 +858,22 @@ function CombatSessionPage() {
           const navigationTimer = setTimeout(() => {
             // Redirect to debrief if missionId is known, otherwise to campaign/dashboard
             if (search.missionId) {
-              // Compute statistics
-              const turnsTaken =
-                scenario?.rounds?.reduce(
+              // Get statistics from API response
+              const stats = result.statistics;
+              const turnsTaken = stats?.total_turns ??
+                (scenario?.rounds?.reduce(
                   (acc, round) => acc + (round.turns?.length || 0),
                   0,
-                ) || 0;
-              const enemyCount =
-                scenario?.combatants?.filter((c) => c.side !== "players")
-                  .length || 0;
-              const damageDealt = enemyCount * 300; // placeholder
-              const damageReceived = 1200; // placeholder
+                ) ?? 0);
+              const damageDealt = stats?.total_damage_dealt_by_players ?? 0;
+              const damageReceived = stats?.total_damage_received_by_players ?? 0;
+              const enemiesDestroyed = stats?.total_enemies_destroyed ?? 0;
+              const closestCall = stats?.closest_call_hp ?? 0;
+              const closestCallCombatant = stats?.closest_call_combatant ?? "";
+              const maxOverkill = stats?.max_overkill ?? 0;
+              const attacks = stats?.action_totals?.attacks ?? 0;
+              const moves = stats?.action_totals?.moves ?? 0;
+              const techs = stats?.action_totals?.techs ?? 0;
               const xpEarned = result.xp_awarded ?? 0;
               const salvageEarned = result.salvage_awarded ?? 0;
 
@@ -880,6 +885,13 @@ function CombatSessionPage() {
                   turns: turnsTaken,
                   damageDealt,
                   damageReceived,
+                  enemiesDestroyed,
+                  closestCall,
+                  closestCallCombatant,
+                  maxOverkill,
+                  attacks,
+                  moves,
+                  techs,
                   xp: xpEarned,
                   salvage: salvageEarned,
                 },

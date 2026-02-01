@@ -2,7 +2,7 @@
  * Context for voice navigation to allow screens to handle specific intents.
  */
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { NavigationIntent } from './navigation'
 
 type IntentHandler = (intent: NavigationIntent) => boolean // return true if handled
@@ -27,15 +27,15 @@ export function VoiceNavigationProvider({
   onIntent,
 }: VoiceNavigationProviderProps) {
   const [handlers, setHandlers] = useState<IntentHandler[]>([])
-  
-  const registerHandler = (handler: IntentHandler) => {
+
+  const unregisterHandler = useCallback((handler: IntentHandler) => {
+    setHandlers(prev => prev.filter(h => h !== handler))
+  }, [])
+
+  const registerHandler = useCallback((handler: IntentHandler) => {
     setHandlers(prev => [...prev, handler])
     return () => unregisterHandler(handler)
-  }
-  
-  const unregisterHandler = (handler: IntentHandler) => {
-    setHandlers(prev => prev.filter(h => h !== handler))
-  }
+  }, [unregisterHandler])
   
   // When intent changes, notify handlers
   useEffect(() => {
@@ -56,12 +56,12 @@ export function VoiceNavigationProvider({
     }
   }, [intent, handlers, onIntent])
   
-  const value: VoiceNavigationContextValue = {
+  const value = useMemo<VoiceNavigationContextValue>(() => ({
     currentIntent: intent,
     registerHandler,
     unregisterHandler,
-  }
-  
+  }), [intent, registerHandler, unregisterHandler])
+
   return (
     <VoiceNavigationContext.Provider value={value}>
       {children}

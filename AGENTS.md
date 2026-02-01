@@ -440,13 +440,16 @@ Use these tools to verify migrations applied correctly and debug database issues
 
 3. **Verify migrations work**: After creating a migration, run `make db-migrate` and then `make dev` to confirm the app starts without database errors
 
-### Testing
+### Testing & Linting
 
 ```bash
 make test-app           # All app tests
+make lint-frontend      # ESLint (catches React hooks errors!)
 cd app/backend && pytest -v   # Backend only
 cd app/frontend && npm test   # Frontend only
 ```
+
+**IMPORTANT**: Always run `make lint-frontend` after making React changes. Tests don't catch React hooks ordering errors - they only crash at runtime. The linter catches them instantly.
 
 Backend tests use in-memory SQLite (no Docker needed).
 
@@ -457,6 +460,50 @@ Backend tests use in-memory SQLite (no Docker needed).
 - **Literal types**: Prefer `Literal["a", "b"]` over `Enum` for better IDE support
 - **Typed IDs**: Use `NewType` IDs from `core/shared/ids.py` (e.g., `WeaponId`, `MechId`); prefer `IdField` helpers from `core/shared/id_helpers.py` for coercion/backward compatibility
 - **Effect primitives**: Build mechanical behaviors with types from `core/shared/effects/`
+
+### Avoiding Circular Imports
+
+The `core/` module has deep interdependencies. New modules can easily create import cycles.
+
+**Symptom**: `make test-core` fails with ALL tests showing `ImportError: cannot import name 'X' from partially initialized module`.
+
+**Common Cause**: Package `__init__.py` re-exports a module that imports back into the same package.
+
+```
+core/shared/combat/__init__.py imports from statistics_integration.py
+    → statistics_integration.py imports from combat_models.py
+    → combat_models.py imports from damage.py
+    → damage.py imports from combat_state.py
+    → combat_state.py imports from core/shared/combat/ ← CYCLE!
+```
+
+**Prevention Strategies**:
+
+1. **Don't re-export cross-dependent modules from `__init__.py`**:
+```python
+# ❌ Creates cycle if statistics_integration imports from same package tree
+from core.shared.combat.statistics_integration import (...)
+
+# ✅ Document that users should import directly instead
+# # Note: Import directly from module:
+# #   from core.shared.combat.statistics_integration import func
+```
+
+2. **Use `TYPE_CHECKING` for type-only imports**:
+```python
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.mech.combat_state import MechCombatScenario
+
+def func(scenario: "MechCombatScenario") -> None:  # String annotation
+    from core.mech.combat_state import MechCombatScenario  # Runtime import
+    ...
+```
+
+3. **Move shared types to lower-level modules** that don't import from higher-level modules.
+
+**Debugging**: Trace the import chain from the error message. Usually the fix is removing an import from `__init__.py`.
 
 ### LLM Pipeline
 - **Paths**: Relative to `llm/` directory
@@ -527,7 +574,13 @@ class PilotData(BaseModel): ...
 
 If a type is missing, add the model to `core/export.py` and run `make generate-types`.
 
-### Testing
+### Testing & Linting
+
+**ALWAYS RUN BOTH before committing**:
+```bash
+make test           # All tests
+make lint           # All linters (catches React hooks errors!)
+```
 
 **Test Commands**:
 - `make test-core` - Core type system (3225+ tests)
@@ -535,15 +588,24 @@ If a type is missing, add the model to `core/export.py` and run `make generate-t
 - `make test-app` - Web app (in-memory SQLite, no Docker)
 - `make test` - All tests
 
-**Testing Requirements**:
+**Lint Commands**:
+- `make lint` - All linters (Python + JavaScript)
+- `make lint-frontend` - ESLint only (React hooks, TypeScript)
+- `make lint-fix` - Auto-fix what can be fixed
 
-| When You | Test Requirement |
-|----------|------------------|
+**Why linting matters**: React hooks ordering errors (e.g., hooks after early returns) don't show up in tests - they only crash at runtime. ESLint catches these instantly.
+
+**Testing & Linting Requirements**:
+
+| When You | Requirement |
+|----------|-------------|
 | Change core model | Write/update tests for affected model |
 | Add computed property | Test derivation at relevant states |
 | Add API endpoint | Test CRUD, validation, errors, computed fields |
 | Change validation | Test both valid and invalid cases |
 | Fix a bug | Write failing test first, then fix |
+| **Change React component** | **Run `make lint-frontend` - tests don't catch hooks errors!** |
+| **Before committing** | **Run `make test && make lint`** |
 
 **Test Patterns**:
 
@@ -580,11 +642,12 @@ core/ change → make test-core → add to export.py → make generate-types →
 
 ## Completed Features
 
-### Core (3277+ tests passing)
+### Core (4000+ tests passing)
 - ✅ **Character System**: Unified Pilot + Mech model (52 tests) - the primary abstraction
 - ✅ **Pilot System**: Skills, backgrounds, 34 talents, licenses, 31 core bonuses, cloning
 - ✅ **Mech System**: 29 frames, 88 weapons, 124 systems, combat state tracking
 - ✅ **Combat System**: Actions, conditions, initiative, heat/structure/stress
+- ✅ **Combat Statistics**: Damage tracking, action counting, closest call, overkill
 - ✅ **NPC System**: 53 templates, AI behaviors, tier/class system
 - ✅ **GM Toolkit**: SITREPs, encounters, world generation
 - ✅ **Effects System**: 136 mechanical effect types with typed primitives
@@ -592,21 +655,25 @@ core/ change → make test-core → add to export.py → make generate-types →
 - ✅ **JSON Schema Export**: Individual and combined schema files
 - ✅ **Validation System**: Pilot progression, mech builds, LL0 rules, license gating
 
-### Web Application (79 backend + 19 frontend tests passing)
+### Web Application (108 backend + 30 frontend tests passing)
 - ✅ **Character API**: Full CRUD with unified pilot + mech, loadout updates, PDF export
 - ✅ **Character Frontend**: List, create, detail routes, loadout builder
-- ✅ **Pilot API**: Low-level primitive API (kept for internal use)
-- ✅ **Combat Session API**: CRUD + campaign integration
+- ✅ **Combat Session API**: CRUD + campaign integration + statistics tracking
 - ✅ **Campaign API**: Full lifecycle (create, invite, lobby, launch, outcome)
 - ✅ **Combat Canvas**: Hex grid visualization with AoE overlays
-- ✅ **Shared Utilities**: `validate_core_model()` for DRY API layer
+- ✅ **Combat UI**: Action preview, AI thinking indicator, victory celebration
+- ✅ **Game Flow**: Title screen, quarters hub, mission select, briefing, debrief
+- ✅ **Voice Interface**: Speech-to-text input, voice intent parsing, TTS narration
+- ✅ **Settings & Save System**: Persistent settings, auto-save, save slots
 
 ### LLM
+- ✅ **AI Tactician**: Multi-action turn planning, tactical reasoning, difficulty scaling
+- ✅ **Voice Intent Parser**: Natural language → combat actions
+- ✅ **Mission Generator**: SITREP selection, enemy composition, terrain generation
+- ✅ **Narrative Generation**: Mission briefings and debriefs with LLM
 - ✅ **RAG Integration**: Heading-aware chunking, FAISS indexing
 - ✅ **Multi-Turn Generation**: Follow-up conversations
 - ✅ **Quality Pipeline**: Verification, deduplication, negatives
-- ✅ **Multi-RPG Templates**: D&D, Lancer, Blades configs
-- ✅ **Evaluation Benchmark**: Accuracy/grounding/citation metrics
 - ✅ **Local Chat**: Ollama + RAG with Gradio UI
 
 ## Autonomous Development (Ralph)
@@ -666,27 +733,24 @@ scripts/ralph/
 
 ## Roadmap
 
-### Current: AI Tactician
-Build an LLM-powered opponent that reasons about tactics.
+### Current: Visual & UX Polish (E9)
+Remaining stories in `scripts/ralph/prd.json`:
+- Enemy team red/crimson color scheme
+- Terrain SVG patterns
+- Frame-based token shapes
+- Contextual help system
+- Compact combat header
+- Side panel information hierarchy
 
-The AI Tactician PRD is at `scripts/ralph/prd.json` with these stories:
-- US-001: Combat state serializer (state → LLM-readable JSON)
-- US-002: Tactical system prompt (combat reasoning instructions)
-- US-003: Action parser (LLM output → validated action)
-- US-004: Tactician class (orchestrates the loop)
-- US-005: Wire into NPC turn flow
-- US-006: UI displays AI reasoning
-
-### Completed (Foundation)
+### Completed
 - ✅ Core type system (4000+ tests)
 - ✅ Combat state machine (actions, reactions, conditions)
-- ✅ Quick Battle (instant scenario generation)
-- ✅ Combat UI (canvas, action bar, tooltips, pan/zoom)
-
-### Future
-- Voice interface (speech-to-action, TTS narration)
-- Mission generator (procedural objectives + narrative)
-- Progression loop (pilot advancement, unlocks)
+- ✅ AI Tactician (multi-action planning, difficulty scaling)
+- ✅ Voice interface (speech-to-text, intent parsing, TTS)
+- ✅ Mission generator (SITREPs, terrain, narrative)
+- ✅ Game flow (title, quarters, missions, debrief)
+- ✅ Combat polish (preview, confirmations, statistics)
+- ✅ Progression (XP, licenses, salvage, save/load)
 
 ### Out of Scope
 - ~~Multiplayer/co-op~~

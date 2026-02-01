@@ -17,6 +17,13 @@ interface DebriefSearch {
   turns?: number;
   damageDealt?: number;
   damageReceived?: number;
+  enemiesDestroyed?: number;
+  closestCall?: number;
+  closestCallCombatant?: string;
+  maxOverkill?: number;
+  attacks?: number;
+  moves?: number;
+  techs?: number;
   xp?: number;
   salvage?: number;
 }
@@ -26,8 +33,15 @@ export const Route = createFileRoute("/missions/$missionId/debrief" as const)({
   validateSearch: (search: Record<string, unknown>): DebriefSearch => ({
     outcome: search.outcome === "defeat" ? "defeat" : "victory",
     turns: typeof search.turns === "number" ? search.turns : 8,
-    damageDealt: typeof search.damageDealt === "number" ? search.damageDealt : 2450,
-    damageReceived: typeof search.damageReceived === "number" ? search.damageReceived : 1200,
+    damageDealt: typeof search.damageDealt === "number" ? search.damageDealt : 0,
+    damageReceived: typeof search.damageReceived === "number" ? search.damageReceived : 0,
+    enemiesDestroyed: typeof search.enemiesDestroyed === "number" ? search.enemiesDestroyed : 0,
+    closestCall: typeof search.closestCall === "number" ? search.closestCall : 0,
+    closestCallCombatant: typeof search.closestCallCombatant === "string" ? search.closestCallCombatant : "",
+    maxOverkill: typeof search.maxOverkill === "number" ? search.maxOverkill : 0,
+    attacks: typeof search.attacks === "number" ? search.attacks : 0,
+    moves: typeof search.moves === "number" ? search.moves : 0,
+    techs: typeof search.techs === "number" ? search.techs : 0,
     xp: typeof search.xp === "number" ? search.xp : undefined,
     salvage: typeof search.salvage === "number" ? search.salvage : undefined,
   }),
@@ -185,10 +199,54 @@ function MissionDebrief() {
                   <div className="text-sm text-muted-foreground">Damage Received</div>
                 </div>
                 <div className="bg-muted/30 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-bold text-foreground">{mission.enemyCount}</div>
-                  <div className="text-sm text-muted-foreground">Enemies Engaged</div>
+                  <div className="text-3xl font-bold text-foreground">{search.enemiesDestroyed}</div>
+                  <div className="text-sm text-muted-foreground">Enemies Destroyed</div>
                 </div>
               </div>
+
+              {/* Interesting moments */}
+              {(search.closestCall && search.closestCall > 0) || (search.maxOverkill && search.maxOverkill > 0) ? (
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {search.closestCall && search.closestCall > 0 && (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-amber-500">{search.closestCall} HP</div>
+                      <div className="text-sm text-muted-foreground">
+                        Closest Call{search.closestCallCombatant ? ` - ${search.closestCallCombatant}` : ""}
+                      </div>
+                    </div>
+                  )}
+                  {search.maxOverkill && search.maxOverkill > 0 && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-red-500">{search.maxOverkill} damage</div>
+                      <div className="text-sm text-muted-foreground">Max Overkill</div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {/* Action breakdown */}
+              {(search.attacks || search.moves || search.techs) ? (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Actions Taken</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {search.attacks ? (
+                      <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                        {search.attacks} Attacks
+                      </span>
+                    ) : null}
+                    {search.moves ? (
+                      <span className="px-3 py-1 bg-blue-500/10 text-blue-500 rounded-full text-sm">
+                        {search.moves} Moves
+                      </span>
+                    ) : null}
+                    {search.techs ? (
+                      <span className="px-3 py-1 bg-purple-500/10 text-purple-500 rounded-full text-sm">
+                        {search.techs} Tech Actions
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </section>
           </div>
 

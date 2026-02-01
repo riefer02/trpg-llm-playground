@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import { forwardRef, useImperativeHandle, useRef } from "react";
+import { forwardRef, useImperativeHandle } from "react";
 import type {
   ActionEconomyState,
   ActionRequest,
@@ -167,8 +167,7 @@ export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
     cancel() {
       // If we're in targeting mode, cancel back to confirming/idle
       if (panelState === "selecting_target" || panelState === "selecting_full_tech_target") {
-        // Clear selected targets but keep the action selected
-        setSelectedTargetIds([]);
+        // selectedTargetIds is cleared by parent via onTargetModeChange(null)
         // Return to confirming state (or selecting_full_tech_option for full tech)
         if (panelState === "selecting_full_tech_target") {
           setPanelState("selecting_full_tech_option");
