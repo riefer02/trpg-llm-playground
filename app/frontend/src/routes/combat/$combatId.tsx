@@ -299,9 +299,13 @@ function CombatSessionPage() {
   const [isForfeiting, setIsForfeiting] = useState(false);
   const [showNavigationConfirm, setShowNavigationConfirm] = useState(false);
 
+  // Overcharge confirmation state (must be before useEffects that use it)
+  const [showOverchargeConfirm, setShowOverchargeConfirm] = useState(false);
+
   // Help system state (E9-US-004)
   const [showHelpOverlay, setShowHelpOverlay] = useState(false);
   const [showFirstCombatTutorial, setShowFirstCombatTutorial] = useState(false);
+  const [tutorialDismissedThisSession, setTutorialDismissedThisSession] = useState(false);
   const [hasSeenTutorial, setHasSeenTutorial] = useState(() => {
     // Check localStorage for whether user has seen tutorial
     if (typeof window !== 'undefined') {
@@ -357,10 +361,11 @@ function CombatSessionPage() {
 
   // Show first combat tutorial when entering first turn of first combat
   useEffect(() => {
-    if (data?.status === 'active' && 
-        currentRound === 1 && 
-        isPlayerTurn && 
+    if (data?.status === 'active' &&
+        currentRound === 1 &&
+        isPlayerTurn &&
         !hasSeenTutorial &&
+        !tutorialDismissedThisSession &&
         !showFirstCombatTutorial) {
       // Small delay to let the combat UI settle
       const timer = setTimeout(() => {
@@ -368,7 +373,7 @@ function CombatSessionPage() {
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [data?.status, currentRound, isPlayerTurn, hasSeenTutorial, showFirstCombatTutorial]);
+  }, [data?.status, currentRound, isPlayerTurn, hasSeenTutorial, tutorialDismissedThisSession, showFirstCombatTutorial]);
 
   // Handle tutorial "don't show again" preference
   const handleTutorialDontShowAgain = () => {
@@ -482,9 +487,6 @@ function CombatSessionPage() {
     null,
   );
   const [showReasoningPanel, setShowReasoningPanel] = useState(false);
-
-  // Overcharge confirmation state (must be before Escape key useEffect)
-  const [showOverchargeConfirm, setShowOverchargeConfirm] = useState(false);
 
   // Context menu state (must be before Escape key useEffect)
   const [contextMenu, setContextMenu] = useState<{
@@ -2209,7 +2211,10 @@ function CombatSessionPage() {
         {/* First Combat Tutorial (E9-US-004) */}
         <FirstCombatTutorial
           isOpen={showFirstCombatTutorial}
-          onClose={() => setShowFirstCombatTutorial(false)}
+          onClose={() => {
+            setShowFirstCombatTutorial(false);
+            setTutorialDismissedThisSession(true);
+          }}
           onDontShowAgain={handleTutorialDontShowAgain}
         />
       </div>
