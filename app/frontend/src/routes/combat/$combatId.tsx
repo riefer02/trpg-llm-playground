@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
 import { useSettings } from "../../lib/hooks/useSettings";
 import { useLowHPWarning } from "../../lib/hooks/useLowHPWarning";
+import { useKeyboardShortcuts } from "../../lib/hooks/useKeyboardShortcuts";
 import { useCombatNarration } from "../../lib/voice/text-to-speech";
 import { useSpeechRecognition } from "../../lib/voice/speech-to-text";
 
@@ -79,6 +80,7 @@ import { TraumaSelectionPrompt } from "../../components/combat/TraumaSelectionPr
 import { MissionCompleteModal } from "../../components/combat/MissionCompleteModal";
 import { ForfeitConfirmationModal } from "../../components/combat/ForfeitConfirmationModal";
 import { PauseMenu } from "../../components/combat/PauseMenu";
+import { InGameSettings } from "../../components/combat/InGameSettings";
 import { VictoryCelebration } from "../../components/combat/VictoryCelebration";
 import { VictoryConditionPanel } from "../../components/combat/VictoryConditionPanel";
 import { ObjectiveTracker } from "../../components/combat/ObjectiveTracker";
@@ -287,6 +289,10 @@ function CombatSessionPage() {
 
   // Pause state
   const [showPauseMenu, setShowPauseMenu] = useState(false);
+  const [showInGameSettings, setShowInGameSettings] = useState(false);
+
+  // Keyboard shortcuts for help
+  const keyboardShortcuts = useKeyboardShortcuts();
 
   // Global keyboard shortcut: Ctrl+Q to forfeit mission
   useEffect(() => {
@@ -600,6 +606,10 @@ function CombatSessionPage() {
 
   // Handle auto NPC turn
   const handleAutoNpcTurn = useCallback(() => {
+    // Don't process AI turns while game is paused
+    if (showPauseMenu) {
+      return;
+    }
     // Clear previous reasoning
     setAiReasoning(null);
     autoNpcTurn.mutate(undefined, {
@@ -628,7 +638,7 @@ function CombatSessionPage() {
       },
       onError: (err) => toast.error(err.message || "NPC turn failed"),
     });
-  }, [autoNpcTurn, settings, narrateTurnStart, narrateAction]);
+  }, [autoNpcTurn, settings, narrateTurnStart, narrateAction, showPauseMenu]);
 
   // Action triggered from ActionBar (to pass to ActionPanel)
   const [triggeredAction, setTriggeredAction] =
@@ -1419,6 +1429,31 @@ function CombatSessionPage() {
         isOpen={showVictoryCelebration}
         outcome={victoryOutcome}
         onClose={() => setShowVictoryCelebration(false)}
+      />
+
+      {/* Pause Menu */}
+      <PauseMenu
+        isOpen={showPauseMenu}
+        onResume={() => setShowPauseMenu(false)}
+        onOpenSettings={() => {
+          setShowPauseMenu(false);
+          setShowInGameSettings(true);
+        }}
+        onOpenHelp={() => {
+          setShowPauseMenu(false);
+          keyboardShortcuts.open();
+        }}
+        onOpenForfeit={() => {
+          setShowPauseMenu(false);
+          setShowForfeitModal(true);
+        }}
+        isPaused={showPauseMenu}
+      />
+
+      {/* In-Game Settings */}
+      <InGameSettings
+        isOpen={showInGameSettings}
+        onClose={() => setShowInGameSettings(false)}
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">

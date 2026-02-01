@@ -623,6 +623,29 @@ Status: FIXES APPLIED
 - All tests pass: Core (4004), LLM, Backend (108), Frontend (30)
 - Quick Battle flow verified via Chrome DevTools: title screen → combat → turn start → actions displayed
 
+## Iteration - Sat Jan 31 2026 23:00 UTC
+Story: E8-US-002 - Pause Functionality
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/components/combat/InGameSettings.tsx: Created new in-game settings modal with Audio, Voice, Display, and Accessibility sections for pause menu
+- app/frontend/src/routes/combat/$combatId.tsx:
+  - Imported InGameSettings and useKeyboardShortcuts hook
+  - Added showInGameSettings state for settings modal
+  - Added keyboardShortcuts hook instance for help functionality
+  - Modified handleAutoNpcTurn to check showPauseMenu and skip processing when paused
+  - Added PauseMenu component to JSX with handlers for Resume, Settings, Forfeit, and Help
+  - Added InGameSettings component to JSX
+  - Wired up onOpenSettings to close pause menu and open in-game settings
+  - Wired up onOpenHelp to close pause menu and open keyboard shortcuts modal
+
+### Learnings
+- The existing PauseMenu component was already built but not integrated into the combat page JSX
+- In-game settings should reuse existing useSettings hook with updateSettings (not updateSetting)
+- Slider and Toggle components require label prop per their interfaces
+- AI turn processing can be paused by checking showPauseMenu state in handleAutoNpcTurn callback
+- Keyboard shortcuts modal can be controlled via useKeyboardShortcuts() hook which provides open/close/toggle functions
+
 ### Next Steps
-- Continue with remaining PRD stories: E8-US-002 (Pause), E8-US-003/004/005, E9-US-* (Visual Polish)
+- Next story: E8-US-003 (Auto-Save on Mission Launch)
 ---
