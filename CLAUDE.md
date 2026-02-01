@@ -27,7 +27,9 @@ Monorepo with three domains:
 | **Mission Generator** | Procedural objectives with narrative | ✅ Complete |
 | **Game Flow** | Title screen, quarters hub, mission select, debrief | ✅ Complete |
 | **Combat Polish** | Action preview, confirmations, undo, statistics | ✅ Complete |
-| **Visual Polish** | Enemy colors, terrain patterns, help system | 🔲 Next |
+| **Visual Polish** | Enemy colors, terrain patterns, help system, side panel | ✅ Complete |
+
+**All 46 user stories in the PRD are complete.** See `scripts/ralph/prd.json` for details.
 
 ### What We're NOT Building
 
