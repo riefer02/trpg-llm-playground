@@ -649,3 +649,39 @@ Status: PASSED
 ### Next Steps
 - Next story: E8-US-003 (Auto-Save on Mission Launch)
 ---
+
+## Iteration - Sat Jan 31 2026 22:45 UTC
+Story: E8-US-004 - Prevent Accidental Navigation
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/routes/combat/\$combatId.tsx:
+  - Added `useBlocker` import from `@tanstack/react-router`
+  - Added `isForfeiting` state to bypass navigation blocker during forfeit flow
+  - Added `showNavigationConfirm` state for custom confirmation modal
+  - Implemented `useBlocker` hook with `shouldBlockFn` that blocks navigation when combat is active and not forfeiting
+  - Added `useEffect` to show custom modal when blocker status is 'blocked'
+  - Implemented `handleNavigationConfirm` callback to proceed or reset based on user choice
+  - Added `beforeunload` event listener for browser tab/window closing (shows native browser warning)
+  - Updated `handleForfeitMission` to set `isForfeiting(true)` before mutation to bypass blocker
+  - Added Navigation Confirmation Modal JSX with "Leave Combat?" title, "Progress will be lost" message, and Stay/Leave buttons
+
+### Acceptance Criteria Verification
+✅ Browser back button during combat shows confirmation (useBlocker handles this)
+✅ Confirmation: "Leave combat? Progress will be lost." (shown in modal)
+✅ Closing browser tab shows native 'unsaved changes' warning (beforeunload event)
+✅ No confirmation needed after combat ends (blocker only active when status === 'active')
+✅ Forfeit flow bypasses this (isForfeiting flag set to true)
+✅ Works on all browsers (beforeunload event is standard)
+✅ `make test-app` passes (108 backend + 30 frontend tests)
+
+### Learnings
+- TanStack Router's `useBlocker` is the idiomatic way to handle navigation blocking in React Router v6+
+- `enableBeforeUnload: true` in useBlocker enables the native browser warning for tab closing
+- Custom modal approach provides better UX than browser's native confirm() dialog
+- State flag (isForfeiting) is needed to bypass blocker for intentional navigation flows like forfeit
+- Blocker should only be active during 'active' combat status to avoid blocking post-combat navigation
+
+### Next Steps
+- Next story: E8-US-005 (Combat Statistics Tracking) - implement statistics collection during combat
+---

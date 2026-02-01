@@ -761,8 +761,8 @@
         "`make test-app` passes"
       ],
       "priority": 38,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented enhanced auto-save system: Extended SaveSlot with MissionState tracking (missionId, missionName, sitrep, difficulty, combatSessionId, inProgress). Auto-saves use dedicated slot (slot 2) to preserve manual saves in slots 0-1. SaveIndicator component shows visual feedback during save. CrashRecoveryModal offers resume/return options when continuing game with mission in progress. Briefing screen saves mission context before launch. Title screen detects missions in progress and shows recovery dialog. All tests pass (core: 4004, backend: 108, frontend: 30)."
     },
     {
       "id": "E8-US-004",
@@ -779,8 +779,8 @@
         "`make test-app` passes"
       ],
       "priority": 39,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented navigation protection using TanStack Router's useBlocker hook with custom confirmation modal. Added beforeunload event listener for browser tab/window closing. Forfeit flow sets isForfeiting flag to bypass blocker. Blocker only activates when combat status is 'active'. Custom modal shows 'Leave Combat?' with Stay/Leave buttons. All acceptance criteria satisfied. All tests pass (108 backend + 30 frontend)."
     },
     {
       "id": "E8-US-005",

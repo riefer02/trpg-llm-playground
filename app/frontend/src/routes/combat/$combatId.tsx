@@ -4,6 +4,7 @@ import {
   Link,
   useNavigate,
   useSearch,
+  useBlocker,
 } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
@@ -291,6 +292,10 @@ function CombatSessionPage() {
   const [showPauseMenu, setShowPauseMenu] = useState(false);
   const [showInGameSettings, setShowInGameSettings] = useState(false);
 
+  // Navigation protection state (E8-US-004)
+  const [isForfeiting, setIsForfeiting] = useState(false);
+  const [showNavigationConfirm, setShowNavigationConfirm] = useState(false);
+
   // Keyboard shortcuts for help
   const keyboardShortcuts = useKeyboardShortcuts();
 
@@ -310,6 +315,50 @@ function CombatSessionPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [data?.status, isPlayerTurn, showForfeitModal, showMissionCompleteModal]);
+
+  // Navigation blocking (E8-US-004): Prevent accidental navigation during combat
+  const blocker = useBlocker({
+    shouldBlockFn: () => {
+      // Only block if combat is active, not forfeiting, and not already showing confirmation
+      return data?.status === 'active' && !isForfeiting && !showNavigationConfirm;
+    },
+    enableBeforeUnload: true,
+    withResolver: true,
+  });
+
+  // Handle blocker status changes to show custom modal
+  useEffect(() => {
+    if (blocker.status === 'blocked') {
+      setShowNavigationConfirm(true);
+    }
+  }, [blocker.status]);
+
+  // Handle navigation confirmation response
+  const handleNavigationConfirm = useCallback((shouldLeave: boolean) => {
+    setShowNavigationConfirm(false);
+    if (shouldLeave && blocker.status === 'blocked') {
+      blocker.proceed();
+    } else {
+      blocker.reset();
+    }
+  }, [blocker]);
+
+  // beforeunload event for browser tab/window closing (E8-US-004)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Only show warning if combat is active and not forfeiting
+      if (data?.status === 'active' && !isForfeiting) {
+        // Standard beforeunload message (browser shows generic text for security)
+        e.preventDefault();
+        // Required for older browsers
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [data?.status, isForfeiting]);
 
   // Weapons data (needed for voice confirmation mapping)
   const weaponsQuery = useWeapons();
@@ -857,6 +906,8 @@ function CombatSessionPage() {
 
   // Handle mission forfeit
   const handleForfeitMission = useCallback(() => {
+    // Set forfeiting flag to bypass navigation blocker (E8-US-004)
+    setIsForfeiting(true);
     forfeitCombat.mutate(undefined, {
       onSuccess: (result) => {
         setShowForfeitModal(false);
@@ -1455,6 +1506,34 @@ function CombatSessionPage() {
         isOpen={showInGameSettings}
         onClose={() => setShowInGameSettings(false)}
       />
+
+      {/* Navigation Confirmation Modal (E8-US-004) */}
+      <Modal
+        isOpen={showNavigationConfirm}
+        onClose={() => handleNavigationConfirm(false)}
+        title="Leave Combat?"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Progress will be lost. Are you sure you want to leave combat?
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => handleNavigationConfirm(false)}
+            >
+              Stay
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleNavigationConfirm(true)}
+            >
+              Leave
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* Canvas area - reduced height when action bar visible */}
