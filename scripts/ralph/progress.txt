@@ -740,3 +740,52 @@ Status: PASSED
 ### Next Steps
 - Next story: E9-US-002 (Terrain SVG Patterns) - render terrain tiles with visually distinct SVG patterns
 ---
+
+## Iteration - Sun Feb 1 2026 14:55 UTC
+Story: E9-US-002 - Terrain SVG Patterns
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/lib/combat-render/terrain-patterns.ts: Created new module with SVG pattern definitions for 6 terrain types (forest, urban, water, hazard, desert, facility). Each pattern uses SVG with embedded pattern definitions for scalable, crisp rendering on Canvas.
+
+- app/frontend/src/lib/combat-render/canvas.ts: 
+  - Added terrainType field to RenderTerrainTile type
+  - Added TerrainStyle properties for elevation shadows and cover indicators
+  - Rewrote drawTerrainTiles() to support pattern-based rendering with fallback colors
+  - Added elevation depth indicators (shadows on bottom-right edges)
+  - Added cover position indicators (shield icons on alternating hex edges)
+  - Added preloadTerrainPatternsForContext() function for async pattern loading
+  - Added cachedTerrainPatterns module-level cache for performance
+
+- app/frontend/src/lib/combat-render/adapter.ts:
+  - Added terrainType parameter to CombatRenderAdapterInput
+  - Updated buildTerrainTiles() to accept and pass terrain type
+  - Added mapMissionTerrainToPattern() integration for tile_set mapping
+
+- app/frontend/src/components/combat/CombatCanvas.tsx:
+  - Added preloadTerrainPatternsForContext import
+  - Added useEffect to preload patterns when canvas context is available
+
+### Verification
+- `make test-app`: 108 passed (backend), 30 passed (frontend)
+- `make lint`: No new errors in modified files
+- Git commit: 36fc0fc
+
+### Learnings
+- Canvas pattern API (createPattern) works well with SVG data URLs for crisp, scalable terrain textures
+- Pattern preloading is essential for performance - patterns load async and need to be cached
+- Elevation depth can be simulated with shadow offset on bottom-right hex edges
+- Cover indicators work best on alternating edges to avoid visual clutter
+- Terrain types flow: Mission.terrain -> adapter.terrainType -> render tile.terrainType -> canvas pattern lookup
+
+### Acceptance Criteria Verification
+✅ Forest terrain: Green pattern with tree/leaf motif (TreePine shapes with leaf accents)
+✅ Urban terrain: Gray pattern with building/grid motif (Building blocks with windows)
+✅ Water terrain: Blue pattern with wave motif (Wave paths with sparkles)
+✅ Hazard terrain: Red/orange pattern with warning motif (Diagonal stripes + triangles)
+✅ Elevation changes have visual depth/shadow indicators (Shadow offset on bottom-right edges)
+✅ Cover positions have clear icon indicators on hex edges (Shield icons on alternating edges)
+
+### Next Steps
+- Next story: E9-US-003 (Frame-Based Token Shapes) - unique token shapes for different mech frames
+---

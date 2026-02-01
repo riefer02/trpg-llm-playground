@@ -830,8 +830,8 @@
         "Cover positions have clear icon indicators on hex edges"
       ],
       "priority": 42,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented SVG pattern system with 6 terrain types (forest, urban, water, hazard, desert, facility). Patterns use Canvas API with createPattern() for crisp rendering. Elevation shadows drawn on bottom-right edges create depth effect. Cover indicators appear as shield icons on alternating hex edges. CombatCanvas preloads patterns on mount. All acceptance criteria satisfied."
     },
     {
       "id": "E9-US-003",
