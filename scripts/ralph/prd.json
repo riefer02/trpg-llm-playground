@@ -866,8 +866,8 @@
         "Context-sensitive tips based on game state"
       ],
       "priority": 44,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented contextual help system with: ContextualHelpOverlay component (4 sections: Overview, Actions, Shortcuts, Voice), FirstCombatTutorial component (7-step tutorial with 'Don't show again' option), '?' help button in ActionBar with purple styling, keyboard shortcut (?) integration, first combat auto-detection, context-sensitive tips based on game state (action economy, heat warnings, reaction availability, overcharge tips), turn phase explanation with visual action economy display, detailed action explanations with tips for all major combat actions. All acceptance criteria satisfied. Tests pass (108 backend + 30 frontend)."
     },
     {
       "id": "E9-US-005",

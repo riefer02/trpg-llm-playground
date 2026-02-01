@@ -822,3 +822,55 @@ Status: PASSED
 ### Next Steps
 - Next story: E9-US-004 (Contextual Help System) - on-demand help overlay explaining actions and game state
 ---
+
+## Iteration - Sun Feb 1 2026 15:15 UTC
+Story: E9-US-004 - Contextual Help System
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/components/combat/ContextualHelpOverlay.tsx: New component with 4-tab interface (Overview, Actions, Shortcuts, Voice) showing combat help and reference information
+- app/frontend/src/components/combat/FirstCombatTutorial.tsx: New 7-step tutorial component that auto-shows on first combat with "Don't show again" option
+- app/frontend/src/components/combat/ActionBar.tsx: Added purple '?' help button with tooltip, added onHelpClick prop
+- app/frontend/src/routes/combat/$combatId.tsx: Integrated help system with keyboard shortcut (?), first combat detection, localStorage persistence for tutorial preference
+
+### Implementation Details
+- ContextualHelpOverlay features:
+  - Overview tab: Turn phase explanation with visual action economy display (Full/Quick/Reaction counters), context-sensitive tips based on game state (first turn, no actions left, high heat, reaction available, overcharge available), quick reference list
+  - Actions tab: Detailed explanations for all major combat actions (Move, Boost, Skirmish, Barrage, Quick Tech, Full Tech, Stabilize, Brace, Overcharge) with descriptions and tips
+  - Shortcuts tab: Keyboard shortcuts reference table (? for help, 1-0 for actions, Escape to cancel, Space for voice)
+  - Voice tab: Voice command examples and usage instructions
+- FirstCombatTutorial features:
+  - 7-step interactive tutorial (Welcome, Actions & Economy, Movement & Positioning, Attacking, Voice Commands, Keyboard Shortcuts, Ready)
+  - Progress dots navigation
+  - Skip option with X button
+  - "Don't show again" checkbox on final step with localStorage persistence
+  - Auto-triggers on first turn of first combat (Round 1, Player turn, not seen before)
+- Integration:
+  - Keyboard shortcut (?) opens help overlay when not typing in input
+  - Respects other modal states (won't open if voice confirmation, overcharge, forfeit, mission complete, victory, pause, or tutorial is showing)
+  - Help button in ActionBar with purple styling and tooltip
+
+### Acceptance Criteria Verification
+✅ '?' help button in action bar opens quick reference overlay
+✅ Turn phase explanation: 'You can use 1 Full + 2 Quick actions' (shown in Overview with visual counters)
+✅ Hover tooltips on action buttons explain what each action does (existing functionality, enhanced with unavailable reasons)
+✅ First combat shows brief tutorial overlay (7-step tutorial auto-shows on Round 1, Player turn, first time)
+✅ Help panel shows keyboard shortcuts and voice commands (dedicated tabs)
+✅ Context-sensitive tips based on game state (first turn, no actions, high heat, reaction available, overcharge available)
+
+### Testing
+- All tests pass: Core (4023), Backend (108), Frontend (30)
+- Linting: Clean for new components (only unrelated pre-existing warnings)
+- Manual verification: Help overlay opens with ? key, tutorial shows on first combat, navigation between tabs works
+
+### Learnings
+- Multi-tab interfaces can be implemented with simple state-based section switching instead of complex tab components
+- localStorage is effective for persisting user preferences like "don't show tutorial again"
+- Context-sensitive tips enhance UX by providing relevant guidance based on current game state
+- Keyboard shortcuts should check for active input focus to avoid triggering during text entry
+- First-time user experience (FTUE) requires careful timing - delay tutorial slightly to let UI settle
+
+### Next Steps
+- Next story: E9-US-005 (Compact Combat Header) - minimize header real estate during active turn
+---
+
