@@ -715,3 +715,28 @@ The Ralph loop introduced a circular import when implementing combat statistics:
 ### Next Steps
 - Remaining stories are in E9 (Visual & UX Polish): enemy colors, terrain patterns, token shapes, help system, compact header, side panel
 ---
+
+## Iteration - Sun Feb 1 2026 15:30 UTC
+Story: E9-US-001 - Enemy Team Red/Crimson Color Scheme
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/lib/combat-render/adapter.ts: Updated DEFAULT_SIDE_COLORS to use #dc2626 (red/crimson) for hostiles instead of orange #f97316
+- app/frontend/src/lib/combat-render/canvas.ts: Added side field to RenderToken type; added subtle blue glow effect for player tokens (rgba(59, 130, 246, 0.25))
+- app/frontend/src/components/combat/TurnIndicator.tsx: Added ENEMY TURN banner with prominent red bg-red-600 styling that displays for 3 seconds when enemy turn starts
+- app/frontend/src/lib/combat-render/adapter.ts: Updated buildTokens to pass side field through to RenderToken
+
+### Verification
+- `make test-app`: 111 passed (backend), 30 passed (frontend)
+- `make lint`: All frontend warnings are pre-existing; no new errors introduced
+- Git commit: a52ee96
+
+### Learnings
+- Token rendering can support team-based effects by passing side information through RenderToken
+- Canvas glow effects use rgba() for transparency to create subtle visual cues without being distracting
+- Turn banners follow the same pattern as existing YOUR TURN banner but with opposing color scheme
+- DEFAULT_SIDE_COLORS is the single source of truth for team colors across the combat visualization
+
+### Next Steps
+- Next story: E9-US-002 (Terrain SVG Patterns) - render terrain tiles with visually distinct SVG patterns
+---

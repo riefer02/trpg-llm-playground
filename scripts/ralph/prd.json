@@ -813,8 +813,8 @@
         "Targeting enemies shows crimson highlighting"
       ],
       "priority": 41,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Updated DEFAULT_SIDE_COLORS to use #dc2626 (red/crimson) for hostiles. Added ENEMY TURN banner with prominent red bg-red-600 styling. Added subtle blue glow effect (rgba(59, 130, 246, 0.25)) for player team tokens via new side field on RenderToken. TurnIndicator already uses red-400 for enemy badges. Targeting highlighting in CombatCanvas already uses crimson/green/blue scheme."
     },
     {
       "id": "E9-US-002",
