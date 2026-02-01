@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import {
+  useEffect,
+  useState,
+} from "react";
+import {
   Footprints,
   Zap,
   Swords,
@@ -19,6 +23,7 @@ import {
   Skull,
   Target,
   Mic,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -324,6 +329,8 @@ export interface ActionBarProps {
   isVoiceListening?: boolean;
   voiceEnabled?: boolean;
   voiceSupported?: boolean;
+  // Help
+  onHelpClick?: () => void;
 }
 
 export function ActionBar({
@@ -344,6 +351,8 @@ export function ActionBar({
   isVoiceListening = false,
   voiceEnabled = false,
   voiceSupported = false,
+  // Help
+  onHelpClick = () => {},
 }: ActionBarProps) {
   // Helper to get first weapon ID for an action that requires a weapon
   const getWeaponIdForAction = (action: AvailableActionItem): string | null => {
@@ -627,6 +636,44 @@ export function ActionBar({
                   </div>
                 </>
               )}
+
+              {/* Help Button */}
+              <>
+                {(freeActions.length > 0 || protocols.length > 0 || (canOvercharge && !economy.overcharge_used) || (voiceSupported && voiceEnabled)) && (
+                  <div className="w-px h-10 bg-border" />
+                )}
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={onHelpClick}
+                    disabled={isExecuting}
+                    className={`
+                      relative w-12 h-12 rounded-lg border-2 border-purple-500 transition-all
+                      flex items-center justify-center
+                      bg-purple-500/10 hover:bg-purple-500/30 hover:border-purple-400
+                      cursor-pointer shadow-md hover:shadow-lg hover:scale-105
+                      ${isExecuting ? "opacity-40 cursor-not-allowed" : ""}
+                    `}
+                    aria-label="Help"
+                  >
+                    <HelpCircle className="w-6 h-6 text-purple-500" />
+                  </button>
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 pointer-events-none z-50">
+                    <div className="bg-popover border border-border rounded-md shadow-lg px-3 py-2 min-w-[160px]">
+                      <div className="font-medium text-sm text-purple-500">
+                        Help & Reference
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Press ? to open
+                      </div>
+                    </div>
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                      <div className="w-2 h-2 bg-popover border-r border-b border-border rotate-45" />
+                    </div>
+                  </div>
+                </div>
+              </>
             </div>
           )}
         </div>

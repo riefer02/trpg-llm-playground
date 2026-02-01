@@ -86,6 +86,8 @@ import { VictoryCelebration } from "../../components/combat/VictoryCelebration";
 import { VictoryConditionPanel } from "../../components/combat/VictoryConditionPanel";
 import { ObjectiveTracker } from "../../components/combat/ObjectiveTracker";
 import { ReservesPanel } from "../../components/combat/ReservesPanel";
+import { ContextualHelpOverlay } from "../../components/combat/ContextualHelpOverlay";
+import { FirstCombatTutorial } from "../../components/combat/FirstCombatTutorial";
 import {
   adaptCombatScenario,
   buildMovementRangeOverlays,
@@ -296,6 +298,17 @@ function CombatSessionPage() {
   const [isForfeiting, setIsForfeiting] = useState(false);
   const [showNavigationConfirm, setShowNavigationConfirm] = useState(false);
 
+  // Help system state (E9-US-004)
+  const [showHelpOverlay, setShowHelpOverlay] = useState(false);
+  const [showFirstCombatTutorial, setShowFirstCombatTutorial] = useState(false);
+  const [hasSeenTutorial, setHasSeenTutorial] = useState(() => {
+    // Check localStorage for whether user has seen tutorial
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lancer-combat-tutorial-seen') === 'true';
+    }
+    return false;
+  });
+
   // Keyboard shortcuts for help
   const keyboardShortcuts = useKeyboardShortcuts();
 
@@ -315,6 +328,54 @@ function CombatSessionPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [data?.status, isPlayerTurn, showForfeitModal, showMissionCompleteModal]);
+
+  // Global keyboard shortcut: ? to open help overlay
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ? key (Shift+/) - open help overlay
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) {
+        // Don't trigger if user is typing in an input
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return;
+        }
+        // Don't trigger if other modals are open
+        if (showVoiceConfirmation || showOverchargeConfirm || showForfeitModal || 
+            showMissionCompleteModal || showVictoryCelebration || showPauseMenu ||
+            showFirstCombatTutorial) {
+          return;
+        }
+        e.preventDefault();
+        setShowHelpOverlay(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showVoiceConfirmation, showOverchargeConfirm, showForfeitModal, showMissionCompleteModal, 
+      showVictoryCelebration, showPauseMenu, showFirstCombatTutorial]);
+
+  // Show first combat tutorial when entering first turn of first combat
+  useEffect(() => {
+    if (data?.status === 'active' && 
+        currentRound === 1 && 
+        isPlayerTurn && 
+        !hasSeenTutorial &&
+        !showFirstCombatTutorial) {
+      // Small delay to let the combat UI settle
+      const timer = setTimeout(() => {
+        setShowFirstCombatTutorial(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [data?.status, currentRound, isPlayerTurn, hasSeenTutorial, showFirstCombatTutorial]);
+
+  // Handle tutorial "don't show again" preference
+  const handleTutorialDontShowAgain = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lancer-combat-tutorial-seen', 'true');
+      setHasSeenTutorial(true);
+    }
+  };
 
   // Navigation blocking (E8-US-004): Prevent accidental navigation during combat
   const blocker = useBlocker({
@@ -2067,6 +2128,24 @@ function CombatSessionPage() {
           isVoiceListening={speechRecognition.isListening}
           voiceEnabled={settings.enableVoiceInput}
           voiceSupported={speechRecognition.recognitionSupported}
+          // Help
+          onHelpClick={() => setShowHelpOverlay(true)}
+        />
+
+        {/* Contextual Help Overlay (E9-US-004) */}
+        <ContextualHelpOverlay
+          isOpen={showHelpOverlay}
+          onClose={() => setShowHelpOverlay(false)}
+          economy={economy}
+          availableActions={availableActions ?? null}
+          currentRound={currentRound}
+        />
+
+        {/* First Combat Tutorial (E9-US-004) */}
+        <FirstCombatTutorial
+          isOpen={showFirstCombatTutorial}
+          onClose={() => setShowFirstCombatTutorial(false)}
+          onDontShowAgain={handleTutorialDontShowAgain}
         />
       </div>
     </div>
