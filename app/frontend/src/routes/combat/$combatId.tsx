@@ -491,6 +491,10 @@ function CombatSessionPage() {
     target: ContextMenuTarget;
   } | null>(null);
 
+  // Header expansion state (for compact header feature)
+  const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
+  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
+
   // Escape key listener to cancel targeting or open pause menu
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1485,50 +1489,112 @@ function CombatSessionPage() {
         </div>
       )}
 
-      {/* Compact header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="text-primary hover:underline text-sm">
-            ←
-          </Link>
-          <div>
-            <h1 className="text-lg font-heading font-semibold text-foreground">
-              {data.name}
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Round {data.current_round} · {data.status}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span
-              className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-500" : "bg-amber-500"}`}
-            />
-            {wsConnected ? "Live" : "Polling"}
-          </div>
-          {data.status === "active" && (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowMissionCompleteModal(true)}
-              >
-                End Mission
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowForfeitModal(true)}
-                disabled={forfeitCombat.isPending || !isPlayerTurn}
-                title={!isPlayerTurn ? "Can only forfeit during your turn" : ""}
-              >
-                Forfeit
-              </Button>
+      {/* Compact Header (E9-US-005) */}
+      {!settings.hideHeader && (
+        <div
+          className={`relative transition-all duration-300 ease-in-out overflow-hidden ${
+            settings.compactHeader && turnActive && !isHeaderHovered && !isHeaderExpanded
+              ? "h-8 py-1"
+              : "h-auto py-3"
+          }`}
+          onMouseEnter={() => setIsHeaderHovered(true)}
+          onMouseLeave={() => {
+            setIsHeaderHovered(false);
+            setIsHeaderExpanded(false);
+          }}
+          onClick={() => {
+            if (settings.compactHeader && turnActive) {
+              setIsHeaderExpanded(!isHeaderExpanded);
+            }
+          }}
+        >
+          {/* Thin strip mode (compact) */}
+          {settings.compactHeader && turnActive && !isHeaderHovered && !isHeaderExpanded ? (
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/"
+                  className="text-primary hover:text-primary/80 transition-colors"
+                  aria-label="Back to menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                  </svg>
+                </Link>
+                <span className="text-xs font-medium text-foreground truncate max-w-[200px]">
+                  {data.name}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  R{data.current_round}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${wsConnected ? "bg-green-500" : "bg-amber-500"}`}
+                  title={wsConnected ? "Live" : "Polling"}
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsHeaderExpanded(true);
+                  }}
+                  className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Expand header"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Full header mode */
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-4">
+                <Link
+                  to="/"
+                  className="text-primary hover:text-primary/80 transition-colors"
+                  aria-label="Back to menu"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                  </svg>
+                </Link>
+                <div>
+                  <h1 className="text-lg font-heading font-semibold text-foreground">
+                    {data.name}
+                  </h1>
+                  <p className="text-xs text-muted-foreground">
+                    Round {data.current_round} · {data.status}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span
+                    className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-500" : "bg-amber-500"}`}
+                  />
+                  {wsConnected ? "Live" : "Polling"}
+                </div>
+                {settings.compactHeader && turnActive && (
+                  <button
+                    type="button"
+                    onClick={() => setIsHeaderExpanded(false)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Collapse header"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* Mission Complete Modal */}
       <MissionCompleteModal
@@ -1765,6 +1831,35 @@ function CombatSessionPage() {
               confirmEndTurn={settings.confirmEndTurn}
             />
           </div>
+
+          {/* Mission Controls - moved from header to side panel (E9-US-005) */}
+          {data.status === "active" && (
+            <div className="rounded-md border border-border bg-muted/30 p-2 space-y-2">
+              <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                Mission Controls
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-xs"
+                  onClick={() => setShowMissionCompleteModal(true)}
+                >
+                  End Mission
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1 text-xs"
+                  onClick={() => setShowForfeitModal(true)}
+                  disabled={forfeitCombat.isPending || !isPlayerTurn}
+                  title={!isPlayerTurn ? "Can only forfeit during your turn" : ""}
+                >
+                  Forfeit
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Scrollable content area */}
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">

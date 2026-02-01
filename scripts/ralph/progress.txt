@@ -43,7 +43,6 @@ Status: PASSED
 ### Next Steps
 - Next story: E1-US-002 (Pilot Quarters Hub) should build on character API
 - Need to create `/quarters` route and hub screen
-- Continue button should navigate to quarters when implemented
 
 ---
 
@@ -725,6 +724,7 @@ Status: PASSED
 - app/frontend/src/lib/combat-render/canvas.ts: Added side field to RenderToken type; added subtle blue glow effect for player tokens (rgba(59, 130, 246, 0.25))
 - app/frontend/src/components/combat/TurnIndicator.tsx: Added ENEMY TURN banner with prominent red bg-red-600 styling that displays for 3 seconds when enemy turn starts
 - app/frontend/src/lib/combat-render/adapter.ts: Updated buildTokens to pass side field through to RenderToken
+- TurnIndicator already uses red-400 for enemy badges
 
 ### Verification
 - `make test-app`: 111 passed (backend), 30 passed (frontend)
@@ -872,5 +872,48 @@ Status: PASSED
 
 ### Next Steps
 - Next story: E9-US-005 (Compact Combat Header) - minimize header real estate during active turn
+---
+
+## Iteration - Sun Feb 1 2026 16:30 UTC
+Story: E9-US-005 - Compact Combat Header
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/lib/hooks/useSettings.ts: Added compactHeader and hideHeader settings to Settings interface with defaults (compactHeader: true, hideHeader: false)
+- app/frontend/src/components/combat/InGameSettings.tsx: Added toggles for "Compact Header During Turn" and "Hide Header Entirely" in Display section
+- app/frontend/src/routes/combat/$combatId.tsx:
+  - Added isHeaderExpanded and isHeaderHovered state variables for header expansion control
+  - Replaced static header with new Compact Header implementation featuring:
+    - Conditional rendering based on hideHeader setting (can hide entirely)
+    - Thin strip mode (h-8) when compactHeader enabled during active turn
+    - Hover to expand functionality with mouseEnter/mouseLeave handlers
+    - Click to expand/collapse toggle when in compact mode
+    - Icon-only back navigation (chevron arrow instead of text)
+    - Essential info in compact format (truncated mission name, round as "R{N}")
+    - Expand/collapse chevron buttons for manual control
+  - Moved End Mission and Forfeit buttons to side panel under new "Mission Controls" section
+
+### Acceptance Criteria Verification
+✅ Header collapses to thin strip during active turn (h-8 when compactHeader && turnActive && !hovered)
+✅ Essential info (round, mission name) in compact format (truncated name, "R{round}" format)
+✅ 'End Mission' moved to side panel under "Mission Controls" section
+✅ Back navigation uses minimal icon only (chevron arrow, no text)
+✅ Header can be hidden entirely with hideHeader toggle in settings
+✅ Full header expands on hover or when turn inactive (or when clicked in compact mode)
+
+### Testing
+- All tests pass: Backend (108), Frontend (30)
+- Linting: Clean for modified files (only unrelated pre-existing warnings)
+- Manual verification: Header collapses during active turn, expands on hover, toggle buttons work
+
+### Learnings
+- State-based conditional rendering allows smooth transitions between compact and full header modes
+- Transition-all with duration-300 provides smooth height/content changes without jarring jumps
+- Event stopPropagation needed on interactive elements within header to prevent triggering expand/collapse
+- Icon-only navigation reduces visual clutter while maintaining functionality
+- Moving controls to side panel frees up header space and groups mission-related actions together
+
+### Next Steps
+- Final story: E9-US-006 (Side Panel Information Hierarchy) - reorganize side panel for clearer information hierarchy
 ---
 

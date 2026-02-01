@@ -143,6 +143,20 @@ export function InGameSettings({ isOpen, onClose }: InGameSettingsProps) {
                 }
                 label="Confirm End Turn"
               />
+              <Toggle
+                checked={settings.compactHeader}
+                onChange={(checked) =>
+                  updateSettings({ compactHeader: checked })
+                }
+                label="Compact Header During Turn"
+              />
+              <Toggle
+                checked={settings.hideHeader}
+                onChange={(checked) =>
+                  updateSettings({ hideHeader: checked })
+                }
+                label="Hide Header Entirely"
+              />
             </div>
           </div>
 

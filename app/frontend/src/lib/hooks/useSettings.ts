@@ -30,9 +30,13 @@ export interface Settings {
    // AI
   showAIReasoning: boolean
    
-   // Combat
-  confirmEndTurn: boolean
-  enableLowHPWarning: boolean
+    // Combat
+   confirmEndTurn: boolean
+   enableLowHPWarning: boolean
+   
+   // Header
+   compactHeader: boolean
+   hideHeader: boolean
 }
 
 const STORAGE_KEY = 'lancer_tactics_settings'
@@ -48,9 +52,13 @@ const STORAGE_KEY = 'lancer_tactics_settings'
   theme: 'light',
   reducedMotion: false,
   highContrast: false,
-  showAIReasoning: true,
-  confirmEndTurn: true,
-  enableLowHPWarning: true,
+   showAIReasoning: true,
+   confirmEndTurn: true,
+   enableLowHPWarning: true,
+   
+   // Header
+   compactHeader: true,
+   hideHeader: false,
 }
 
 function loadSettings(): Settings {
