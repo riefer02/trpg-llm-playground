@@ -58,15 +58,16 @@ import {
 } from "../../components/combat/MapTooltip";
 import { ActionPreviewPanel } from "../../components/combat/ActionPreviewPanel";
 import { AIThinkingIndicator } from "../../components/combat/AIThinkingIndicator";
-import {
-  ActionLog,
-  type SelectedAction,
-} from "../../components/combat/ActionLog";
+import { type SelectedAction } from "../../components/combat/ActionLog";
+import { CurrentActorPanel } from "../../components/combat/CurrentActorPanel";
+import { InitiativeStrip } from "../../components/combat/InitiativeStrip";
+import { CollapsibleActionLog } from "../../components/combat/CollapsibleActionLog";
+import { CombatantList } from "../../components/combat/CombatantList";
 import {
   TurnControls,
   type TurnState,
 } from "../../components/combat/TurnControls";
-import { TurnIndicator } from "../../components/combat/TurnIndicator";
+// TurnIndicator removed - replaced by CurrentActorPanel and InitiativeStrip (E9-US-006)
 import {
   ActionPanel,
   type TargetMode,
@@ -1799,16 +1800,20 @@ function CombatSessionPage() {
         </div>
 
         <div className="flex flex-col h-full max-h-[calc(100vh-100px)]">
-          {/* Sticky Turn Controls with integrated Economy */}
+          {/* Sticky header area with current actor and controls */}
           <div className="sticky top-0 z-10 bg-background pb-2 space-y-2">
-            {/* Turn Indicator with initiative order */}
-            <TurnIndicator
-              currentActor={currentActor}
-              combatants={combatants}
-              roundNumber={currentRound}
-              turnIndex={currentTurnIndex}
+            {/* Current Actor Panel - most prominent (E9-US-006) */}
+            <CurrentActorPanel
+              actor={currentActor}
               isTurnActive={turnActive}
-              isPlayerTurn={currentActor?.side === "players"}
+            />
+
+            {/* Initiative Strip - compact horizontal (E9-US-006) */}
+            <InitiativeStrip
+              combatants={combatants}
+              currentActorId={currentActor?.id ?? null}
+              turnIndex={currentTurnIndex}
+              roundNumber={currentRound}
             />
 
             {/* Turn Controls (Start/End Turn buttons) */}
@@ -1834,7 +1839,7 @@ function CombatSessionPage() {
 
           {/* Mission Controls - moved from header to side panel (E9-US-005) */}
           {data.status === "active" && (
-            <div className="rounded-md border border-border bg-muted/30 p-2 space-y-2">
+            <div className="rounded-md border border-border bg-muted/30 p-2 space-y-2 mb-2">
               <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
                 Mission Controls
               </div>
@@ -1862,25 +1867,19 @@ function CombatSessionPage() {
           )}
 
           {/* Scrollable content area */}
-          <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-            {/* Action Log - at top for visibility */}
-            <div className="rounded-md border border-border bg-muted/30 p-2 space-y-1">
-              <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                Action Log
-              </div>
-              <div className="max-h-24 overflow-y-auto">
-                <ActionLog
-                  rounds={rounds}
-                  currentRound={currentRound}
-                  currentTurnIndex={currentTurnIndex}
-                  combatantNames={combatantNameById}
-                  selectedAction={selectedAction}
-                  onSelectAction={(roundIdx, turnIdx, actionIdx) =>
-                    setSelectedAction({ roundIdx, turnIdx, actionIdx })
-                  }
-                />
-              </div>
-            </div>
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {/* Action Log - collapsible (E9-US-006) */}
+            <CollapsibleActionLog
+              rounds={rounds}
+              currentRound={currentRound}
+              currentTurnIndex={currentTurnIndex}
+              combatantNames={combatantNameById}
+              selectedAction={selectedAction}
+              onSelectAction={(roundIdx, turnIdx, actionIdx) =>
+                setSelectedAction({ roundIdx, turnIdx, actionIdx })
+              }
+              defaultCollapsed={true}
+            />
 
             {/* Voice Transcription Display */}
             <VoiceTranscriptDisplay
@@ -1996,42 +1995,13 @@ function CombatSessionPage() {
               isSpending={spendReserve.isPending}
             />
 
-            {/* Combatants List - compact */}
-            <div className="rounded-md border border-border bg-muted/30 p-2 space-y-1">
-              <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                Combatants
-              </div>
-              <div className="space-y-0.5">
-                {combatants.map((combatant) => (
-                  <div
-                    key={combatant.id}
-                    className={`flex items-center justify-between rounded px-2 py-1 text-xs ${
-                      combatant.id === currentActor?.id
-                        ? "bg-primary/10 border-l-2 border-primary"
-                        : "bg-muted/40"
-                    } ${
-                      selectedTargetIds.includes(combatant.id)
-                        ? "ring-1 ring-green-500"
-                        : ""
-                    }`}
-                  >
-                    <div className="font-medium truncate">
-                      {combatant.name}
-                      {combatant.id === currentActor?.id && (
-                        <span className="ml-1 text-[10px] text-primary font-normal">
-                          ●
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground ml-2">
-                      {combatant.position?.coord
-                        ? `${combatant.position.coord.q},${combatant.position.coord.r}`
-                        : "--"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Combatants List with HP bars (E9-US-006) */}
+            <CombatantList
+              combatants={combatants}
+              currentActorId={currentActor?.id ?? null}
+              selectedTargetIds={selectedTargetIds}
+              onCombatantClick={handleTokenClick}
+            />
           </div>
         </div>
 

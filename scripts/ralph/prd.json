@@ -885,6 +885,7 @@
       "priority": 45,
       "passes": true,
       "notes": "Implemented compact combat header with: 1) Header collapses to thin strip (h-8) during active turn when compactHeader setting enabled, 2) Essential info shown in compact format (mission name truncated, round number as 'R{round}'), 3) End Mission and Forfeit buttons moved to side panel under 'Mission Controls' section, 4) Back navigation uses minimal icon-only button (chevron arrow), 5) Header can be hidden entirely with hideHeader toggle in settings, 6) Full header expands on hover or click when in compact mode, with expand/collapse toggle button. Settings added: compactHeader (default true) and hideHeader (default false). All acceptance criteria satisfied. Tests pass (108 backend + 30 frontend)."
+    },
     {
       "id": "E9-US-006",
       "epic": "E9",
@@ -900,8 +901,8 @@
         "Clear visual separation between sections"
       ],
       "priority": 46,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented side panel information hierarchy with: 1) CurrentActorPanel at top showing prominent HP/Heat gauges with large numbers, structure/stress indicators, and condition badges with tooltips; 2) InitiativeStrip as compact horizontal strip showing turn order with HP dots; 3) CollapsibleActionLog with expand/collapse functionality; 4) CombatantList grouped by side with inline HP bars. Visual separation via rounded borders and spacing. All acceptance criteria satisfied. Tests pass (108 backend + 30 frontend)."
     }
   ],
   "implementationOrder": [

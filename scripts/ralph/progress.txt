@@ -917,3 +917,35 @@ Status: PASSED
 - Final story: E9-US-006 (Side Panel Information Hierarchy) - reorganize side panel for clearer information hierarchy
 ---
 
+
+## Iteration - Sun Feb 1 2026 16:15 UTC
+Story: E9-US-006 - Side Panel Information Hierarchy
+Status: PASSED
+
+### Changes Made
+- app/frontend/src/components/combat/CurrentActorPanel.tsx: New component displaying current actor with prominent HP/Heat gauges (large numbers with bars), Structure/Stress pip indicators, condition and status badges with tooltip descriptions. Border highlighting for player vs enemy turns.
+- app/frontend/src/components/combat/InitiativeStrip.tsx: Compact horizontal initiative order showing turn order with abbreviated names and small HP indicator dots. Shows current actor highlighted with round number.
+- app/frontend/src/components/combat/CollapsibleActionLog.tsx: Wrapper component making ActionLog collapsible with action count badge in header.
+- app/frontend/src/components/combat/CombatantList.tsx: Enhanced combatant list grouped by side (Allies/Enemies) with inline HP bars for at-a-glance health status and condition count badges with tooltip.
+- app/frontend/src/routes/combat/$combatId.tsx: Integrated new components replacing TurnIndicator with CurrentActorPanel + InitiativeStrip at top, replaced inline combatant list with CombatantList, replaced ActionLog with CollapsibleActionLog.
+- scripts/ralph/prd.json: Fixed JSON parse error (missing comma) and marked E9-US-006 as passing.
+
+### Acceptance Criteria Verification
+✅ Current actor section is most prominent (larger, top) - CurrentActorPanel at top with large border, shadow, and colored accent
+✅ HP/Heat displayed as large, easy-to-read gauges - 4px tall rounded bars with large numeric values (text-lg font-bold)
+✅ Status conditions shown as clear badges with tooltips - Amber and purple badges with condition descriptions on hover
+✅ Initiative order compressed into horizontal strip - InitiativeStrip component with overflow-x-auto scrolling
+✅ Action log collapsible/expandable - CollapsibleActionLog with ChevronDown/ChevronUp toggle
+✅ Combatant list shows HP bars at a glance - Inline HP bars with percentage fill and numeric values
+✅ Clear visual separation between sections - Rounded borders, spacing between sections, grouped combatant lists
+
+### Learnings
+- Large gauge components benefit from showing both visual bar AND numeric values for accessibility
+- Condition badges need tooltips for new players who don't know what conditions do
+- Initiative strip horizontal layout saves vertical space while maintaining turn order visibility
+- Grouping combatants by side (Allies/Enemies) improves scan-ability
+- HP dots in initiative strip provide quick health overview without taking much space
+
+### Next Steps
+- All E9 (Visual & UX Polish) stories complete! PRD iteration finished.
+---
