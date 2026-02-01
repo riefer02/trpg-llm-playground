@@ -272,6 +272,11 @@ class CombatantState(FrozenModel):
     core_power_effects: MechanicalEffect | None = Field(
         default=None, description="Active effects from core power when activated"
     )
+    # Frame identification for visual rendering (E9-US-003)
+    frame_id: str | None = Field(
+        default=None,
+        description="Frame identifier for token shape rendering (e.g., 'gms_everest', 'ipsn_raleigh')",
+    )
     # Mount/Dismount/Eject state
     piloting_mech_id: str | None = Field(
         default=None, description="ID of mech this pilot is piloting (pilot only)"

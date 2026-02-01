@@ -49925,6 +49925,19 @@
           "default": null,
           "description": "Active effects from core power when activated"
         },
+        "frame_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Frame identifier for token shape rendering (e.g., 'gms_everest', 'ipsn_raleigh')",
+          "title": "Frame Id"
+        },
         "piloting_mech_id": {
           "anyOf": [
             {
@@ -50570,6 +50583,226 @@
         "round_index"
       ],
       "title": "CombatRound",
+      "type": "object"
+    },
+    "ActionTypeCount": {
+      "description": "Count of actions taken by type.",
+      "properties": {
+        "attacks": {
+          "default": 0,
+          "description": "Number of attack actions",
+          "minimum": 0,
+          "title": "Attacks",
+          "type": "integer"
+        },
+        "moves": {
+          "default": 0,
+          "description": "Number of move/boost actions",
+          "minimum": 0,
+          "title": "Moves",
+          "type": "integer"
+        },
+        "techs": {
+          "default": 0,
+          "description": "Number of tech actions",
+          "minimum": 0,
+          "title": "Techs",
+          "type": "integer"
+        },
+        "full_actions": {
+          "default": 0,
+          "description": "Number of full actions",
+          "minimum": 0,
+          "title": "Full Actions",
+          "type": "integer"
+        },
+        "quick_actions": {
+          "default": 0,
+          "description": "Number of quick actions",
+          "minimum": 0,
+          "title": "Quick Actions",
+          "type": "integer"
+        },
+        "reactions": {
+          "default": 0,
+          "description": "Number of reactions used",
+          "minimum": 0,
+          "title": "Reactions",
+          "type": "integer"
+        },
+        "overcharges": {
+          "default": 0,
+          "description": "Number of overcharge actions",
+          "minimum": 0,
+          "title": "Overcharges",
+          "type": "integer"
+        }
+      },
+      "title": "ActionTypeCount",
+      "type": "object"
+    },
+    "CombatStatistics": {
+      "description": "Complete combat statistics for a mission.\n\nTracks aggregate and per-combatant statistics for post-mission debriefing.",
+      "properties": {
+        "rounds_completed": {
+          "default": 0,
+          "description": "Number of combat rounds completed",
+          "minimum": 0,
+          "title": "Rounds Completed",
+          "type": "integer"
+        },
+        "total_turns": {
+          "default": 0,
+          "description": "Total turns taken by all combatants",
+          "minimum": 0,
+          "title": "Total Turns",
+          "type": "integer"
+        },
+        "total_damage_dealt_by_players": {
+          "default": 0,
+          "description": "Total damage dealt by player side",
+          "minimum": 0,
+          "title": "Total Damage Dealt By Players",
+          "type": "integer"
+        },
+        "total_damage_received_by_players": {
+          "default": 0,
+          "description": "Total damage received by player side",
+          "minimum": 0,
+          "title": "Total Damage Received By Players",
+          "type": "integer"
+        },
+        "total_enemies_destroyed": {
+          "default": 0,
+          "description": "Total enemies destroyed",
+          "minimum": 0,
+          "title": "Total Enemies Destroyed",
+          "type": "integer"
+        },
+        "closest_call_hp": {
+          "default": 0,
+          "description": "Lowest HP reached by any player (closest call)",
+          "title": "Closest Call Hp",
+          "type": "integer"
+        },
+        "closest_call_combatant": {
+          "default": "",
+          "description": "Name of combatant with closest call",
+          "title": "Closest Call Combatant",
+          "type": "string"
+        },
+        "max_overkill": {
+          "default": 0,
+          "description": "Maximum overkill damage dealt",
+          "minimum": 0,
+          "title": "Max Overkill",
+          "type": "integer"
+        },
+        "combatant_stats": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CombatantStatistics"
+          },
+          "description": "Statistics per combatant ID",
+          "title": "Combatant Stats",
+          "type": "object"
+        },
+        "action_totals": {
+          "$ref": "#/$defs/ActionTypeCount",
+          "description": "Total actions taken by all combatants"
+        }
+      },
+      "title": "CombatStatistics",
+      "type": "object"
+    },
+    "CombatantStatistics": {
+      "description": "Statistics for an individual combatant.",
+      "properties": {
+        "combatant_id": {
+          "description": "ID of the combatant",
+          "title": "Combatant Id",
+          "type": "string"
+        },
+        "combatant_name": {
+          "description": "Name of the combatant",
+          "title": "Combatant Name",
+          "type": "string"
+        },
+        "side": {
+          "description": "Which side the combatant is on",
+          "enum": [
+            "players",
+            "hostiles",
+            "neutral"
+          ],
+          "title": "Side",
+          "type": "string"
+        },
+        "damage_dealt": {
+          "default": 0,
+          "description": "Total damage dealt to enemies",
+          "minimum": 0,
+          "title": "Damage Dealt",
+          "type": "integer"
+        },
+        "damage_received": {
+          "default": 0,
+          "description": "Total damage received",
+          "minimum": 0,
+          "title": "Damage Received",
+          "type": "integer"
+        },
+        "overkill_dealt": {
+          "default": 0,
+          "description": "Excess damage beyond enemy HP (overkill)",
+          "minimum": 0,
+          "title": "Overkill Dealt",
+          "type": "integer"
+        },
+        "lowest_hp_reached": {
+          "default": 0,
+          "description": "Lowest HP reached during combat",
+          "title": "Lowest Hp Reached",
+          "type": "integer"
+        },
+        "hp_at_start": {
+          "default": 0,
+          "description": "HP at combat start for calculating closest call",
+          "title": "Hp At Start",
+          "type": "integer"
+        },
+        "actions_taken": {
+          "$ref": "#/$defs/ActionTypeCount",
+          "description": "Actions taken by type"
+        },
+        "enemies_destroyed": {
+          "default": 0,
+          "description": "Number of enemies destroyed",
+          "minimum": 0,
+          "title": "Enemies Destroyed",
+          "type": "integer"
+        },
+        "destroyed_enemy_ids": {
+          "description": "IDs of destroyed enemies",
+          "items": {
+            "type": "string"
+          },
+          "title": "Destroyed Enemy Ids",
+          "type": "array"
+        },
+        "turns_taken": {
+          "default": 0,
+          "description": "Number of turns taken",
+          "minimum": 0,
+          "title": "Turns Taken",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "combatant_id",
+        "combatant_name",
+        "side"
+      ],
+      "title": "CombatantStatistics",
       "type": "object"
     },
     "DeployableState": {
@@ -51462,6 +51695,10 @@
           },
           "title": "Mission Reserves",
           "type": "array"
+        },
+        "statistics": {
+          "$ref": "#/$defs/CombatStatistics",
+          "description": "Combat statistics tracking for post-mission debriefing"
         }
       },
       "title": "MechCombatScenario",

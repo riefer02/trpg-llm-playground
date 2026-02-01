@@ -314,6 +314,7 @@ def _character_to_combatant(character_db: CharacterDB) -> CombatantState:
         core_power_available=True,
         core_power_active=False,
         core_power_effects=core_power_effects,
+        frame_id=active_mech.frame_id if active_mech else None,
     )
 
 

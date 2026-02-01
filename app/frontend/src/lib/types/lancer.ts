@@ -30012,6 +30012,10 @@ export type CorePowerAvailable = boolean;
  */
 export type CorePowerActive = boolean;
 /**
+ * Frame identifier for token shape rendering (e.g., 'gms_everest', 'ipsn_raleigh')
+ */
+export type FrameId3 = string | null;
+/**
  * ID of mech this pilot is piloting (pilot only)
  */
 export type PilotingMechId = string | null;
@@ -30318,6 +30322,110 @@ export type Objectives1 = MissionObjective[];
  * Reserves from campaign lobby available for spending during combat
  */
 export type MissionReserves = ReservePlanEntry[];
+/**
+ * Number of combat rounds completed
+ */
+export type RoundsCompleted = number;
+/**
+ * Total turns taken by all combatants
+ */
+export type TotalTurns = number;
+/**
+ * Total damage dealt by player side
+ */
+export type TotalDamageDealtByPlayers = number;
+/**
+ * Total damage received by player side
+ */
+export type TotalDamageReceivedByPlayers = number;
+/**
+ * Total enemies destroyed
+ */
+export type TotalEnemiesDestroyed = number;
+/**
+ * Lowest HP reached by any player (closest call)
+ */
+export type ClosestCallHp = number;
+/**
+ * Name of combatant with closest call
+ */
+export type ClosestCallCombatant = string;
+/**
+ * Maximum overkill damage dealt
+ */
+export type MaxOverkill = number;
+/**
+ * ID of the combatant
+ */
+export type CombatantId2 = string;
+/**
+ * Name of the combatant
+ */
+export type CombatantName = string;
+/**
+ * Which side the combatant is on
+ */
+export type Side1 = "players" | "hostiles" | "neutral";
+/**
+ * Total damage dealt to enemies
+ */
+export type DamageDealt = number;
+/**
+ * Total damage received
+ */
+export type DamageReceived = number;
+/**
+ * Excess damage beyond enemy HP (overkill)
+ */
+export type OverkillDealt = number;
+/**
+ * Lowest HP reached during combat
+ */
+export type LowestHpReached = number;
+/**
+ * HP at combat start for calculating closest call
+ */
+export type HpAtStart = number;
+/**
+ * Number of attack actions
+ */
+export type Attacks = number;
+/**
+ * Number of move/boost actions
+ */
+export type Moves = number;
+/**
+ * Number of tech actions
+ */
+export type Techs = number;
+/**
+ * Number of full actions
+ */
+export type FullActions = number;
+/**
+ * Number of quick actions
+ */
+export type QuickActions = number;
+/**
+ * Number of reactions used
+ */
+export type Reactions2 = number;
+/**
+ * Number of overcharge actions
+ */
+export type Overcharges = number;
+/**
+ * Number of enemies destroyed
+ */
+export type EnemiesDestroyed = number;
+/**
+ * IDs of destroyed enemies
+ */
+export type DestroyedEnemyIds = string[];
+/**
+ * Number of turns taken
+ */
+export type TurnsTaken = number;
 export type Code4 = string;
 export type Message4 = string;
 export type Severity5 = "error" | "warning";
@@ -30450,7 +30558,7 @@ export type EffectsApplied = {
 /**
  * Total damage dealt
  */
-export type DamageDealt = number;
+export type DamageDealt1 = number;
 export type Kinetic = number;
 export type Explosive = number;
 export type Energy = number;
@@ -30727,7 +30835,7 @@ export type EffectsApplied1 = {
 /**
  * Damage dealt by overwatch
  */
-export type DamageDealt1 = number;
+export type DamageDealt2 = number;
 /**
  * Whether overwatch attack hit
  */
@@ -30794,10 +30902,10 @@ export type MaxTargets = number;
  * Actor these actions are for
  */
 export type ActorId4 = string;
-export type FullActions = AvailableAction[];
-export type QuickActions = AvailableAction[];
+export type FullActions1 = AvailableAction[];
+export type QuickActions1 = AvailableAction[];
 export type FreeActions = AvailableAction[];
-export type Reactions2 = AvailableAction[];
+export type Reactions3 = AvailableAction[];
 export type Protocols1 = AvailableAction[];
 /**
  * Whether overcharge is available
@@ -36417,6 +36525,7 @@ export interface CombatantState {
    * Active effects from core power when activated
    */
   core_power_effects?: MechanicalEffect | null;
+  frame_id?: FrameId3;
   piloting_mech_id?: PilotingMechId;
   mounted_pilot_id?: MountedPilotId;
   eject_used?: EjectUsed;
@@ -36791,6 +36900,7 @@ export interface MechCombatScenario {
   pending_decisions?: PendingDecisions;
   objectives?: Objectives1;
   mission_reserves?: MissionReserves;
+  statistics?: CombatStatistics;
   [k: string]: unknown;
 }
 /**
@@ -37002,6 +37112,72 @@ export interface ObjectiveCriterion {
   [k: string]: unknown;
 }
 /**
+ * Combat statistics tracking for post-mission debriefing
+ */
+export interface CombatStatistics {
+  rounds_completed?: RoundsCompleted;
+  total_turns?: TotalTurns;
+  total_damage_dealt_by_players?: TotalDamageDealtByPlayers;
+  total_damage_received_by_players?: TotalDamageReceivedByPlayers;
+  total_enemies_destroyed?: TotalEnemiesDestroyed;
+  closest_call_hp?: ClosestCallHp;
+  closest_call_combatant?: ClosestCallCombatant;
+  max_overkill?: MaxOverkill;
+  combatant_stats?: CombatantStats;
+  action_totals?: ActionTypeCount1;
+  [k: string]: unknown;
+}
+/**
+ * Statistics per combatant ID
+ */
+export interface CombatantStats {
+  [k: string]: CombatantStatistics;
+}
+/**
+ * Statistics for an individual combatant.
+ */
+export interface CombatantStatistics {
+  combatant_id: CombatantId2;
+  combatant_name: CombatantName;
+  side: Side1;
+  damage_dealt?: DamageDealt;
+  damage_received?: DamageReceived;
+  overkill_dealt?: OverkillDealt;
+  lowest_hp_reached?: LowestHpReached;
+  hp_at_start?: HpAtStart;
+  actions_taken?: ActionTypeCount;
+  enemies_destroyed?: EnemiesDestroyed;
+  destroyed_enemy_ids?: DestroyedEnemyIds;
+  turns_taken?: TurnsTaken;
+  [k: string]: unknown;
+}
+/**
+ * Actions taken by type
+ */
+export interface ActionTypeCount {
+  attacks?: Attacks;
+  moves?: Moves;
+  techs?: Techs;
+  full_actions?: FullActions;
+  quick_actions?: QuickActions;
+  reactions?: Reactions2;
+  overcharges?: Overcharges;
+  [k: string]: unknown;
+}
+/**
+ * Total actions taken by all combatants
+ */
+export interface ActionTypeCount1 {
+  attacks?: Attacks;
+  moves?: Moves;
+  techs?: Techs;
+  full_actions?: FullActions;
+  quick_actions?: QuickActions;
+  reactions?: Reactions2;
+  overcharges?: Overcharges;
+  [k: string]: unknown;
+}
+/**
  * A combat validation issue.
  */
 export interface CombatValidationIssue {
@@ -37142,7 +37318,7 @@ export interface ActionExecutionResult {
    */
   action_use?: ActionUse | null;
   effects_applied?: EffectsApplied;
-  damage_dealt?: DamageDealt;
+  damage_dealt?: DamageDealt1;
   damage_breakdown?: DamageBreakdown;
   heat_generated?: HeatGenerated1;
   resource_changes?: ResourceChanges1;
@@ -37320,7 +37496,7 @@ export interface ReactionResult {
   error?: Error1;
   reaction_used?: ReactionUsed;
   effects_applied?: EffectsApplied1;
-  damage_dealt?: DamageDealt1;
+  damage_dealt?: DamageDealt2;
   damage_breakdown?: DamageBreakdown2;
   attack_hit?: AttackHit;
   attack_critical?: AttackCritical;
@@ -37362,10 +37538,10 @@ export interface AvailableAction {
 export interface AvailableActionsResult {
   actor_id: ActorId4;
   economy: ActionEconomyState1;
-  full_actions?: FullActions;
-  quick_actions?: QuickActions;
+  full_actions?: FullActions1;
+  quick_actions?: QuickActions1;
   free_actions?: FreeActions;
-  reactions?: Reactions2;
+  reactions?: Reactions3;
   protocols?: Protocols1;
   can_overcharge?: CanOvercharge;
   [k: string]: unknown;

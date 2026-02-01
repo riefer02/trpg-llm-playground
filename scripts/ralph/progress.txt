@@ -789,3 +789,36 @@ Status: PASSED
 ### Next Steps
 - Next story: E9-US-003 (Frame-Based Token Shapes) - unique token shapes for different mech frames
 ---
+
+## Iteration - Sun Feb 2 2026 15:00 UTC
+Story: E9-US-003 - Frame-Based Token Shapes
+Status: PASSED
+
+### Changes Made
+- core/mech/combat_state.py: Added frame_id field to CombatantState model for frame identification in combat
+- app/backend/api/campaigns.py: Updated _character_to_combatant to pass active_mech.frame_id when creating combatant state
+- app/frontend/src/lib/combat-render/token-shapes.ts: New module with 7 token shape types (circle, triangle, diamond, hex_point, asymmetric, square, rounded_rect) and drawing functions for each manufacturer style
+- app/frontend/src/lib/combat-render/adapter.ts: Updated buildTokens to compute shape based on frame_id (mechs) or npc_role (NPCs), imported getTokenShapeForFrame and getTokenShapeForNPC
+- app/frontend/src/lib/combat-render/canvas.ts: Updated RenderToken type to include shape field, imported TokenShape and drawTokenShape, modified drawTokens to use shape-based rendering instead of always drawing circles
+- app/frontend/src/lib/types/lancer.ts: Regenerated TypeScript types to include new frame_id field on CombatantState
+
+### Acceptance Criteria Verification
+✅ Each major frame type gets a distinct shape silhouette
+✅ GMS Everest: Standard circle (baseline)
+✅ IPS-N frames (Raleigh, Blackbeard): Angular triangle shape; Drake and others: Diamond shape
+✅ SSC frames: Sleek hex_point shape with elongated top/bottom points
+✅ HORUS frames: Unusual asymmetric 5-sided polygon
+✅ HA frames: Sherman uses square; Barbarossa and others use rounded_rect
+✅ NPCs/Grunts: Role-based shapes (striker=triangle, defender=square, controller=diamond, supporter=circle)
+✅ Callsign initial displayed inside token (existing label system)
+
+### Learnings
+- Adding fields to core CombatantState requires updating backend serialization (_character_to_combatant) to populate the new field
+- Token shapes can be computed at the adapter layer by examining frame_id pattern (manufacturer prefix) or NPC role
+- Canvas API path drawing supports complex shapes: triangles, diamonds, asymmetric polygons, rounded rectangles via quadraticCurveTo
+- Shape selection strategy: Default to circle for unknown/unspecified frames to maintain backward compatibility
+- All tests pass after changes (core: 4023, backend: 108, frontend: 30), linting clean for modified files
+
+### Next Steps
+- Next story: E9-US-004 (Contextual Help System) - on-demand help overlay explaining actions and game state
+---

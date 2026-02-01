@@ -849,8 +849,8 @@
         "Callsign initial or frame icon displayed inside token"
       ],
       "priority": 43,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented frame-based token shapes: Added frame_id field to CombatantState in core, updated backend to pass frame_id when creating combatants, created token-shapes.ts with 7 distinct shapes (circle, triangle, diamond, hex_point, asymmetric, square, rounded_rect), shapes mapped by manufacturer (GMS=circle, IPS-N=triangle/diamond, SSC=hex_point, HORUS=asymmetric, HA=square/rounded_rect), NPC shapes based on role (striker=triangle, defender=square, controller=diamond, supporter=circle), updated adapter to compute shape from frame_id, updated canvas drawTokens to render shapes via drawTokenShape function. All tests pass (4023 core, 108 backend, 30 frontend)."
     },
     {
       "id": "E9-US-004",

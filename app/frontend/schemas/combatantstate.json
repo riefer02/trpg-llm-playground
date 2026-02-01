@@ -39764,6 +39764,19 @@
       "default": null,
       "description": "Active effects from core power when activated"
     },
+    "frame_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Frame identifier for token shape rendering (e.g., 'gms_everest', 'ipsn_raleigh')",
+      "title": "Frame Id"
+    },
     "piloting_mech_id": {
       "anyOf": [
         {

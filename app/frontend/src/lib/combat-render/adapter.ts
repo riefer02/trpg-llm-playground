@@ -24,6 +24,7 @@ import type {
 import { buildHexGrid } from "./canvas";
 import { hex } from "./hex";
 import { mapMissionTerrainToPattern } from "./terrain-patterns";
+import { getTokenShapeForFrame, getTokenShapeForNPC } from "./token-shapes";
 import {
   hexCone,
   hexConeCentered,
@@ -238,6 +239,11 @@ function buildTokens(
       continue;
     }
 
+    // Determine token shape based on combatant type (E9-US-003)
+    const shape = combatant.kind === "mech" && combatant.frame_id
+      ? getTokenShapeForFrame(combatant.frame_id)
+      : getTokenShapeForNPC(combatant.kind, combatant.npc_role ?? null);
+
     tokens.push({
       id: combatant.id,
       coord: position.coord,
@@ -245,6 +251,7 @@ function buildTokens(
       label: labelFromName(combatant.name),
       isActive: combatant.id === activeActorId,
       side: combatant.side,
+      shape,
     });
   }
 

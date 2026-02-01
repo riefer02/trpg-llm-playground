@@ -6,6 +6,8 @@ import type { HexLayout, PixelPoint } from "./hex";
 import { axialToPixel, hex, hexCorners, pixelToAxial } from "./hex";
 import type { TerrainPatternType } from "./terrain-patterns";
 import { getTerrainFallbackFill } from "./terrain-patterns";
+import type { TokenShape } from "./token-shapes";
+import { drawTokenShape } from "./token-shapes";
 
 export type HexGrid = {
   coords: HexCoord[];
@@ -33,6 +35,8 @@ export type RenderToken = {
   isActive?: boolean;
   /** Side identifier for team-based visual effects (friendly glow for players) */
   side?: "players" | "hostiles" | "neutral";
+  /** Token shape for visual frame identification (E9-US-003) */
+  shape?: TokenShape;
 };
 
 export type DeployableKind = "mine" | "drone" | "deployable" | "other";
@@ -283,16 +287,14 @@ export function drawTokens(
       ctx.fill();
     }
 
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = token.color ?? style.fillStyle ?? "#334155";
-    ctx.fill();
+    // Draw token shape (E9-US-003: frame-based shapes)
+    // Default to circle if no shape specified
+    const shape = token.shape ?? "circle";
+    const color = token.color ?? style.fillStyle ?? "#334155";
+    const strokeStyle = style.strokeStyle ?? "#0f172a";
+    const lineWidth = style.lineWidth ?? 2;
 
-    if (style.strokeStyle || token.color) {
-      ctx.strokeStyle = style.strokeStyle ?? "#0f172a";
-      ctx.lineWidth = style.lineWidth ?? 2;
-      ctx.stroke();
-    }
+    drawTokenShape(ctx, center, radius, shape, color, strokeStyle, lineWidth);
 
     if (token.label) {
       ctx.fillStyle = style.labelColor ?? "#f8fafc";
