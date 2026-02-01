@@ -29,6 +29,8 @@ export type RenderToken = {
   radius?: number;
   /** When true, renders with a distinctive glow to indicate current actor */
   isActive?: boolean;
+  /** Side identifier for team-based visual effects (friendly glow for players) */
+  side?: "players" | "hostiles" | "neutral";
 };
 
 export type DeployableKind = "mine" | "drone" | "deployable" | "other";
@@ -258,6 +260,14 @@ export function drawTokens(
       ctx.strokeStyle = "#facc15";
       ctx.lineWidth = 3;
       ctx.stroke();
+    }
+
+    // Draw subtle friendly glow for player team tokens
+    if (token.side === "players" && !token.isActive) {
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius + 3, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(59, 130, 246, 0.25)";
+      ctx.fill();
     }
 
     ctx.beginPath();

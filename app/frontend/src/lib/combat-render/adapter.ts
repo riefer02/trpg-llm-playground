@@ -82,9 +82,9 @@ export type CombatRenderAdapterOutput = {
 const DEFAULT_GRID_RADIUS = 4;
 
 const DEFAULT_SIDE_COLORS: Record<Side, string> = {
-  players: "#1d4ed8",
-  hostiles: "#f97316",
-  neutral: "#10b981",
+  players: "#1d4ed8",     // Blue for player team
+  hostiles: "#dc2626",    // Red/crimson for enemy team (hostile)
+  neutral: "#10b981",     // Green for neutral
 };
 
 const PATTERN_OVERLAY_STYLES: Record<string, HoverStyle> = {
@@ -238,6 +238,7 @@ function buildTokens(
       color: colors[combatant.side],
       label: labelFromName(combatant.name),
       isActive: combatant.id === activeActorId,
+      side: combatant.side,
     });
   }
 

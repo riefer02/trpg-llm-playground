@@ -35,8 +35,9 @@ export function TurnIndicator({
 }: TurnIndicatorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
+  const [showEnemyBanner, setShowEnemyBanner] = useState(false);
 
-  // Show "YOUR TURN" banner briefly when turn starts
+  // Show "YOUR TURN" banner briefly when player turn starts
   useEffect(() => {
     if (isTurnActive && isPlayerTurn) {
       setShowBanner(true);
@@ -47,12 +48,23 @@ export function TurnIndicator({
     }
   }, [isTurnActive, isPlayerTurn, currentActor?.id]);
 
+  // Show "ENEMY TURN" banner briefly when enemy turn starts
+  useEffect(() => {
+    if (isTurnActive && !isPlayerTurn) {
+      setShowEnemyBanner(true);
+      const timer = setTimeout(() => setShowEnemyBanner(false), 3000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowEnemyBanner(false);
+    }
+  }, [isTurnActive, isPlayerTurn, currentActor?.id]);
+
   // Get upcoming actors (next 2-3 after current)
   const upcomingActors = getUpcomingActors(combatants, turnIndex, 3);
 
   return (
     <>
-      {/* Prominent "YOUR TURN" Banner */}
+      {/* Prominent "YOUR TURN" Banner - Blue/Green for player */}
       {showBanner && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top duration-300">
           <div className="bg-primary text-primary-foreground px-8 py-3 rounded-lg shadow-2xl border-2 border-primary-foreground/20">
@@ -60,6 +72,20 @@ export function TurnIndicator({
               YOUR TURN
             </div>
             <div className="text-sm text-center opacity-80">
+              {currentActor?.name ?? "Unknown"}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prominent "ENEMY TURN" Banner - Red/Crimson for enemy */}
+      {showEnemyBanner && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top duration-300">
+          <div className="bg-red-600 text-white px-8 py-3 rounded-lg shadow-2xl border-2 border-red-400/30">
+            <div className="text-2xl font-bold font-heading tracking-wide text-center">
+              ENEMY TURN
+            </div>
+            <div className="text-sm text-center opacity-90">
               {currentActor?.name ?? "Unknown"}
             </div>
           </div>
