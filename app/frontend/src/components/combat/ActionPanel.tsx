@@ -14,7 +14,7 @@ import type {
   MechInventory,
   MechWeaponDefinition,
 } from "../../lib/types/lancer";
-import { calculatePathDistance, hexEquals, isAdjacent } from "../../lib/combat-render/hex";
+import { calculatePathDistance, findPath, hexEquals, isAdjacent } from "../../lib/combat-render/hex";
 import { Button } from "../ui";
 import { SystemPicker } from "./SystemPicker";
 import { WeaponPicker } from "./WeaponPicker";
@@ -96,7 +96,23 @@ export interface TargetMode {
 }
 
 export interface ActionPanelHandle {
-  cancel: () => void;
+  cancel: () => boolean;
+  /** Fully reset the panel state (used after overlay confirmation) */
+  reset: () => void;
+}
+
+/** Data structure for action confirmation overlay */
+export interface ActionConfirmationReadyData {
+  action: AvailableActionItem;
+  targetIds?: string[];
+  weaponId?: string | null;
+  weaponProfileId?: string | null;
+  systemId?: string | null;
+  useThrown?: boolean;
+  movementPath?: HexCoord[];
+  pathDistance?: number;
+  fullTechFirst?: { option: string; target_id: string };
+  fullTechSecond?: { option: string; target_id: string };
 }
 
 export interface ActionPanelProps {
@@ -128,6 +144,10 @@ export interface ActionPanelProps {
   onTriggeredActionProcessed?: () => void;
   /** Callback when action is hovered (for preview) */
   onActionHover?: (action: AvailableActionItem | null) => void;
+  /** Callback when action is ready for confirmation (triggers overlay) */
+  onConfirmationReady?: (data: ActionConfirmationReadyData | null) => void;
+  /** Whether to use the confirmation overlay instead of inline confirm */
+  useConfirmationOverlay?: boolean;
 }
 
 export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
@@ -149,6 +169,8 @@ export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
   triggeredAction,
   onTriggeredActionProcessed,
   onActionHover,
+  onConfirmationReady,
+  useConfirmationOverlay = false,
 }: ActionPanelProps, ref) => {
   const [panelState, setPanelState] = useState<ActionPanelState>("idle");
   const [selectedAction, setSelectedAction] = useState<AvailableActionItem | null>(null);
@@ -162,7 +184,7 @@ export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
   const [fullTechStep, setFullTechStep] = useState<FullTechStep>(1);
   const [fullTechSelections, setFullTechSelections] = useState<FullTechSelectionState>({});
 
-  // Expose cancel method via ref
+  // Expose cancel and reset methods via ref
   useImperativeHandle(ref, () => ({
     cancel() {
       // If we're in targeting mode, cancel back to confirming/idle
@@ -192,7 +214,24 @@ export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
       // Not in a cancellable state
       return false;
     },
-  }), [panelState, actorPosition, onTargetModeChange, onPathModeChange]);
+    reset() {
+      // Fully reset panel state (used after overlay confirmation succeeds)
+      setSelectedAction(null);
+      setSelectedWeaponId(null);
+      setSelectedWeaponProfileId(null);
+      setSelectedSystemId(null);
+      setUseThrown(false);
+      setMovementPath([]);
+      setFullTechStep(1);
+      setFullTechSelections({});
+      setPanelState("idle");
+      onTargetModeChange(null);
+      onPathModeChange(false, []);
+      onAreaPreviewChange?.(null, null, null);
+      onMovementRangeChange?.(false, 0);
+      onConfirmationReady?.(null);
+    },
+  }), [panelState, actorPosition, onTargetModeChange, onPathModeChange, onAreaPreviewChange, onMovementRangeChange, onConfirmationReady]);
 
   const selectedWeaponDefinition =
     selectedWeaponId && weaponDefinitions ? weaponDefinitions.get(selectedWeaponId) : undefined;
@@ -233,17 +272,32 @@ export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
         return currentPath;
       }
 
-      // Only allow adjacent hexes
-      if (lastHex && !isAdjacent(lastHex, coord)) {
-        return currentPath; // Ignore non-adjacent clicks
+      // If adjacent, just add to path
+      if (lastHex && isAdjacent(lastHex, coord)) {
+        const newPath = [...currentPath, coord];
+        onPathModeChange(true, newPath);
+        return newPath;
       }
 
-      // Add to path
+      // Non-adjacent click: use pathfinding to calculate path to destination
+      if (lastHex) {
+        const pathToDestination = findPath(lastHex, coord, actorSpeed * 2);
+        if (pathToDestination && pathToDestination.length > 1) {
+          // pathToDestination includes lastHex, so remove it to avoid duplication
+          const newPath = [...currentPath, ...pathToDestination.slice(1)];
+          onPathModeChange(true, newPath);
+          return newPath;
+        }
+        // No path found (too far or blocked), ignore click
+        return currentPath;
+      }
+
+      // No lastHex, just add the coord
       const newPath = [...currentPath, coord];
       onPathModeChange(true, newPath);
       return newPath;
     });
-  }, [hexClickCoord, panelState, lastProcessedClick, onPathModeChange]);
+  }, [hexClickCoord, panelState, lastProcessedClick, onPathModeChange, actorSpeed]);
 
   // Reset thrown state when weapon changes and thrown is no longer valid
   useEffect(() => {
@@ -339,6 +393,79 @@ export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
       setLastTriggeredActionId(null);
     }
   }, [panelState]);
+
+  // Notify parent when action is ready for confirmation (for overlay mode)
+  // NOTE: This must be BEFORE the early return to comply with Rules of Hooks
+  useEffect(() => {
+    if (!useConfirmationOverlay || !onConfirmationReady) return;
+
+    // For movement actions ready to confirm
+    if (panelState === "selecting_path" && selectedAction && movementPath.length >= 2) {
+      const pathDistance = calculatePathDistance(movementPath);
+      onConfirmationReady({
+        action: selectedAction,
+        movementPath,
+        pathDistance,
+      });
+      return;
+    }
+
+    // For target-based actions ready to confirm
+    if ((panelState === "confirming" || panelState === "selecting_target") && selectedAction) {
+      // Only trigger if action doesn't require targets OR we have targets
+      if (!selectedAction.requires_target || selectedTargetIds.length > 0) {
+        onConfirmationReady({
+          action: selectedAction,
+          targetIds: selectedTargetIds,
+          weaponId: selectedWeaponId,
+          weaponProfileId: selectedWeaponProfileId,
+          systemId: selectedSystemId,
+          useThrown,
+        });
+        return;
+      }
+    }
+
+    // For full tech ready to confirm
+    if (panelState === "confirming_full_tech" && selectedAction) {
+      if (
+        fullTechSelections.firstOption &&
+        fullTechSelections.firstTargetId &&
+        fullTechSelections.secondOption &&
+        fullTechSelections.secondTargetId
+      ) {
+        onConfirmationReady({
+          action: selectedAction,
+          fullTechFirst: {
+            option: fullTechSelections.firstOption,
+            target_id: fullTechSelections.firstTargetId,
+          },
+          fullTechSecond: {
+            option: fullTechSelections.secondOption,
+            target_id: fullTechSelections.secondTargetId,
+          },
+        });
+        return;
+      }
+    }
+
+    // Clear confirmation when not ready
+    if (panelState === "idle" || panelState === "selecting_weapon" || panelState === "selecting_system" || panelState === "selecting_weapon_profile") {
+      onConfirmationReady(null);
+    }
+  }, [
+    useConfirmationOverlay,
+    panelState,
+    selectedAction,
+    selectedTargetIds,
+    selectedWeaponId,
+    selectedWeaponProfileId,
+    selectedSystemId,
+    useThrown,
+    movementPath,
+    fullTechSelections,
+    onConfirmationReady,
+  ]);
 
   // Early return AFTER all hooks are called
   if (!availableActions || !economy) {
@@ -609,6 +736,7 @@ export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
     onPathModeChange(false, []);
     onAreaPreviewChange?.(null, null, null);
     onMovementRangeChange?.(false, 0);
+    onConfirmationReady?.(null);
   };
 
   const handleCancelTargeting = () => {
@@ -640,6 +768,7 @@ export const ActionPanel = forwardRef<ActionPanelHandle, ActionPanelProps>(({
     onPathModeChange(false, []);
     onAreaPreviewChange?.(null, null, null);
     onMovementRangeChange?.(false, 0);
+    onConfirmationReady?.(null);
   };
 
   // Handle confirm path for movement actions

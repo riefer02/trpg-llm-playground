@@ -129,3 +129,75 @@ export function calculatePathDistance(path: HexCoord[]): number {
 export function hexEquals(a: HexCoord, b: HexCoord): boolean {
   return a.q === b.q && a.r === b.r;
 }
+
+/**
+ * Get all 6 neighbors of a hex in axial coordinates.
+ */
+export function getHexNeighbors(coord: HexCoord): HexCoord[] {
+  const directions = [
+    { q: 1, r: 0 },   // East
+    { q: 1, r: -1 },  // Northeast
+    { q: 0, r: -1 },  // Northwest
+    { q: -1, r: 0 },  // West
+    { q: -1, r: 1 },  // Southwest
+    { q: 0, r: 1 },   // Southeast
+  ];
+  return directions.map(d => hex(coord.q + d.q, coord.r + d.r));
+}
+
+/**
+ * Find a path between two hexes using BFS.
+ * Returns the path including start and end, or null if no path exists.
+ *
+ * @param start - Starting hex coordinate
+ * @param end - Destination hex coordinate
+ * @param maxDistance - Maximum path length (to limit search)
+ * @param isBlocked - Optional function to check if a hex is blocked
+ */
+export function findPath(
+  start: HexCoord,
+  end: HexCoord,
+  maxDistance: number = 20,
+  isBlocked?: (coord: HexCoord) => boolean,
+): HexCoord[] | null {
+  if (hexEquals(start, end)) {
+    return [start];
+  }
+
+  const queue: { coord: HexCoord; path: HexCoord[] }[] = [
+    { coord: start, path: [start] },
+  ];
+  const visited = new Set<string>();
+  visited.add(`${start.q},${start.r}`);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+
+    if (current.path.length > maxDistance) {
+      continue;
+    }
+
+    for (const neighbor of getHexNeighbors(current.coord)) {
+      const key = `${neighbor.q},${neighbor.r}`;
+
+      if (visited.has(key)) {
+        continue;
+      }
+
+      if (isBlocked && isBlocked(neighbor)) {
+        continue;
+      }
+
+      const newPath = [...current.path, neighbor];
+
+      if (hexEquals(neighbor, end)) {
+        return newPath;
+      }
+
+      visited.add(key);
+      queue.push({ coord: neighbor, path: newPath });
+    }
+  }
+
+  return null;
+}

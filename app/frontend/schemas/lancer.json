@@ -55300,6 +55300,733 @@
       ],
       "title": "TraumaDecisionResult",
       "type": "object"
+    },
+    "ActionEconomyBrief": {
+      "description": "Pre-computed action economy state for the current actor.",
+      "properties": {
+        "full_actions_remaining": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Full Actions Remaining",
+          "type": "integer"
+        },
+        "quick_actions_remaining": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Quick Actions Remaining",
+          "type": "integer"
+        },
+        "can_overcharge": {
+          "default": true,
+          "title": "Can Overcharge",
+          "type": "boolean"
+        },
+        "reactions_remaining": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Reactions Remaining",
+          "type": "integer"
+        },
+        "overcharge_used": {
+          "default": false,
+          "title": "Overcharge Used",
+          "type": "boolean"
+        },
+        "move_used": {
+          "default": false,
+          "title": "Move Used",
+          "type": "boolean"
+        }
+      },
+      "title": "ActionEconomyBrief",
+      "type": "object"
+    },
+    "ActionFeedEntry": {
+      "description": "Pre-flattened action for display in the action feed.\n\nReplaces the frontend's triple-nested loop over rounds/turns/actions.",
+      "properties": {
+        "id": {
+          "description": "Unique ID in 'round-turn-action' format",
+          "title": "Id",
+          "type": "string"
+        },
+        "round_number": {
+          "minimum": 1,
+          "title": "Round Number",
+          "type": "integer"
+        },
+        "actor_id": {
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "actor_name": {
+          "title": "Actor Name",
+          "type": "string"
+        },
+        "actor_side": {
+          "enum": [
+            "players",
+            "hostiles",
+            "neutral"
+          ],
+          "title": "Actor Side",
+          "type": "string"
+        },
+        "action_id": {
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_name": {
+          "title": "Action Name",
+          "type": "string"
+        },
+        "target_names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Names",
+          "type": "array"
+        },
+        "damage_dealt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Damage Dealt"
+        },
+        "heat_dealt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heat Dealt"
+        },
+        "statuses_applied": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Statuses Applied",
+          "type": "array"
+        },
+        "timestamp": {
+          "description": "Ordering index (round * 1000 + turn * 10 + action)",
+          "title": "Timestamp",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "round_number",
+        "actor_id",
+        "actor_name",
+        "actor_side",
+        "action_id",
+        "action_name",
+        "timestamp"
+      ],
+      "title": "ActionFeedEntry",
+      "type": "object"
+    },
+    "CombatantBrief": {
+      "description": "Minimal combatant data for UI rendering.\n\nContains only the fields needed for:\n- Token rendering (position, side, frame)\n- Health bars (hp, heat, structure)\n- Status indicators (statuses, destroyed)\n- AI indicator",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "side": {
+          "enum": [
+            "players",
+            "hostiles",
+            "neutral"
+          ],
+          "title": "Side",
+          "type": "string"
+        },
+        "frame_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Frame identifier for sprite lookup (e.g., 'gms_everest')",
+          "title": "Frame Id"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HexCoord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Current hex position"
+        },
+        "hp_current": {
+          "minimum": 0,
+          "title": "Hp Current",
+          "type": "integer"
+        },
+        "hp_max": {
+          "minimum": 1,
+          "title": "Hp Max",
+          "type": "integer"
+        },
+        "heat_current": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Heat Current",
+          "type": "integer"
+        },
+        "heat_cap": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Heat Cap",
+          "type": "integer"
+        },
+        "structure_current": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Structure Current",
+          "type": "integer"
+        },
+        "stress_current": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Stress Current",
+          "type": "integer"
+        },
+        "statuses": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Statuses",
+          "type": "array"
+        },
+        "is_destroyed": {
+          "default": false,
+          "title": "Is Destroyed",
+          "type": "boolean"
+        },
+        "is_ai_controlled": {
+          "default": false,
+          "title": "Is Ai Controlled",
+          "type": "boolean"
+        },
+        "speed": {
+          "default": 0,
+          "description": "Movement speed for range preview",
+          "minimum": 0,
+          "title": "Speed",
+          "type": "integer"
+        },
+        "evasion": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Evasion",
+          "type": "integer"
+        },
+        "e_defense": {
+          "default": 0,
+          "minimum": 0,
+          "title": "E Defense",
+          "type": "integer"
+        },
+        "armor": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Armor",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "side",
+        "hp_current",
+        "hp_max"
+      ],
+      "title": "CombatantBrief",
+      "type": "object"
+    },
+    "CurrentActorState": {
+      "description": "Pre-computed current actor info.\n\nEliminates the need for frontend to traverse rounds/turns/combatants\nto find the current actor.",
+      "properties": {
+        "actor_id": {
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "actor_name": {
+          "title": "Actor Name",
+          "type": "string"
+        },
+        "frame_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frame Id"
+        },
+        "side": {
+          "enum": [
+            "players",
+            "hostiles",
+            "neutral"
+          ],
+          "title": "Side",
+          "type": "string"
+        },
+        "is_player_controlled": {
+          "title": "Is Player Controlled",
+          "type": "boolean"
+        },
+        "economy": {
+          "$ref": "#/$defs/ActionEconomyBrief"
+        }
+      },
+      "required": [
+        "actor_id",
+        "actor_name",
+        "side",
+        "is_player_controlled",
+        "economy"
+      ],
+      "title": "CurrentActorState",
+      "type": "object"
+    },
+    "DeployableBrief": {
+      "description": "Minimal deployable info for rendering.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "drone",
+            "mine",
+            "deployable",
+            "other"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Id"
+        },
+        "position": {
+          "$ref": "#/$defs/HexCoord"
+        },
+        "hp": {
+          "title": "Hp",
+          "type": "integer"
+        },
+        "max_hp": {
+          "title": "Max Hp",
+          "type": "integer"
+        },
+        "is_armed": {
+          "default": false,
+          "title": "Is Armed",
+          "type": "boolean"
+        },
+        "is_destroyed": {
+          "default": false,
+          "title": "Is Destroyed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "position",
+        "hp",
+        "max_hp"
+      ],
+      "title": "DeployableBrief",
+      "type": "object"
+    },
+    "MovementRangeData": {
+      "description": "Pre-computed movement data for range preview.\n\nEliminates the expensive hex generation and pathfinding on the frontend.",
+      "properties": {
+        "actor_id": {
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "max_range": {
+          "description": "From speed stat",
+          "minimum": 0,
+          "title": "Max Range",
+          "type": "integer"
+        },
+        "reachable_hexes": {
+          "description": "Valid movement destinations",
+          "items": {
+            "$ref": "#/$defs/HexCoord"
+          },
+          "title": "Reachable Hexes",
+          "type": "array"
+        },
+        "blocked_hexes": {
+          "description": "Hexes blocked by other combatants",
+          "items": {
+            "$ref": "#/$defs/HexCoord"
+          },
+          "title": "Blocked Hexes",
+          "type": "array"
+        },
+        "difficult_hexes": {
+          "description": "Difficult terrain hexes",
+          "items": {
+            "$ref": "#/$defs/HexCoord"
+          },
+          "title": "Difficult Hexes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "actor_id",
+        "max_range"
+      ],
+      "title": "MovementRangeData",
+      "type": "object"
+    },
+    "ObjectiveBrief": {
+      "description": "Minimal objective info for UI display.",
+      "properties": {
+        "objective_id": {
+          "title": "Objective Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "completed",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "is_optional": {
+          "default": false,
+          "title": "Is Optional",
+          "type": "boolean"
+        },
+        "is_primary": {
+          "default": false,
+          "title": "Is Primary",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "objective_id",
+        "name",
+        "description",
+        "status"
+      ],
+      "title": "ObjectiveBrief",
+      "type": "object"
+    },
+    "PendingDecisionBrief": {
+      "description": "Minimal decision info for UI prompts.",
+      "properties": {
+        "decision_id": {
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "decision_type": {
+          "enum": [
+            "hull_save",
+            "engineering_save",
+            "engineering_check",
+            "system_trauma"
+          ],
+          "title": "Decision Type",
+          "type": "string"
+        },
+        "combatant_id": {
+          "title": "Combatant Id",
+          "type": "string"
+        },
+        "combatant_name": {
+          "title": "Combatant Name",
+          "type": "string"
+        },
+        "trigger_source": {
+          "title": "Trigger Source",
+          "type": "string"
+        },
+        "save_target": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Save Target"
+        },
+        "eligible_mounts": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Eligible Mounts",
+          "type": "array"
+        },
+        "eligible_systems": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Eligible Systems",
+          "type": "array"
+        }
+      },
+      "required": [
+        "decision_id",
+        "decision_type",
+        "combatant_id",
+        "combatant_name",
+        "trigger_source"
+      ],
+      "title": "PendingDecisionBrief",
+      "type": "object"
+    },
+    "CombatUIState": {
+      "description": "Top-level UI DTO - replaces raw scenario in responses.\n\nThis model provides everything the frontend needs to render combat\nwithout additional computation:\n\n- Pre-computed lookups (combatant_names, combatant_sides)\n- Current turn info (current_actor, is_player_turn)\n- Flattened action history (recent_actions)\n- Movement preview data (movement_range)\n\nThe frontend becomes a thin rendering layer that just maps this\ndata to React components.",
+      "example": {
+        "combatant_names": {
+          "c1": "VANGUARD's Everest",
+          "c2": "GMS Grunt"
+        },
+        "combatant_sides": {
+          "c1": "players",
+          "c2": "hostiles"
+        },
+        "current_round": 1,
+        "current_turn_index": 0,
+        "is_player_turn": true,
+        "session_id": "combat_123",
+        "status": "active"
+      },
+      "properties": {
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "current_round": {
+          "minimum": 1,
+          "title": "Current Round",
+          "type": "integer"
+        },
+        "current_turn_index": {
+          "minimum": 0,
+          "title": "Current Turn Index",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "paused",
+            "completed",
+            "abandoned"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "combatant_names": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Map of combatant ID to display name",
+          "title": "Combatant Names",
+          "type": "object"
+        },
+        "combatant_sides": {
+          "additionalProperties": {
+            "enum": [
+              "players",
+              "hostiles",
+              "neutral"
+            ],
+            "type": "string"
+          },
+          "description": "Map of combatant ID to side",
+          "title": "Combatant Sides",
+          "type": "object"
+        },
+        "current_actor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CurrentActorState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "is_player_turn": {
+          "default": false,
+          "title": "Is Player Turn",
+          "type": "boolean"
+        },
+        "pending_decisions": {
+          "items": {
+            "$ref": "#/$defs/PendingDecisionBrief"
+          },
+          "title": "Pending Decisions",
+          "type": "array"
+        },
+        "combatants": {
+          "items": {
+            "$ref": "#/$defs/CombatantBrief"
+          },
+          "title": "Combatants",
+          "type": "array"
+        },
+        "terrain_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash for terrain cache invalidation",
+          "title": "Terrain Hash"
+        },
+        "deployables": {
+          "items": {
+            "$ref": "#/$defs/DeployableBrief"
+          },
+          "title": "Deployables",
+          "type": "array"
+        },
+        "objectives": {
+          "items": {
+            "$ref": "#/$defs/ObjectiveBrief"
+          },
+          "title": "Objectives",
+          "type": "array"
+        },
+        "recent_actions": {
+          "description": "Last 50 actions, most recent first",
+          "items": {
+            "$ref": "#/$defs/ActionFeedEntry"
+          },
+          "title": "Recent Actions",
+          "type": "array"
+        },
+        "total_action_count": {
+          "default": 0,
+          "description": "Total actions for 'X more actions' display",
+          "title": "Total Action Count",
+          "type": "integer"
+        },
+        "movement_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MovementRangeData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "turn_order": {
+          "description": "Ordered list of combatant IDs for initiative display",
+          "items": {
+            "type": "string"
+          },
+          "title": "Turn Order",
+          "type": "array"
+        },
+        "mission_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mission Name"
+        },
+        "tile_set": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Terrain tileset for visual rendering",
+          "title": "Tile Set"
+        }
+      },
+      "required": [
+        "session_id",
+        "current_round",
+        "current_turn_index",
+        "status"
+      ],
+      "title": "CombatUIState",
+      "type": "object"
     }
   },
   "oneOf": [
@@ -56103,6 +56830,33 @@
     },
     {
       "$ref": "#/$defs/TraumaDecisionResult"
+    },
+    {
+      "$ref": "#/$defs/ActionEconomyBrief"
+    },
+    {
+      "$ref": "#/$defs/ActionFeedEntry"
+    },
+    {
+      "$ref": "#/$defs/CombatantBrief"
+    },
+    {
+      "$ref": "#/$defs/CombatUIState"
+    },
+    {
+      "$ref": "#/$defs/CurrentActorState"
+    },
+    {
+      "$ref": "#/$defs/DeployableBrief"
+    },
+    {
+      "$ref": "#/$defs/MovementRangeData"
+    },
+    {
+      "$ref": "#/$defs/ObjectiveBrief"
+    },
+    {
+      "$ref": "#/$defs/PendingDecisionBrief"
     }
   ]
 }

@@ -1,0 +1,66 @@
+{
+  "description": "Minimal decision info for UI prompts.",
+  "properties": {
+    "decision_id": {
+      "title": "Decision Id",
+      "type": "string"
+    },
+    "decision_type": {
+      "enum": [
+        "hull_save",
+        "engineering_save",
+        "engineering_check",
+        "system_trauma"
+      ],
+      "title": "Decision Type",
+      "type": "string"
+    },
+    "combatant_id": {
+      "title": "Combatant Id",
+      "type": "string"
+    },
+    "combatant_name": {
+      "title": "Combatant Name",
+      "type": "string"
+    },
+    "trigger_source": {
+      "title": "Trigger Source",
+      "type": "string"
+    },
+    "save_target": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Save Target"
+    },
+    "eligible_mounts": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Eligible Mounts",
+      "type": "array"
+    },
+    "eligible_systems": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Eligible Systems",
+      "type": "array"
+    }
+  },
+  "required": [
+    "decision_id",
+    "decision_type",
+    "combatant_id",
+    "combatant_name",
+    "trigger_source"
+  ],
+  "title": "PendingDecisionBrief",
+  "type": "object"
+}

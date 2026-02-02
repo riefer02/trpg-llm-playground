@@ -949,3 +949,34 @@ Status: PASSED
 ### Next Steps
 - All E9 (Visual & UX Polish) stories complete! PRD iteration finished.
 ---
+
+
+## Iteration - Mon Feb 02 2026 00:25 UTC
+Epic: E10 - Combat UI DTO Layer
+Stories: E10-US-013, E10-US-015
+Status: COMPLETE - All 15 stories now passing
+
+### Changes Made
+
+#### E10-US-013: Integrate useModalManager
+- app/frontend/src/hooks/useModalManager.ts: Added isAnyModalOpen helper
+- app/frontend/src/routes/combat/$combatId.tsx: Replaced 8 boolean modal useState hooks with single useModalManager call
+- Simplified keyboard guard checks from 6+ individual booleans to isAnyModalOpen
+- Updated all modal openings/closings to use openModal()/closeModal()
+
+#### E10-US-015: Remove Frontend Movement Calculations  
+- app/backend/api/dtos/converters.py: Replaced hexes_in_radius() with proper BFS pathfinding
+- BFS now accounts for difficult terrain (cost 2), blocked hexes, and movement limits
+- build_combat_ui_state() auto-populates movement_range for player turns
+- Frontend movementRangeOverlays now prefers backend-computed data, with fallback
+
+### Learnings
+- Discriminated union hooks reduce state explosion and simplify dependency arrays
+- Backend BFS ensures consistent terrain cost handling across client/server
+- Movement range can be pre-computed without significant API latency impact
+
+### Next Steps
+- E10 epic complete - all 15 user stories passing
+- Consider similar DTO patterns for other complex state (e.g., weapon selection)
+---
+

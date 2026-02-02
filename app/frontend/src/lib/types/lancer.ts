@@ -270,7 +270,16 @@ export type LancerTTRPGSchema =
   | PendingDecision
   | DecisionResolution
   | SaveDecisionResult
-  | TraumaDecisionResult;
+  | TraumaDecisionResult
+  | ActionEconomyBrief
+  | ActionFeedEntry
+  | CombatantBrief
+  | CombatUIState
+  | CurrentActorState
+  | DeployableBrief
+  | MovementRangeData
+  | ObjectiveBrief
+  | PendingDecisionBrief;
 export type Id = string;
 /**
  * The pilot's callsign
@@ -31238,6 +31247,127 @@ export type ValidSelection = boolean;
  * Error message if selection was invalid
  */
 export type ErrorMessage = string | null;
+export type FullActionsRemaining = number;
+export type QuickActionsRemaining = number;
+export type CanOvercharge2 = boolean;
+export type ReactionsRemaining = number;
+export type OverchargeUsed1 = boolean;
+export type MoveUsed1 = boolean;
+/**
+ * Unique ID in 'round-turn-action' format
+ */
+export type Id33 = string;
+export type RoundNumber = number;
+export type ActorId5 = string;
+export type ActorName1 = string;
+export type ActorSide = "players" | "hostiles" | "neutral";
+export type ActionId5 = string;
+export type ActionName1 = string;
+export type TargetNames = string[];
+export type DamageDealt3 = number | null;
+export type HeatDealt = number | null;
+export type StatusesApplied1 = string[];
+/**
+ * Ordering index (round * 1000 + turn * 10 + action)
+ */
+export type Timestamp = number;
+export type Id34 = string;
+export type Name55 = string;
+export type Side2 = "players" | "hostiles" | "neutral";
+/**
+ * Frame identifier for sprite lookup (e.g., 'gms_everest')
+ */
+export type FrameId4 = string | null;
+export type HpCurrent2 = number;
+export type HpMax1 = number;
+export type HeatCurrent1 = number;
+export type HeatCap3 = number;
+export type StructureCurrent2 = number;
+export type StressCurrent2 = number;
+export type Statuses2 = string[];
+export type IsDestroyed3 = boolean;
+export type IsAiControlled = boolean;
+/**
+ * Movement speed for range preview
+ */
+export type Speed5 = number;
+export type Evasion10 = number;
+export type EDefense7 = number;
+export type Armor8 = number;
+export type SessionId1 = string;
+export type CurrentRound1 = number;
+export type CurrentTurnIndex = number;
+export type Status18 = "active" | "paused" | "completed" | "abandoned";
+export type ActorId6 = string;
+export type ActorName2 = string;
+export type FrameId5 = string | null;
+export type Side3 = "players" | "hostiles" | "neutral";
+export type IsPlayerControlled = boolean;
+export type IsPlayerTurn = boolean;
+export type DecisionId3 = string;
+export type DecisionType1 = "hull_save" | "engineering_save" | "engineering_check" | "system_trauma";
+export type CombatantId3 = string;
+export type CombatantName1 = string;
+export type TriggerSource1 = string;
+export type SaveTarget4 = number | null;
+export type EligibleMounts2 = number[];
+export type EligibleSystems2 = string[];
+export type PendingDecisions1 = PendingDecisionBrief[];
+export type Combatants1 = CombatantBrief[];
+/**
+ * Hash for terrain cache invalidation
+ */
+export type TerrainHash = string | null;
+export type Id35 = string;
+export type Name56 = string;
+export type Kind8 = "drone" | "mine" | "deployable" | "other";
+export type OwnerId1 = string | null;
+export type Hp9 = number;
+export type MaxHp2 = number;
+export type IsArmed1 = boolean;
+export type IsDestroyed4 = boolean;
+export type Deployables1 = DeployableBrief[];
+export type ObjectiveId = string;
+export type Name57 = string;
+export type Description13 = string;
+export type Status19 = "active" | "completed" | "failed";
+export type IsOptional1 = boolean;
+export type IsPrimary = boolean;
+export type Objectives2 = ObjectiveBrief[];
+/**
+ * Last 50 actions, most recent first
+ */
+export type RecentActions = ActionFeedEntry[];
+/**
+ * Total actions for 'X more actions' display
+ */
+export type TotalActionCount = number;
+export type ActorId7 = string;
+/**
+ * From speed stat
+ */
+export type MaxRange = number;
+/**
+ * Valid movement destinations
+ */
+export type ReachableHexes = HexCoord[];
+/**
+ * Hexes blocked by other combatants
+ */
+export type BlockedHexes = HexCoord[];
+/**
+ * Difficult terrain hexes
+ */
+export type DifficultHexes = HexCoord[];
+/**
+ * Ordered list of combatant IDs for initiative display
+ */
+export type TurnOrder = string[];
+export type MissionName2 = string | null;
+/**
+ * Terrain tileset for visual rendering
+ */
+export type TileSet1 = string | null;
 
 /**
  * A Lancer pilot character.
@@ -38069,5 +38199,187 @@ export interface TraumaDecisionResult {
   system_id?: SystemId3;
   valid_selection: ValidSelection;
   error_message?: ErrorMessage;
+  [k: string]: unknown;
+}
+/**
+ * Pre-computed action economy state for the current actor.
+ */
+export interface ActionEconomyBrief {
+  full_actions_remaining?: FullActionsRemaining;
+  quick_actions_remaining?: QuickActionsRemaining;
+  can_overcharge?: CanOvercharge2;
+  reactions_remaining?: ReactionsRemaining;
+  overcharge_used?: OverchargeUsed1;
+  move_used?: MoveUsed1;
+  [k: string]: unknown;
+}
+/**
+ * Pre-flattened action for display in the action feed.
+ *
+ * Replaces the frontend's triple-nested loop over rounds/turns/actions.
+ */
+export interface ActionFeedEntry {
+  id: Id33;
+  round_number: RoundNumber;
+  actor_id: ActorId5;
+  actor_name: ActorName1;
+  actor_side: ActorSide;
+  action_id: ActionId5;
+  action_name: ActionName1;
+  target_names?: TargetNames;
+  damage_dealt?: DamageDealt3;
+  heat_dealt?: HeatDealt;
+  statuses_applied?: StatusesApplied1;
+  timestamp: Timestamp;
+  [k: string]: unknown;
+}
+/**
+ * Minimal combatant data for UI rendering.
+ *
+ * Contains only the fields needed for:
+ * - Token rendering (position, side, frame)
+ * - Health bars (hp, heat, structure)
+ * - Status indicators (statuses, destroyed)
+ * - AI indicator
+ */
+export interface CombatantBrief {
+  id: Id34;
+  name: Name55;
+  side: Side2;
+  frame_id?: FrameId4;
+  /**
+   * Current hex position
+   */
+  position?: HexCoord | null;
+  hp_current: HpCurrent2;
+  hp_max: HpMax1;
+  heat_current?: HeatCurrent1;
+  heat_cap?: HeatCap3;
+  structure_current?: StructureCurrent2;
+  stress_current?: StressCurrent2;
+  statuses?: Statuses2;
+  is_destroyed?: IsDestroyed3;
+  is_ai_controlled?: IsAiControlled;
+  speed?: Speed5;
+  evasion?: Evasion10;
+  e_defense?: EDefense7;
+  armor?: Armor8;
+  [k: string]: unknown;
+}
+/**
+ * Top-level UI DTO - replaces raw scenario in responses.
+ *
+ * This model provides everything the frontend needs to render combat
+ * without additional computation:
+ *
+ * - Pre-computed lookups (combatant_names, combatant_sides)
+ * - Current turn info (current_actor, is_player_turn)
+ * - Flattened action history (recent_actions)
+ * - Movement preview data (movement_range)
+ *
+ * The frontend becomes a thin rendering layer that just maps this
+ * data to React components.
+ */
+export interface CombatUIState {
+  session_id: SessionId1;
+  current_round: CurrentRound1;
+  current_turn_index: CurrentTurnIndex;
+  status: Status18;
+  combatant_names?: CombatantNames;
+  combatant_sides?: CombatantSides;
+  current_actor?: CurrentActorState | null;
+  is_player_turn?: IsPlayerTurn;
+  pending_decisions?: PendingDecisions1;
+  combatants?: Combatants1;
+  terrain_hash?: TerrainHash;
+  deployables?: Deployables1;
+  objectives?: Objectives2;
+  recent_actions?: RecentActions;
+  total_action_count?: TotalActionCount;
+  movement_range?: MovementRangeData | null;
+  turn_order?: TurnOrder;
+  mission_name?: MissionName2;
+  tile_set?: TileSet1;
+  [k: string]: unknown;
+}
+/**
+ * Map of combatant ID to display name
+ */
+export interface CombatantNames {
+  [k: string]: string;
+}
+/**
+ * Map of combatant ID to side
+ */
+export interface CombatantSides {
+  [k: string]: "players" | "hostiles" | "neutral";
+}
+/**
+ * Pre-computed current actor info.
+ *
+ * Eliminates the need for frontend to traverse rounds/turns/combatants
+ * to find the current actor.
+ */
+export interface CurrentActorState {
+  actor_id: ActorId6;
+  actor_name: ActorName2;
+  frame_id?: FrameId5;
+  side: Side3;
+  is_player_controlled: IsPlayerControlled;
+  economy: ActionEconomyBrief;
+  [k: string]: unknown;
+}
+/**
+ * Minimal decision info for UI prompts.
+ */
+export interface PendingDecisionBrief {
+  decision_id: DecisionId3;
+  decision_type: DecisionType1;
+  combatant_id: CombatantId3;
+  combatant_name: CombatantName1;
+  trigger_source: TriggerSource1;
+  save_target?: SaveTarget4;
+  eligible_mounts?: EligibleMounts2;
+  eligible_systems?: EligibleSystems2;
+  [k: string]: unknown;
+}
+/**
+ * Minimal deployable info for rendering.
+ */
+export interface DeployableBrief {
+  id: Id35;
+  name: Name56;
+  kind: Kind8;
+  owner_id?: OwnerId1;
+  position: HexCoord;
+  hp: Hp9;
+  max_hp: MaxHp2;
+  is_armed?: IsArmed1;
+  is_destroyed?: IsDestroyed4;
+  [k: string]: unknown;
+}
+/**
+ * Minimal objective info for UI display.
+ */
+export interface ObjectiveBrief {
+  objective_id: ObjectiveId;
+  name: Name57;
+  description: Description13;
+  status: Status19;
+  is_optional?: IsOptional1;
+  is_primary?: IsPrimary;
+  [k: string]: unknown;
+}
+/**
+ * Pre-computed movement data for range preview.
+ *
+ * Eliminates the expensive hex generation and pathfinding on the frontend.
+ */
+export interface MovementRangeData {
+  actor_id: ActorId7;
+  max_range: MaxRange;
+  reachable_hexes?: ReachableHexes;
+  blocked_hexes?: BlockedHexes;
+  difficult_hexes?: DifficultHexes;
   [k: string]: unknown;
 }

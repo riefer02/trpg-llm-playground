@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./client";
 import { characterKeys, type CharacterResponse } from "./characters";
-import type { FullTechOptionSelection, MechCombatScenario } from "../types/lancer";
+import type {
+  CombatUIState,
+  FullTechOptionSelection,
+  MechCombatScenario,
+} from "../types/lancer";
 import { getActiveCharacterId, autoSave } from '../save/saveSystem';
 
 // =============================================================================
@@ -16,7 +20,8 @@ export interface TurnStartResponse {
   available_actions: string[];
   prepared_action_expired: boolean;
   cooldowns_decremented: string[];
-  scenario: MechCombatScenario;
+  ui?: CombatUIState | null;
+  scenario?: MechCombatScenario | null;
 }
 
 // =============================================================================
@@ -76,7 +81,8 @@ export interface ActionResponse {
   damage_dealt: number;
   heat_generated: number;
   economy: ActionEconomyState;
-  scenario: MechCombatScenario;
+  ui?: CombatUIState | null;
+  scenario?: MechCombatScenario | null;
 }
 
 export interface TurnEndResponse {
@@ -86,7 +92,8 @@ export interface TurnEndResponse {
   round_advanced: boolean;
   new_round_number: number | null;
   end_of_turn_effects: Record<string, unknown>[];
-  scenario: MechCombatScenario;
+  ui?: CombatUIState | null;
+  scenario?: MechCombatScenario | null;
 }
 
 export interface ReactionRequest {
@@ -103,7 +110,8 @@ export interface ReactionResponse {
   reaction_used?: string;
   effects_applied: Record<string, unknown>[];
   damage_dealt: number;
-  scenario: MechCombatScenario;
+  ui?: CombatUIState | null;
+  scenario?: MechCombatScenario | null;
 }
 
 export interface AvailableActionItem {
@@ -192,7 +200,10 @@ export interface CombatSessionResponse {
   notes: string;
   xp_awarded?: number;
   salvage_awarded?: number;
-  scenario: MechCombatScenario;
+  /** Pre-computed UI state with lookups and flattened data */
+  ui?: CombatUIState | null;
+  /** Full scenario (optional when ui is present) */
+  scenario?: MechCombatScenario | null;
 }
 
 export const combatKeys = {
@@ -572,21 +583,10 @@ export interface AutoNPCTurnResponse {
 }
 
 export function useAutoNpcTurn(sessionId: string) {
-  const queryClient = useQueryClient();
+  // Note: WebSocket broadcast handles cache updates to avoid race conditions
+  // that cause DOM errors with Sonner toast library
   return useMutation({
     mutationFn: () =>
       api.post<AutoNPCTurnResponse>(`/combat/${sessionId}/turns/auto-npc`),
-    onSuccess: (data) => {
-      queryClient.setQueryData<CombatSessionResponse>(
-        combatKeys.detail(sessionId),
-        (prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            scenario: data.scenario,
-          };
-        },
-      );
-    },
   });
 }

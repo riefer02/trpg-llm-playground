@@ -1,0 +1,95 @@
+{
+  "description": "Pre-flattened action for display in the action feed.\n\nReplaces the frontend's triple-nested loop over rounds/turns/actions.",
+  "properties": {
+    "id": {
+      "description": "Unique ID in 'round-turn-action' format",
+      "title": "Id",
+      "type": "string"
+    },
+    "round_number": {
+      "minimum": 1,
+      "title": "Round Number",
+      "type": "integer"
+    },
+    "actor_id": {
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "actor_name": {
+      "title": "Actor Name",
+      "type": "string"
+    },
+    "actor_side": {
+      "enum": [
+        "players",
+        "hostiles",
+        "neutral"
+      ],
+      "title": "Actor Side",
+      "type": "string"
+    },
+    "action_id": {
+      "title": "Action Id",
+      "type": "string"
+    },
+    "action_name": {
+      "title": "Action Name",
+      "type": "string"
+    },
+    "target_names": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Target Names",
+      "type": "array"
+    },
+    "damage_dealt": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Damage Dealt"
+    },
+    "heat_dealt": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Heat Dealt"
+    },
+    "statuses_applied": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Statuses Applied",
+      "type": "array"
+    },
+    "timestamp": {
+      "description": "Ordering index (round * 1000 + turn * 10 + action)",
+      "title": "Timestamp",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "round_number",
+    "actor_id",
+    "actor_name",
+    "actor_side",
+    "action_id",
+    "action_name",
+    "timestamp"
+  ],
+  "title": "ActionFeedEntry",
+  "type": "object"
+}

@@ -1,0 +1,75 @@
+{
+  "$defs": {
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    }
+  },
+  "description": "Pre-computed movement data for range preview.\n\nEliminates the expensive hex generation and pathfinding on the frontend.",
+  "properties": {
+    "actor_id": {
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "max_range": {
+      "description": "From speed stat",
+      "minimum": 0,
+      "title": "Max Range",
+      "type": "integer"
+    },
+    "reachable_hexes": {
+      "description": "Valid movement destinations",
+      "items": {
+        "$ref": "#/$defs/HexCoord"
+      },
+      "title": "Reachable Hexes",
+      "type": "array"
+    },
+    "blocked_hexes": {
+      "description": "Hexes blocked by other combatants",
+      "items": {
+        "$ref": "#/$defs/HexCoord"
+      },
+      "title": "Blocked Hexes",
+      "type": "array"
+    },
+    "difficult_hexes": {
+      "description": "Difficult terrain hexes",
+      "items": {
+        "$ref": "#/$defs/HexCoord"
+      },
+      "title": "Difficult Hexes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "actor_id",
+    "max_range"
+  ],
+  "title": "MovementRangeData",
+  "type": "object"
+}

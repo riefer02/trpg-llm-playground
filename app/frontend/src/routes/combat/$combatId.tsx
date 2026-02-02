@@ -11,6 +11,7 @@ import { useCanvasViewport } from "../../lib/hooks/useCanvasViewport";
 import { useSettings } from "../../lib/hooks/useSettings";
 import { useLowHPWarning } from "../../lib/hooks/useLowHPWarning";
 import { useKeyboardShortcuts } from "../../lib/hooks/useKeyboardShortcuts";
+import { useModalManager } from "../../hooks/useModalManager";
 import { useCombatNarration } from "../../lib/voice/text-to-speech";
 import { useSpeechRecognition } from "../../lib/voice/speech-to-text";
 
@@ -71,8 +72,16 @@ import {
 import {
   ActionPanel,
   type TargetMode,
+  type ActionConfirmationReadyData,
+  type ActionPanelHandle,
 } from "../../components/combat/ActionPanel";
 import { ActionBar } from "../../components/combat/ActionBar";
+import {
+  ActionConfirmationOverlay,
+  type ActionConfirmationData,
+} from "../../components/combat/ActionConfirmationOverlay";
+import { TurnStateBanner, type TurnBannerState } from "../../components/combat/TurnStateBanner";
+import { ActionFeed } from "../../components/combat/ActionFeed";
 import { VoiceTranscriptDisplay } from "../../components/combat/VoiceTranscriptDisplay";
 import { VoiceActionConfirmationDialog } from "../../components/combat/VoiceActionConfirmationDialog";
 import { OverchargeConfirm } from "../../components/combat/OverchargeConfirm";
@@ -162,31 +171,39 @@ function CombatSessionPage() {
   // ActionPanel ref for cancel targeting
   const actionPanelRef = useRef<ActionPanelHandle>(null);
 
-  // Extract scenario data early so it can be used in subsequent hooks
-  const scenario = data?.scenario;
+  // Extract UI state and scenario data
+  // UI state provides pre-computed lookups, scenario provides full data when needed
+  const ui = data?.ui ?? null;
+  const scenario = useMemo(() => data?.scenario ?? null, [data?.scenario]);
   const rounds = scenario?.rounds ?? [];
   const currentRound = data?.current_round ?? 1;
   const currentTurnIndex = data?.current_turn_index ?? 0;
+  // Prefer UI combatants when available (minimal data, already typed)
   const combatants = scenario?.combatants ?? [];
   const lowHPWarning = useLowHPWarning(combatants, 'players');
 
-  // Determine current actor from turn order (needed for voice hooks)
+  // Determine current actor - use UI state when available (pre-computed)
   const currentActor = useMemo(() => {
+    // If UI state has current_actor, use it to find the full combatant
+    if (ui?.current_actor) {
+      const actorId = ui.current_actor.actor_id;
+      return combatants.find((c) => c.id === actorId) ?? null;
+    }
+    // Fall back to computing from scenario
     if (!scenario) return null;
-    // Find combatant based on turn order in the current round
     const round = scenario.rounds?.[currentRound - 1];
     const turn = round?.turns?.[currentTurnIndex];
     if (turn?.actor_id) {
       return combatants.find((c) => c.id === turn.actor_id) ?? null;
     }
-    // Fall back to first combatant if no turn data
     return combatants[0] ?? null;
-  }, [scenario, currentRound, currentTurnIndex, combatants]);
+  }, [ui?.current_actor, scenario, currentRound, currentTurnIndex, combatants]);
 
-  // Determine if it's currently the player's turn (for forfeit validation)
+  // Determine if it's currently the player's turn - use UI state when available
   const isPlayerTurn = useMemo(() => {
+    if (ui) return ui.is_player_turn;
     return currentActor?.side === "players";
-  }, [currentActor]);
+  }, [ui, currentActor]);
 
   // Voice transcript parsing
   const lastParsedTranscriptRef = useRef("");
@@ -282,29 +299,19 @@ function CombatSessionPage() {
     executeAction,
   ]);
 
-  // Mission completion state (must be defined before useEffect that uses them)
-  const [showMissionCompleteModal, setShowMissionCompleteModal] =
-    useState(false);
-  const [showForfeitModal, setShowForfeitModal] = useState(false);
+  // Modal state - consolidated via discriminated union (E10-US-013)
+  const { modal, openModal, closeModal, isOpen, isAnyModalOpen } = useModalManager();
+
+  // Victory celebration state (separate from modal - displays as full-screen overlay)
   const [showVictoryCelebration, setShowVictoryCelebration] = useState(false);
   const [victoryOutcome, setVictoryOutcome] = useState<"victory" | "defeat">(
     "victory",
   );
 
-  // Pause state
-  const [showPauseMenu, setShowPauseMenu] = useState(false);
-  const [showInGameSettings, setShowInGameSettings] = useState(false);
-
   // Navigation protection state (E8-US-004)
   const [isForfeiting, setIsForfeiting] = useState(false);
-  const [showNavigationConfirm, setShowNavigationConfirm] = useState(false);
 
-  // Overcharge confirmation state (must be before useEffects that use it)
-  const [showOverchargeConfirm, setShowOverchargeConfirm] = useState(false);
-
-  // Help system state (E9-US-004)
-  const [showHelpOverlay, setShowHelpOverlay] = useState(false);
-  const [showFirstCombatTutorial, setShowFirstCombatTutorial] = useState(false);
+  // Tutorial dismissal state (separate - tracks session/permanent dismissal)
   const [tutorialDismissedThisSession, setTutorialDismissedThisSession] = useState(false);
   const [hasSeenTutorial, setHasSeenTutorial] = useState(() => {
     // Check localStorage for whether user has seen tutorial
@@ -323,16 +330,16 @@ function CombatSessionPage() {
       // Ctrl+Q (or Cmd+Q on Mac) - forfeit mission
       if ((e.ctrlKey || e.metaKey) && e.key === 'q' && !e.repeat) {
         // Only trigger if mission is active, it's player's turn, and no modal is open
-        if (data?.status === 'active' && isPlayerTurn && !showForfeitModal && !showMissionCompleteModal) {
+        if (data?.status === 'active' && isPlayerTurn && !isAnyModalOpen) {
           e.preventDefault();
-          setShowForfeitModal(true);
+          openModal({ type: "forfeit" });
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [data?.status, isPlayerTurn, showForfeitModal, showMissionCompleteModal]);
+  }, [data?.status, isPlayerTurn, isAnyModalOpen, openModal]);
 
   // Global keyboard shortcut: ? to open help overlay
   useEffect(() => {
@@ -343,21 +350,18 @@ function CombatSessionPage() {
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
           return;
         }
-        // Don't trigger if other modals are open
-        if (showVoiceConfirmation || showOverchargeConfirm || showForfeitModal || 
-            showMissionCompleteModal || showVictoryCelebration || showPauseMenu ||
-            showFirstCombatTutorial) {
+        // Don't trigger if other modals are open or showing voice/victory overlays
+        if (showVoiceConfirmation || showVictoryCelebration || isAnyModalOpen) {
           return;
         }
         e.preventDefault();
-        setShowHelpOverlay(true);
+        openModal({ type: "help" });
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showVoiceConfirmation, showOverchargeConfirm, showForfeitModal, showMissionCompleteModal, 
-      showVictoryCelebration, showPauseMenu, showFirstCombatTutorial]);
+  }, [showVoiceConfirmation, showVictoryCelebration, isAnyModalOpen, openModal]);
 
   // Show first combat tutorial when entering first turn of first combat
   useEffect(() => {
@@ -366,14 +370,14 @@ function CombatSessionPage() {
         isPlayerTurn &&
         !hasSeenTutorial &&
         !tutorialDismissedThisSession &&
-        !showFirstCombatTutorial) {
+        !isOpen("tutorial")) {
       // Small delay to let the combat UI settle
       const timer = setTimeout(() => {
-        setShowFirstCombatTutorial(true);
+        openModal({ type: "tutorial" });
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [data?.status, currentRound, isPlayerTurn, hasSeenTutorial, tutorialDismissedThisSession, showFirstCombatTutorial]);
+  }, [data?.status, currentRound, isPlayerTurn, hasSeenTutorial, tutorialDismissedThisSession, isOpen, openModal]);
 
   // Handle tutorial "don't show again" preference
   const handleTutorialDontShowAgain = () => {
@@ -387,7 +391,7 @@ function CombatSessionPage() {
   const blocker = useBlocker({
     shouldBlockFn: () => {
       // Only block if combat is active, not forfeiting, and not already showing confirmation
-      return data?.status === 'active' && !isForfeiting && !showNavigationConfirm;
+      return data?.status === 'active' && !isForfeiting && !isOpen("navigationConfirm");
     },
     enableBeforeUnload: true,
     withResolver: true,
@@ -396,19 +400,19 @@ function CombatSessionPage() {
   // Handle blocker status changes to show custom modal
   useEffect(() => {
     if (blocker.status === 'blocked') {
-      setShowNavigationConfirm(true);
+      openModal({ type: "navigationConfirm" });
     }
-  }, [blocker.status]);
+  }, [blocker.status, openModal]);
 
   // Handle navigation confirmation response
   const handleNavigationConfirm = useCallback((shouldLeave: boolean) => {
-    setShowNavigationConfirm(false);
+    closeModal();
     if (shouldLeave && blocker.status === 'blocked') {
       blocker.proceed();
     } else {
       blocker.reset();
     }
-  }, [blocker]);
+  }, [blocker, closeModal]);
 
   // beforeunload event for browser tab/window closing (E8-US-004)
   useEffect(() => {
@@ -498,22 +502,41 @@ function CombatSessionPage() {
   const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
 
+  // Action bar minimize state
+  const [actionBarMinimized, setActionBarMinimized] = useState(false);
+
+  // Tab key listener to toggle action bar minimize
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle Tab key when turn is active
+      if (event.key !== "Tab" || !turnActive) return;
+      // Don't interfere with input fields
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+      // Don't interfere with dialogs or overlays
+      if (showVoiceConfirmation || showVictoryCelebration || isAnyModalOpen) {
+        return;
+      }
+      event.preventDefault();
+      setActionBarMinimized((prev) => !prev);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [turnActive, showVoiceConfirmation, showVictoryCelebration, isAnyModalOpen]);
+
   // Escape key listener to cancel targeting or open pause menu
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Only handle Escape key
       if (event.key !== "Escape") return;
-      // Don't interfere with other dialogs (voice confirmation, overcharge, etc.)
-      if (
-        showVoiceConfirmation ||
-        showOverchargeConfirm ||
-        contextMenu ||
-        showForfeitModal ||
-        showMissionCompleteModal ||
-        showVictoryCelebration ||
-        showPauseMenu
-      )
+      // Don't interfere with other dialogs or overlays
+      if (showVoiceConfirmation || contextMenu || showVictoryCelebration || isAnyModalOpen) {
         return;
+      }
       // If turn is active, try to cancel targeting first
       if (turnActive && actionPanelRef.current?.cancel()) {
         event.preventDefault();
@@ -521,20 +544,11 @@ function CombatSessionPage() {
       }
       // Otherwise open pause menu
       event.preventDefault();
-      setShowPauseMenu(true);
+      openModal({ type: "pause" });
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    turnActive,
-    showVoiceConfirmation,
-    showOverchargeConfirm,
-    contextMenu,
-    showForfeitModal,
-    showMissionCompleteModal,
-    showVictoryCelebration,
-    showPauseMenu,
-  ]);
+  }, [turnActive, showVoiceConfirmation, contextMenu, showVictoryCelebration, isAnyModalOpen, openModal]);
 
   // Available actions query (only when turn is active)
   const { data: availableActions } = useAvailableActions(combatId, {
@@ -571,6 +585,13 @@ function CombatSessionPage() {
   // Movement range preview state
   const [showMovementRange, setShowMovementRange] = useState(false);
   const [movementRangeSpeed, setMovementRangeSpeed] = useState(0);
+
+  // Action confirmation overlay state (UI overhaul)
+  const [confirmationData, setConfirmationData] = useState<ActionConfirmationData | null>(null);
+  const [showConfirmationOverlay, setShowConfirmationOverlay] = useState(false);
+
+  // Action feed expansion state
+  const [actionFeedExpanded, setActionFeedExpanded] = useState(false);
 
   // Viewport pan/zoom state
   const {
@@ -724,14 +745,14 @@ function CombatSessionPage() {
   // Handle auto NPC turn
   const handleAutoNpcTurn = useCallback(() => {
     // Don't process AI turns while game is paused
-    if (showPauseMenu) {
+    if (isOpen("pause")) {
       return;
     }
     // Clear previous reasoning
     setAiReasoning(null);
     autoNpcTurn.mutate(undefined, {
       onSuccess: (response) => {
-        // Turn state remains inactive since the full turn cycle completed
+        // Reset state synchronously
         setTurnActive(false);
         setEconomy(null);
         setTargetMode(null);
@@ -751,11 +772,19 @@ function CombatSessionPage() {
             response.decision_target,
           );
         }
-        toast.success("NPC turn completed");
+        // Defer toast to avoid DOM race condition with Sonner + WebSocket updates
+        setTimeout(() => {
+          toast.success("NPC turn completed");
+        }, 0);
       },
-      onError: (err) => toast.error(err.message || "NPC turn failed"),
+      onError: (err) => {
+        // Defer toast to avoid DOM race condition
+        setTimeout(() => {
+          toast.error(err.message || "NPC turn failed");
+        }, 0);
+      },
     });
-  }, [autoNpcTurn, settings, narrateTurnStart, narrateAction, showPauseMenu]);
+  }, [autoNpcTurn, settings, narrateTurnStart, narrateAction, isOpen]);
 
   // Action triggered from ActionBar (to pass to ActionPanel)
   const [triggeredAction, setTriggeredAction] =
@@ -775,7 +804,7 @@ function CombatSessionPage() {
     (request: ActionRequest) => {
       // Intercept overcharge to show confirmation modal
       if (request.is_overcharge) {
-        setShowOverchargeConfirm(true);
+        openModal({ type: "overcharge" });
         return;
       }
 
@@ -854,12 +883,13 @@ function CombatSessionPage() {
       handleEndTurn,
       narrateAction,
       playerCombatantName,
+      openModal,
     ],
   );
 
   // Handle overcharge confirmation
   const handleOverchargeConfirm = useCallback(() => {
-    setShowOverchargeConfirm(false);
+    closeModal();
     executeAction.mutate(
       {
         action_id: "overcharge",
@@ -876,7 +906,7 @@ function CombatSessionPage() {
         onError: (err) => toast.error(err.message || "Overcharge failed"),
       },
     );
-  }, [executeAction]);
+  }, [executeAction, closeModal]);
 
   // Handle reaction submission
   const handleReactionSubmit = useCallback(
@@ -905,7 +935,7 @@ function CombatSessionPage() {
     (request: CombatCompleteRequest) => {
       completeCombat.mutate(request, {
         onSuccess: (result) => {
-          setShowMissionCompleteModal(false);
+          closeModal();
           toast.success("Mission completed");
           // Narrate victory/defeat
           const victoriousSide =
@@ -981,7 +1011,7 @@ function CombatSessionPage() {
           toast.error(err.message || "Failed to complete mission"),
       });
     },
-    [completeCombat, navigate, search, scenario, narrateVictory],
+    [completeCombat, navigate, search, scenario, narrateVictory, closeModal],
   );
 
   // Handle mission forfeit
@@ -990,7 +1020,7 @@ function CombatSessionPage() {
     setIsForfeiting(true);
     forfeitCombat.mutate(undefined, {
       onSuccess: (result) => {
-        setShowForfeitModal(false);
+        closeModal();
         toast.info("Mission forfeited - counted as defeat");
         // Narrate enemy victory
         narrateVictory("enemy");
@@ -1047,7 +1077,7 @@ function CombatSessionPage() {
       onError: (err) =>
         toast.error(err.message || "Failed to forfeit mission"),
     });
-  }, [forfeitCombat, navigate, search, scenario, narrateVictory]);
+  }, [forfeitCombat, navigate, search, scenario, narrateVictory, closeModal]);
 
   // Handle reserve spending
   const handleSpendReserve = useCallback(
@@ -1117,6 +1147,112 @@ function CombatSessionPage() {
     },
     [],
   );
+
+  // Handle confirmation ready from ActionPanel (for overlay)
+  const handleConfirmationReady = useCallback(
+    (data: ActionConfirmationReadyData | null) => {
+      if (!data) {
+        setShowConfirmationOverlay(false);
+        setConfirmationData(null);
+        return;
+      }
+
+      // Build target names from IDs
+      const targetNames = data.targetIds?.map(
+        (id) => combatants.find((c) => c.id === id)?.name ?? id
+      );
+
+      // Build weapon name
+      const weaponName = data.weaponId
+        ? weaponsQuery.data?.find((w) => w.id === data.weaponId)?.name ?? data.weaponId
+        : undefined;
+
+      // Build confirmation data for overlay
+      const confirmData: ActionConfirmationData = {
+        action: data.action,
+        targetNames,
+        targetIds: data.targetIds,
+        weaponName,
+        weaponId: data.weaponId ?? undefined,
+        systemName: data.systemId ?? undefined,
+        systemId: data.systemId ?? undefined,
+        movementPath: data.movementPath,
+        pathDistance: data.pathDistance,
+        preview: previewResponse ?? null,
+        isPreviewLoading,
+      };
+
+      setConfirmationData(confirmData);
+      setShowConfirmationOverlay(true);
+    },
+    [combatants, weaponsQuery.data, previewResponse, isPreviewLoading]
+  );
+
+  // Handle confirmation overlay confirm action
+  const handleOverlayConfirm = useCallback(() => {
+    if (!confirmationData) return;
+
+    const { action, targetIds, weaponId, systemId, movementPath } = confirmationData;
+
+    // IMPORTANT: Reset ActionPanel state BEFORE executing to stop it from re-triggering the overlay
+    actionPanelRef.current?.reset();
+    setShowConfirmationOverlay(false);
+    setConfirmationData(null);
+
+    // Build the action request based on what data we have
+    if (movementPath && movementPath.length >= 2) {
+      // Movement action
+      handleExecuteAction({
+        action_id: action.action_id,
+        action_type: action.action_type as ActionRequest["action_type"],
+        movement_path: movementPath.map((c) => ({ coord: { q: c.q, r: c.r } })),
+      });
+    } else {
+      // Target-based or simple action
+      handleExecuteAction({
+        action_id: action.action_id,
+        action_type: action.action_type as ActionRequest["action_type"],
+        target_ids: targetIds,
+        weapon_id: weaponId ?? undefined,
+        system_id: systemId ?? undefined,
+      });
+    }
+  }, [confirmationData, handleExecuteAction]);
+
+  // Handle confirmation overlay cancel
+  const handleOverlayCancel = useCallback(() => {
+    setShowConfirmationOverlay(false);
+    setConfirmationData(null);
+    // Fully reset ActionPanel state to stop it from re-triggering the overlay
+    actionPanelRef.current?.reset();
+  }, []);
+
+  // Compute turn banner state for UI overhaul
+  const turnBannerState: TurnBannerState = useMemo(() => {
+    if (autoNpcTurn.isPending) return "ai_thinking";
+    if (!turnActive && currentActor?.ai_controlled) return "enemy_turn";
+    if (turnActive && targetMode?.requiresTarget) return "select_target";
+    if (turnActive && isPathMode) return "select_destination";
+    if (turnActive) return "your_turn";
+    return "waiting";
+  }, [turnActive, currentActor?.ai_controlled, targetMode, isPathMode, autoNpcTurn.isPending]);
+
+  // Combatant sides lookup - use pre-computed from UI when available
+  const combatantSides = useMemo(() => {
+    if (ui?.combatant_sides) {
+      // Convert from UI format to expected format (players/enemies)
+      const map = new Map<string, "players" | "enemies">();
+      for (const [id, side] of Object.entries(ui.combatant_sides)) {
+        map.set(id, side === "players" ? "players" : "enemies");
+      }
+      return map;
+    }
+    const map = new Map<string, "players" | "enemies">();
+    for (const c of combatants) {
+      map.set(c.id, c.side === "players" ? "players" : "enemies");
+    }
+    return map;
+  }, [ui?.combatant_sides, combatants]);
 
   // Viewport control handlers
   const handleZoomIn = useCallback(() => {
@@ -1308,26 +1444,102 @@ function CombatSessionPage() {
   const activeActionIndex = selectedAction?.actionIdx ?? 0;
   const action = actions[activeActionIndex] ?? null;
 
-  const combatantNameById = useMemo(
-    () => new Map((scenario?.combatants ?? []).map((c) => [c.id, c.name])),
-    [scenario?.combatants],
-  );
+  // Combatant name lookup - use pre-computed from UI when available
+  const combatantNameById = useMemo(() => {
+    if (ui?.combatant_names) {
+      return new Map(Object.entries(ui.combatant_names));
+    }
+    return new Map((scenario?.combatants ?? []).map((c) => [c.id, c.name]));
+  }, [ui?.combatant_names, scenario?.combatants]);
   const weaponDefinitions = useMemo(
     () =>
       new Map((weaponsQuery.data ?? []).map((weapon) => [weapon.id, weapon])),
     [weaponsQuery.data],
   );
 
+  // Check if there are recent actions to determine action log default state
+  const hasRecentActions = useMemo(() => {
+    const currentRoundTurns = rounds[currentRound - 1]?.turns ?? [];
+    // Check the last 2 turns for any actions
+    return currentRoundTurns
+      .slice(-2)
+      .some((t) => (t.actions ?? []).length > 0);
+  }, [rounds, currentRound]);
+
   // Build movement range overlays when in path mode
+  // Prefer backend-computed data when available for consistent terrain cost calculations
   const movementRangeOverlays = useMemo(() => {
-    if (!showMovementRange || !currentActor?.position?.coord || !scenario) {
+    if (!showMovementRange || !currentActor?.position?.coord) {
       return [];
     }
 
-    const origin = currentActor.position.coord;
     const speed = movementRangeSpeed;
-
     if (speed <= 0) return [];
+
+    // Use backend-computed movement range when available (E10-US-015)
+    // This eliminates expensive frontend BFS and ensures consistent terrain handling
+    if (ui?.movement_range && ui.movement_range.actor_id === currentActor.id) {
+      const backendData = ui.movement_range;
+      const difficultSet = new Set(
+        (backendData.difficult_hexes ?? []).map((h) => `${h.q},${h.r}`)
+      );
+
+      // Color code based on movement cost (50% threshold)
+      const easyThreshold = Math.floor(speed / 2);
+      const easy: HexCoord[] = [];
+      const atMax: HexCoord[] = [];
+
+      // Since backend returns reachable hexes but not cost, we estimate based on
+      // distance and difficult terrain (this matches the visual intent)
+      for (const hex of backendData.reachable_hexes ?? []) {
+        const originCoord = currentActor.position.coord;
+        const basicDistance = Math.max(
+          Math.abs(hex.q - originCoord.q),
+          Math.abs(hex.r - originCoord.r),
+          Math.abs((-hex.q - hex.r) - (-originCoord.q - originCoord.r))
+        );
+
+        // Estimate if it's an "easy" move (within half speed threshold)
+        // Account for difficult terrain making it harder to reach
+        const isDifficult = difficultSet.has(`${hex.q},${hex.r}`);
+        const estimatedCost = basicDistance + (isDifficult ? 1 : 0);
+
+        if (estimatedCost <= easyThreshold) {
+          easy.push(hex);
+        } else {
+          atMax.push(hex);
+        }
+      }
+
+      // Return overlays with style matching frontend's MOVEMENT_OVERLAY_STYLES
+      const overlays: typeof import("../../lib/combat-render/canvas").AreaOverlay[] = [];
+      if (easy.length > 0) {
+        overlays.push({
+          coords: easy,
+          style: {
+            fillStyle: "rgba(34, 197, 94, 0.2)", // green-500
+            strokeStyle: "rgba(34, 197, 94, 0.5)",
+            lineWidth: 1,
+          },
+        });
+      }
+      if (atMax.length > 0) {
+        overlays.push({
+          coords: atMax,
+          style: {
+            fillStyle: "rgba(234, 179, 8, 0.2)", // yellow-500
+            strokeStyle: "rgba(234, 179, 8, 0.5)",
+            lineWidth: 1,
+          },
+        });
+      }
+      return overlays;
+    }
+
+    // Fall back to frontend calculation when backend data unavailable
+    if (!scenario) return [];
+
+    const origin = currentActor.position.coord;
 
     // Build valid hex set from grid (we need to compute the grid first)
     // Use a temporary grid calculation matching what adaptCombatScenario would use
@@ -1382,7 +1594,7 @@ function CombatSessionPage() {
       blockedHexes,
       difficultHexes,
     );
-  }, [showMovementRange, currentActor, scenario, movementRangeSpeed]);
+  }, [showMovementRange, currentActor, scenario, movementRangeSpeed, ui?.movement_range]);
 
   const renderOutput: CombatRenderAdapterOutput | null = useMemo(() => {
     if (!scenario) {
@@ -1405,9 +1617,11 @@ function CombatSessionPage() {
       patternOrigin: effectivePatternOrigin,
       patternDirection: areaDirection ?? undefined,
       actorId: currentActor?.id,
+      // Include movement range overlays in grid calculation
+      additionalOverlays: movementRangeOverlays.length > 0 ? movementRangeOverlays : undefined,
     });
 
-    // Add movement range overlays (before other overlays so they appear underneath)
+    // Add movement range overlays to the display (before other overlays so they appear underneath)
     if (movementRangeOverlays.length > 0) {
       result.state.overlays = [
         ...movementRangeOverlays,
@@ -1428,6 +1642,16 @@ function CombatSessionPage() {
     previewOrigin,
     movementRangeOverlays,
   ]);
+
+  // Canvas key for forced re-render when combatant positions change
+  // This ensures tokens visually move after actions execute
+  const canvasKey = useMemo(() => {
+    if (!scenario?.combatants) return "no-scenario";
+    const positions = scenario.combatants
+      .map((c) => `${c.id}:${c.position?.coord?.q ?? "?"},${c.position?.coord?.r ?? "?"}`)
+      .join("|");
+    return `r${currentRound}-t${currentTurnIndex}-${positions}`;
+  }, [scenario?.combatants, currentRound, currentTurnIndex]);
 
   if (isLoading) {
     return <CombatSessionSkeleton />;
@@ -1601,9 +1825,9 @@ function CombatSessionPage() {
 
       {/* Mission Complete Modal */}
       <MissionCompleteModal
-        isOpen={showMissionCompleteModal}
+        isOpen={isOpen("missionComplete")}
         onComplete={handleMissionComplete}
-        onCancel={() => setShowMissionCompleteModal(false)}
+        onCancel={closeModal}
         isSubmitting={completeCombat.isPending}
         campaignId={data.campaign_id}
         missionReserves={scenario?.mission_reserves}
@@ -1611,9 +1835,9 @@ function CombatSessionPage() {
 
       {/* Forfeit Confirmation Modal */}
       <ForfeitConfirmationModal
-        isOpen={showForfeitModal}
+        isOpen={isOpen("forfeit")}
         onConfirm={handleForfeitMission}
-        onCancel={() => setShowForfeitModal(false)}
+        onCancel={closeModal}
         isSubmitting={forfeitCombat.isPending}
       />
 
@@ -1626,32 +1850,26 @@ function CombatSessionPage() {
 
       {/* Pause Menu */}
       <PauseMenu
-        isOpen={showPauseMenu}
-        onResume={() => setShowPauseMenu(false)}
-        onOpenSettings={() => {
-          setShowPauseMenu(false);
-          setShowInGameSettings(true);
-        }}
+        isOpen={isOpen("pause")}
+        onResume={closeModal}
+        onOpenSettings={() => openModal({ type: "settings" })}
         onOpenHelp={() => {
-          setShowPauseMenu(false);
+          closeModal();
           keyboardShortcuts.open();
         }}
-        onOpenForfeit={() => {
-          setShowPauseMenu(false);
-          setShowForfeitModal(true);
-        }}
-        isPaused={showPauseMenu}
+        onOpenForfeit={() => openModal({ type: "forfeit" })}
+        isPaused={isOpen("pause")}
       />
 
       {/* In-Game Settings */}
       <InGameSettings
-        isOpen={showInGameSettings}
-        onClose={() => setShowInGameSettings(false)}
+        isOpen={isOpen("settings")}
+        onClose={closeModal}
       />
 
       {/* Navigation Confirmation Modal (E8-US-004) */}
       <Modal
-        isOpen={showNavigationConfirm}
+        isOpen={isOpen("navigationConfirm")}
         onClose={() => handleNavigationConfirm(false)}
         title="Leave Combat?"
         size="sm"
@@ -1685,6 +1903,7 @@ function CombatSessionPage() {
           >
             {renderOutput ? (
               <CombatCanvas
+                key={canvasKey}
                 width={720}
                 height={520}
                 resizeToParent
@@ -1787,6 +2006,46 @@ function CombatSessionPage() {
                 No scenario data available yet.
               </div>
             )}
+
+            {/* Turn State Banner (UI Overhaul - overlay on canvas) */}
+            <div className="absolute top-2 left-2 right-2 z-10">
+              <TurnStateBanner
+                state={turnBannerState}
+                actorName={currentActor?.name}
+                mechName={currentActor?.mech_name}
+                economy={economy}
+                contextHint={
+                  turnBannerState === "select_destination"
+                    ? `Click within ${movementRangeSpeed} spaces`
+                    : turnBannerState === "select_target"
+                    ? "Click an enemy to target"
+                    : undefined
+                }
+                isAiControlled={currentActor?.ai_controlled}
+              />
+            </div>
+
+            {/* Action Confirmation Overlay (UI Overhaul - centered on canvas) */}
+            <ActionConfirmationOverlay
+              isOpen={showConfirmationOverlay}
+              data={confirmationData}
+              onConfirm={handleOverlayConfirm}
+              onCancel={handleOverlayCancel}
+              isExecuting={executeAction.isPending}
+            />
+
+            {/* Action Feed (UI Overhaul - bottom left overlay) */}
+            <ActionFeed
+              recentActions={ui?.recent_actions}
+              totalActionCount={ui?.total_action_count}
+              rounds={rounds}
+              currentRound={currentRound}
+              combatantNames={combatantNameById}
+              combatantSides={combatantSides}
+              maxVisibleEntries={4}
+              expanded={actionFeedExpanded}
+              onToggleExpanded={() => setActionFeedExpanded(!actionFeedExpanded)}
+            />
           </div>
           {/* Viewport Controls (pan/zoom) */}
           <ViewportControls
@@ -1850,7 +2109,7 @@ function CombatSessionPage() {
                   variant="outline"
                   size="sm"
                   className="flex-1 text-xs"
-                  onClick={() => setShowMissionCompleteModal(true)}
+                  onClick={() => openModal({ type: "missionComplete" })}
                 >
                   End Mission
                 </Button>
@@ -1858,7 +2117,7 @@ function CombatSessionPage() {
                   variant="destructive"
                   size="sm"
                   className="flex-1 text-xs"
-                  onClick={() => setShowForfeitModal(true)}
+                  onClick={() => openModal({ type: "forfeit" })}
                   disabled={forfeitCombat.isPending || !isPlayerTurn}
                   title={!isPlayerTurn ? "Can only forfeit during your turn" : ""}
                 >
@@ -1880,7 +2139,7 @@ function CombatSessionPage() {
               onSelectAction={(roundIdx, turnIdx, actionIdx) =>
                 setSelectedAction({ roundIdx, turnIdx, actionIdx })
               }
-              defaultCollapsed={true}
+              defaultCollapsed={!hasRecentActions}
             />
 
             {/* Voice Transcription Display */}
@@ -1979,6 +2238,8 @@ function CombatSessionPage() {
                 triggeredAction={triggeredAction}
                 onTriggeredActionProcessed={() => setTriggeredAction(null)}
                 onActionHover={setPreviewAction}
+                onConfirmationReady={handleConfirmationReady}
+                useConfirmationOverlay={true}
               />
             )}
 
@@ -2009,14 +2270,14 @@ function CombatSessionPage() {
 
         {/* Modals - outside sidebar */}
         {/* Overcharge Confirmation Modal */}
-        {showOverchargeConfirm && currentActor && (
+        {isOpen("overcharge") && currentActor && (
           <OverchargeConfirm
             currentLevel={availableActions?.overcharge_level ?? 0}
             heatCurrent={currentActor.resources?.heat_current ?? 0}
             heatCap={currentActor.resources?.heat_cap ?? 6}
             onConfirm={handleOverchargeConfirm}
-            onCancel={() => setShowOverchargeConfirm(false)}
-            isOpen={showOverchargeConfirm}
+            onCancel={closeModal}
+            isOpen={isOpen("overcharge")}
           />
         )}
 
@@ -2182,11 +2443,14 @@ function CombatSessionPage() {
           availableActions={availableActions ?? null}
           economy={economy}
           onActionSelect={handleActionSelect}
-          onOvercharge={() => setShowOverchargeConfirm(true)}
+          onOvercharge={() => openModal({ type: "overcharge" })}
           canOvercharge={availableActions?.can_overcharge ?? false}
           overchargeLevel={availableActions?.overcharge_level ?? 0}
           isExecuting={executeAction.isPending}
           visible={turnActive}
+          // Minimize
+          minimized={actionBarMinimized}
+          onMinimizeToggle={() => setActionBarMinimized((prev) => !prev)}
           // Preview targeting
           previewTargetId={previewTargetId}
           currentActor={currentActor}
@@ -2196,13 +2460,13 @@ function CombatSessionPage() {
           voiceEnabled={settings.enableVoiceInput}
           voiceSupported={speechRecognition.recognitionSupported}
           // Help
-          onHelpClick={() => setShowHelpOverlay(true)}
+          onHelpClick={() => openModal({ type: "help" })}
         />
 
         {/* Contextual Help Overlay (E9-US-004) */}
         <ContextualHelpOverlay
-          isOpen={showHelpOverlay}
-          onClose={() => setShowHelpOverlay(false)}
+          isOpen={isOpen("help")}
+          onClose={closeModal}
           economy={economy}
           availableActions={availableActions ?? null}
           currentRound={currentRound}
@@ -2210,9 +2474,9 @@ function CombatSessionPage() {
 
         {/* First Combat Tutorial (E9-US-004) */}
         <FirstCombatTutorial
-          isOpen={showFirstCombatTutorial}
+          isOpen={isOpen("tutorial")}
           onClose={() => {
-            setShowFirstCombatTutorial(false);
+            closeModal();
             setTutorialDismissedThisSession(true);
           }}
           onDontShowAgain={handleTutorialDontShowAgain}

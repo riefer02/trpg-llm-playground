@@ -20,6 +20,8 @@ import {
   Target,
   Mic,
   HelpCircle,
+  ChevronUp,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 
@@ -317,6 +319,9 @@ export interface ActionBarProps {
   overchargeLevel?: number;
   isExecuting?: boolean;
   visible?: boolean;
+  // Minimize
+  minimized?: boolean;
+  onMinimizeToggle?: () => void;
   // Preview targeting
   previewTargetId?: string | null;
   currentActor?: CombatantState | null;
@@ -339,6 +344,9 @@ export function ActionBar({
   overchargeLevel = 0,
   isExecuting = false,
   visible = true,
+  // Minimize
+  minimized = false,
+  onMinimizeToggle = () => {},
   // Preview targeting
   previewTargetId = null,
   currentActor = null,
@@ -422,6 +430,63 @@ export function ActionBar({
     return null;
   }
 
+  // Minimized view - compact strip with economy pips and expand button
+  if (minimized) {
+    const fullRemaining = 1 - economy.full_actions_used;
+    const quickTotal = 2 + (economy.overcharge_used ? 1 : 0);
+    const quickRemaining = quickTotal - economy.quick_actions_used;
+    const reactRemaining = 1 - economy.reactions_used_this_turn;
+
+    return (
+      <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
+        <div className="flex justify-center pb-2">
+          <button
+            type="button"
+            onClick={onMinimizeToggle}
+            className="pointer-events-auto bg-background/95 backdrop-blur-sm border border-border rounded-full px-4 py-1.5 flex items-center gap-3 hover:bg-muted/50 transition-colors shadow-lg"
+          >
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Actions</span>
+            {/* Compact economy pips */}
+            <div className="flex items-center gap-2">
+              <div className="flex gap-0.5">
+                {[0].map((i) => (
+                  <div
+                    key={`full-${i}`}
+                    className={`w-2 h-2 rounded-full ${
+                      i < fullRemaining ? "bg-blue-500" : "bg-muted-foreground/20"
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-0.5">
+                {Array.from({ length: quickTotal }).map((_, i) => (
+                  <div
+                    key={`quick-${i}`}
+                    className={`w-2 h-2 rounded-full ${
+                      i < quickRemaining ? "bg-green-500" : "bg-muted-foreground/20"
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-0.5">
+                {[0].map((i) => (
+                  <div
+                    key={`react-${i}`}
+                    className={`w-2 h-2 rounded-full ${
+                      i < reactRemaining ? "bg-amber-500" : "bg-muted-foreground/20"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+            <span className="text-[10px] text-muted-foreground/70">Tab</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Group actions by type for visual separation
   const fullActions = availableActions.full_actions;
   const quickActions = availableActions.quick_actions;
@@ -439,6 +504,17 @@ export function ActionBar({
     <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
       <div className="flex justify-center pb-4">
         <div className="pointer-events-auto bg-background/95 backdrop-blur-sm border border-border rounded-xl shadow-xl px-4 py-3 flex flex-col gap-3">
+          {/* Minimize button */}
+          <div className="flex justify-center -mb-1">
+            <button
+              type="button"
+              onClick={onMinimizeToggle}
+              className="text-muted-foreground/50 hover:text-muted-foreground transition-colors p-0.5"
+              title="Minimize action bar (Tab)"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
           {/* Top Row: Economy + Full + Quick Actions */}
           <div className="flex items-center justify-center gap-6">
             {/* Economy Display */}

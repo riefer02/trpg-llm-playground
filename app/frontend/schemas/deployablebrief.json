@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    }
+  },
+  "description": "Minimal deployable info for rendering.",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "drone",
+        "mine",
+        "deployable",
+        "other"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "owner_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Owner Id"
+    },
+    "position": {
+      "$ref": "#/$defs/HexCoord"
+    },
+    "hp": {
+      "title": "Hp",
+      "type": "integer"
+    },
+    "max_hp": {
+      "title": "Max Hp",
+      "type": "integer"
+    },
+    "is_armed": {
+      "default": false,
+      "title": "Is Armed",
+      "type": "boolean"
+    },
+    "is_destroyed": {
+      "default": false,
+      "title": "Is Destroyed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "kind",
+    "position",
+    "hp",
+    "max_hp"
+  ],
+  "title": "DeployableBrief",
+  "type": "object"
+}

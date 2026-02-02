@@ -95,6 +95,9 @@ from llm.src.tactician.integration import execute_llm_npc_turn
 from llm.src.tactician.tactician import TacticianConfig, LLMBackend
 from llm.src.mission.difficulty import get_ai_aggression
 
+# Import UI DTO converters
+from app.backend.api.dtos import CombatUIState, build_combat_ui_state
+
 
 logger = logging.getLogger(__name__)
 
@@ -249,8 +252,12 @@ class CombatSessionResponse(BaseModel):
     current_turn_index: int
     notes: str
 
+    # UI-optimized state (pre-computed lookups, flattened data)
+    ui: CombatUIState | None = None
+
     # Full scenario - serialized from core model
-    scenario: dict[str, Any]
+    # When ui is present, scenario can be omitted to reduce payload size
+    scenario: dict[str, Any] | None = None
 
 
 class CombatSessionListItem(BaseModel):
@@ -330,8 +337,40 @@ def _validate_scenario(
         raise ValidationError("Invalid combat scenario", errors=errors)
 
 
-def _session_to_response(session_db: CombatSessionDB) -> CombatSessionResponse:
-    """Convert DB record to response - scenario already validated on write."""
+def _session_to_response(
+    session_db: CombatSessionDB,
+    economy: ActionEconomyState | None = None,
+    include_scenario: bool = True,
+) -> CombatSessionResponse:
+    """Convert DB record to response with UI state.
+
+    Args:
+        session_db: Database session record
+        economy: Optional action economy state for current actor
+        include_scenario: Whether to include full scenario (default True for backwards compat)
+
+    Returns:
+        CombatSessionResponse with pre-computed UI state
+    """
+    # Hydrate scenario for UI state computation
+    scenario = MechCombatScenario.model_validate(session_db.scenario)
+
+    # Get pending decisions for UI state
+    pending_decisions = list(scenario.pending_decisions) if scenario.pending_decisions else []
+
+    # Build UI state with pre-computed lookups
+    ui_state = build_combat_ui_state(
+        scenario=scenario,
+        session_id=session_db.id,
+        current_round=session_db.current_round,
+        current_turn_index=session_db.current_turn_index,
+        status=cast(SessionStatus, session_db.status),
+        economy=economy,
+        pending_decisions=pending_decisions,
+        mission_name=session_db.name,  # Use session name as mission name for now
+        tile_set=scenario.terrain.tile_set if scenario.terrain else None,
+    )
+
     return CombatSessionResponse(
         id=session_db.id,
         gm_user_id=session_db.gm_user_id,
@@ -343,7 +382,8 @@ def _session_to_response(session_db: CombatSessionDB) -> CombatSessionResponse:
         current_round=session_db.current_round,
         current_turn_index=session_db.current_turn_index,
         notes=session_db.notes,
-        scenario=session_db.scenario,
+        ui=ui_state,
+        scenario=session_db.scenario if include_scenario else None,
     )
 
 
@@ -351,15 +391,32 @@ def _session_to_complete_response(
     session_db: CombatSessionDB,
     xp_awarded: int | None = None,
     salvage_awarded: int | None = None,
+    include_scenario: bool = True,
 ) -> CombatSessionCompleteResponse:
     """Convert DB record to complete response with reward details."""
     # Extract statistics from scenario if available
     statistics_dict = None
+    scenario: MechCombatScenario | None = None
     try:
         scenario = MechCombatScenario.model_validate(session_db.scenario)
         statistics_dict = scenario.statistics.model_dump(mode="json")
     except Exception:
         pass  # Statistics not available
+
+    # Build UI state
+    ui_state = None
+    if scenario:
+        pending_decisions = list(scenario.pending_decisions) if scenario.pending_decisions else []
+        ui_state = build_combat_ui_state(
+            scenario=scenario,
+            session_id=session_db.id,
+            current_round=session_db.current_round,
+            current_turn_index=session_db.current_turn_index,
+            status=cast(SessionStatus, session_db.status),
+            pending_decisions=pending_decisions,
+            mission_name=session_db.name,
+            tile_set=scenario.terrain.tile_set if scenario.terrain else None,
+        )
 
     return CombatSessionCompleteResponse(
         id=session_db.id,
@@ -372,7 +429,8 @@ def _session_to_complete_response(
         current_round=session_db.current_round,
         current_turn_index=session_db.current_turn_index,
         notes=session_db.notes,
-        scenario=session_db.scenario,
+        ui=ui_state,
+        scenario=session_db.scenario if include_scenario else None,
         xp_awarded=xp_awarded,
         salvage_awarded=salvage_awarded,
         statistics=statistics_dict,
@@ -1242,7 +1300,8 @@ class TurnStartResponse(BaseModel):
     available_actions: list[str]
     prepared_action_expired: bool
     cooldowns_decremented: list[str]
-    scenario: dict[str, Any]
+    ui: CombatUIState | None = None
+    scenario: dict[str, Any] | None = None
 
 
 class ActionRequest(BaseModel):
@@ -1305,7 +1364,8 @@ class ActionResponse(BaseModel):
     damage_dealt: int
     heat_generated: int
     economy: dict[str, Any]
-    scenario: dict[str, Any]
+    ui: CombatUIState | None = None
+    scenario: dict[str, Any] | None = None
 
 
 class TurnEndResponse(BaseModel):
@@ -1317,7 +1377,8 @@ class TurnEndResponse(BaseModel):
     round_advanced: bool
     new_round_number: int | None
     end_of_turn_effects: list[dict[str, Any]]
-    scenario: dict[str, Any]
+    ui: CombatUIState | None = None
+    scenario: dict[str, Any] | None = None
 
 
 class ReactionRequest(BaseModel):
@@ -1344,7 +1405,8 @@ class ReactionResponse(BaseModel):
     reaction_used: str | None = None
     effects_applied: list[dict[str, Any]]
     damage_dealt: int
-    scenario: dict[str, Any]
+    ui: CombatUIState | None = None
+    scenario: dict[str, Any] | None = None
 
 
 class AvailableActionItem(BaseModel):
@@ -1485,7 +1547,8 @@ class DecisionResultResponse(BaseModel):
     roll_result: int | None = None
     save_succeeded: bool | None = None
     effects_applied: list[dict[str, Any]]
-    scenario: dict[str, Any]
+    ui: CombatUIState | None = None
+    scenario: dict[str, Any] | None = None
 
 
 # =============================================================================
@@ -1607,7 +1670,7 @@ async def start_combat_turn(
     _set_session_economy(session_id, turn_result.economy)
 
     # Broadcast state update to all connected WebSocket clients
-    response = _session_to_response(combat_session)
+    response = _session_to_response(combat_session, economy=turn_result.economy)
     await combat_ws_manager.broadcast(
         session_id,
         {"type": "state", "data": response.model_dump(mode="json")},
@@ -1620,6 +1683,7 @@ async def start_combat_turn(
         available_actions=turn_result.available_actions,
         prepared_action_expired=turn_result.prepared_action_expired,
         cooldowns_decremented=turn_result.cooldowns_decremented,
+        ui=response.ui,
         scenario=combat_session.scenario,
     )
 
@@ -1803,7 +1867,7 @@ async def execute_combat_action(
     _set_session_economy(session_id, updated_economy)
 
     # Broadcast state update to all connected WebSocket clients
-    ws_response = _session_to_response(combat_session)
+    ws_response = _session_to_response(combat_session, economy=updated_economy)
     await combat_ws_manager.broadcast(
         session_id,
         {"type": "state", "data": ws_response.model_dump(mode="json")},
@@ -1818,6 +1882,7 @@ async def execute_combat_action(
         damage_dealt=action_result.damage_dealt,
         heat_generated=action_result.heat_generated,
         economy=updated_economy.model_dump(),
+        ui=ws_response.ui,
         scenario=combat_session.scenario,
     )
 
@@ -1938,6 +2003,7 @@ async def end_combat_turn(
         round_advanced=turn_end_result.round_advanced,
         new_round_number=turn_end_result.new_round_number,
         end_of_turn_effects=turn_end_result.end_of_turn_effects,
+        ui=ws_response.ui,
         scenario=combat_session.scenario,
     )
 
@@ -2028,6 +2094,7 @@ async def submit_reaction(
         reaction_used=reaction_result.reaction_used,
         effects_applied=reaction_result.effects_applied,
         damage_dealt=reaction_result.damage_dealt,
+        ui=ws_response.ui,
         scenario=combat_session.scenario,
     )
 
@@ -2699,6 +2766,7 @@ async def submit_decision(
         roll_result=roll_result,
         save_succeeded=save_succeeded,
         effects_applied=effects_applied,
+        ui=ws_response.ui,
         scenario=combat_session.scenario,
     )
 

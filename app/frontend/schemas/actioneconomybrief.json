@@ -1,0 +1,41 @@
+{
+  "description": "Pre-computed action economy state for the current actor.",
+  "properties": {
+    "full_actions_remaining": {
+      "default": 1,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Full Actions Remaining",
+      "type": "integer"
+    },
+    "quick_actions_remaining": {
+      "default": 2,
+      "minimum": 0,
+      "title": "Quick Actions Remaining",
+      "type": "integer"
+    },
+    "can_overcharge": {
+      "default": true,
+      "title": "Can Overcharge",
+      "type": "boolean"
+    },
+    "reactions_remaining": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Reactions Remaining",
+      "type": "integer"
+    },
+    "overcharge_used": {
+      "default": false,
+      "title": "Overcharge Used",
+      "type": "boolean"
+    },
+    "move_used": {
+      "default": false,
+      "title": "Move Used",
+      "type": "boolean"
+    }
+  },
+  "title": "ActionEconomyBrief",
+  "type": "object"
+}

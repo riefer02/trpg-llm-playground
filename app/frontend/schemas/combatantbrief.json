@@ -1,0 +1,162 @@
+{
+  "$defs": {
+    "HexCoord": {
+      "description": "Axial hex coordinate (q, r).\n\nSupports tuple-like comparison and indexing for migration compatibility:\n- h == (x, y) returns True if coordinates match\n- h[0] == h.q, h[1] == h.r\n- hash(h) == hash((x, y))",
+      "properties": {
+        "q": {
+          "description": "Axial q coordinate",
+          "title": "Q",
+          "type": "integer"
+        },
+        "r": {
+          "description": "Axial r coordinate",
+          "title": "R",
+          "type": "integer"
+        },
+        "s": {
+          "description": "Derived s coordinate (q + r + s = 0).",
+          "readOnly": true,
+          "title": "S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "q",
+        "r",
+        "s"
+      ],
+      "title": "HexCoord",
+      "type": "object"
+    }
+  },
+  "description": "Minimal combatant data for UI rendering.\n\nContains only the fields needed for:\n- Token rendering (position, side, frame)\n- Health bars (hp, heat, structure)\n- Status indicators (statuses, destroyed)\n- AI indicator",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "side": {
+      "enum": [
+        "players",
+        "hostiles",
+        "neutral"
+      ],
+      "title": "Side",
+      "type": "string"
+    },
+    "frame_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Frame identifier for sprite lookup (e.g., 'gms_everest')",
+      "title": "Frame Id"
+    },
+    "position": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HexCoord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Current hex position"
+    },
+    "hp_current": {
+      "minimum": 0,
+      "title": "Hp Current",
+      "type": "integer"
+    },
+    "hp_max": {
+      "minimum": 1,
+      "title": "Hp Max",
+      "type": "integer"
+    },
+    "heat_current": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Heat Current",
+      "type": "integer"
+    },
+    "heat_cap": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Heat Cap",
+      "type": "integer"
+    },
+    "structure_current": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Structure Current",
+      "type": "integer"
+    },
+    "stress_current": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Stress Current",
+      "type": "integer"
+    },
+    "statuses": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Statuses",
+      "type": "array"
+    },
+    "is_destroyed": {
+      "default": false,
+      "title": "Is Destroyed",
+      "type": "boolean"
+    },
+    "is_ai_controlled": {
+      "default": false,
+      "title": "Is Ai Controlled",
+      "type": "boolean"
+    },
+    "speed": {
+      "default": 0,
+      "description": "Movement speed for range preview",
+      "minimum": 0,
+      "title": "Speed",
+      "type": "integer"
+    },
+    "evasion": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Evasion",
+      "type": "integer"
+    },
+    "e_defense": {
+      "default": 0,
+      "minimum": 0,
+      "title": "E Defense",
+      "type": "integer"
+    },
+    "armor": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Armor",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "side",
+    "hp_current",
+    "hp_max"
+  ],
+  "title": "CombatantBrief",
+  "type": "object"
+}

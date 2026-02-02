@@ -1,0 +1,207 @@
+{
+  "epic": "E10",
+  "epic_title": "Combat UI DTO Layer",
+  "description": "Transform game engine data into UI-optimized responses. Frontend becomes thin rendering layer, backend owns all state and computation.",
+  "status": "complete",
+  "user_stories": [
+    {
+      "id": "E10-US-001",
+      "title": "Create CombatUIState DTO",
+      "description": "Create Pydantic models for UI-optimized combat state",
+      "acceptance_criteria": [
+        "CombatantBrief model with minimal fields",
+        "CurrentActorState model with economy",
+        "ActionFeedEntry model for flattened history",
+        "CombatUIState model as top-level container",
+        "All models have proper type hints"
+      ],
+      "files": ["app/backend/api/dtos/combat_ui.py"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-002",
+      "title": "Create DTO Converter Functions",
+      "description": "Functions to transform MechCombatScenario to CombatUIState",
+      "acceptance_criteria": [
+        "build_combat_ui_state() function",
+        "build_action_feed() flattens rounds/turns/actions",
+        "build_combatant_brief() extracts minimal data",
+        "build_current_actor_state() from turn context",
+        "Unit tests for all converters"
+      ],
+      "files": ["app/backend/api/dtos/converters.py"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-003",
+      "title": "Update GET /combat/{id} Endpoint",
+      "description": "Return CombatUIState in addition to raw scenario",
+      "acceptance_criteria": [
+        "Response includes ui: CombatUIState",
+        "scenario still returned for backwards compatibility",
+        "UI state populated with pre-computed lookups"
+      ],
+      "files": ["app/backend/api/combat.py"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-004",
+      "title": "Update Turn Start/End Endpoints",
+      "description": "Add CombatUIState to turn lifecycle responses",
+      "acceptance_criteria": [
+        "TurnStartResponse includes ui field",
+        "TurnEndResponse includes ui field",
+        "current_actor populated on turn start",
+        "recent_actions updated after actions"
+      ],
+      "files": ["app/backend/api/combat.py"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-005",
+      "title": "Update Action Execution Endpoint",
+      "description": "Return CombatUIState after action execution",
+      "acceptance_criteria": [
+        "ActionResponse includes ui field",
+        "Action added to recent_actions",
+        "affected combatants updated in combatants list",
+        "economy updated in current_actor"
+      ],
+      "files": ["app/backend/api/combat.py"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-006",
+      "title": "Generate TypeScript Types",
+      "description": "Auto-generate frontend types from new DTOs",
+      "acceptance_criteria": [
+        "make generate-types succeeds",
+        "CombatUIState type in lancer.ts",
+        "CombatantBrief type in lancer.ts",
+        "ActionFeedEntry type in lancer.ts"
+      ],
+      "files": ["app/frontend/src/lib/types/lancer.ts"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-007",
+      "title": "Update Frontend API Client",
+      "description": "Update combat.ts to use new response types",
+      "acceptance_criteria": [
+        "Response types include ui property",
+        "CombatSessionResponse has ui field",
+        "TurnStartResponse has ui field",
+        "ActionResponse has ui field"
+      ],
+      "files": ["app/frontend/src/lib/api/combat.ts"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-008",
+      "title": "Simplify combatantNameById lookup",
+      "description": "Use pre-computed combatant_names from API when available",
+      "acceptance_criteria": [
+        "combatantNameById uses ui.combatant_names when available",
+        "Falls back to computing from scenario if ui not present",
+        "No breaking change to existing code"
+      ],
+      "files": ["app/frontend/src/routes/combat/$combatId.tsx"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-009",
+      "title": "Simplify combatantSides lookup",
+      "description": "Use pre-computed combatant_sides from API when available",
+      "acceptance_criteria": [
+        "combatantSides uses ui.combatant_sides when available",
+        "Falls back to computing from scenario if ui not present",
+        "ActionFeed still works correctly"
+      ],
+      "files": ["app/frontend/src/routes/combat/$combatId.tsx"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-010",
+      "title": "Simplify currentActor lookup",
+      "description": "Use pre-computed current_actor from API when available",
+      "acceptance_criteria": [
+        "currentActor uses ui.current_actor to find actor",
+        "Falls back to traversing rounds/turns if ui not present",
+        "isPlayerTurn derived from ui when available"
+      ],
+      "files": ["app/frontend/src/routes/combat/$combatId.tsx"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-011",
+      "title": "Simplify ActionFeed Component",
+      "description": "Use pre-flattened recent_actions from API",
+      "acceptance_criteria": [
+        "Remove buildFeedEntry function",
+        "Remove triple-nested loop over rounds/turns/actions",
+        "Use ui.recent_actions directly",
+        "Component renders pre-computed entries"
+      ],
+      "files": ["app/frontend/src/components/combat/ActionFeed.tsx"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-012",
+      "title": "Create useModalManager Hook",
+      "description": "Replace 8 boolean modals with discriminated union",
+      "acceptance_criteria": [
+        "ModalState type with all modal variants",
+        "useModalManager hook with open/close functions",
+        "Only one modal can be open at a time",
+        "Type-safe modal data access"
+      ],
+      "files": ["app/frontend/src/hooks/useModalManager.ts"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-013",
+      "title": "Integrate useModalManager",
+      "description": "Replace boolean modal state in combat route",
+      "acceptance_criteria": [
+        "Delete 8 modal useState hooks",
+        "Use useModalManager instead",
+        "All modals still function correctly",
+        "Reduced useState count"
+      ],
+      "files": ["app/frontend/src/routes/combat/$combatId.tsx"],
+      "passes": true
+    },
+    {
+      "id": "E10-US-014",
+      "title": "Add Movement Range to DTO",
+      "description": "Pre-compute movement range on backend when needed",
+      "acceptance_criteria": [
+        "MovementRangeData model created",
+        "build_movement_range() uses core pathfinding",
+        "Returned when actor requests path mode",
+        "Frontend uses pre-computed hexes"
+      ],
+      "files": [
+        "app/backend/api/dtos/combat_ui.py",
+        "app/backend/api/dtos/converters.py"
+      ],
+      "passes": true
+    },
+    {
+      "id": "E10-US-015",
+      "title": "Remove Frontend Movement Calculations",
+      "description": "Delete duplicate hex math from frontend",
+      "acceptance_criteria": [
+        "movementRangeOverlays useMemo simplified",
+        "Uses ui.movement_range when available",
+        "No hex generation in frontend",
+        "Pathfinding only on backend"
+      ],
+      "files": [
+        "app/frontend/src/routes/combat/$combatId.tsx",
+        "app/frontend/src/lib/combat-render/movement.ts"
+      ],
+      "passes": true
+    }
+  ]
+}

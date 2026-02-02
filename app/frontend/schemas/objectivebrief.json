@@ -1,0 +1,44 @@
+{
+  "description": "Minimal objective info for UI display.",
+  "properties": {
+    "objective_id": {
+      "title": "Objective Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "active",
+        "completed",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "is_optional": {
+      "default": false,
+      "title": "Is Optional",
+      "type": "boolean"
+    },
+    "is_primary": {
+      "default": false,
+      "title": "Is Primary",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "objective_id",
+    "name",
+    "description",
+    "status"
+  ],
+  "title": "ObjectiveBrief",
+  "type": "object"
+}

@@ -51,6 +51,8 @@ export type CombatRenderAdapterInput = {
   tokenColors?: Partial<Record<Side, string>>;
   /** Terrain type for visual pattern rendering (forest, urban, water, etc.) */
   terrainType?: string;
+  /** Additional overlays to include in grid calculation (e.g., movement range) */
+  additionalOverlays?: AreaOverlay[];
 };
 
 export type RenderTokenMetadata = {
@@ -167,12 +169,18 @@ export function adaptCombatScenario(
     }
   }
 
+  // Combine overlays with additional overlays for grid calculation
+  const allOverlaysForGrid = [
+    ...overlayBuild.overlays,
+    ...(input.additionalOverlays ?? []),
+  ];
+
   const grid = resolveGrid({
     origin: input.gridOrigin ?? hex(0, 0),
     radius: input.gridRadius,
     tokens,
     markers,
-    overlays: overlayBuild.overlays,
+    overlays: allOverlaysForGrid,
     scenario: input.scenario,
   });
 

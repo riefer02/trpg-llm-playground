@@ -326,6 +326,19 @@ from core.shared.decisions import (
     TraumaDecisionResult,
 )
 
+# UI DTO models for frontend consumption
+from app.backend.api.dtos.combat_ui import (
+    ActionEconomyBrief,
+    ActionFeedEntry,
+    CombatantBrief,
+    CombatUIState,
+    CurrentActorState,
+    DeployableBrief,
+    MovementRangeData,
+    ObjectiveBrief,
+    PendingDecisionBrief,
+)
+
 
 # All exportable models
 EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
@@ -612,6 +625,16 @@ EXPORTABLE_MODELS: dict[str, type[BaseModel]] = {
     "DecisionResolution": DecisionResolution,
     "SaveDecisionResult": SaveDecisionResult,
     "TraumaDecisionResult": TraumaDecisionResult,
+    # UI DTO models (pre-computed for frontend rendering)
+    "ActionEconomyBrief": ActionEconomyBrief,
+    "ActionFeedEntry": ActionFeedEntry,
+    "CombatantBrief": CombatantBrief,
+    "CombatUIState": CombatUIState,
+    "CurrentActorState": CurrentActorState,
+    "DeployableBrief": DeployableBrief,
+    "MovementRangeData": MovementRangeData,
+    "ObjectiveBrief": ObjectiveBrief,
+    "PendingDecisionBrief": PendingDecisionBrief,
 }
 
 

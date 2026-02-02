@@ -1,0 +1,93 @@
+{
+  "$defs": {
+    "ActionEconomyBrief": {
+      "description": "Pre-computed action economy state for the current actor.",
+      "properties": {
+        "full_actions_remaining": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Full Actions Remaining",
+          "type": "integer"
+        },
+        "quick_actions_remaining": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Quick Actions Remaining",
+          "type": "integer"
+        },
+        "can_overcharge": {
+          "default": true,
+          "title": "Can Overcharge",
+          "type": "boolean"
+        },
+        "reactions_remaining": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Reactions Remaining",
+          "type": "integer"
+        },
+        "overcharge_used": {
+          "default": false,
+          "title": "Overcharge Used",
+          "type": "boolean"
+        },
+        "move_used": {
+          "default": false,
+          "title": "Move Used",
+          "type": "boolean"
+        }
+      },
+      "title": "ActionEconomyBrief",
+      "type": "object"
+    }
+  },
+  "description": "Pre-computed current actor info.\n\nEliminates the need for frontend to traverse rounds/turns/combatants\nto find the current actor.",
+  "properties": {
+    "actor_id": {
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "actor_name": {
+      "title": "Actor Name",
+      "type": "string"
+    },
+    "frame_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Frame Id"
+    },
+    "side": {
+      "enum": [
+        "players",
+        "hostiles",
+        "neutral"
+      ],
+      "title": "Side",
+      "type": "string"
+    },
+    "is_player_controlled": {
+      "title": "Is Player Controlled",
+      "type": "boolean"
+    },
+    "economy": {
+      "$ref": "#/$defs/ActionEconomyBrief"
+    }
+  },
+  "required": [
+    "actor_id",
+    "actor_name",
+    "side",
+    "is_player_controlled",
+    "economy"
+  ],
+  "title": "CurrentActorState",
+  "type": "object"
+}
